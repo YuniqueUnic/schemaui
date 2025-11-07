@@ -1,0 +1,39 @@
+[package]
+name = "schemaui"
+authors = ["unic <yuniqueunic@gmail.com>"]
+version = "0.1.0"
+edition = "2024"
+keywords = ["configuration", "schema", "filesystem", "cross-platform"]
+repository = "https://github.com/yuniqueunic/schemaui"
+documentation = "https://docs.rs/schemaui"
+readme = "README.md"
+
+[features]
+default = ["tui", "yaml"]
+full = ["all_formats", "tui", "web"]
+tui = []
+web = []
+
+all_formats = ["json", "yaml", "toml"]
+json = []
+yaml = []
+toml = []
+
+compile_time = []
+
+
+[dependencies]
+anyhow = "1"
+schemars = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+
+
+# For serialization formats
+serde_json = "1"
+serde_yaml = "0.9"
+toml = "0.9"
+
+[package.metadata.release]
+pre-release-replacements = [
+    { file = "README.md", search = "schemaui = \"[0-9]+\\.[0-9]+\\.[0-9]+[^\"]*\"", replace = "schemaui = \"{{version}}\"" },
+]
