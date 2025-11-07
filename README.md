@@ -1,4 +1,8 @@
-WIP:
+## schemaui
+
+A library for generating a TUI/Web from json schema for better configuration.
+
+### WIP:
 
 ```bash
 cargo add schemaui
@@ -21,3 +25,17 @@ More POC:
 1. parse json schema at runtime and generate a TUI/Web
 2. parse json schema at compile time Then generate the code for TUI/Web, expose
    nessessary APIs for runtime.
+
+### License
+
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
+  http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+### Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

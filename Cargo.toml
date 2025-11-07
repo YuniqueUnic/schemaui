@@ -6,6 +6,8 @@ edition = "2024"
 keywords = ["configuration", "schema", "filesystem", "cross-platform"]
 repository = "https://github.com/yuniqueunic/schemaui"
 documentation = "https://docs.rs/schemaui"
+description = "A Rust library for generating TUI and Web UIs from JSON Schemas for configuration management."
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 
 [features]
