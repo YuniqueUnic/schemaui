@@ -10,7 +10,7 @@ cargo add schemaui
 
 ```toml
 [dependencies]
-schemaui = "0.1.0"
+schemaui = "0.1.1"
 ```
 
 1. Core: Using json schema to render a TUI/Web for configuration
