@@ -1,12 +1,12 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs, Wrap},
 };
 
-use crate::state::{FieldState, FormState};
+use crate::form::{FieldState, FormState};
 
 pub struct UiContext<'a> {
     pub form_state: &'a FormState,
@@ -148,6 +148,8 @@ fn render_fields(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enab
     frame.render_stateful_widget(list, field_area, &mut list_state);
 
     if enable_cursor {
+        // TODO: 当前的 cursor 渲染的位置不对, 并没有在 content 的实际输入框的尾部.
+        // 当前的位置是在 content 的顶部和中间部位. 需要修复
         if let Some(cursor) = cursor_hint {
             let line = cursor.line_offset.min(u16::MAX as usize) as u16;
             let cursor_y = field_area.y.saturating_add(line);

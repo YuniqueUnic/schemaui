@@ -1,11 +1,11 @@
 #![deny(rust_2018_idioms)]
 
-mod runtime;
-mod schema;
-mod state;
-mod ui;
+mod app;
+mod domain;
+mod form;
+mod presentation;
 
-pub use runtime::{SchemaUI, UiOptions};
+pub use app::{SchemaUI, UiOptions};
 
 pub mod prelude {
     pub use super::{SchemaUI, UiOptions};

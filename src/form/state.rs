@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde_json::{Map, Value};
 
-use crate::schema::{FieldKind, FieldSchema, FormSchema, FormSection};
+use crate::domain::{FieldKind, FieldSchema, FormSchema, FormSection};
 
 #[derive(Debug, Clone)]
 pub struct SectionState {
