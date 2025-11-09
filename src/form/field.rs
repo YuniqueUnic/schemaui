@@ -13,6 +13,10 @@ pub enum FieldValue {
         options: Vec<String>,
         selected: usize,
     },
+    MultiSelect {
+        options: Vec<String>,
+        selected: Vec<bool>,
+    },
     Array(String),
 }
 
@@ -54,15 +58,41 @@ impl FieldState {
                     selected,
                 }
             }
-            FieldKind::Array(_) => {
-                let default = schema
-                    .default
-                    .as_ref()
-                    .and_then(|value| value.as_array())
-                    .map(|items| array_to_string(items))
-                    .unwrap_or_default();
-                FieldValue::Array(default)
-            }
+            FieldKind::Array(inner) => match inner.as_ref() {
+                FieldKind::Enum(options) => {
+                    let defaults = schema
+                        .default
+                        .as_ref()
+                        .and_then(|value| value.as_array())
+                        .map(|items| {
+                            items
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .map(str::to_string)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    let mut selected = vec![false; options.len()];
+                    for (idx, option) in options.iter().enumerate() {
+                        if defaults.iter().any(|value| value == option) {
+                            selected[idx] = true;
+                        }
+                    }
+                    FieldValue::MultiSelect {
+                        options: options.clone(),
+                        selected,
+                    }
+                }
+                _ => {
+                    let default = schema
+                        .default
+                        .as_ref()
+                        .and_then(|value| value.as_array())
+                        .map(|items| array_to_string(items))
+                        .unwrap_or_default();
+                    FieldValue::Array(default)
+                }
+            },
         };
 
         FieldState {
@@ -75,7 +105,44 @@ impl FieldState {
 
     pub fn handle_key(&mut self, key: &KeyEvent) -> bool {
         match &mut self.value {
-            FieldValue::Text(buffer) | FieldValue::Array(buffer) => match key.code {
+            FieldValue::Text(buffer) => match key.code {
+                KeyCode::Left => {
+                    if adjust_numeric_value(buffer, &self.schema.kind, -1) {
+                        self.after_edit();
+                        true
+                    } else {
+                        false
+                    }
+                }
+                KeyCode::Right => {
+                    if adjust_numeric_value(buffer, &self.schema.kind, 1) {
+                        self.after_edit();
+                        true
+                    } else {
+                        false
+                    }
+                }
+                KeyCode::Char(c) => {
+                    if key.modifiers.contains(KeyModifiers::CONTROL) {
+                        return false;
+                    }
+                    buffer.push(c);
+                    self.after_edit();
+                    true
+                }
+                KeyCode::Backspace => {
+                    buffer.pop();
+                    self.after_edit();
+                    true
+                }
+                KeyCode::Delete => {
+                    buffer.clear();
+                    self.after_edit();
+                    true
+                }
+                _ => false,
+            },
+            FieldValue::Array(buffer) => match key.code {
                 KeyCode::Char(c) => {
                     if key.modifiers.contains(KeyModifiers::CONTROL) {
                         return false;
@@ -97,7 +164,7 @@ impl FieldState {
                 _ => false,
             },
             FieldValue::Bool(value) => match key.code {
-                KeyCode::Char(' ') => {
+                KeyCode::Char(' ') | KeyCode::Left | KeyCode::Right => {
                     *value = !*value;
                     self.after_edit();
                     true
@@ -123,6 +190,7 @@ impl FieldState {
                 }
                 _ => false,
             },
+            FieldValue::MultiSelect { .. } => false,
         }
     }
 
@@ -148,6 +216,31 @@ impl FieldState {
         }
     }
 
+    pub fn set_multi_selection(&mut self, selections: &[bool]) {
+        if let FieldValue::MultiSelect { selected, .. } = &mut self.value {
+            if selected.len() == selections.len() && selected != selections {
+                selected.clone_from_slice(selections);
+                self.after_edit();
+            }
+        }
+    }
+
+    pub fn multi_states(&self) -> Option<&[bool]> {
+        if let FieldValue::MultiSelect { selected, .. } = &self.value {
+            Some(selected)
+        } else {
+            None
+        }
+    }
+
+    pub fn multi_options(&self) -> Option<&[String]> {
+        if let FieldValue::MultiSelect { options, .. } = &self.value {
+            Some(options)
+        } else {
+            None
+        }
+    }
+
     pub fn display_value(&self) -> String {
         match &self.value {
             FieldValue::Text(text) => text.clone(),
@@ -156,6 +249,18 @@ impl FieldState {
                 .get(*selected)
                 .cloned()
                 .unwrap_or_else(|| "<none>".to_string()),
+            FieldValue::MultiSelect { options, selected } => {
+                let values = options
+                    .iter()
+                    .zip(selected.iter())
+                    .filter_map(|(option, flag)| if *flag { Some(option.clone()) } else { None })
+                    .collect::<Vec<_>>();
+                if values.is_empty() {
+                    "[]".to_string()
+                } else {
+                    format!("[{}]", values.join(", "))
+                }
+            }
             FieldValue::Array(buffer) => format!("[{}]", buffer.trim()),
         }
     }
@@ -169,6 +274,20 @@ impl FieldState {
             (FieldKind::Enum(options), FieldValue::Enum { selected, .. }) => {
                 let value = options.get(*selected).cloned().unwrap_or_default();
                 Ok(Some(Value::String(value)))
+            }
+            (FieldKind::Array(_), FieldValue::MultiSelect { options, selected }) => {
+                let values = options
+                    .iter()
+                    .zip(selected.iter())
+                    .filter_map(|(option, flag)| {
+                        if *flag {
+                            Some(Value::String(option.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                Ok(Some(Value::Array(values)))
             }
             (FieldKind::Array(inner), FieldValue::Array(buffer)) => {
                 array_value(buffer, inner.as_ref(), &self.schema)
@@ -329,4 +448,21 @@ fn array_to_string(items: &[Value]) -> String {
         .map(value_to_string)
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+fn adjust_numeric_value(buffer: &mut String, kind: &FieldKind, delta: i64) -> bool {
+    match kind {
+        FieldKind::Integer => {
+            let current = buffer.trim().parse::<i64>().unwrap_or(0);
+            let next = current.saturating_add(delta);
+            *buffer = next.to_string();
+            true
+        }
+        FieldKind::Number => {
+            let current = buffer.trim().parse::<f64>().unwrap_or(0.0);
+            *buffer = (current + delta as f64).to_string();
+            true
+        }
+        _ => false,
+    }
 }

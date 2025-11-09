@@ -4,6 +4,7 @@ use jsonschema::Validator;
 use serde_json::Value;
 
 use crate::{
+    domain::FieldKind,
     form::FormState,
     presentation::{self, UiContext},
 };
@@ -43,11 +44,19 @@ impl App {
                 }
                 KeyCode::Up => popup.select_previous(),
                 KeyCode::Down => popup.select_next(),
+                KeyCode::Char(' ') if popup.is_multi() => {
+                    popup.toggle_current();
+                    return Ok(true);
+                }
                 KeyCode::Enter => {
-                    let selection = popup.selection();
-                    let pointer = popup.pointer().to_string();
-                    self.apply_popup_selection(&pointer, selection);
+                    let (pointer, selection, multi_flags) = {
+                        let pointer = popup.pointer().to_string();
+                        let selection = popup.selection();
+                        let multi_flags = popup.active().map(|flags| flags.to_vec());
+                        (pointer, selection, multi_flags)
+                    };
                     self.popup = None;
+                    self.apply_popup_selection_data(&pointer, selection, multi_flags);
                     if self.options.auto_validate {
                         self.run_validation(false);
                     }
@@ -181,16 +190,34 @@ impl App {
             return false;
         };
         if let Some(popup) = PopupState::from_field(field) {
+            let message = if popup.is_multi() {
+                "Use ↑/↓ to move, Space to toggle, Enter to apply"
+            } else {
+                "Use ↑/↓ and Enter to choose"
+            };
+            self.status.set_raw(message);
             self.popup = Some(popup);
-            self.status.set_raw("Use ↑/↓ and Enter to choose");
             return true;
         }
         false
     }
 
-    fn apply_popup_selection(&mut self, pointer: &str, selection: usize) {
+    fn apply_popup_selection_data(
+        &mut self,
+        pointer: &str,
+        selection: usize,
+        multi: Option<Vec<bool>>,
+    ) {
         if let Some(field) = self.form_state.field_mut_by_pointer(pointer) {
-            PopupState::apply_selection(field, selection);
+            if let Some(flags) = multi {
+                field.set_multi_selection(&flags);
+            } else {
+                match &field.schema.kind {
+                    FieldKind::Boolean => field.set_bool(selection == 0),
+                    FieldKind::Enum(_) => field.set_enum_selected(selection),
+                    _ => {}
+                }
+            }
         }
     }
 

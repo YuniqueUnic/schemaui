@@ -4,28 +4,44 @@ use crate::{
 };
 
 pub(crate) struct PopupState {
-    pub(crate) field_pointer: String,
+    field_pointer: String,
     title: String,
     options: Vec<String>,
     selected: usize,
+    multi: bool,
+    toggles: Vec<bool>,
 }
 
 impl PopupState {
     pub(crate) fn from_field(field: &FieldState) -> Option<Self> {
-        match &field.value {
-            FieldValue::Bool(current) => Some(Self {
+        match (field.multi_options(), field.multi_states()) {
+            (Some(options), Some(states)) => Some(Self {
                 field_pointer: field.schema.pointer.clone(),
                 title: field.schema.display_label(),
-                options: vec!["true".to_string(), "false".to_string()],
-                selected: if *current { 0 } else { 1 },
+                options: options.to_vec(),
+                selected: 0,
+                multi: true,
+                toggles: states.to_vec(),
             }),
-            FieldValue::Enum { options, selected } => Some(Self {
-                field_pointer: field.schema.pointer.clone(),
-                title: field.schema.display_label(),
-                options: options.clone(),
-                selected: *selected,
-            }),
-            _ => None,
+            _ => match &field.value {
+                FieldValue::Bool(current) => Some(Self {
+                    field_pointer: field.schema.pointer.clone(),
+                    title: field.schema.display_label(),
+                    options: vec!["true".to_string(), "false".to_string()],
+                    selected: if *current { 0 } else { 1 },
+                    multi: false,
+                    toggles: Vec::new(),
+                }),
+                FieldValue::Enum { options, selected } => Some(Self {
+                    field_pointer: field.schema.pointer.clone(),
+                    title: field.schema.display_label(),
+                    options: options.clone(),
+                    selected: *selected,
+                    multi: false,
+                    toggles: Vec::new(),
+                }),
+                _ => None,
+            },
         }
     }
 
@@ -55,19 +71,34 @@ impl PopupState {
         &self.field_pointer
     }
 
+    pub(crate) fn is_multi(&self) -> bool {
+        self.multi
+    }
+
+    pub(crate) fn toggle_current(&mut self) {
+        if !self.multi {
+            return;
+        }
+        if let Some(flag) = self.toggles.get_mut(self.selected) {
+            *flag = !*flag;
+        }
+    }
+
+    pub(crate) fn active(&self) -> Option<&[bool]> {
+        if self.multi {
+            Some(&self.toggles)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn as_render(&self) -> PopupRender<'_> {
         PopupRender {
             title: &self.title,
             options: &self.options,
             selected: self.selected,
-        }
-    }
-
-    pub(crate) fn apply_selection(field: &mut FieldState, selection: usize) {
-        match &field.value {
-            FieldValue::Bool(_) => field.set_bool(selection == 0),
-            FieldValue::Enum { .. } => field.set_enum_selected(selection),
-            _ => {}
+            multi: self.multi,
+            active: self.active(),
         }
     }
 }

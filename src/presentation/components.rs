@@ -6,7 +6,10 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs, Wrap},
 };
 
-use crate::form::{FieldState, FormState};
+use crate::{
+    domain::FieldKind,
+    form::{FieldState, FormState},
+};
 
 use super::{PopupRender, UiContext};
 
@@ -90,7 +93,20 @@ pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
     let items: Vec<ListItem<'static>> = popup
         .options
         .iter()
-        .map(|option| ListItem::new(option.clone()))
+        .enumerate()
+        .map(|(index, option)| {
+            let label = if popup.multi {
+                let mark = popup
+                    .active
+                    .and_then(|flags| flags.get(index))
+                    .copied()
+                    .unwrap_or(false);
+                format!("[{}] {}", if mark { "x" } else { " " }, option)
+            } else {
+                option.clone()
+            };
+            ListItem::new(label)
+        })
         .collect();
     let mut state = ListState::default();
     let selected = popup.selected.min(popup.options.len().saturating_sub(1));
@@ -160,6 +176,7 @@ fn render_fields(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enab
         return;
     }
 
+    let content_width = field_area.width.saturating_sub(4);
     let mut items = Vec::with_capacity(section.fields.len());
     let mut cursor_hint: Option<CursorHint> = None;
     let mut line_offset = 0usize;
@@ -168,7 +185,7 @@ fn render_fields(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enab
         .min(section.fields.len().saturating_sub(1));
 
     for (idx, field) in section.fields.iter().enumerate() {
-        let render = build_field_render(field, idx == selected_index);
+        let render = build_field_render(field, idx == selected_index, content_width);
         let line_count = render.lines.len();
         if cursor_hint.is_none() {
             if let Some(mut hint) = render.cursor_hint {
@@ -198,11 +215,16 @@ fn render_fields(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enab
 
     if enable_cursor {
         if let Some(cursor) = cursor_hint {
-            let line = cursor.line_offset.min(u16::MAX as usize) as u16;
-            let cursor_y = field_area.y.saturating_add(line);
-            let cursor_x = field_area
-                .x
-                .saturating_add(cursor.column_offset.saturating_add(cursor.value_width));
+            let inner_y = field_area.y.saturating_add(1);
+            let inner_x = field_area.x.saturating_add(1);
+            let line = cursor
+                .line_offset
+                .min(field_area.height.saturating_sub(2) as usize) as u16;
+            let cursor_y = inner_y.saturating_add(line);
+            let cursor_x = inner_x
+                .saturating_add(2)
+                .saturating_add(cursor.column_offset)
+                .saturating_add(cursor.value_width);
             frame.set_cursor_position((cursor_x, cursor_y));
         }
     }
@@ -240,7 +262,39 @@ struct CursorHint {
     value_width: u16,
 }
 
-fn build_field_render(field: &FieldState, is_selected: bool) -> FieldRender {
+fn field_type_label(kind: &FieldKind) -> String {
+    match kind {
+        FieldKind::String => "string".to_string(),
+        FieldKind::Integer => "integer".to_string(),
+        FieldKind::Number => "number".to_string(),
+        FieldKind::Boolean => "boolean".to_string(),
+        FieldKind::Enum(_) => "enum".to_string(),
+        FieldKind::Array(inner) => format!("{}[]", field_type_label(inner)),
+    }
+}
+
+fn clamp_value(value: &str, max_chars: usize) -> (String, u16) {
+    if max_chars == 0 {
+        return (String::new(), 0);
+    }
+    let mut result = String::new();
+    let mut char_count = 0usize;
+    for ch in value.chars() {
+        if char_count + 1 > max_chars {
+            break;
+        }
+        result.push(ch);
+        char_count += 1;
+    }
+    if value.chars().count() > char_count && char_count > 1 {
+        result.pop();
+        result.push('…');
+    }
+    let width = result.chars().count() as u16;
+    (result, width)
+}
+
+fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> FieldRender {
     let mut lines = Vec::new();
     let mut label = field.schema.display_label();
     if field.schema.required {
@@ -258,12 +312,13 @@ fn build_field_render(field: &FieldState, is_selected: bool) -> FieldRender {
     };
     lines.push(Line::from(Span::styled(label, label_style)));
 
-    let value_display = field.display_value();
+    let clamp_width = max_width.max(4) as usize;
+    let (visible_text, visible_width) = clamp_value(&field.display_value(), clamp_width);
     let mut cursor_hint = None;
 
     if is_selected {
-        let visible_width = value_display.chars().count() + 2;
-        let border_line = "─".repeat(visible_width);
+        let border_width = visible_width as usize + 2;
+        let border_line = "─".repeat(border_width);
         let border_style = Style::default().fg(Color::Yellow);
         let value_style = Style::default()
             .fg(Color::White)
@@ -276,7 +331,7 @@ fn build_field_render(field: &FieldState, is_selected: bool) -> FieldRender {
         let value_line_index = lines.len();
         lines.push(Line::from(vec![
             Span::styled("│ ", border_style),
-            Span::styled(value_display.clone(), value_style),
+            Span::styled(visible_text.clone(), value_style),
             Span::styled(" │", border_style),
         ]));
         lines.push(Line::from(Span::styled(
@@ -284,7 +339,7 @@ fn build_field_render(field: &FieldState, is_selected: bool) -> FieldRender {
             border_style,
         )));
 
-        let value_width = value_display.chars().count().min(u16::MAX as usize) as u16;
+        let value_width = visible_width;
         cursor_hint = Some(CursorHint {
             line_offset: value_line_index,
             column_offset: 2,
@@ -293,21 +348,24 @@ fn build_field_render(field: &FieldState, is_selected: bool) -> FieldRender {
     } else {
         lines.push(Line::from(vec![
             Span::raw("  "),
-            Span::styled(value_display.clone(), Style::default().fg(Color::White)),
+            Span::styled(visible_text.clone(), Style::default().fg(Color::White)),
         ]));
     }
 
-    if let Some(description) = &field.schema.description {
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(
-                description.clone(),
-                Style::default()
-                    .fg(Color::Gray)
-                    .add_modifier(Modifier::ITALIC),
-            ),
-        ]));
-    }
+    let type_label = field_type_label(&field.schema.kind);
+    let desc_text = match &field.schema.description {
+        Some(desc) if !desc.is_empty() => format!("{type_label} | {desc}"),
+        _ => type_label,
+    };
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(
+            desc_text,
+            Style::default()
+                .fg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        ),
+    ]));
 
     if let Some(error) = &field.error {
         lines.push(Line::from(Span::styled(
