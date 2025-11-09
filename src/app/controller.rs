@@ -1,22 +1,17 @@
-use std::io::{self, Stdout};
-use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
-};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use jsonschema::{Validator, validator_for};
-use ratatui::{Terminal, backend::CrosstermBackend};
 use serde_json::Value;
 
 use crate::{
-    schema::parse_form_schema,
-    state::{FieldState, FieldValue, FormState},
-    ui::{self, PopupRender, UiContext},
+    domain::parse_form_schema,
+    form::{FieldState, FieldValue, FormState},
+    presentation::{self, PopupRender, UiContext},
 };
+
+use super::terminal::TerminalGuard;
 
 const HELP_TEXT: &str =
     "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+S save • Ctrl+Q quit";
@@ -222,7 +217,7 @@ impl App {
             None
         };
 
-        ui::draw(
+        presentation::draw(
             frame,
             UiContext {
                 form_state: &self.form_state,
@@ -409,42 +404,5 @@ impl App {
                 ValidationResult::Invalid
             }
         }
-    }
-}
-
-struct TerminalGuard {
-    terminal: Terminal<CrosstermBackend<Stdout>>,
-}
-
-impl TerminalGuard {
-    fn new() -> Result<Self> {
-        enable_raw_mode().context("failed to enable raw mode")?;
-        let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
-        let backend = CrosstermBackend::new(stdout);
-        let terminal = Terminal::new(backend).context("failed to initialize terminal")?;
-        Ok(Self { terminal })
-    }
-}
-
-impl Drop for TerminalGuard {
-    fn drop(&mut self) {
-        let _ = disable_raw_mode();
-        let _ = execute!(self.terminal.backend_mut(), LeaveAlternateScreen);
-        let _ = self.terminal.show_cursor();
-    }
-}
-
-impl Deref for TerminalGuard {
-    type Target = Terminal<CrosstermBackend<Stdout>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.terminal
-    }
-}
-
-impl DerefMut for TerminalGuard {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.terminal
     }
 }

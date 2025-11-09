@@ -26,6 +26,10 @@ fn main() -> AppResult<()> {
                 "type": "object",
                 "description": "Log configuration",
                 "properties": {
+                     "enable": {
+                        "type": "boolean",
+                        "default": "false"
+                    },
                     "level": {
                         "type": "string",
                         "enum": ["debug", "info", "warn", "error"],
