@@ -174,6 +174,17 @@ impl FormState {
         false
     }
 
+    pub fn field_mut_by_pointer(&mut self, pointer: &str) -> Option<&mut FieldState> {
+        for section in &mut self.sections {
+            for field in &mut section.fields {
+                if field.schema.pointer == pointer {
+                    return Some(field);
+                }
+            }
+        }
+        None
+    }
+
     pub fn is_dirty(&self) -> bool {
         self.sections
             .iter()
@@ -272,7 +283,7 @@ impl FieldState {
                 _ => false,
             },
             FieldValue::Bool(value) => match key.code {
-                KeyCode::Char(' ') | KeyCode::Enter => {
+                KeyCode::Char(' ') => {
                     *value = !*value;
                     self.after_edit();
                     true
@@ -289,7 +300,7 @@ impl FieldState {
                     self.after_edit();
                     true
                 }
-                KeyCode::Down | KeyCode::Right | KeyCode::Enter => {
+                KeyCode::Down | KeyCode::Right => {
                     if !options.is_empty() {
                         *selected = (*selected + 1) % options.len();
                     }
@@ -298,6 +309,28 @@ impl FieldState {
                 }
                 _ => false,
             },
+        }
+    }
+
+    pub fn set_bool(&mut self, value: bool) {
+        if let FieldValue::Bool(current) = &mut self.value {
+            if *current != value {
+                *current = value;
+                self.after_edit();
+            }
+        }
+    }
+
+    pub fn set_enum_selected(&mut self, index: usize) {
+        if let FieldValue::Enum { options, selected } = &mut self.value {
+            if options.is_empty() {
+                return;
+            }
+            let bounded = index.min(options.len() - 1);
+            if *selected != bounded {
+                *selected = bounded;
+                self.after_edit();
+            }
         }
     }
 
