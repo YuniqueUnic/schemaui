@@ -34,6 +34,7 @@ impl FieldState {
             FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Json => {
                 FieldValue::Text(default_text(&schema))
             }
+            FieldKind::Composite(_) => FieldValue::Text(default_text(&schema)),
             FieldKind::Boolean => {
                 let default = schema
                     .default
@@ -83,6 +84,7 @@ impl FieldState {
                         selected,
                     }
                 }
+                FieldKind::Composite(_) => FieldValue::Array(default_text(&schema)),
                 _ => {
                     let default = schema
                         .default
@@ -293,6 +295,7 @@ impl FieldState {
             (FieldKind::Array(inner), FieldValue::Array(buffer)) => {
                 array_value(buffer, inner.as_ref(), &self.schema)
             }
+            (FieldKind::Composite(_), FieldValue::Text(text)) => string_value(text, &self.schema),
             _ => Ok(None),
         }
     }
@@ -408,7 +411,7 @@ fn array_value(
                     });
                 }
             }
-            FieldKind::Json => Value::String(item.to_string()),
+            FieldKind::Json | FieldKind::Composite(_) => Value::String(item.to_string()),
             FieldKind::Array(_) => {
                 return Err(FieldCoercionError {
                     pointer: schema.pointer.clone(),
