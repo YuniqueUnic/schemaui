@@ -34,6 +34,7 @@ schemars = { version = "0.8.22", features = ["preserve_order"] }
 serde = { version = "1", features = ["derive"] }
 indexmap = "2"
 percent-encoding = "2"
+textwrap = "0.16"
 
 # For serialization formats
 serde_json = "1"

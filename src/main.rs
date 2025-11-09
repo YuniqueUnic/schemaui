@@ -127,31 +127,41 @@ fn main() -> AppResult<()> {
           ]
         },
         "auth": {
-          "type": "object",
-          "description": "Authentication and authorization settings.",
-          "properties": {
-            "provider": {
-              "type": "string",
-              "enum": ["jwt", "oauth2", "basic"],
-              "default": "jwt"
-            },
-            "jwtSecret": {
-              "type": "string",
-              "minLength": 32,
-              "description": "Secret key for signing JWT tokens. Required if provider is 'jwt'."
-            },
-            "oauth2": {
-              "type": "object",
+          "title": "Authentication Strategy",
+          "description": "Configuration for the authentication mechanism. Only one strategy can be active.",
+          "oneOf": [
+            {
+              "title": "JWT Authentication",
+              "required": ["provider", "jwtSecret"],
               "properties": {
-                "issuerUrl": { "type": "string", "format": "uri" },
-                "clientId": { "type": "string" },
-                "clientSecret": { "type": "string" }
+                "provider": { "const": "jwt" },
+                "jwtSecret": { "type": "string", "minLength": 32, "description": "Secret key for signing JWT tokens." }
+              }
+            },
+            {
+              "title": "OAuth2 Authentication",
+              "required": ["provider", "oauth2"],
+              "properties": {
+                "provider": { "const": "oauth2" },
+                "oauth2": {
+                  "type": "object",
+                  "required": ["issuerUrl", "clientId"],
+                  "properties": {
+                    "issuerUrl": { "type": "string", "format": "uri" },
+                    "clientId": { "type": "string" },
+                    "clientSecret": { "type": "string" }
+                  }
+                }
+              }
+            },
+            {
+              "title": "Basic Authentication",
+              "required": ["provider"],
+              "properties": {
+                "provider": { "const": "basic" }
               }
             }
-          },
-          "dependencies": {
-            "jwtSecret": ["provider"]
-          }
+          ]
         },
         "logging": {
           "type": "object",
@@ -189,31 +199,31 @@ fn main() -> AppResult<()> {
         },
         "featureFlags": {
           "type": "object",
-          "description": "Flags to enable/disable experimental or conditional features.",
-          "properties": {
-            "enableNewDashboard": {
-              "type": "boolean",
-              "default": false
-            },
-            "betaApiAccess": {
-              "type": ["boolean", "null"],
-              "description": "Grants access to the beta API. 'null' means the feature is controlled by a remote service."
-            },
-            "allowedOrigins": {
-              "type": "array",
-              "description": "List of allowed origins for CORS.",
-              "items": {
-                "type": "string",
-                "format": "uri"
+          "description": "A dynamic set of feature flags. The key is the flag's name, and the value can be a boolean, a number (for percentage rollouts), or an array of strings (for whitelists).",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "A simple on/off switch."
               },
-              "default": []
-            }
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "A percentage for a staged rollout (0-100)."
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "A list of user IDs or identifiers to whitelist."
+              }
+            ]
           }
-        },
-
+        }
       }
-    }
-    );
+    });
 
     let value = SchemaUI::new(schema).with_title("SchemaUI Demo").run()?;
 
