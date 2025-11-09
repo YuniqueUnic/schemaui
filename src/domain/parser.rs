@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use indexmap::IndexMap;
+use schemars::schema::{
+    ArrayValidation, InstanceType, ObjectValidation, RootSchema, Schema, SchemaObject, SingleOrVec,
+};
 use serde_json::Value;
 
 use super::schema::{FieldKind, FieldSchema, FormSchema, FormSection};
@@ -13,18 +16,22 @@ struct SectionInfo {
     description: Option<String>,
 }
 
-pub fn parse_form_schema(schema: &Value) -> Result<FormSchema> {
-    ensure_object(schema)?;
-    let schema_type = read_type(schema).unwrap_or_else(|| "object".to_string());
-    if schema_type != "object" {
-        bail!("root schema must be an object, found {schema_type}");
-    }
+pub fn parse_form_schema(schema_value: &Value) -> Result<FormSchema> {
+    let root: RootSchema = serde_json::from_value(schema_value.clone())
+        .context("schema is not a valid JSON Schema document")?;
+    let context = SchemaContext::new(&root);
+    let root_object = context
+        .root_object()
+        .cloned()
+        .ok_or_else(|| anyhow!("root schema must be an object"))?;
+    ensure_object_schema(&root_object)?;
 
     let mut section_meta: IndexMap<String, SectionInfo> = IndexMap::new();
     let mut section_fields: IndexMap<String, Vec<FieldSchema>> = IndexMap::new();
 
     parse_object_fields(
-        schema,
+        &context,
+        &root_object,
         Vec::new(),
         None,
         &mut section_meta,
@@ -42,48 +49,62 @@ pub fn parse_form_schema(schema: &Value) -> Result<FormSchema> {
         .collect();
 
     Ok(FormSchema {
-        title: schema
-            .get("title")
-            .and_then(|v| v.as_str())
-            .map(str::to_string),
-        description: schema
-            .get("description")
-            .and_then(|v| v.as_str())
-            .map(str::to_string),
+        title: root_object.metadata.as_ref().and_then(|m| m.title.clone()),
+        description: root_object
+            .metadata
+            .as_ref()
+            .and_then(|m| m.description.clone()),
         sections,
     })
 }
 
 fn parse_object_fields(
-    schema: &Value,
+    context: &SchemaContext<'_>,
+    schema: &SchemaObject,
     path_prefix: Vec<String>,
     parent_section: Option<SectionInfo>,
     meta: &mut IndexMap<String, SectionInfo>,
     slots: &mut IndexMap<String, Vec<FieldSchema>>,
 ) -> Result<()> {
-    let properties = schema
-        .get("properties")
-        .and_then(Value::as_object)
+    let object = schema
+        .object
+        .as_ref()
         .context("object schema must define properties")?;
-    let required = required_set(schema);
+    let required = required_set(object);
 
-    for (name, value) in properties {
+    for (name, property_schema) in &object.properties {
         let mut next_path = path_prefix.clone();
         next_path.push(name.clone());
-        if is_object(value) {
-            let next_section = section_info_for_object(value, name, parent_section.as_ref());
+        let resolved = context.resolve_schema(property_schema)?;
+
+        if is_object_schema(&resolved) {
+            let next_section = section_info_for_object(&resolved, name, parent_section.as_ref());
             meta.entry(next_section.id.clone())
                 .or_insert_with(|| next_section.clone());
             slots.entry(next_section.id.clone()).or_default();
-            parse_object_fields(value, next_path, Some(next_section), meta, slots)?;
+            parse_object_fields(
+                context,
+                &resolved,
+                next_path,
+                Some(next_section),
+                meta,
+                slots,
+            )?;
             continue;
         }
 
-        let section = section_info_for_field(value, &next_path, parent_section.as_ref());
+        let section = section_info_for_field(&resolved, &next_path, parent_section.as_ref());
         meta.entry(section.id.clone())
             .or_insert_with(|| section.clone());
 
-        let field = build_field_schema(value, name, next_path, section, required.contains(name))?;
+        let field = build_field_schema(
+            context,
+            &resolved,
+            name,
+            next_path,
+            section,
+            required.contains(name),
+        )?;
         slots
             .entry(field.section_id.clone())
             .or_default()
@@ -94,43 +115,43 @@ fn parse_object_fields(
 }
 
 fn build_field_schema(
-    value: &Value,
+    context: &SchemaContext<'_>,
+    schema: &SchemaObject,
     name: &str,
     path: Vec<String>,
     section: SectionInfo,
     required: bool,
 ) -> Result<FieldSchema> {
-    let metadata = metadata_map(value);
-    let kind =
-        detect_kind(value).with_context(|| format!("unsupported schema for field '{name}'"))?;
-    let title = value
-        .get("title")
-        .and_then(|v| v.as_str())
-        .map(str::to_string)
+    let metadata = metadata_map(schema);
+    let kind = detect_kind(context, schema)
+        .with_context(|| format!("unsupported schema for field '{name}'"))?;
+    let title = schema
+        .metadata
+        .as_ref()
+        .and_then(|m| m.title.clone())
         .unwrap_or_else(|| prettify_label(name));
+    let default = schema.metadata.as_ref().and_then(|m| m.default.clone());
+    let description = schema.metadata.as_ref().and_then(|m| m.description.clone());
 
     Ok(FieldSchema {
         name: name.to_string(),
         path: path.clone(),
         pointer: to_pointer(&path),
         title,
-        description: value
-            .get("description")
-            .and_then(|v| v.as_str())
-            .map(str::to_string),
+        description,
         section_id: section.id,
         kind,
         required,
-        default: value.get("default").cloned(),
+        default,
         metadata,
     })
 }
 
-fn detect_kind(value: &Value) -> Result<FieldKind> {
-    if let Some(options) = value.get("enum").and_then(Value::as_array) {
+fn detect_kind(context: &SchemaContext<'_>, schema: &SchemaObject) -> Result<FieldKind> {
+    if let Some(options) = &schema.enum_values {
         let enum_values = options
             .iter()
-            .map(|v| match v {
+            .map(|value| match value {
                 Value::String(s) => Ok(s.clone()),
                 other => Ok(other.to_string()),
             })
@@ -138,46 +159,59 @@ fn detect_kind(value: &Value) -> Result<FieldKind> {
         return Ok(FieldKind::Enum(enum_values));
     }
 
-    match read_type(value).as_deref() {
-        Some("string") | None => Ok(FieldKind::String),
-        Some("integer") => Ok(FieldKind::Integer),
-        Some("number") => Ok(FieldKind::Number),
-        Some("boolean") => Ok(FieldKind::Boolean),
-        Some("array") => {
-            let items = value
-                .get("items")
+    match instance_type(schema) {
+        Some(InstanceType::String) | None => Ok(FieldKind::String),
+        Some(InstanceType::Integer) => Ok(FieldKind::Integer),
+        Some(InstanceType::Number) => Ok(FieldKind::Number),
+        Some(InstanceType::Boolean) => Ok(FieldKind::Boolean),
+        Some(InstanceType::Array) => {
+            let array = schema
+                .array
+                .as_ref()
                 .context("array schema must define items")?;
-            let inner = detect_kind(items)?;
-            match inner {
+            let inner = resolve_array_items(context, array)?;
+            let inner_kind = detect_kind(context, &inner)?;
+            match inner_kind {
                 FieldKind::String
                 | FieldKind::Integer
                 | FieldKind::Number
                 | FieldKind::Boolean
-                | FieldKind::Enum(_) => Ok(FieldKind::Array(Box::new(inner))),
+                | FieldKind::Enum(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
                 FieldKind::Array(_) => bail!("nested arrays are not supported"),
             }
         }
-        Some(other) => bail!("unsupported field type {other}"),
+        Some(other) => bail!("unsupported field type {other:?}"),
+    }
+}
+
+fn resolve_array_items(
+    context: &SchemaContext<'_>,
+    array: &ArrayValidation,
+) -> Result<SchemaObject> {
+    let items = array
+        .items
+        .as_ref()
+        .context("array schema must define items")?;
+    match items {
+        SingleOrVec::Single(schema) => context.resolve_schema(schema),
+        SingleOrVec::Vec(list) => match list.first() {
+            Some(first) => context.resolve_schema(first),
+            None => bail!("tuple arrays without items are not supported"),
+        },
     }
 }
 
 fn section_info_for_object(
-    schema: &Value,
+    schema: &SchemaObject,
     name: &str,
     parent: Option<&SectionInfo>,
 ) -> SectionInfo {
-    if let Some(group) = schema.get("x-group").and_then(Value::as_str) {
-        let title = schema
-            .get("x-group-title")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .unwrap_or_else(|| prettify_label(group));
-        let description = schema
-            .get("x-group-description")
-            .and_then(Value::as_str)
-            .map(str::to_string);
+    if let Some(group) = extension_string(schema, "x-group") {
+        let title =
+            extension_string(schema, "x-group-title").unwrap_or_else(|| prettify_label(&group));
+        let description = extension_string(schema, "x-group-description");
         return SectionInfo {
-            id: group.to_string(),
+            id: group,
             title,
             description,
         };
@@ -186,35 +220,29 @@ fn section_info_for_object(
     SectionInfo {
         id: name.to_string(),
         title: schema
-            .get("title")
-            .and_then(Value::as_str)
-            .map(str::to_string)
+            .metadata
+            .as_ref()
+            .and_then(|m| m.title.clone())
             .unwrap_or_else(|| prettify_label(name)),
         description: schema
-            .get("description")
-            .and_then(Value::as_str)
-            .map(str::to_string)
+            .metadata
+            .as_ref()
+            .and_then(|m| m.description.clone())
             .or_else(|| parent.and_then(|p| p.description.clone())),
     }
 }
 
 fn section_info_for_field(
-    schema: &Value,
+    schema: &SchemaObject,
     path: &[String],
     parent: Option<&SectionInfo>,
 ) -> SectionInfo {
-    if let Some(group) = schema.get("x-group").and_then(Value::as_str) {
-        let title = schema
-            .get("x-group-title")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .unwrap_or_else(|| prettify_label(group));
-        let description = schema
-            .get("x-group-description")
-            .and_then(Value::as_str)
-            .map(str::to_string);
+    if let Some(group) = extension_string(schema, "x-group") {
+        let title =
+            extension_string(schema, "x-group-title").unwrap_or_else(|| prettify_label(&group));
+        let description = extension_string(schema, "x-group-description");
         return SectionInfo {
-            id: group.to_string(),
+            id: group,
             title,
             description,
         };
@@ -243,40 +271,24 @@ fn section_info_for_field(
     }
 }
 
-fn read_type(value: &Value) -> Option<String> {
-    match value.get("type")? {
-        Value::String(s) => Some(s.to_lowercase()),
-        Value::Array(items) => items
-            .iter()
-            .filter_map(Value::as_str)
-            .map(|s| s.to_lowercase())
-            .find(|s| s != "null"),
-        _ => None,
-    }
-}
-
-fn metadata_map(value: &Value) -> HashMap<String, Value> {
-    match value.as_object() {
-        Some(obj) => obj
-            .iter()
-            .filter(|(key, _)| key.starts_with("x-"))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
-        None => HashMap::new(),
-    }
-}
-
-fn required_set(schema: &Value) -> HashSet<String> {
+fn metadata_map(schema: &SchemaObject) -> HashMap<String, Value> {
     schema
-        .get("required")
-        .and_then(Value::as_array)
-        .map(|arr| {
-            arr.iter()
-                .filter_map(Value::as_str)
-                .map(str::to_string)
-                .collect()
-        })
-        .unwrap_or_default()
+        .extensions
+        .iter()
+        .filter(|(key, _)| key.starts_with("x-"))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
+}
+
+fn extension_string(schema: &SchemaObject, key: &str) -> Option<String> {
+    schema
+        .extensions
+        .get(key)
+        .and_then(|value| value.as_str().map(str::to_string))
+}
+
+fn required_set(object: &ObjectValidation) -> HashSet<String> {
+    object.required.iter().cloned().collect()
 }
 
 fn to_pointer(path: &[String]) -> String {
@@ -318,17 +330,68 @@ fn prettify_label(raw: &str) -> String {
     result.trim().to_string()
 }
 
-fn is_object(value: &Value) -> bool {
-    match read_type(value) {
-        Some(ty) => ty == "object",
-        None => value.get("properties").is_some(),
+fn is_object_schema(schema: &SchemaObject) -> bool {
+    match instance_type(schema) {
+        Some(InstanceType::Object) => true,
+        None => schema.object.is_some(),
+        _ => false,
     }
 }
 
-fn ensure_object(value: &Value) -> Result<()> {
-    if value.is_object() {
+fn instance_type(schema: &SchemaObject) -> Option<InstanceType> {
+    schema.instance_type.as_ref().and_then(|kind| match kind {
+        SingleOrVec::Single(single) => Some((**single).clone()),
+        SingleOrVec::Vec(items) => items
+            .iter()
+            .cloned()
+            .find(|item| *item != InstanceType::Null),
+    })
+}
+
+fn ensure_object_schema(schema: &SchemaObject) -> Result<()> {
+    if is_object_schema(schema) {
         Ok(())
     } else {
-        bail!("schema must be a JSON object")
+        bail!("schema must describe an object")
+    }
+}
+
+struct SchemaContext<'a> {
+    root: &'a RootSchema,
+}
+
+impl<'a> SchemaContext<'a> {
+    fn new(root: &'a RootSchema) -> Self {
+        Self { root }
+    }
+
+    fn root_object(&self) -> Option<&SchemaObject> {
+        Some(&self.root.schema)
+    }
+
+    fn resolve_schema(&self, schema: &Schema) -> Result<SchemaObject> {
+        match schema {
+            Schema::Bool(value) => Ok(Schema::Bool(*value).into_object()),
+            Schema::Object(object) => {
+                if let Some(reference) = &object.reference {
+                    self.follow_reference(reference)
+                } else {
+                    Ok(object.clone())
+                }
+            }
+        }
+    }
+
+    fn follow_reference(&self, reference: &str) -> Result<SchemaObject> {
+        if let Some(key) = reference.strip_prefix("#/definitions/") {
+            let target = self
+                .root
+                .definitions
+                .get(key)
+                .with_context(|| format!("definition '{key}' not found"))?;
+            return self.resolve_schema(target);
+        }
+
+        bail!("unsupported reference {reference}")
     }
 }
