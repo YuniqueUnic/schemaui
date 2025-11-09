@@ -8,7 +8,10 @@ use schemars::schema::{
 };
 use serde_json::Value;
 
-use super::schema::{FieldKind, FieldSchema, FormSchema, FormSection};
+use super::schema::{
+    CompositeField, CompositeMode, CompositeVariant, FieldKind, FieldSchema, FormSchema,
+    FormSection,
+};
 
 #[derive(Debug, Clone)]
 struct SectionInfo {
@@ -149,6 +152,9 @@ fn build_field_schema(
 }
 
 fn detect_kind(context: &SchemaContext<'_>, schema: &SchemaObject) -> Result<FieldKind> {
+    if let Some(composite) = composite_field(context, schema)? {
+        return Ok(FieldKind::Composite(composite));
+    }
     if let Some(options) = &schema.enum_values {
         let enum_values = options
             .iter()
@@ -179,12 +185,64 @@ fn detect_kind(context: &SchemaContext<'_>, schema: &SchemaObject) -> Result<Fie
                 | FieldKind::Number
                 | FieldKind::Boolean
                 | FieldKind::Enum(_)
-                | FieldKind::Json => Ok(FieldKind::Array(Box::new(inner_kind))),
+                | FieldKind::Json
+                | FieldKind::Composite(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
                 FieldKind::Array(_) => bail!("nested arrays are not supported"),
             }
         }
         Some(other) => bail!("unsupported field type {other:?}"),
     }
+}
+
+fn composite_field(
+    context: &SchemaContext<'_>,
+    schema: &SchemaObject,
+) -> Result<Option<CompositeField>> {
+    let Some(subschemas) = schema.subschemas.as_ref() else {
+        return Ok(None);
+    };
+    if let Some(one_of) = subschemas.one_of.as_ref() {
+        return build_composite(context, CompositeMode::OneOf, one_of);
+    }
+    if let Some(any_of) = subschemas.any_of.as_ref() {
+        return build_composite(context, CompositeMode::AnyOf, any_of);
+    }
+    Ok(None)
+}
+
+fn build_composite(
+    context: &SchemaContext<'_>,
+    mode: CompositeMode,
+    schemas: &[Schema],
+) -> Result<Option<CompositeField>> {
+    if schemas.is_empty() {
+        return Ok(None);
+    }
+
+    let mut variants = Vec::new();
+    for (index, variant) in schemas.iter().enumerate() {
+        let resolved = context.resolve_schema(variant)?;
+        ensure_object_schema(&resolved)?;
+        let schema_value = serde_json::to_value(&Schema::Object(resolved.clone()))
+            .context("failed to serialize composite variant schema")?;
+        let title = resolved
+            .metadata
+            .as_ref()
+            .and_then(|m| m.title.clone())
+            .unwrap_or_else(|| format!("Variant {}", index + 1));
+        let description = resolved
+            .metadata
+            .as_ref()
+            .and_then(|m| m.description.clone());
+        variants.push(CompositeVariant {
+            id: format!("variant_{}", index),
+            title,
+            description,
+            schema: schema_value,
+        });
+    }
+
+    Ok(Some(CompositeField { mode, variants }))
 }
 
 fn resolve_array_items(

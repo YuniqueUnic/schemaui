@@ -295,6 +295,7 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Enum(_) => "enum".to_string(),
         FieldKind::Array(inner) => format!("{}[]", field_type_label(inner)),
         FieldKind::Json => "object".to_string(),
+        FieldKind::Composite(_) => "composite".to_string(),
     }
 }
 

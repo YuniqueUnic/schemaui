@@ -28,6 +28,27 @@ pub enum FieldKind {
     Enum(Vec<String>),
     Array(Box<FieldKind>),
     Json,
+    Composite(CompositeField),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompositeField {
+    pub mode: CompositeMode,
+    pub variants: Vec<CompositeVariant>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CompositeMode {
+    OneOf,
+    AnyOf,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompositeVariant {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub schema: Value,
 }
 
 #[derive(Debug, Clone)]
