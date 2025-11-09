@@ -1,4 +1,5 @@
 mod options;
+mod popup;
 mod runtime;
 mod schema_ui;
 mod terminal;
