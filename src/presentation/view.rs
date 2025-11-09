@@ -21,6 +21,8 @@ pub struct PopupRender<'a> {
     pub title: &'a str,
     pub options: &'a [String],
     pub selected: usize,
+    pub multi: bool,
+    pub active: Option<&'a [bool]>,
 }
 
 pub fn draw(frame: &mut Frame<'_>, ctx: UiContext<'_>) {
