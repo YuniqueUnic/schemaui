@@ -4,11 +4,11 @@ use jsonschema::Validator;
 use serde_json::Value;
 
 use crate::{
-    form::{FieldState, FieldValue, FormState},
-    presentation::{self, PopupRender, UiContext},
+    form::FormState,
+    presentation::{self, UiContext},
 };
 
-use super::{options::UiOptions, terminal::TerminalGuard};
+use super::{options::UiOptions, popup::PopupState, terminal::TerminalGuard};
 
 const HELP_TEXT: &str =
     "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+S save • Ctrl+Q quit";
@@ -32,59 +32,6 @@ enum ValidationResult {
     Invalid,
 }
 
-struct PopupState {
-    field_pointer: String,
-    title: String,
-    options: Vec<String>,
-    selected: usize,
-}
-
-impl PopupState {
-    fn from_field(field: &FieldState) -> Option<Self> {
-        match &field.value {
-            FieldValue::Bool(current) => Some(Self {
-                field_pointer: field.schema.pointer.clone(),
-                title: format!("{}", field.schema.display_label()),
-                options: vec!["true".to_string(), "false".to_string()],
-                selected: if *current { 0 } else { 1 },
-            }),
-            FieldValue::Enum { options, selected } => Some(Self {
-                field_pointer: field.schema.pointer.clone(),
-                title: field.schema.display_label(),
-                options: options.clone(),
-                selected: *selected,
-            }),
-            _ => None,
-        }
-    }
-
-    fn select_previous(&mut self) {
-        if self.options.is_empty() {
-            return;
-        }
-        if self.selected == 0 {
-            self.selected = self.options.len().saturating_sub(1);
-        } else {
-            self.selected -= 1;
-        }
-    }
-
-    fn select_next(&mut self) {
-        if self.options.is_empty() {
-            return;
-        }
-        self.selected = (self.selected + 1) % self.options.len();
-    }
-
-    fn as_render(&self) -> PopupRender<'_> {
-        PopupRender {
-            title: &self.title,
-            options: &self.options,
-            selected: self.selected,
-        }
-    }
-}
-
 impl App {
     fn handle_popup_key(&mut self, key: KeyEvent) -> Result<bool> {
         if let Some(popup) = &mut self.popup {
@@ -96,8 +43,8 @@ impl App {
                 KeyCode::Up => popup.select_previous(),
                 KeyCode::Down => popup.select_next(),
                 KeyCode::Enter => {
-                    let selection = popup.selected;
-                    let pointer = popup.field_pointer.clone();
+                    let selection = popup.selection();
+                    let pointer = popup.pointer().to_string();
                     self.apply_popup_selection(&pointer, selection);
                     self.popup = None;
                     if self.options.auto_validate {
@@ -263,11 +210,7 @@ impl App {
 
     fn apply_popup_selection(&mut self, pointer: &str, selection: usize) {
         if let Some(field) = self.form_state.field_mut_by_pointer(pointer) {
-            if matches!(field.value, FieldValue::Bool(_)) {
-                field.set_bool(selection == 0);
-            } else if matches!(field.value, FieldValue::Enum { .. }) {
-                field.set_enum_selected(selection);
-            }
+            PopupState::apply_selection(field, selection);
         }
     }
 
