@@ -1,84 +1,20 @@
-use std::time::Duration;
-
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use jsonschema::{Validator, validator_for};
+use jsonschema::Validator;
 use serde_json::Value;
 
 use crate::{
-    domain::parse_form_schema,
     form::{FieldState, FieldValue, FormState},
     presentation::{self, PopupRender, UiContext},
 };
 
-use super::terminal::TerminalGuard;
+use super::{options::UiOptions, terminal::TerminalGuard};
 
 const HELP_TEXT: &str =
     "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+S save • Ctrl+Q quit";
 const READY_STATUS: &str = "Ready. Press Ctrl+S to validate and save.";
 
-#[derive(Debug, Clone)]
-pub struct UiOptions {
-    pub tick_rate: Duration,
-    pub auto_validate: bool,
-    pub confirm_exit: bool,
-    pub show_help: bool,
-}
-
-impl Default for UiOptions {
-    fn default() -> Self {
-        Self {
-            tick_rate: Duration::from_millis(250),
-            auto_validate: true,
-            confirm_exit: true,
-            show_help: true,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct SchemaUI {
-    schema: Value,
-    title: Option<String>,
-    options: UiOptions,
-}
-
-impl SchemaUI {
-    pub fn new(schema: Value) -> Self {
-        Self {
-            schema,
-            title: None,
-            options: UiOptions::default(),
-        }
-    }
-
-    pub fn with_title(mut self, title: impl Into<String>) -> Self {
-        self.title = Some(title.into());
-        self
-    }
-
-    pub fn with_options(mut self, options: UiOptions) -> Self {
-        self.options = options;
-        self
-    }
-
-    pub fn run(self) -> Result<Value> {
-        let SchemaUI {
-            schema,
-            title: _,
-            options,
-        } = self;
-
-        let validator = validator_for(&schema).context("failed to compile JSON schema")?;
-        let form_schema = parse_form_schema(&schema)?;
-        let form_state = FormState::from_schema(&form_schema);
-
-        let mut app = App::new(form_state, validator, options);
-        app.run()
-    }
-}
-
-struct App {
+pub(crate) struct App {
     form_state: FormState,
     validator: Validator,
     options: UiOptions,
@@ -176,7 +112,7 @@ impl App {
         Ok(false)
     }
 
-    fn new(form_state: FormState, validator: Validator, options: UiOptions) -> Self {
+    pub fn new(form_state: FormState, validator: Validator, options: UiOptions) -> Self {
         Self {
             form_state,
             validator,
@@ -191,7 +127,7 @@ impl App {
         }
     }
 
-    fn run(&mut self) -> Result<Value> {
+    pub fn run(&mut self) -> Result<Value> {
         let mut terminal = TerminalGuard::new()?;
         while !self.should_quit {
             terminal.draw(|frame| self.draw(frame))?;

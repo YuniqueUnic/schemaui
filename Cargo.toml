@@ -30,7 +30,7 @@ anyhow = "1"
 crossterm = "0.29.0"
 jsonschema = "0.33.0"
 ratatui = "0.29.0"
-schemars = "0.8.21"
+schemars = { version = "0.8.22", features = ["preserve_order"] }
 serde = { version = "1", features = ["derive"] }
 indexmap = "2"
 
@@ -42,6 +42,10 @@ toml = "0.9"
 [[example]]
 name = "jsonattr"
 path = "examples/jsonattr.rs"
+
+[[example]]
+name = "schemars"
+path = "examples/schemars.rs"
 
 
 [package.metadata.release]
