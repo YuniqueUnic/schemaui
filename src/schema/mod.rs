@@ -6,7 +6,9 @@ use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub struct FormSchema {
+    #[allow(dead_code)]
     pub title: Option<String>,
+    #[allow(dead_code)]
     pub description: Option<String>,
     pub sections: Vec<FormSection>,
 }
