@@ -30,7 +30,7 @@ anyhow = "1"
 crossterm = "0.29.0"
 jsonschema = "0.33.0"
 ratatui = "0.29.0"
-schemars = { version = "1", features = ["derive"] }
+schemars = "0.8.21"
 serde = { version = "1", features = ["derive"] }
 indexmap = "2"
 
