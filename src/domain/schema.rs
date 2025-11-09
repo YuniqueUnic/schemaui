@@ -27,6 +27,7 @@ pub enum FieldKind {
     Boolean,
     Enum(Vec<String>),
     Array(Box<FieldKind>),
+    Json,
 }
 
 #[derive(Debug, Clone)]

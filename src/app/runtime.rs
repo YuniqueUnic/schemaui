@@ -225,7 +225,6 @@ impl App {
         if let Some(value) = self.run_validation(true) {
             self.status.set_raw("Configuration saved");
             self.result = Some(value);
-            self.should_quit = true;
         }
     }
 

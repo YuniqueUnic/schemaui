@@ -165,6 +165,7 @@ fn detect_kind(context: &SchemaContext<'_>, schema: &SchemaObject) -> Result<Fie
         Some(InstanceType::Integer) => Ok(FieldKind::Integer),
         Some(InstanceType::Number) => Ok(FieldKind::Number),
         Some(InstanceType::Boolean) => Ok(FieldKind::Boolean),
+        Some(InstanceType::Object) => Ok(FieldKind::Json),
         Some(InstanceType::Array) => {
             let array = schema
                 .array
@@ -177,7 +178,8 @@ fn detect_kind(context: &SchemaContext<'_>, schema: &SchemaObject) -> Result<Fie
                 | FieldKind::Integer
                 | FieldKind::Number
                 | FieldKind::Boolean
-                | FieldKind::Enum(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
+                | FieldKind::Enum(_)
+                | FieldKind::Json => Ok(FieldKind::Array(Box::new(inner_kind))),
                 FieldKind::Array(_) => bail!("nested arrays are not supported"),
             }
         }

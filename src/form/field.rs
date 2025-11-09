@@ -31,7 +31,7 @@ pub struct FieldState {
 impl FieldState {
     pub fn from_schema(schema: FieldSchema) -> Self {
         let value = match &schema.kind {
-            FieldKind::String | FieldKind::Integer | FieldKind::Number => {
+            FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Json => {
                 FieldValue::Text(default_text(&schema))
             }
             FieldKind::Boolean => {
@@ -270,6 +270,7 @@ impl FieldState {
             (FieldKind::String, FieldValue::Text(text)) => string_value(text, &self.schema),
             (FieldKind::Integer, FieldValue::Text(text)) => integer_value(text, &self.schema),
             (FieldKind::Number, FieldValue::Text(text)) => number_value(text, &self.schema),
+            (FieldKind::Json, FieldValue::Text(text)) => string_value(text, &self.schema),
             (FieldKind::Boolean, FieldValue::Bool(value)) => Ok(Some(Value::Bool(*value))),
             (FieldKind::Enum(options), FieldValue::Enum { selected, .. }) => {
                 let value = options.get(*selected).cloned().unwrap_or_default();
@@ -407,6 +408,7 @@ fn array_value(
                     });
                 }
             }
+            FieldKind::Json => Value::String(item.to_string()),
             FieldKind::Array(_) => {
                 return Err(FieldCoercionError {
                     pointer: schema.pointer.clone(),

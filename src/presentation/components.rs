@@ -11,6 +11,8 @@ use crate::{
     form::{FieldState, FormState},
 };
 
+use textwrap::wrap;
+
 use super::{PopupRender, UiContext};
 
 pub fn render_body(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enable_cursor: bool) {
@@ -125,13 +127,35 @@ pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
 }
 
 fn render_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
-    let titles: Vec<Line<'static>> = form_state
-        .sections
-        .iter()
-        .map(|section| Line::from(format!("{} [{}]", section.title, section.id)))
-        .collect();
+    let total = form_state.sections.len();
+    let window = 5usize;
+    let mut start = 0usize;
+    if total > window {
+        let half = window / 2;
+        if form_state.section_index > half {
+            start = form_state
+                .section_index
+                .saturating_sub(half)
+                .min(total.saturating_sub(window));
+        }
+    }
+    let end = (start + window).min(total);
+    let mut titles: Vec<Line<'static>> = Vec::new();
+    let mut select_index = form_state.section_index - start;
+    if start > 0 {
+        titles.push(Line::from("«"));
+        select_index += 1;
+    }
+    titles.extend(
+        form_state.sections[start..end]
+            .iter()
+            .map(|section| Line::from(format!("{} [{}]", section.title, section.id))),
+    );
+    if end < total {
+        titles.push(Line::from("»"));
+    }
     let tabs = Tabs::new(titles)
-        .select(form_state.section_index)
+        .select(select_index)
         .block(Block::default().borders(Borders::ALL).title("Sections"))
         .highlight_style(
             Style::default()
@@ -270,28 +294,8 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Boolean => "boolean".to_string(),
         FieldKind::Enum(_) => "enum".to_string(),
         FieldKind::Array(inner) => format!("{}[]", field_type_label(inner)),
+        FieldKind::Json => "object".to_string(),
     }
-}
-
-fn clamp_value(value: &str, max_chars: usize) -> (String, u16) {
-    if max_chars == 0 {
-        return (String::new(), 0);
-    }
-    let mut result = String::new();
-    let mut char_count = 0usize;
-    for ch in value.chars() {
-        if char_count + 1 > max_chars {
-            break;
-        }
-        result.push(ch);
-        char_count += 1;
-    }
-    if value.chars().count() > char_count && char_count > 1 {
-        result.pop();
-        result.push('…');
-    }
-    let width = result.chars().count() as u16;
-    (result, width)
 }
 
 fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> FieldRender {
@@ -313,11 +317,21 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
     lines.push(Line::from(Span::styled(label, label_style)));
 
     let clamp_width = max_width.max(4) as usize;
-    let (visible_text, visible_width) = clamp_value(&field.display_value(), clamp_width);
+    let value_text = field.display_value();
+    let wrapped_value = wrap(&value_text, clamp_width);
+    let inner_width = wrapped_value
+        .iter()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap_or(0);
+    let last_line_width = wrapped_value
+        .last()
+        .map(|line| line.chars().count())
+        .unwrap_or(0);
     let mut cursor_hint = None;
 
     if is_selected {
-        let border_width = visible_width as usize + 2;
+        let border_width = inner_width.saturating_add(2);
         let border_line = "─".repeat(border_width);
         let border_style = Style::default().fg(Color::Yellow);
         let value_style = Style::default()
@@ -329,27 +343,35 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
             border_style,
         )));
         let value_line_index = lines.len();
-        lines.push(Line::from(vec![
-            Span::styled("│ ", border_style),
-            Span::styled(visible_text.clone(), value_style),
-            Span::styled(" │", border_style),
-        ]));
+        for segment in &wrapped_value {
+            let mut content = segment.to_string();
+            while content.chars().count() < inner_width {
+                content.push(' ');
+            }
+            lines.push(Line::from(vec![
+                Span::styled("│ ", border_style),
+                Span::styled(content, value_style),
+                Span::styled(" │", border_style),
+            ]));
+        }
         lines.push(Line::from(Span::styled(
             format!("└{}┘", border_line),
             border_style,
         )));
 
-        let value_width = visible_width;
+        let value_width = last_line_width as u16;
         cursor_hint = Some(CursorHint {
-            line_offset: value_line_index,
+            line_offset: value_line_index + wrapped_value.len().saturating_sub(1),
             column_offset: 2,
             value_width,
         });
     } else {
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(visible_text.clone(), Style::default().fg(Color::White)),
-        ]));
+        for segment in &wrapped_value {
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(segment.to_string(), Style::default().fg(Color::White)),
+            ]));
+        }
     }
 
     let type_label = field_type_label(&field.schema.kind);
