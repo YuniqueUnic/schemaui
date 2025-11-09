@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{Context, Result, anyhow, bail};
 use indexmap::IndexMap;
+use percent_encoding::percent_decode_str;
 use schemars::schema::{
     ArrayValidation, InstanceType, ObjectValidation, RootSchema, Schema, SchemaObject, SingleOrVec,
 };
@@ -19,7 +20,7 @@ struct SectionInfo {
 pub fn parse_form_schema(schema_value: &Value) -> Result<FormSchema> {
     let root: RootSchema = serde_json::from_value(schema_value.clone())
         .context("schema is not a valid JSON Schema document")?;
-    let context = SchemaContext::new(&root);
+    let context = SchemaContext::new(schema_value, &root);
     let root_object = context
         .root_object()
         .cloned()
@@ -357,12 +358,13 @@ fn ensure_object_schema(schema: &SchemaObject) -> Result<()> {
 }
 
 struct SchemaContext<'a> {
+    raw: &'a Value,
     root: &'a RootSchema,
 }
 
 impl<'a> SchemaContext<'a> {
-    fn new(root: &'a RootSchema) -> Self {
-        Self { root }
+    fn new(raw: &'a Value, root: &'a RootSchema) -> Self {
+        Self { raw, root }
     }
 
     fn root_object(&self) -> Option<&SchemaObject> {
@@ -390,6 +392,26 @@ impl<'a> SchemaContext<'a> {
                 .get(key)
                 .with_context(|| format!("definition '{key}' not found"))?;
             return self.resolve_schema(target);
+        }
+
+        if let Some(fragment) = reference.strip_prefix('#') {
+            let decoded = percent_decode_str(fragment)
+                .decode_utf8()
+                .context("invalid percent-encoding in $ref")?;
+            let pointer = if decoded.is_empty() {
+                String::new()
+            } else if decoded.starts_with('/') {
+                decoded.to_string()
+            } else {
+                format!("/{}", decoded)
+            };
+            let target = self
+                .raw
+                .pointer(&pointer)
+                .with_context(|| format!("reference '{reference}' not found"))?;
+            let schema: Schema = serde_json::from_value(target.clone())
+                .with_context(|| format!("reference '{reference}' is not a valid schema"))?;
+            return self.resolve_schema(&schema);
         }
 
         bail!("unsupported reference {reference}")
