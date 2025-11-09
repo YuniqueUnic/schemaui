@@ -1,0 +1,332 @@
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use serde_json::Value;
+
+use crate::domain::{FieldKind, FieldSchema};
+
+use super::error::FieldCoercionError;
+
+#[derive(Debug, Clone)]
+pub enum FieldValue {
+    Text(String),
+    Bool(bool),
+    Enum {
+        options: Vec<String>,
+        selected: usize,
+    },
+    Array(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct FieldState {
+    pub schema: FieldSchema,
+    pub value: FieldValue,
+    pub dirty: bool,
+    pub error: Option<String>,
+}
+
+impl FieldState {
+    pub fn from_schema(schema: FieldSchema) -> Self {
+        let value = match &schema.kind {
+            FieldKind::String | FieldKind::Integer | FieldKind::Number => {
+                FieldValue::Text(default_text(&schema))
+            }
+            FieldKind::Boolean => {
+                let default = schema
+                    .default
+                    .as_ref()
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false);
+                FieldValue::Bool(default)
+            }
+            FieldKind::Enum(options) => {
+                let default_value = schema
+                    .default
+                    .as_ref()
+                    .map(value_to_string)
+                    .and_then(|value| if value.is_empty() { None } else { Some(value) })
+                    .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+                let selected = options
+                    .iter()
+                    .position(|item| item == &default_value)
+                    .unwrap_or(0);
+                FieldValue::Enum {
+                    options: options.clone(),
+                    selected,
+                }
+            }
+            FieldKind::Array(_) => {
+                let default = schema
+                    .default
+                    .as_ref()
+                    .and_then(|value| value.as_array())
+                    .map(|items| array_to_string(items))
+                    .unwrap_or_default();
+                FieldValue::Array(default)
+            }
+        };
+
+        FieldState {
+            schema,
+            value,
+            dirty: false,
+            error: None,
+        }
+    }
+
+    pub fn handle_key(&mut self, key: &KeyEvent) -> bool {
+        match &mut self.value {
+            FieldValue::Text(buffer) | FieldValue::Array(buffer) => match key.code {
+                KeyCode::Char(c) => {
+                    if key.modifiers.contains(KeyModifiers::CONTROL) {
+                        return false;
+                    }
+                    buffer.push(c);
+                    self.after_edit();
+                    true
+                }
+                KeyCode::Backspace => {
+                    buffer.pop();
+                    self.after_edit();
+                    true
+                }
+                KeyCode::Delete => {
+                    buffer.clear();
+                    self.after_edit();
+                    true
+                }
+                _ => false,
+            },
+            FieldValue::Bool(value) => match key.code {
+                KeyCode::Char(' ') => {
+                    *value = !*value;
+                    self.after_edit();
+                    true
+                }
+                _ => false,
+            },
+            FieldValue::Enum { options, selected } => match key.code {
+                KeyCode::Up | KeyCode::Left => {
+                    if *selected == 0 {
+                        *selected = options.len().saturating_sub(1);
+                    } else {
+                        *selected -= 1;
+                    }
+                    self.after_edit();
+                    true
+                }
+                KeyCode::Down | KeyCode::Right => {
+                    if !options.is_empty() {
+                        *selected = (*selected + 1) % options.len();
+                    }
+                    self.after_edit();
+                    true
+                }
+                _ => false,
+            },
+        }
+    }
+
+    pub fn set_bool(&mut self, value: bool) {
+        if let FieldValue::Bool(current) = &mut self.value {
+            if *current != value {
+                *current = value;
+                self.after_edit();
+            }
+        }
+    }
+
+    pub fn set_enum_selected(&mut self, index: usize) {
+        if let FieldValue::Enum { options, selected } = &mut self.value {
+            if options.is_empty() {
+                return;
+            }
+            let bounded = index.min(options.len() - 1);
+            if *selected != bounded {
+                *selected = bounded;
+                self.after_edit();
+            }
+        }
+    }
+
+    pub fn display_value(&self) -> String {
+        match &self.value {
+            FieldValue::Text(text) => text.clone(),
+            FieldValue::Bool(value) => value.to_string(),
+            FieldValue::Enum { options, selected } => options
+                .get(*selected)
+                .cloned()
+                .unwrap_or_else(|| "<none>".to_string()),
+            FieldValue::Array(buffer) => format!("[{}]", buffer.trim()),
+        }
+    }
+
+    pub fn current_value(&self) -> Result<Option<Value>, FieldCoercionError> {
+        match (&self.schema.kind, &self.value) {
+            (FieldKind::String, FieldValue::Text(text)) => string_value(text, &self.schema),
+            (FieldKind::Integer, FieldValue::Text(text)) => integer_value(text, &self.schema),
+            (FieldKind::Number, FieldValue::Text(text)) => number_value(text, &self.schema),
+            (FieldKind::Boolean, FieldValue::Bool(value)) => Ok(Some(Value::Bool(*value))),
+            (FieldKind::Enum(options), FieldValue::Enum { selected, .. }) => {
+                let value = options.get(*selected).cloned().unwrap_or_default();
+                Ok(Some(Value::String(value)))
+            }
+            (FieldKind::Array(inner), FieldValue::Array(buffer)) => {
+                array_value(buffer, inner.as_ref(), &self.schema)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    pub fn clear_error(&mut self) {
+        self.error = None;
+    }
+
+    pub fn set_error(&mut self, message: String) {
+        self.error = Some(message);
+    }
+
+    fn after_edit(&mut self) {
+        self.dirty = true;
+        self.error = None;
+    }
+}
+
+fn string_value(contents: &str, schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
+    if contents.is_empty() && !schema.required {
+        return Ok(None);
+    }
+    Ok(Some(Value::String(contents.to_string())))
+}
+
+fn integer_value(
+    contents: &str,
+    schema: &FieldSchema,
+) -> Result<Option<Value>, FieldCoercionError> {
+    let trimmed = contents.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    trimmed
+        .parse::<i64>()
+        .map(Value::from)
+        .map(Some)
+        .map_err(|_| FieldCoercionError {
+            pointer: schema.pointer.clone(),
+            message: "expected integer".to_string(),
+        })
+}
+
+fn number_value(contents: &str, schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
+    let trimmed = contents.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    trimmed
+        .parse::<f64>()
+        .map(Value::from)
+        .map(Some)
+        .map_err(|_| FieldCoercionError {
+            pointer: schema.pointer.clone(),
+            message: "expected number".to_string(),
+        })
+}
+
+fn array_value(
+    contents: &str,
+    inner: &FieldKind,
+    schema: &FieldSchema,
+) -> Result<Option<Value>, FieldCoercionError> {
+    let trimmed = contents.trim();
+    if trimmed.is_empty() {
+        if schema.required {
+            return Ok(Some(Value::Array(Vec::new())));
+        }
+        return Ok(None);
+    }
+
+    let mut values = Vec::new();
+    for raw in contents.split(',') {
+        let item = raw.trim();
+        if item.is_empty() {
+            continue;
+        }
+        let value = match inner {
+            FieldKind::String => Value::String(item.to_string()),
+            FieldKind::Integer => {
+                item.parse::<i64>()
+                    .map(Value::from)
+                    .map_err(|_| FieldCoercionError {
+                        pointer: schema.pointer.clone(),
+                        message: format!("'{item}' is not a valid integer"),
+                    })?
+            }
+            FieldKind::Number => {
+                item.parse::<f64>()
+                    .map(Value::from)
+                    .map_err(|_| FieldCoercionError {
+                        pointer: schema.pointer.clone(),
+                        message: format!("'{item}' is not a valid number"),
+                    })?
+            }
+            FieldKind::Boolean => match item.to_ascii_lowercase().as_str() {
+                "true" => Value::Bool(true),
+                "false" => Value::Bool(false),
+                _ => {
+                    return Err(FieldCoercionError {
+                        pointer: schema.pointer.clone(),
+                        message: format!("'{item}' is not a valid boolean"),
+                    });
+                }
+            },
+            FieldKind::Enum(options) => {
+                if options.iter().any(|opt| opt == item) {
+                    Value::String(item.to_string())
+                } else {
+                    return Err(FieldCoercionError {
+                        pointer: schema.pointer.clone(),
+                        message: format!("value '{item}' is not one of: {}", options.join(", ")),
+                    });
+                }
+            }
+            FieldKind::Array(_) => {
+                return Err(FieldCoercionError {
+                    pointer: schema.pointer.clone(),
+                    message: "nested arrays are not supported".to_string(),
+                });
+            }
+        };
+        values.push(value);
+    }
+
+    Ok(Some(Value::Array(values)))
+}
+
+fn default_text(schema: &FieldSchema) -> String {
+    schema
+        .default
+        .as_ref()
+        .map(value_to_string)
+        .unwrap_or_default()
+}
+
+fn value_to_string(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Number(num) => num.to_string(),
+        Value::Bool(flag) => flag.to_string(),
+        Value::Array(items) => items
+            .iter()
+            .map(value_to_string)
+            .collect::<Vec<_>>()
+            .join(", "),
+        other => other.to_string(),
+    }
+}
+
+fn array_to_string(items: &[Value]) -> String {
+    items
+        .iter()
+        .map(value_to_string)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
