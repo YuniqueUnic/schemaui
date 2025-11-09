@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
 use serde_json::Value;
 
@@ -8,7 +8,14 @@ use crate::{
     presentation::{self, UiContext},
 };
 
-use super::{options::UiOptions, popup::PopupState, status::StatusLine, terminal::TerminalGuard};
+use super::{
+    input::{self, KeyCommand},
+    options::UiOptions,
+    popup::PopupState,
+    status::StatusLine,
+    terminal::TerminalGuard,
+    validation::{ValidationOutcome, validate_form},
+};
 
 const HELP_TEXT: &str =
     "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+S save • Ctrl+Q quit";
@@ -24,11 +31,6 @@ pub(crate) struct App {
     should_quit: bool,
     result: Option<Value>,
     popup: Option<PopupState>,
-}
-
-enum ValidationResult {
-    Valid(Value),
-    Invalid,
 }
 
 impl App {
@@ -47,7 +49,7 @@ impl App {
                     self.apply_popup_selection(&pointer, selection);
                     self.popup = None;
                     if self.options.auto_validate {
-                        self.validate_current(false);
+                        self.run_validation(false);
                     }
                     self.status.value_updated();
                 }
@@ -125,71 +127,47 @@ impl App {
             return Ok(());
         }
 
-        if key.modifiers.contains(KeyModifiers::CONTROL) {
-            match key.code {
-                KeyCode::Char('s') | KeyCode::Char('S') => {
-                    self.exit_armed = false;
-                    self.on_save();
-                    return Ok(());
-                }
-                KeyCode::Char('q')
-                | KeyCode::Char('Q')
-                | KeyCode::Char('c')
-                | KeyCode::Char('C') => {
-                    self.on_exit();
-                    return Ok(());
-                }
-                KeyCode::Tab => {
-                    let delta = if key.modifiers.contains(KeyModifiers::SHIFT) {
-                        -1
-                    } else {
-                        1
-                    };
-                    self.form_state.focus_next_section(delta);
-                    self.exit_armed = false;
-                    return Ok(());
-                }
-                _ => {}
+        match input::classify(&key) {
+            KeyCommand::Save => {
+                self.exit_armed = false;
+                self.on_save();
             }
-        }
-
-        match key.code {
-            KeyCode::Tab => {
+            KeyCommand::Quit => {
+                self.on_exit();
+            }
+            KeyCommand::SwitchSection(delta) => {
+                self.form_state.focus_next_section(delta);
+                self.exit_armed = false;
+            }
+            KeyCommand::NextField => {
                 self.form_state.focus_next_field();
                 self.exit_armed = false;
             }
-            KeyCode::BackTab => {
+            KeyCommand::PrevField => {
                 self.form_state.focus_prev_field();
                 self.exit_armed = false;
             }
-            KeyCode::Down => {
-                self.form_state.focus_next_field();
-                self.exit_armed = false;
-            }
-            KeyCode::Up => {
-                self.form_state.focus_prev_field();
-                self.exit_armed = false;
-            }
-            KeyCode::Esc => {
+            KeyCommand::ResetStatus => {
                 self.exit_armed = false;
                 self.status.ready();
             }
-            KeyCode::Enter => {
+            KeyCommand::TogglePopup => {
                 if self.try_open_popup() {
                     return Ok(());
                 }
             }
-            _ => {
+            KeyCommand::Edit(event) => {
                 if let Some(field) = self.form_state.focused_field_mut() {
-                    if field.handle_key(&key) {
+                    if field.handle_key(&event) {
                         self.exit_armed = false;
                         self.status.editing(&field.schema.display_label());
                         if self.options.auto_validate {
-                            self.validate_current(false);
+                            self.run_validation(false);
                         }
                     }
                 }
             }
+            KeyCommand::None => {}
         }
 
         Ok(())
@@ -217,17 +195,10 @@ impl App {
     }
 
     fn on_save(&mut self) {
-        match self.validate_current(true) {
-            ValidationResult::Valid(value) => {
-                self.status.set_raw("Configuration saved");
-                self.result = Some(value);
-                self.should_quit = true;
-            }
-            ValidationResult::Invalid => {
-                if self.validation_errors > 0 {
-                    self.status.issues_remaining(self.validation_errors);
-                }
-            }
+        if let Some(value) = self.run_validation(true) {
+            self.status.set_raw("Configuration saved");
+            self.result = Some(value);
+            self.should_quit = true;
         }
     }
 
@@ -241,47 +212,32 @@ impl App {
         self.result = None;
     }
 
-    fn validate_current(&mut self, announce: bool) -> ValidationResult {
-        match self.form_state.try_build_value() {
-            Ok(value) => {
-                if self.validator.is_valid(&value) {
-                    self.form_state.clear_errors();
-                    self.global_errors.clear();
-                    self.validation_errors = 0;
-                    if announce {
-                        self.status.validation_passed();
-                    }
-                    ValidationResult::Valid(value)
-                } else {
-                    self.form_state.clear_errors();
-                    self.global_errors.clear();
-                    let mut count = 0;
-                    for error in self.validator.iter_errors(&value) {
-                        count += 1;
-                        let pointer = error.instance_path.to_string();
-                        let message = error.to_string();
-                        if !self.form_state.set_error(&pointer, message.clone()) {
-                            let prefix = if pointer.is_empty() {
-                                "<root>".to_string()
-                            } else {
-                                pointer.clone()
-                            };
-                            self.global_errors.push(format!("{prefix}: {message}"));
-                        }
-                    }
-                    self.validation_errors = count;
-                    if announce {
-                        self.status.issues_remaining(count);
-                    }
-                    ValidationResult::Invalid
+    fn run_validation(&mut self, announce: bool) -> Option<Value> {
+        match validate_form(&mut self.form_state, &self.validator) {
+            ValidationOutcome::Valid(value) => {
+                self.global_errors.clear();
+                self.validation_errors = 0;
+                if announce {
+                    self.status.validation_passed();
                 }
+                Some(value)
             }
-            Err(err) => {
-                self.form_state.set_error(&err.pointer, err.message.clone());
-                self.global_errors = vec![err.message.clone()];
+            ValidationOutcome::Invalid {
+                issues,
+                global_errors,
+            } => {
+                self.global_errors = global_errors;
+                self.validation_errors = issues;
+                if announce {
+                    self.status.issues_remaining(issues);
+                }
+                None
+            }
+            ValidationOutcome::BuildError { message } => {
+                self.global_errors = vec![message.clone()];
                 self.validation_errors = 1;
-                self.status.set_raw(err.message);
-                ValidationResult::Invalid
+                self.status.set_raw(message);
+                None
             }
         }
     }
