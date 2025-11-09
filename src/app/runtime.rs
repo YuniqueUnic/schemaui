@@ -8,17 +8,16 @@ use crate::{
     presentation::{self, UiContext},
 };
 
-use super::{options::UiOptions, popup::PopupState, terminal::TerminalGuard};
+use super::{options::UiOptions, popup::PopupState, status::StatusLine, terminal::TerminalGuard};
 
 const HELP_TEXT: &str =
     "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+S save • Ctrl+Q quit";
-const READY_STATUS: &str = "Ready. Press Ctrl+S to validate and save.";
 
 pub(crate) struct App {
     form_state: FormState,
     validator: Validator,
     options: UiOptions,
-    status_message: String,
+    status: StatusLine,
     global_errors: Vec<String>,
     validation_errors: usize,
     exit_armed: bool,
@@ -38,7 +37,7 @@ impl App {
             match key.code {
                 KeyCode::Esc => {
                     self.popup = None;
-                    self.status_message = READY_STATUS.to_string();
+                    self.status.ready();
                 }
                 KeyCode::Up => popup.select_previous(),
                 KeyCode::Down => popup.select_next(),
@@ -50,7 +49,7 @@ impl App {
                     if self.options.auto_validate {
                         self.validate_current(false);
                     }
-                    self.status_message = "Value updated".to_string();
+                    self.status.value_updated();
                 }
                 _ => {}
             }
@@ -64,7 +63,7 @@ impl App {
             form_state,
             validator,
             options,
-            status_message: READY_STATUS.to_string(),
+            status: StatusLine::new(),
             global_errors: Vec::new(),
             validation_errors: 0,
             exit_armed: false,
@@ -78,6 +77,9 @@ impl App {
         let mut terminal = TerminalGuard::new()?;
         while !self.should_quit {
             terminal.draw(|frame| self.draw(frame))?;
+            if !event::poll(self.options.tick_rate)? {
+                continue;
+            }
             match event::read()? {
                 Event::Key(key) => self.handle_key(key)?,
                 Event::Resize(_, _) => {}
@@ -104,7 +106,7 @@ impl App {
             frame,
             UiContext {
                 form_state: &self.form_state,
-                status_message: &self.status_message,
+                status_message: self.status.message(),
                 dirty: self.form_state.is_dirty(),
                 error_count: self.validation_errors,
                 help,
@@ -170,7 +172,7 @@ impl App {
             }
             KeyCode::Esc => {
                 self.exit_armed = false;
-                self.status_message = READY_STATUS.to_string();
+                self.status.ready();
             }
             KeyCode::Enter => {
                 if self.try_open_popup() {
@@ -181,7 +183,7 @@ impl App {
                 if let Some(field) = self.form_state.focused_field_mut() {
                     if field.handle_key(&key) {
                         self.exit_armed = false;
-                        self.status_message = format!("Editing {}", field.schema.display_label());
+                        self.status.editing(&field.schema.display_label());
                         if self.options.auto_validate {
                             self.validate_current(false);
                         }
@@ -202,7 +204,7 @@ impl App {
         };
         if let Some(popup) = PopupState::from_field(field) {
             self.popup = Some(popup);
-            self.status_message = "Use ↑/↓ and Enter to choose".to_string();
+            self.status.set_raw("Use ↑/↓ and Enter to choose");
             return true;
         }
         false
@@ -217,13 +219,13 @@ impl App {
     fn on_save(&mut self) {
         match self.validate_current(true) {
             ValidationResult::Valid(value) => {
-                self.status_message = "Configuration saved".to_string();
+                self.status.set_raw("Configuration saved");
                 self.result = Some(value);
                 self.should_quit = true;
             }
             ValidationResult::Invalid => {
                 if self.validation_errors > 0 {
-                    self.status_message = format!("{0} issue(s) remaining", self.validation_errors);
+                    self.status.issues_remaining(self.validation_errors);
                 }
             }
         }
@@ -232,8 +234,7 @@ impl App {
     fn on_exit(&mut self) {
         if self.options.confirm_exit && self.form_state.is_dirty() && !self.exit_armed {
             self.exit_armed = true;
-            self.status_message =
-                "Unsaved changes. Press Ctrl+Q again to quit without saving.".to_string();
+            self.status.pending_exit();
             return;
         }
         self.should_quit = true;
@@ -248,7 +249,7 @@ impl App {
                     self.global_errors.clear();
                     self.validation_errors = 0;
                     if announce {
-                        self.status_message = "Validation passed".to_string();
+                        self.status.validation_passed();
                     }
                     ValidationResult::Valid(value)
                 } else {
@@ -270,7 +271,7 @@ impl App {
                     }
                     self.validation_errors = count;
                     if announce {
-                        self.status_message = format!("{count} issue(s) remaining");
+                        self.status.issues_remaining(count);
                     }
                     ValidationResult::Invalid
                 }
@@ -279,7 +280,7 @@ impl App {
                 self.form_state.set_error(&err.pointer, err.message.clone());
                 self.global_errors = vec![err.message.clone()];
                 self.validation_errors = 1;
-                self.status_message = err.message;
+                self.status.set_raw(err.message);
                 ValidationResult::Invalid
             }
         }
