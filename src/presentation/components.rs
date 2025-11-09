@@ -11,6 +11,8 @@ use crate::{
     form::{FieldState, FormState},
 };
 
+use unicode_width::UnicodeWidthStr;
+
 use textwrap::wrap;
 
 use super::{PopupRender, UiContext};
@@ -322,12 +324,12 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
     let wrapped_value = wrap(&value_text, clamp_width);
     let inner_width = wrapped_value
         .iter()
-        .map(|line| line.chars().count())
+        .map(|line| UnicodeWidthStr::width(line.as_ref()))
         .max()
         .unwrap_or(0);
     let last_line_width = wrapped_value
         .last()
-        .map(|line| line.chars().count())
+        .map(|line| UnicodeWidthStr::width(line.as_ref()))
         .unwrap_or(0);
     let mut cursor_hint = None;
 
@@ -346,8 +348,10 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
         let value_line_index = lines.len();
         for segment in &wrapped_value {
             let mut content = segment.to_string();
-            while content.chars().count() < inner_width {
+            let mut width = UnicodeWidthStr::width(content.as_str());
+            while width < inner_width {
                 content.push(' ');
+                width += 1;
             }
             lines.push(Line::from(vec![
                 Span::styled("│ ", border_style),
@@ -360,7 +364,7 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
             border_style,
         )));
 
-        let value_width = last_line_width as u16;
+        let value_width = last_line_width.min(u16::MAX as usize) as u16;
         cursor_hint = Some(CursorHint {
             line_offset: value_line_index + wrapped_value.len().saturating_sub(1),
             column_offset: 2,
