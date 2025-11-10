@@ -7,7 +7,7 @@ use ratatui::{
 use crate::form::FormState;
 
 use super::{
-    fields::{FieldRenderOptions, render_fields},
+    fields::render_fields,
     sections::{render_root_tabs, render_section_tabs},
 };
 
@@ -16,7 +16,6 @@ pub fn render_body(
     area: Rect,
     form_state: &mut FormState,
     enable_cursor: bool,
-    options: FieldRenderOptions,
 ) {
     if form_state.is_empty() {
         let placeholder = Paragraph::new("No editable fields in schema")
@@ -54,5 +53,5 @@ pub fn render_body(
         render_section_tabs(frame, chunks[index], form_state);
         index += 1;
     }
-    render_fields(frame, chunks[index], form_state, enable_cursor, options);
+    render_fields(frame, chunks[index], form_state, enable_cursor);
 }
