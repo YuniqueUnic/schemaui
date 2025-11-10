@@ -332,21 +332,43 @@ fn key_value_field(
     let Some(object) = schema.object.as_ref() else {
         return Ok(None);
     };
-    let Some(additional) = object.additional_properties.as_ref() else {
-        return Ok(None);
-    };
-    if !object.properties.is_empty() || !object.pattern_properties.is_empty() {
+    if !object.properties.is_empty() {
         return Ok(None);
     }
 
-    let value_resolved = resolver.resolve_schema(additional)?;
+    if let Some(additional) = object.additional_properties.as_ref() {
+        return build_key_value_from_schema(resolver, schema, additional, None);
+    }
+
+    if let Some((pattern, pattern_schema)) = object.pattern_properties.iter().next() {
+        let key_schema = serde_json::json!({
+            "type": "string",
+            "pattern": pattern,
+            "title": "Key",
+        });
+        return build_key_value_from_schema(resolver, schema, pattern_schema, Some(key_schema));
+    }
+
+    Ok(None)
+}
+
+fn build_key_value_from_schema(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+    value_schema: &Schema,
+    key_override: Option<Value>,
+) -> Result<Option<KeyValueField>> {
+    let object = schema.object.as_ref().expect("object schema");
+    let value_resolved = resolver.resolve_schema(value_schema)?;
     let value_kind = detect_kind(resolver, &value_resolved)?;
     let value_schema = schema_object_to_value(&value_resolved)
-        .context("failed to serialize additionalProperties schema")?;
+        .context("failed to serialize value schema")?;
     let (value_title, value_description, value_default) = schema_titles(&value_resolved, "Value");
 
     let (key_schema_value, key_title, key_description, key_default) =
-        if let Some(names) = object.property_names.as_ref() {
+        if let Some(override_schema) = key_override {
+            (override_schema, "Key".to_string(), None, None)
+        } else if let Some(names) = object.property_names.as_ref() {
             let resolved = resolver.resolve_schema(names)?;
             let serialized = schema_object_to_value(&resolved)
                 .context("failed to serialize propertyNames schema")?;
@@ -687,10 +709,8 @@ mod tests {
             }
         });
         let form = build_form_schema(&schema).expect("schema parsed");
-        let labels_root = form.roots.iter().find(|root| root.id == "labels").unwrap();
-        let section = labels_root.sections.first().unwrap();
-        assert_eq!(section.fields.len(), 1);
-        assert!(matches!(section.fields[0].kind, FieldKind::KeyValue(_)));
+        let field = find_field(&form, |field| field.name == "labels").expect("labels field");
+        assert!(matches!(field.kind, FieldKind::KeyValue(_)));
     }
 
     #[test]
@@ -723,8 +743,40 @@ mod tests {
             }
         });
         let form = build_form_schema(&schema).expect("schema parsed");
-        let runtime = form.roots.iter().find(|root| root.id == "runtime").unwrap();
-        let limits = &runtime.sections[0].children[0];
-        assert_eq!(limits.fields[0].name, "requestTimeout");
+        let field = find_field(&form, |field| {
+            field.pointer.ends_with("/runtime/limits/requestTimeout/value")
+        })
+        .expect("requestTimeout value field");
+        assert_eq!(field.name, "value");
     }
+
+    fn find_field<'a>(
+        form: &'a FormSchema,
+        predicate: impl Fn(&FieldSchema) -> bool,
+    ) -> Option<&'a FieldSchema> {
+        for root in &form.roots {
+            if let Some(field) = find_in_sections(&root.sections, &predicate) {
+                return Some(field);
+            }
+        }
+        None
+    }
+
+    fn find_in_sections<'a>(
+        sections: &'a [FormSection],
+        predicate: &impl Fn(&FieldSchema) -> bool,
+    ) -> Option<&'a FieldSchema> {
+        for section in sections {
+            for field in &section.fields {
+                if predicate(field) {
+                    return Some(field);
+                }
+            }
+            if let Some(found) = find_in_sections(&section.children, predicate) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
 }
