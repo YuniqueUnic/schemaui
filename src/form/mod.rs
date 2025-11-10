@@ -6,4 +6,5 @@ mod state;
 
 pub use composite::CompositeEditorSession;
 pub use field::{CompositePopupData, FieldState, FieldValue};
+pub use section::SectionState;
 pub use state::FormState;

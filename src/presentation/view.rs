@@ -8,14 +8,14 @@ use crate::form::FormState;
 use super::components::{render_body, render_composite_overlay, render_footer, render_popup};
 
 pub struct UiContext<'a> {
-    pub form_state: &'a FormState,
     pub status_message: &'a str,
     pub dirty: bool,
     pub error_count: usize,
     pub help: Option<&'a str>,
     pub global_errors: &'a [String],
+    pub focus_label: Option<String>,
     pub popup: Option<PopupRender<'a>>,
-    pub composite_overlay: Option<CompositeOverlay<'a>>,
+    pub composite_overlay: Option<CompositeOverlay>,
 }
 
 pub struct PopupRender<'a> {
@@ -26,27 +26,34 @@ pub struct PopupRender<'a> {
     pub active: Option<&'a [bool]>,
 }
 
-pub struct CompositeOverlay<'a> {
-    pub title: &'a str,
-    pub description: Option<&'a str>,
-    pub form_state: &'a FormState,
+#[derive(Debug, Clone)]
+pub struct CompositeOverlay {
+    pub title: String,
+    pub description: Option<String>,
+    pub dirty: bool,
+    pub instructions: String,
 }
 
-pub fn draw(frame: &mut Frame<'_>, ctx: UiContext<'_>) {
+pub fn draw(
+    frame: &mut Frame<'_>,
+    form_state: &mut FormState,
+    overlay_form: Option<&mut FormState>,
+    ctx: UiContext<'_>,
+) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(7), Constraint::Length(3)])
         .split(frame.area());
 
     let cursor_enabled = ctx.popup.is_none() && ctx.composite_overlay.is_none();
-    render_body(frame, chunks[0], ctx.form_state, cursor_enabled);
+    render_body(frame, chunks[0], form_state, cursor_enabled);
     render_footer(frame, chunks[1], &ctx);
 
     if let Some(popup) = ctx.popup {
         render_popup(frame, popup);
     }
 
-    if let Some(overlay) = ctx.composite_overlay {
-        render_composite_overlay(frame, overlay);
+    if let (Some(meta), Some(mut overlay_state)) = (ctx.composite_overlay.as_ref(), overlay_form) {
+        render_composite_overlay(frame, meta, &mut overlay_state);
     }
 }

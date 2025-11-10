@@ -25,7 +25,7 @@ pub struct CompositeVariantState {
     form: RefCell<Option<FormState>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompositeEditorSession {
     pub variant_index: usize,
     pub title: String,
@@ -34,10 +34,171 @@ pub struct CompositeEditorSession {
 }
 
 #[derive(Debug, Clone)]
+pub struct CompositeListEditorContext {
+    pub entry_index: usize,
+    pub entry_label: String,
+    pub session: CompositeEditorSession,
+}
+
+#[derive(Debug, Clone)]
 pub struct CompositeVariantSummary {
     pub title: String,
     pub description: Option<String>,
     pub lines: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CompositeListState {
+    pointer: String,
+    template: CompositeField,
+    entries: Vec<CompositeListEntry>,
+    selected: usize,
+    counter: usize,
+}
+
+#[derive(Debug, Clone)]
+struct CompositeListEntry {
+    pointer: String,
+    state: CompositeState,
+}
+
+impl CompositeListState {
+    pub fn new(pointer: &str, template: CompositeField) -> Self {
+        Self {
+            pointer: pointer.to_string(),
+            template,
+            entries: Vec::new(),
+            selected: 0,
+            counter: 0,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn selected_index(&self) -> Option<usize> {
+        if self.entries.is_empty() {
+            None
+        } else {
+            Some(self.selected.min(self.entries.len() - 1))
+        }
+    }
+
+    pub fn select(&mut self, delta: i32) -> bool {
+        if self.entries.is_empty() {
+            return false;
+        }
+        let len = self.entries.len() as i32;
+        let next = (self.selected as i32 + delta).clamp(0, len - 1);
+        let changed = next as usize != self.selected;
+        self.selected = next as usize;
+        changed
+    }
+
+    pub fn add_entry(&mut self) -> usize {
+        let entry_pointer = format!("{}/entry_{}", self.pointer, self.counter);
+        self.counter += 1;
+        let state = CompositeState::new(&entry_pointer, &self.template);
+        self.entries.push(CompositeListEntry {
+            pointer: entry_pointer,
+            state,
+        });
+        self.selected = self.entries.len().saturating_sub(1);
+        self.selected
+    }
+
+    pub fn remove_selected(&mut self) -> bool {
+        if self.entries.is_empty() {
+            return false;
+        }
+        let idx = self.selected.min(self.entries.len() - 1);
+        self.entries.remove(idx);
+        if idx >= self.entries.len() {
+            self.selected = self.entries.len().saturating_sub(1);
+        }
+        true
+    }
+
+    pub fn move_selected(&mut self, delta: i32) -> bool {
+        if self.entries.len() < 2 {
+            return false;
+        }
+        let len = self.entries.len() as i32;
+        let next = self.selected as i32 + delta;
+        if next < 0 || next >= len {
+            return false;
+        }
+        self.entries.swap(self.selected, next as usize);
+        self.selected = next as usize;
+        self.refresh_entry_pointers();
+        true
+    }
+
+    pub fn selected_label(&self) -> Option<String> {
+        let idx = self.selected_index()?;
+        let entry = self.entries.get(idx)?;
+        Some(format!("#{} {}", idx + 1, entry.state.summary()))
+    }
+
+    pub fn open_selected_editor(
+        &mut self,
+    ) -> Result<CompositeListEditorContext, FieldCoercionError> {
+        let idx = self.selected_index().ok_or_else(|| FieldCoercionError {
+            pointer: self.pointer.clone(),
+            message: "no entry selected".to_string(),
+        })?;
+        let entry = self
+            .entries
+            .get(idx)
+            .ok_or_else(|| FieldCoercionError {
+                pointer: self.pointer.clone(),
+                message: "invalid entry selection".to_string(),
+            })?;
+        let variant_index = entry
+            .state
+            .active_indices()
+            .first()
+            .copied()
+            .unwrap_or(0);
+        let session = entry
+            .state
+            .take_editor_session(&entry.pointer, variant_index)?;
+        Ok(CompositeListEditorContext {
+            entry_index: idx,
+            entry_label: format!("#{} {}", idx + 1, entry.state.summary()),
+            session,
+        })
+    }
+
+    pub fn restore_entry_editor(
+        &mut self,
+        entry_index: usize,
+        session: CompositeEditorSession,
+    ) {
+        if let Some(entry) = self.entries.get(entry_index) {
+            entry.state.restore_editor_session(session);
+        }
+    }
+
+    pub fn build_value(&self) -> Result<Option<Value>, FieldCoercionError> {
+        let mut values = Vec::new();
+        for entry in &self.entries {
+            match entry.state.build_value(false)? {
+                Some(value) => values.push(value),
+                None => values.push(Value::Null),
+            }
+        }
+        Ok(Some(Value::Array(values)))
+    }
+
+    fn refresh_entry_pointers(&mut self) {
+        for (index, entry) in self.entries.iter_mut().enumerate() {
+            let pointer = format!("{}/entry_{}", self.pointer, index);
+            entry.pointer = pointer.clone();
+            entry.state.rebind_pointer(&pointer);
+        }
+    }
 }
 
 impl CompositeState {
@@ -87,6 +248,10 @@ impl CompositeState {
 
     pub fn pointer(&self) -> &str {
         &self.pointer
+    }
+
+    pub fn rebind_pointer(&mut self, pointer: &str) {
+        self.pointer = pointer.to_string();
     }
 
     pub fn is_multi(&self) -> bool {
