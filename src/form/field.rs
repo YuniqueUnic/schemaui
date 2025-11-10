@@ -1,9 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde_json::Value;
 
-use crate::domain::{CompositeField, CompositeMode, FieldKind, FieldSchema};
+use crate::domain::{FieldKind, FieldSchema};
 
-use super::error::FieldCoercionError;
+use super::{composite::CompositeState, error::FieldCoercionError};
 
 #[derive(Debug, Clone)]
 pub enum FieldValue {
@@ -19,6 +19,14 @@ pub enum FieldValue {
     },
     Array(String),
     Composite(CompositeState),
+}
+
+#[derive(Debug, Clone)]
+pub struct CompositePopupData {
+    pub options: Vec<String>,
+    pub selected: usize,
+    pub multi: bool,
+    pub active: Vec<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -95,7 +103,9 @@ impl FieldState {
                     FieldValue::Array(default)
                 }
             },
-            FieldKind::Composite(meta) => FieldValue::Composite(CompositeState::from(meta)),
+            FieldKind::Composite(meta) => {
+                FieldValue::Composite(CompositeState::new(&schema.pointer, meta))
+            }
         };
 
         FieldState {
@@ -229,6 +239,42 @@ impl FieldState {
         }
     }
 
+    pub fn composite_popup(&self) -> Option<CompositePopupData> {
+        if let FieldValue::Composite(state) = &self.value {
+            let options = state.option_titles();
+            if options.is_empty() {
+                return None;
+            }
+            let selected = state.selected_index().unwrap_or(0).min(options.len() - 1);
+            let active = state.active_flags();
+            let multi = state.is_multi();
+            return Some(CompositePopupData {
+                options,
+                selected,
+                multi,
+                active,
+            });
+        }
+        None
+    }
+
+    pub fn apply_composite_selection(&mut self, selection: usize, multi_flags: Option<Vec<bool>>) {
+        if let FieldValue::Composite(state) = &mut self.value {
+            let changed = if state.is_multi() {
+                if let Some(flags) = multi_flags {
+                    state.apply_multi(&flags)
+                } else {
+                    false
+                }
+            } else {
+                state.apply_single(selection)
+            };
+            if changed {
+                self.after_edit();
+            }
+        }
+    }
+
     pub fn multi_states(&self) -> Option<&[bool]> {
         if let FieldValue::MultiSelect { selected, .. } = &self.value {
             Some(selected)
@@ -266,7 +312,15 @@ impl FieldState {
                 }
             }
             FieldValue::Array(buffer) => format!("[{}]", buffer.trim()),
-            FieldValue::Composite(state) => state.summary(),
+            FieldValue::Composite(state) => {
+                let mut label = state.summary();
+                if !state.is_multi() {
+                    label.push_str(" (Enter to choose)");
+                } else {
+                    label.push_str(" (Enter to toggle)");
+                }
+                label
+            }
         }
     }
 
@@ -298,7 +352,9 @@ impl FieldState {
             (FieldKind::Array(inner), FieldValue::Array(buffer)) => {
                 array_value(buffer, inner.as_ref(), &self.schema)
             }
-            (FieldKind::Composite(_), FieldValue::Composite(_)) => Ok(None),
+            (FieldKind::Composite(_), FieldValue::Composite(state)) => {
+                state.build_value(self.schema.required)
+            }
             (FieldKind::Composite(_), FieldValue::Text(text)) => string_value(text, &self.schema),
             _ => Ok(None),
         }
@@ -473,65 +529,5 @@ fn adjust_numeric_value(buffer: &mut String, kind: &FieldKind, delta: i64) -> bo
             true
         }
         _ => false,
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CompositeState {
-    mode: CompositeMode,
-    variants: Vec<CompositeOptionState>,
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-struct CompositeOptionState {
-    id: String,
-    title: String,
-    description: Option<String>,
-    schema: Value,
-    active: bool,
-}
-
-impl CompositeState {
-    fn from(field: &CompositeField) -> Self {
-        let mut variants = Vec::new();
-        for (index, variant) in field.variants.iter().enumerate() {
-            variants.push(CompositeOptionState {
-                id: variant.id.clone(),
-                title: variant.title.clone(),
-                description: variant.description.clone(),
-                schema: variant.schema.clone(),
-                active: field.mode == CompositeMode::OneOf && index == 0,
-            });
-        }
-
-        Self {
-            mode: field.mode.clone(),
-            variants,
-        }
-    }
-
-    pub fn summary(&self) -> String {
-        match self.mode {
-            CompositeMode::OneOf => self
-                .variants
-                .iter()
-                .find(|variant| variant.active)
-                .map(|variant| format!("Variant: {}", variant.title))
-                .unwrap_or_else(|| "Variant: <none>".to_string()),
-            CompositeMode::AnyOf => {
-                let active = self
-                    .variants
-                    .iter()
-                    .filter(|variant| variant.active)
-                    .map(|variant| variant.title.clone())
-                    .collect::<Vec<_>>();
-                if active.is_empty() {
-                    "Variants: []".to_string()
-                } else {
-                    format!("Variants: {}", active.join(", "))
-                }
-            }
-        }
     }
 }

@@ -210,9 +210,20 @@ impl App {
     ) {
         if let Some(field) = self.form_state.field_mut_by_pointer(pointer) {
             if let Some(flags) = multi {
-                field.set_multi_selection(&flags);
+                match &field.schema.kind {
+                    FieldKind::Composite(_) => {
+                        field.apply_composite_selection(selection, Some(flags));
+                    }
+                    FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Enum(_)) => {
+                        field.set_multi_selection(&flags);
+                    }
+                    _ => {}
+                }
             } else {
                 match &field.schema.kind {
+                    FieldKind::Composite(_) => {
+                        field.apply_composite_selection(selection, None);
+                    }
                     FieldKind::Boolean => field.set_bool(selection == 0),
                     FieldKind::Enum(_) => field.set_enum_selected(selection),
                     _ => {}
