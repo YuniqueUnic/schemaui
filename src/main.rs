@@ -1,9 +1,9 @@
+use color_eyre::eyre::{Result, WrapErr, eyre};
 use schemaui::SchemaUI;
 use serde_json::json;
 
-type AppResult<T> = Result<T, Box<dyn std::error::Error>>;
-
-fn main() -> AppResult<()> {
+fn main() -> Result<()> {
+    color_eyre::install()?;
     let schema = json!({
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "Unified Platform Configuration",
@@ -331,8 +331,14 @@ fn main() -> AppResult<()> {
         "additionalProperties": false
     });
 
-    let value = SchemaUI::new(schema).with_title("SchemaUI Demo").run()?;
+    let value = SchemaUI::new(schema)
+        .with_title("SchemaUI Demo")
+        .run()
+        .map_err(|err| eyre!(err))
+        .wrap_err("failed to run SchemaUI demo")?;
 
-    println!("{}", serde_json::to_string_pretty(&value)?);
+    let pretty = serde_json::to_string_pretty(&value)
+        .wrap_err("failed to format SchemaUI result as JSON")?;
+    println!("{pretty}");
     Ok(())
 }

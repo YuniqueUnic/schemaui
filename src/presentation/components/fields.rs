@@ -93,27 +93,29 @@ pub fn render_fields(
             (cursor_hint, field_heights.get(selected_index).copied())
         && selected_index >= viewport_top
     {
-        let mut relative_y = 0usize;
-        for idx in field_heights.iter().take(selected_index).skip(viewport_top) {
-            relative_y += field_heights[*idx];
-        }
+        let relative_y: usize = field_heights
+            .iter()
+            .take(selected_index)
+            .skip(viewport_top)
+            .copied()
+            .sum();
         let caret_line = relative_y + cursor.line_in_field.min(height.saturating_sub(1));
         let max_visible = field_area.height.saturating_sub(3) as usize;
-        // #[cfg(debug_assertions)]
-        // println!(
-        //     "[cursor-debug] selected={} scroll_offset={} relative_y={} caret_line={} max_visible={}",
-        //     selected_index, section.scroll_offset, relative_y, caret_line, max_visible
-        // );
+        #[cfg(feature = "debug")]
+        println!(
+            "[cursor-debug] selected={} scroll_offset={} relative_y={} caret_line={} max_visible={}",
+            selected_index, section.scroll_offset, relative_y, caret_line, max_visible
+        );
         if caret_line <= max_visible {
             let inner_y = field_area.y.saturating_add(2);
             let inner_x = field_area.x.saturating_add(1);
-            // #[cfg(debug_assertions)]
-            // println!(
-            //     "[cursor-debug-xy] inner_y={} caret_line={} cursor_y={}",
-            //     inner_y,
-            //     caret_line,
-            //     inner_y + caret_line as u16
-            // );
+            #[cfg(feature = "debug")]
+            println!(
+                "[cursor-debug-xy] inner_y={} caret_line={} cursor_y={}",
+                inner_y,
+                caret_line,
+                inner_y + caret_line as u16
+            );
             let cursor_y = inner_y.saturating_add(caret_line as u16);
             let cursor_x = inner_x
                 .saturating_add(2)
