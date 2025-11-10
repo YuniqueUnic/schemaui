@@ -223,14 +223,17 @@ fn build_entry_form_state(template: &ScalarArrayTemplate, value: &Value) -> Form
         id: "array_entry".to_string(),
         title: template.label.clone(),
         description: template.description.clone(),
+        path: vec!["value".to_string()],
+        depth: 0,
         fields: vec![field_state],
         scroll_offset: 0,
     };
-    FormState {
-        sections: vec![section],
-        section_index: 0,
-        field_index: 0,
-    }
+    FormState::from_sections(
+        "array_entry",
+        template.label.clone(),
+        template.description.clone(),
+        vec![section],
+    )
 }
 
 struct FieldSchemaStub {

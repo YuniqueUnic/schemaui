@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use super::schema::{
     CompositeField, CompositeMode, CompositeVariant, FieldKind, FieldSchema, FormSchema,
-    FormSection, KeyValueField,
+    FormSection, KeyValueField, RootSection,
 };
 
 #[derive(Debug, Clone)]
@@ -18,6 +18,35 @@ struct SectionInfo {
     id: String,
     title: String,
     description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct RootBuilder {
+    id: String,
+    title: String,
+    description: Option<String>,
+    sections: Vec<FormSection>,
+}
+
+impl RootBuilder {
+    fn new(name: &str, schema: &SchemaObject) -> Self {
+        let meta = section_info_for_object(schema, name, None);
+        Self {
+            id: name.to_string(),
+            title: meta.title,
+            description: meta.description,
+            sections: Vec::new(),
+        }
+    }
+
+    fn into_root(self) -> RootSection {
+        RootSection {
+            id: self.id,
+            title: self.title,
+            description: self.description,
+            sections: self.sections,
+        }
+    }
 }
 
 pub fn parse_form_schema(schema_value: &Value) -> Result<FormSchema> {
@@ -30,33 +59,92 @@ pub fn parse_form_schema(schema_value: &Value) -> Result<FormSchema> {
         .ok_or_else(|| anyhow!("root schema must be an object"))?;
     ensure_object_schema(&root_object)?;
 
-    let mut section_meta: IndexMap<String, SectionInfo> = IndexMap::new();
-    let mut section_fields: IndexMap<String, Vec<FieldSchema>> = IndexMap::new();
+    let mut roots: IndexMap<String, RootBuilder> = IndexMap::new();
+    let mut general_fields: Vec<(usize, FieldSchema)> = Vec::new();
+    let mut order_counter = 0usize;
+    let object = root_object
+        .object
+        .as_ref()
+        .context("root schema must define properties")?;
+    let required = required_set(object);
 
-    parse_object_fields(
-        &context,
-        &root_object,
-        Vec::new(),
-        None,
-        &mut section_meta,
-        &mut section_fields,
-    )?;
-
-    let mut sections: Vec<FormSection> = section_meta
-        .into_iter()
-        .map(|(id, meta)| FormSection {
-            title: meta.title,
-            description: meta.description,
-            fields: section_fields.shift_remove(&id).unwrap_or_default(),
-            id,
-        })
-        .collect();
-
-    if let Some(pos) = sections.iter().position(|section| section.id == "general") {
-        if pos != 0 {
-            let general = sections.remove(pos);
-            sections.insert(0, general);
+    for (name, property_schema) in &object.properties {
+        let mut path = Vec::with_capacity(1);
+        path.push(name.clone());
+        let resolved = context.resolve_schema(property_schema)?;
+        if should_descend(&resolved) {
+            let entry = roots
+                .entry(name.clone())
+                .or_insert_with(|| RootBuilder::new(name, &resolved));
+            let section = build_section_tree(&context, &resolved, path, None, &mut order_counter)?;
+            entry.sections.push(section);
+        } else {
+            let field = build_field_schema(
+                &context,
+                &resolved,
+                name,
+                vec![name.clone()],
+                general_section_info(),
+                required.contains(name),
+            )?;
+            general_fields.push((order_counter, field));
+            order_counter += 1;
         }
+    }
+
+    if let Some(additional) = object.additional_properties.as_ref() {
+        let resolved = context.resolve_schema(additional)?;
+        let field = build_field_schema(
+            &context,
+            &resolved,
+            "additional",
+            Vec::new(),
+            general_section_info(),
+            false,
+        )?;
+        general_fields.push((order_counter, field));
+    }
+
+    general_fields.sort_by_key(|(order, _)| *order);
+
+    let mut roots_out = Vec::new();
+    if !general_fields.is_empty() {
+        let fields = general_fields.into_iter().map(|(_, field)| field).collect();
+        roots_out.push(RootSection {
+            id: "general".to_string(),
+            title: "General".to_string(),
+            description: None,
+            sections: vec![FormSection {
+                id: "general".to_string(),
+                title: "General".to_string(),
+                description: None,
+                path: Vec::new(),
+                fields,
+                children: Vec::new(),
+            }],
+        });
+    }
+
+    for (_, builder) in roots {
+        if !builder.sections.is_empty() {
+            roots_out.push(builder.into_root());
+        }
+    }
+
+    if roots_out.is_empty() {
+        roots_out.push(RootSection {
+            id: "general".to_string(),
+            title: "General".to_string(),
+            description: None,
+            sections: vec![FormSection {
+                id: "general".to_string(),
+                title: "General".to_string(),
+                description: None,
+                path: Vec::new(),
+                fields: Vec::new(),
+                children: Vec::new(),
+            }],
+        });
     }
 
     Ok(FormSchema {
@@ -65,95 +153,99 @@ pub fn parse_form_schema(schema_value: &Value) -> Result<FormSchema> {
             .metadata
             .as_ref()
             .and_then(|m| m.description.clone()),
-        sections,
+        roots: roots_out,
     })
 }
 
-fn parse_object_fields(
+fn build_section_tree(
     context: &SchemaContext<'_>,
     schema: &SchemaObject,
-    path_prefix: Vec<String>,
-    parent_section: Option<SectionInfo>,
-    meta: &mut IndexMap<String, SectionInfo>,
-    slots: &mut IndexMap<String, Vec<FieldSchema>>,
-) -> Result<()> {
+    path: Vec<String>,
+    parent_section: Option<&SectionInfo>,
+    order: &mut usize,
+) -> Result<FormSection> {
+    let name = path
+        .last()
+        .cloned()
+        .unwrap_or_else(|| "section".to_string());
+    let section_info = section_info_for_object(schema, &name, parent_section);
     let object = schema
         .object
         .as_ref()
         .context("object schema must define properties")?;
     let required = required_set(object);
 
-    for (name, property_schema) in &object.properties {
-        let mut next_path = path_prefix.clone();
-        next_path.push(name.clone());
-        let resolved = context.resolve_schema(property_schema)?;
+    let mut fields: Vec<(usize, FieldSchema)> = Vec::new();
+    let mut children = Vec::new();
 
-        let descend = is_object_schema(&resolved)
-            && resolved
-                .object
-                .as_ref()
-                .map(|obj| !obj.properties.is_empty())
-                .unwrap_or(false)
-            && !has_composite_subschemas(&resolved);
-
-        if descend {
-            let next_section = section_info_for_object(&resolved, name, parent_section.as_ref());
-            meta.entry(next_section.id.clone())
-                .or_insert_with(|| next_section.clone());
-            slots.entry(next_section.id.clone()).or_default();
-            parse_object_fields(
+    for (child_name, child_schema) in &object.properties {
+        let mut next_path = path.clone();
+        next_path.push(child_name.clone());
+        let resolved = context.resolve_schema(child_schema)?;
+        if should_descend(&resolved) {
+            let child =
+                build_section_tree(context, &resolved, next_path, Some(&section_info), order)?;
+            children.push(child);
+        } else {
+            let field = build_field_schema(
                 context,
                 &resolved,
+                child_name,
                 next_path,
-                Some(next_section),
-                meta,
-                slots,
+                section_info.clone(),
+                required.contains(child_name),
             )?;
-            continue;
+            fields.push((*order, field));
+            *order += 1;
         }
-
-        let section = section_info_for_field(&resolved, &next_path, parent_section.as_ref());
-        meta.entry(section.id.clone())
-            .or_insert_with(|| section.clone());
-
-        let field = build_field_schema(
-            context,
-            &resolved,
-            name,
-            next_path,
-            section,
-            required.contains(name),
-        )?;
-        slots
-            .entry(field.section_id.clone())
-            .or_default()
-            .push(field);
     }
 
     if let Some(additional) = object.additional_properties.as_ref() {
         let resolved = context.resolve_schema(additional)?;
-        let field_name = path_prefix
+        let field_name = path
             .last()
             .cloned()
             .unwrap_or_else(|| "additional".to_string());
-        let section = section_info_for_field(&resolved, &path_prefix, parent_section.as_ref());
-        meta.entry(section.id.clone())
-            .or_insert_with(|| section.clone());
         let field = build_field_schema(
             context,
             &resolved,
             &field_name,
-            path_prefix.clone(),
-            section,
+            path.clone(),
+            section_info.clone(),
             false,
         )?;
-        slots
-            .entry(field.section_id.clone())
-            .or_default()
-            .push(field);
+        fields.push((*order, field));
+        *order += 1;
     }
 
-    Ok(())
+    fields.sort_by_key(|(pos, _)| *pos);
+
+    Ok(FormSection {
+        id: section_info.id,
+        title: section_info.title,
+        description: section_info.description,
+        path,
+        fields: fields.into_iter().map(|(_, field)| field).collect(),
+        children,
+    })
+}
+
+fn general_section_info() -> SectionInfo {
+    SectionInfo {
+        id: "general".to_string(),
+        title: "General".to_string(),
+        description: None,
+    }
+}
+
+fn should_descend(schema: &SchemaObject) -> bool {
+    is_object_schema(schema)
+        && schema
+            .object
+            .as_ref()
+            .map(|obj| !obj.properties.is_empty())
+            .unwrap_or(false)
+        && !has_composite_subschemas(schema)
 }
 
 fn build_field_schema(
@@ -325,8 +417,13 @@ fn build_composite(
     for (index, variant) in schemas.iter().enumerate() {
         let resolved = context.resolve_schema(variant)?;
         ensure_object_schema(&resolved)?;
-        let schema_value = serde_json::to_value(&Schema::Object(resolved.clone()))
+        let mut schema_value = serde_json::to_value(&Schema::Object(resolved.clone()))
             .context("failed to serialize composite variant schema")?;
+        if let Some(definitions) = context.definitions_snapshot() {
+            if let Value::Object(ref mut map) = schema_value {
+                map.entry("definitions".to_string()).or_insert(definitions);
+            }
+        }
         let title = resolved
             .metadata
             .as_ref()
@@ -445,59 +542,6 @@ fn section_info_for_object(
     }
 }
 
-fn section_info_for_field(
-    schema: &SchemaObject,
-    path: &[String],
-    parent: Option<&SectionInfo>,
-) -> SectionInfo {
-    if let Some(group) = extension_string(schema, "x-group") {
-        let title =
-            extension_string(schema, "x-group-title").unwrap_or_else(|| prettify_label(&group));
-        let description = extension_string(schema, "x-group-description");
-        return SectionInfo {
-            id: group,
-            title,
-            description,
-        };
-    }
-
-    if schema_prefers_own_section(schema) {
-        if let Some(key) = path.first() {
-            return SectionInfo {
-                id: key.clone(),
-                title: prettify_label(key),
-                description: schema
-                    .metadata
-                    .as_ref()
-                    .and_then(|m| m.description.clone())
-                    .or_else(|| parent.and_then(|p| p.description.clone())),
-            };
-        }
-    }
-
-    if let Some(parent_section) = parent {
-        return parent_section.clone();
-    }
-
-    if path.len() > 1 {
-        let id = path
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "general".to_string());
-        return SectionInfo {
-            title: prettify_label(&id),
-            description: None,
-            id,
-        };
-    }
-
-    SectionInfo {
-        id: "general".to_string(),
-        title: "General".to_string(),
-        description: None,
-    }
-}
-
 fn metadata_map(schema: &SchemaObject) -> HashMap<String, Value> {
     schema
         .extensions
@@ -591,46 +635,6 @@ fn has_composite_subschemas(schema: &SchemaObject) -> bool {
         .unwrap_or(false)
 }
 
-fn schema_prefers_own_section(schema: &SchemaObject) -> bool {
-    if has_composite_subschemas(schema) {
-        return true;
-    }
-    if instance_type(schema) == Some(InstanceType::Object) {
-        return true;
-    }
-    if schema
-        .object
-        .as_ref()
-        .map(|obj| obj.additional_properties.is_some())
-        .unwrap_or(false)
-    {
-        return true;
-    }
-    if array_has_object_items(schema) {
-        return true;
-    }
-    false
-}
-
-fn array_has_object_items(schema: &SchemaObject) -> bool {
-    let array = match &schema.array {
-        Some(array) => array,
-        None => return false,
-    };
-    match &array.items {
-        Some(SingleOrVec::Single(item)) => schema_is_object(item),
-        Some(SingleOrVec::Vec(items)) => items.iter().any(schema_is_object),
-        None => false,
-    }
-}
-
-fn schema_is_object(def: &Schema) -> bool {
-    match def {
-        Schema::Object(obj) => is_object_schema(obj),
-        Schema::Bool(_) => false,
-    }
-}
-
 struct SchemaContext<'a> {
     raw: &'a Value,
     root: &'a RootSchema,
@@ -656,6 +660,13 @@ impl<'a> SchemaContext<'a> {
                 }
             }
         }
+    }
+
+    fn definitions_snapshot(&self) -> Option<Value> {
+        self.raw
+            .as_object()
+            .and_then(|obj| obj.get("definitions"))
+            .cloned()
     }
 
     fn follow_reference(&self, reference: &str) -> Result<SchemaObject> {
