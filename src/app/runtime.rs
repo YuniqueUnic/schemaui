@@ -833,6 +833,7 @@ impl App {
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
+        self.reopen_overlay_if_needed(&pointer);
         true
     }
 
@@ -867,6 +868,7 @@ impl App {
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
+        self.reopen_overlay_if_needed(&pointer);
         true
     }
 
@@ -898,6 +900,7 @@ impl App {
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
+        self.reopen_overlay_if_needed(&pointer);
         true
     }
 
@@ -925,7 +928,21 @@ impl App {
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
+        self.reopen_overlay_if_needed(&pointer);
         true
+    }
+
+    fn reopen_overlay_if_needed(&mut self, pointer: &str) {
+        let needs = self
+            .composite_editor
+            .as_ref()
+            .map(|editor| editor.field_pointer == pointer)
+            .unwrap_or(false);
+        if !needs {
+            return;
+        }
+        self.close_composite_editor(true);
+        self.try_open_composite_editor();
     }
 
     fn refresh_list_overlay_panel(&mut self) {

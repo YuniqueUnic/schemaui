@@ -42,7 +42,7 @@ pub fn parse_form_schema(schema_value: &Value) -> Result<FormSchema> {
         &mut section_fields,
     )?;
 
-    let sections = section_meta
+    let mut sections: Vec<FormSection> = section_meta
         .into_iter()
         .map(|(id, meta)| FormSection {
             title: meta.title,
@@ -51,6 +51,13 @@ pub fn parse_form_schema(schema_value: &Value) -> Result<FormSchema> {
             id,
         })
         .collect();
+
+    if let Some(pos) = sections.iter().position(|section| section.id == "general") {
+        if pos != 0 {
+            let general = sections.remove(pos);
+            sections.insert(0, general);
+        }
+    }
 
     Ok(FormSchema {
         title: root_object.metadata.as_ref().and_then(|m| m.title.clone()),
@@ -219,8 +226,14 @@ fn detect_kind(context: &SchemaContext<'_>, schema: &SchemaObject) -> Result<Fie
                 | FieldKind::Number
                 | FieldKind::Boolean
                 | FieldKind::Enum(_)
-                | FieldKind::Json
                 | FieldKind::Composite(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
+                FieldKind::Json => {
+                    if let Some(composite) = inline_object_composite(&inner)? {
+                        Ok(FieldKind::Array(Box::new(FieldKind::Composite(composite))))
+                    } else {
+                        Ok(FieldKind::Array(Box::new(FieldKind::Json)))
+                    }
+                }
                 FieldKind::KeyValue(_) => {
                     bail!("arrays of key/value maps are not supported")
                 }
@@ -376,6 +389,29 @@ fn key_value_entry_schema(key_schema: &Value, value_schema: &Value) -> Value {
             "value": value_schema,
         }
     })
+}
+
+fn inline_object_composite(schema: &SchemaObject) -> Result<Option<CompositeField>> {
+    if !is_object_schema(schema) {
+        return Ok(None);
+    }
+    let schema_value = schema_object_to_value(schema)?;
+    let title = schema
+        .metadata
+        .as_ref()
+        .and_then(|m| m.title.clone())
+        .unwrap_or_else(|| "Entry".to_string());
+    let description = schema.metadata.as_ref().and_then(|m| m.description.clone());
+    let variant = CompositeVariant {
+        id: "variant_0".to_string(),
+        title,
+        description,
+        schema: schema_value,
+    };
+    Ok(Some(CompositeField {
+        mode: CompositeMode::OneOf,
+        variants: vec![variant],
+    }))
 }
 
 fn section_info_for_object(
@@ -570,7 +606,29 @@ fn schema_prefers_own_section(schema: &SchemaObject) -> bool {
     {
         return true;
     }
+    if array_has_object_items(schema) {
+        return true;
+    }
     false
+}
+
+fn array_has_object_items(schema: &SchemaObject) -> bool {
+    let array = match &schema.array {
+        Some(array) => array,
+        None => return false,
+    };
+    match &array.items {
+        Some(SingleOrVec::Single(item)) => schema_is_object(item),
+        Some(SingleOrVec::Vec(items)) => items.iter().any(schema_is_object),
+        None => false,
+    }
+}
+
+fn schema_is_object(def: &Schema) -> bool {
+    match def {
+        Schema::Object(obj) => is_object_schema(obj),
+        Schema::Bool(_) => false,
+    }
 }
 
 struct SchemaContext<'a> {
