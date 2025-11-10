@@ -26,6 +26,21 @@ More POC:
 2. parse json schema at compile time Then generate the code for TUI/Web, expose
    nessessary APIs for runtime.
 
+### Keyboard Shortcuts
+
+| Context              | Keys                                       | Description                                              |
+| -------------------- | ------------------------------------------ | -------------------------------------------------------- |
+| Global               | `Tab` / `Shift+Tab`                         | Move between fields and sections                         |
+|                      | `Enter`                                     | Open popup/variant selector                              |
+|                      | `Ctrl+E`                                    | Edit composite field or open overlay                     |
+|                      | `Ctrl+S`                                    | Save (runs schema validation)                            |
+|                      | `Ctrl+Q`                                    | Quit (prompts when unsaved)                              |
+| Composite/KeyValue   | `Ctrl+N` / `Ctrl+D`                         | Add or remove list/map entries                           |
+| lists & key/value    | `Ctrl+←` / `Ctrl+→`                         | Select previous/next entry                               |
+| maps                 | `Ctrl+↑` / `Ctrl+↓`                         | Reorder selected entry                                   |
+| Overlay editors      | `Ctrl+S` / `Esc`                            | Save overlay / close overlay (press `Esc` twice to abort) |
+|                      | `Tab` / `Shift+Tab`                         | Navigate overlay fields                                  |
+
 ### License
 
 Licensed under either of

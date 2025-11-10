@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use super::schema::{
     CompositeField, CompositeMode, CompositeVariant, FieldKind, FieldSchema, FormSchema,
-    FormSection,
+    FormSection, KeyValueField,
 };
 
 #[derive(Debug, Clone)]
@@ -183,6 +183,9 @@ fn build_field_schema(
 }
 
 fn detect_kind(context: &SchemaContext<'_>, schema: &SchemaObject) -> Result<FieldKind> {
+    if let Some(key_value) = key_value_field(context, schema)? {
+        return Ok(FieldKind::KeyValue(key_value));
+    }
     if let Some(composite) = composite_field(context, schema)? {
         return Ok(FieldKind::Composite(composite));
     }
@@ -218,11 +221,66 @@ fn detect_kind(context: &SchemaContext<'_>, schema: &SchemaObject) -> Result<Fie
                 | FieldKind::Enum(_)
                 | FieldKind::Json
                 | FieldKind::Composite(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
+                FieldKind::KeyValue(_) => {
+                    bail!("arrays of key/value maps are not supported")
+                }
                 FieldKind::Array(_) => bail!("nested arrays are not supported"),
             }
         }
         Some(other) => bail!("unsupported field type {other:?}"),
     }
+}
+
+fn key_value_field(
+    context: &SchemaContext<'_>,
+    schema: &SchemaObject,
+) -> Result<Option<KeyValueField>> {
+    let Some(object) = schema.object.as_ref() else {
+        return Ok(None);
+    };
+    let Some(additional) = object.additional_properties.as_ref() else {
+        return Ok(None);
+    };
+    if !object.properties.is_empty() || !object.pattern_properties.is_empty() {
+        return Ok(None);
+    }
+
+    let value_resolved = context.resolve_schema(additional)?;
+    let value_kind = detect_kind(context, &value_resolved)?;
+    let value_schema = schema_object_to_value(&value_resolved)
+        .context("failed to serialize additionalProperties schema")?;
+    let (value_title, value_description, value_default) = schema_titles(&value_resolved, "Value");
+
+    let (key_schema_value, key_title, key_description, key_default) =
+        if let Some(names) = object.property_names.as_ref() {
+            let resolved = context.resolve_schema(names)?;
+            let serialized = schema_object_to_value(&resolved)
+                .context("failed to serialize propertyNames schema")?;
+            let (title, description, default) = schema_titles(&resolved, "Key");
+            (serialized, title, description, default)
+        } else {
+            (
+                serde_json::json!({"type": "string", "title": "Key"}),
+                "Key".to_string(),
+                None,
+                None,
+            )
+        };
+
+    let entry_schema = key_value_entry_schema(&key_schema_value, &value_schema);
+
+    Ok(Some(KeyValueField {
+        key_title,
+        key_description,
+        key_default,
+        key_schema: key_schema_value,
+        value_title,
+        value_description,
+        value_default,
+        value_schema,
+        value_kind: Box::new(value_kind),
+        entry_schema,
+    }))
 }
 
 fn composite_field(
@@ -291,6 +349,33 @@ fn resolve_array_items(
             None => bail!("tuple arrays without items are not supported"),
         },
     }
+}
+
+fn schema_object_to_value(schema: &SchemaObject) -> Result<Value> {
+    serde_json::to_value(Schema::Object(schema.clone()))
+        .context("failed to serialize schema object")
+}
+
+fn schema_titles(schema: &SchemaObject, fallback: &str) -> (String, Option<String>, Option<Value>) {
+    let title = schema
+        .metadata
+        .as_ref()
+        .and_then(|m| m.title.clone())
+        .unwrap_or_else(|| fallback.to_string());
+    let description = schema.metadata.as_ref().and_then(|m| m.description.clone());
+    let default = schema.metadata.as_ref().and_then(|m| m.default.clone());
+    (title, description, default)
+}
+
+fn key_value_entry_schema(key_schema: &Value, value_schema: &Value) -> Value {
+    serde_json::json!({
+        "type": "object",
+        "required": ["key", "value"],
+        "properties": {
+            "key": key_schema,
+            "value": value_schema,
+        }
+    })
 }
 
 fn section_info_for_object(
