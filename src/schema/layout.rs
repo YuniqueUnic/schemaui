@@ -551,3 +551,124 @@ fn has_composite_subschemas(schema: &SchemaObject) -> bool {
         .map(|subs| subs.one_of.is_some() || subs.any_of.is_some())
         .unwrap_or(false)
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn builds_nested_sections_and_general_root() {
+        let schema = json!({
+            "type": "object",
+            "definitions": {
+                "duration": {
+                    "type": "object",
+                    "properties": {
+                        "value": {"type": "integer"}
+                    }
+                }
+            },
+            "properties": {
+                "metadata": {
+                    "type": "object",
+                    "properties": {
+                        "serviceName": {"type": "string"}
+                    }
+                },
+                "runtime": {
+                    "type": "object",
+                    "properties": {
+                        "http": {
+                            "type": "object",
+                            "properties": {
+                                "port": {"type": "integer"},
+                                "limits": {
+                                    "type": "object",
+                                    "properties": {
+                                        "timeout": {"$ref": "#/definitions/duration"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "generalFlag": {"type": "string"}
+            }
+        });
+
+        let form = build_form_schema(&schema).expect("schema parsed");
+        assert_eq!(form.roots.len(), 3);
+        let runtime = form
+            .roots
+            .iter()
+            .find(|root| root.id == "runtime")
+            .expect("runtime root");
+        assert_eq!(runtime.sections.len(), 1);
+        let http = &runtime.sections[0];
+        assert_eq!(http.children.len(), 1);
+        let http_child = &http.children[0];
+        assert_eq!(http_child.fields.len(), 1);
+    }
+
+    #[test]
+    fn composite_variants_keep_definitions() {
+        let schema = json!({
+            "type": "object",
+            "definitions": {
+                "endpoint": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string"}
+                    }
+                }
+            },
+            "properties": {
+                "notifications": {
+                    "type": "object",
+                    "properties": {
+                        "channel": {
+                            "oneOf": [
+                                {
+                                    "title": "HTTP",
+                                    "properties": {
+                                        "type": {"const": "http"},
+                                        "target": {"$ref": "#/definitions/endpoint"}
+                                    },
+                                    "required": ["type", "target"]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        });
+
+        let form = build_form_schema(&schema).expect("schema parsed");
+        let notifications = form
+            .roots
+            .iter()
+            .find(|root| root.id == "notifications")
+            .expect("notifications root");
+        let section = notifications.sections.first().expect("section");
+        let channel = section
+            .fields
+            .iter()
+            .find(|field| field.name == "channel")
+            .expect("channel field");
+        match &channel.kind {
+            FieldKind::Composite(composite) => {
+                assert!(
+                    composite
+                        .variants
+                        .first()
+                        .and_then(|variant| variant.schema.get("definitions"))
+                        .is_some(),
+                    "variant schema should embed definitions"
+                );
+            }
+            other => panic!("expected composite field, got {:?}", other),
+        }
+    }
+}
