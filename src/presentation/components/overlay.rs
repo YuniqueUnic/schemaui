@@ -8,7 +8,7 @@ use ratatui::{
 use crate::form::FormState;
 
 use super::super::view::CompositeOverlay;
-use super::{body::render_body, layout::popup_rect};
+use super::{body::render_body, fields::FieldRenderOptions, layout::popup_rect};
 
 pub fn render_composite_overlay(
     frame: &mut Frame<'_>,
@@ -57,6 +57,7 @@ pub fn render_composite_overlay(
         .constraints([Constraint::Min(5), Constraint::Length(2)])
         .split(content_area);
 
+    let field_options = FieldRenderOptions::overlay();
     if let Some(description) = &overlay.description {
         let sub = Layout::default()
             .direction(Direction::Vertical)
@@ -66,9 +67,9 @@ pub fn render_composite_overlay(
             .wrap(Wrap { trim: true })
             .style(Style::default().fg(Color::Gray));
         frame.render_widget(desc, sub[0]);
-        render_body(frame, sub[1], overlay_form, true);
+        render_body(frame, sub[1], overlay_form, true, field_options);
     } else {
-        render_body(frame, layout[0], overlay_form, true);
+        render_body(frame, layout[0], overlay_form, true, field_options);
     }
 
     let footer = Paragraph::new(overlay.instructions.clone())

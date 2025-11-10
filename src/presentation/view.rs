@@ -5,7 +5,9 @@ use ratatui::{
 
 use crate::form::FormState;
 
-use super::components::{render_body, render_composite_overlay, render_footer, render_popup};
+use super::components::{
+    FieldRenderOptions, render_body, render_composite_overlay, render_footer, render_popup,
+};
 
 pub struct UiContext<'a> {
     pub status_message: &'a str,
@@ -48,7 +50,13 @@ pub fn draw(
         .split(frame.area());
 
     let cursor_enabled = ctx.popup.is_none() && ctx.composite_overlay.is_none();
-    render_body(frame, chunks[0], form_state, cursor_enabled);
+    render_body(
+        frame,
+        chunks[0],
+        form_state,
+        cursor_enabled,
+        FieldRenderOptions::default(),
+    );
     render_footer(frame, chunks[1], &ctx);
 
     if let Some(popup) = ctx.popup {
