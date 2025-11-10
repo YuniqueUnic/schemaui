@@ -292,10 +292,9 @@ impl InputRouter {
 }
 
 fn is_prev_root_combo(key: &KeyEvent) -> bool {
-    if key.modifiers.contains(KeyModifiers::ALT) && key.modifiers.contains(KeyModifiers::SHIFT) {
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
-            KeyCode::Left | KeyCode::Char('[') => return true,
-            KeyCode::Esc => return true,
+            KeyCode::Char('j') | KeyCode::Char('J') => return true,
             _ => {}
         }
     }
@@ -303,9 +302,9 @@ fn is_prev_root_combo(key: &KeyEvent) -> bool {
 }
 
 fn is_next_root_combo(key: &KeyEvent) -> bool {
-    if key.modifiers.contains(KeyModifiers::ALT) && key.modifiers.contains(KeyModifiers::SHIFT) {
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
         match key.code {
-            KeyCode::Right | KeyCode::Char(']') => return true,
+            KeyCode::Char('l') | KeyCode::Char('L') => return true,
             _ => {}
         }
     }

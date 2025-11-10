@@ -13,33 +13,11 @@ use crate::{
     form::{FieldState, FieldValue, FormState, SectionState},
 };
 
-#[derive(Clone, Copy)]
-pub struct FieldRenderOptions {
-    pub highlight_style: Style,
-}
-
-impl Default for FieldRenderOptions {
-    fn default() -> Self {
-        Self {
-            highlight_style: Style::default().bg(Color::DarkGray),
-        }
-    }
-}
-
-impl FieldRenderOptions {
-    pub fn overlay() -> Self {
-        Self {
-            highlight_style: Style::default(),
-        }
-    }
-}
-
 pub fn render_fields(
     frame: &mut Frame<'_>,
     area: Rect,
     form_state: &mut FormState,
     enable_cursor: bool,
-    options: FieldRenderOptions,
 ) {
     let Some((section, selected_index)) = form_state.active_section_mut() else {
         let placeholder =
@@ -105,7 +83,7 @@ pub fn render_fields(
                 .title(section.title.clone())
                 .borders(Borders::ALL),
         )
-        .highlight_style(options.highlight_style)
+        .highlight_style(Style::default())
         .highlight_symbol("» ");
 
     frame.render_stateful_widget(list, field_area, &mut list_state);
@@ -290,16 +268,12 @@ fn value_panel_lines(
     (lines, cursor_hint)
 }
 
-fn meta_line(field: &FieldState, is_selected: bool) -> Line<'static> {
+fn meta_line(field: &FieldState, _is_selected: bool) -> Line<'static> {
     let mut meta = Vec::new();
-    let type_color = if is_selected {
-        Color::Black
-    } else {
-        Color::DarkGray
-    };
+
     meta.push(Span::styled(
         format!("  type: {}", field_type_label(&field.schema.kind)),
-        Style::default().fg(type_color),
+        Style::default().fg(Color::DarkGray),
     ));
     if field.error.is_some() {
         meta.push(Span::styled(
