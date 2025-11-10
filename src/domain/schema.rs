@@ -38,8 +38,8 @@ pub enum FieldKind {
     Enum(Vec<String>),
     Array(Box<FieldKind>),
     Json,
-    Composite(CompositeField),
-    KeyValue(KeyValueField),
+    Composite(Box<CompositeField>),
+    KeyValue(Box<KeyValueField>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

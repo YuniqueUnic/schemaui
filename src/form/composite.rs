@@ -304,10 +304,6 @@ impl CompositeState {
         matches!(self.mode, CompositeMode::AnyOf)
     }
 
-    pub fn variant_count(&self) -> usize {
-        self.variants.len()
-    }
-
     pub fn active_summaries(&self) -> Vec<CompositeVariantSummary> {
         let mut summaries = Vec::new();
         for variant in self.variants.iter().filter(|variant| variant.active) {
@@ -538,10 +534,10 @@ impl CompositeVariantState {
     fn matches_value(&self, value: &Map<String, Value>) -> bool {
         if let Some(props) = self.schema.get("properties").and_then(Value::as_object) {
             for (key, schema) in props {
-                if let Some(expected) = schema.get("const") {
-                    if value.get(key) != Some(expected) {
-                        return false;
-                    }
+                if let Some(expected) = schema.get("const")
+                    && value.get(key) != Some(expected)
+                {
+                    return false;
                 }
             }
         }
@@ -554,7 +550,9 @@ fn join_pointer(base: &str, child: &str) -> String {
         (true, true) => String::new(),
         (true, false) => child.to_string(),
         (false, true) => base.to_string(),
-        (false, false) => {
+        (false, false) =>
+        {
+            #[allow(clippy::if_same_then_else)]
             if child.starts_with('/') {
                 format!("{base}{child}")
             } else if base.ends_with('/') {

@@ -55,7 +55,7 @@ pub fn draw(
         render_popup(frame, popup);
     }
 
-    if let (Some(meta), Some(mut overlay_state)) = (ctx.composite_overlay.as_ref(), overlay_form) {
-        render_composite_overlay(frame, meta, &mut overlay_state);
+    if let (Some(meta), Some(overlay_state)) = (ctx.composite_overlay.as_ref(), overlay_form) {
+        render_composite_overlay(frame, meta, overlay_state);
     }
 }
