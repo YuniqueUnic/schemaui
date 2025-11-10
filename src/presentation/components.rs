@@ -43,10 +43,16 @@ pub fn render_body(
 }
 
 pub fn render_footer(frame: &mut Frame<'_>, area: Rect, ctx: &UiContext<'_>) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Length(2)])
         .split(area);
+
+    let actions = ctx.help.unwrap_or(" ");
+    let actions_widget = Paragraph::new(format!("Actions: {actions}"))
+        .wrap(Wrap { trim: true })
+        .style(Style::default().fg(Color::Yellow));
+    frame.render_widget(actions_widget, rows[0]);
 
     let mut status = ctx.status_message.to_string();
     if ctx.dirty {
@@ -67,16 +73,8 @@ pub fn render_footer(frame: &mut Frame<'_>, area: Rect, ctx: &UiContext<'_>) {
         status = "Ready".to_string();
     }
 
-    let status_widget = Paragraph::new(status)
-        .wrap(Wrap { trim: true })
-        .block(Block::default().borders(Borders::ALL).title("Status"));
-    frame.render_widget(status_widget, chunks[0]);
-
-    let help_text = ctx.help.unwrap_or(" ");
-    let help_widget = Paragraph::new(help_text.to_string())
-        .wrap(Wrap { trim: true })
-        .block(Block::default().borders(Borders::ALL).title("Actions"));
-    frame.render_widget(help_widget, chunks[1]);
+    let status_widget = Paragraph::new(format!("Status: {status}")).wrap(Wrap { trim: true });
+    frame.render_widget(status_widget, rows[1]);
 }
 
 pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
@@ -156,7 +154,7 @@ fn render_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
     titles.extend(
         form_state.sections[start..end]
             .iter()
-            .map(|section| Line::from(format!("{} [{}]", section.title, section.id))),
+            .map(|section| Line::from(section.title.clone())),
     );
     if end < total {
         titles.push(Line::from("»"));
@@ -552,10 +550,17 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
     ]));
 
     if let Some(error) = &field.error {
-        lines.push(Line::from(Span::styled(
-            format!("  ⚠ {error}"),
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-        )));
+        let warning = format!("⚠ {error}");
+        for (idx, chunk) in wrap(&warning, clamp_width).iter().enumerate() {
+            let prefix = if idx == 0 { "  " } else { "    " };
+            lines.push(Line::from(vec![
+                Span::raw(prefix),
+                Span::styled(
+                    chunk.to_string(),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+            ]));
+        }
     }
 
     FieldRender { lines, cursor_hint }

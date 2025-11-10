@@ -18,8 +18,7 @@ use super::{
     validation::{ValidationOutcome, validate_form},
 };
 
-const HELP_TEXT: &str =
-    "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+E edit composite • Ctrl+S save • Ctrl+Q quit";
+const HELP_TEXT: &str = "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+N add list entry • Ctrl+D remove entry • Ctrl+←/→ select entry • Ctrl+↑/↓ move entry • Ctrl+E edit composite • Ctrl+S save • Ctrl+Q quit";
 
 #[derive(Clone, Copy)]
 enum PopupOwner {
