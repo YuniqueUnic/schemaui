@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::{
     domain::FieldKind,
-    form::FormState,
+    form::{CompositeEditorSession, FieldState, FormState},
     presentation::{self, UiContext},
 };
 
@@ -19,7 +19,76 @@ use super::{
 };
 
 const HELP_TEXT: &str =
-    "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+S save • Ctrl+Q quit";
+    "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+E edit composite • Ctrl+S save • Ctrl+Q quit";
+
+#[derive(Clone, Copy)]
+enum PopupOwner {
+    Root,
+    Composite,
+}
+
+fn apply_selection_to_field(
+    field: &mut FieldState,
+    selection: usize,
+    multi: Option<Vec<bool>>,
+) {
+    if let Some(flags) = multi {
+        match &field.schema.kind {
+            FieldKind::Composite(_) => {
+                field.apply_composite_selection(selection, Some(flags));
+            }
+            FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Enum(_)) => {
+                field.set_multi_selection(&flags);
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    match &field.schema.kind {
+        FieldKind::Composite(_) => {
+            field.apply_composite_selection(selection, None);
+        }
+        FieldKind::Boolean => field.set_bool(selection == 0),
+        FieldKind::Enum(_) => field.set_enum_selected(selection),
+        _ => {}
+    }
+}
+
+struct AppPopup {
+    owner: PopupOwner,
+    state: PopupState,
+}
+
+struct CompositeEditorOverlay {
+    field_pointer: String,
+    field_label: String,
+    display_title: String,
+    display_description: Option<String>,
+    session: CompositeEditorSession,
+}
+
+impl CompositeEditorOverlay {
+    fn new(field_pointer: String, field_label: String, session: CompositeEditorSession) -> Self {
+        let display_title = format!("Edit {} – {}", field_label, session.title);
+        let display_description = session.description.clone();
+        Self {
+            field_pointer,
+            field_label,
+            display_title,
+            display_description,
+            session,
+        }
+    }
+
+    fn form_state(&self) -> &FormState {
+        &self.session.form_state
+    }
+
+    fn form_state_mut(&mut self) -> &mut FormState {
+        &mut self.session.form_state
+    }
+}
 
 pub(crate) struct App {
     form_state: FormState,
@@ -31,12 +100,14 @@ pub(crate) struct App {
     exit_armed: bool,
     should_quit: bool,
     result: Option<Value>,
-    popup: Option<PopupState>,
+    popup: Option<AppPopup>,
+    composite_editor: Option<CompositeEditorOverlay>,
 }
 
 impl App {
     fn handle_popup_key(&mut self, key: KeyEvent) -> Result<bool> {
-        if let Some(popup) = &mut self.popup {
+        if let Some(app_popup) = &mut self.popup {
+            let popup = &mut app_popup.state;
             match key.code {
                 KeyCode::Esc => {
                     self.popup = None;
@@ -55,8 +126,9 @@ impl App {
                         let multi_flags = popup.active().map(|flags| flags.to_vec());
                         (pointer, selection, multi_flags)
                     };
+                    let owner = app_popup.owner;
                     self.popup = None;
-                    self.apply_popup_selection_data(&pointer, selection, multi_flags);
+                    self.apply_popup_selection_data(owner, &pointer, selection, multi_flags);
                     if self.options.auto_validate {
                         self.run_validation(false);
                     }
@@ -81,6 +153,7 @@ impl App {
             should_quit: false,
             result: None,
             popup: None,
+            composite_editor: None,
         }
     }
 
@@ -113,6 +186,15 @@ impl App {
             None
         };
 
+        let overlay = self
+            .composite_editor
+            .as_ref()
+            .map(|editor| presentation::CompositeOverlay {
+                title: &editor.display_title,
+                description: editor.display_description.as_deref(),
+                form_state: editor.form_state(),
+            });
+
         presentation::draw(
             frame,
             UiContext {
@@ -122,7 +204,8 @@ impl App {
                 error_count: self.validation_errors,
                 help,
                 global_errors: &self.global_errors,
-                popup: self.popup.as_ref().map(|popup| popup.as_render()),
+                popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
+                composite_overlay: overlay,
             },
         );
     }
@@ -133,6 +216,11 @@ impl App {
         }
 
         if self.handle_popup_key(key)? {
+            return Ok(());
+        }
+
+        if self.composite_editor.is_some() {
+            self.handle_composite_editor_key(key)?;
             return Ok(());
         }
 
@@ -161,9 +249,12 @@ impl App {
                 self.status.ready();
             }
             KeyCommand::TogglePopup => {
-                if self.try_open_popup() {
+                if self.try_open_popup(PopupOwner::Root) {
                     return Ok(());
                 }
+            }
+            KeyCommand::EditComposite => {
+                self.try_open_composite_editor();
             }
             KeyCommand::Edit(event) => {
                 if let Some(field) = self.form_state.focused_field_mut() {
@@ -182,11 +273,18 @@ impl App {
         Ok(())
     }
 
-    fn try_open_popup(&mut self) -> bool {
+    fn try_open_popup(&mut self, owner: PopupOwner) -> bool {
         if self.popup.is_some() {
             return true;
         }
-        let Some(field) = self.form_state.focused_field() else {
+        let field_opt = match owner {
+            PopupOwner::Root => self.form_state.focused_field(),
+            PopupOwner::Composite => self
+                .composite_editor
+                .as_ref()
+                .and_then(|editor| editor.form_state().focused_field()),
+        };
+        let Some(field) = field_opt else {
             return false;
         };
         if let Some(popup) = PopupState::from_field(field) {
@@ -196,37 +294,138 @@ impl App {
                 "Use ↑/↓ and Enter to choose"
             };
             self.status.set_raw(message);
-            self.popup = Some(popup);
+            self.popup = Some(AppPopup { owner, state: popup });
             return true;
         }
         false
     }
 
+    fn try_open_composite_editor(&mut self) {
+        if self.composite_editor.is_some() {
+            return;
+        }
+        let Some(field) = self.form_state.focused_field_mut() else {
+            self.status.set_raw("No field selected");
+            return;
+        };
+        if !matches!(field.schema.kind, FieldKind::Composite(_)) {
+            self.status
+                .set_raw("Focus a composite field before entering the editor");
+            return;
+        }
+        let active = field.active_composite_variants();
+        let Some(&variant_index) = active.first() else {
+            self.status
+                .set_raw("Select a variant via Enter before editing (oneOf/anyOf)");
+            return;
+        };
+        let pointer = field.schema.pointer.clone();
+        let label = field.schema.display_label();
+        match field.open_composite_editor(variant_index) {
+            Ok(session) => {
+                self.popup = None;
+                self.composite_editor =
+                    Some(CompositeEditorOverlay::new(pointer, label, session));
+                self.status
+                    .set_raw("Composite editor: Ctrl+S save • Esc cancel");
+            }
+            Err(err) => self.status.set_raw(&err.message),
+        }
+    }
+
+    fn close_composite_editor(&mut self, commit: bool) {
+        if let Some(editor) = self.composite_editor.take() {
+            let pointer = editor.field_pointer.clone();
+            let session = editor.session;
+            if let Some(field) = self.form_state.field_mut_by_pointer(&pointer) {
+                field.close_composite_editor(session, commit);
+            }
+            self.popup = None;
+            if commit {
+                self.exit_armed = false;
+                self.status.value_updated();
+                if self.options.auto_validate {
+                    self.run_validation(false);
+                }
+            } else {
+                self.status.ready();
+            }
+        }
+    }
+
+    fn handle_composite_editor_key(&mut self, key: KeyEvent) -> Result<()> {
+        if key.code == KeyCode::Esc {
+            self.close_composite_editor(false);
+            return Ok(());
+        }
+
+        match input::classify(&key) {
+            KeyCommand::Save | KeyCommand::EditComposite => {
+                self.close_composite_editor(true);
+                return Ok(());
+            }
+            KeyCommand::Quit => {
+                self.close_composite_editor(false);
+                return Ok(());
+            }
+            KeyCommand::SwitchSection(delta) => {
+                if let Some(editor) = self.composite_editor.as_mut() {
+                    editor.form_state_mut().focus_next_section(delta);
+                }
+            }
+            KeyCommand::NextField => {
+                if let Some(editor) = self.composite_editor.as_mut() {
+                    editor.form_state_mut().focus_next_field();
+                }
+            }
+            KeyCommand::PrevField => {
+                if let Some(editor) = self.composite_editor.as_mut() {
+                    editor.form_state_mut().focus_prev_field();
+                }
+            }
+            KeyCommand::ResetStatus => {
+                self.status.ready();
+            }
+            KeyCommand::TogglePopup => {
+                if self.try_open_popup(PopupOwner::Composite) {
+                    return Ok(());
+                }
+            }
+            KeyCommand::Edit(event) => {
+                if let Some(editor) = self.composite_editor.as_mut() {
+                    let label = editor.field_label.clone();
+                    if let Some(field) = editor.form_state_mut().focused_field_mut() {
+                        if field.handle_key(&event) {
+                            self.status
+                                .editing(&format!("{} › {}", label, field.schema.display_label()));
+                        }
+                    }
+                }
+            }
+            KeyCommand::None => {}
+        }
+
+        Ok(())
+    }
+
     fn apply_popup_selection_data(
         &mut self,
+        owner: PopupOwner,
         pointer: &str,
         selection: usize,
         multi: Option<Vec<bool>>,
     ) {
-        if let Some(field) = self.form_state.field_mut_by_pointer(pointer) {
-            if let Some(flags) = multi {
-                match &field.schema.kind {
-                    FieldKind::Composite(_) => {
-                        field.apply_composite_selection(selection, Some(flags));
-                    }
-                    FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Enum(_)) => {
-                        field.set_multi_selection(&flags);
-                    }
-                    _ => {}
+        match owner {
+            PopupOwner::Root => {
+                if let Some(field) = self.form_state.field_mut_by_pointer(pointer) {
+                    apply_selection_to_field(field, selection, multi);
                 }
-            } else {
-                match &field.schema.kind {
-                    FieldKind::Composite(_) => {
-                        field.apply_composite_selection(selection, None);
+            }
+            PopupOwner::Composite => {
+                if let Some(editor) = &mut self.composite_editor {
+                    if let Some(field) = editor.form_state_mut().field_mut_by_pointer(pointer) {
+                        apply_selection_to_field(field, selection, multi);
                     }
-                    FieldKind::Boolean => field.set_bool(selection == 0),
-                    FieldKind::Enum(_) => field.set_enum_selected(selection),
-                    _ => {}
                 }
             }
         }

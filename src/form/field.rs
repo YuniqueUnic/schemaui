@@ -3,7 +3,10 @@ use serde_json::Value;
 
 use crate::domain::{FieldKind, FieldSchema};
 
-use super::{composite::CompositeState, error::FieldCoercionError};
+use super::{
+    composite::{CompositeEditorSession, CompositeState},
+    error::FieldCoercionError,
+};
 
 #[derive(Debug, Clone)]
 pub enum FieldValue {
@@ -256,6 +259,41 @@ impl FieldState {
             });
         }
         None
+    }
+
+    pub fn active_composite_variants(&self) -> Vec<usize> {
+        if let FieldValue::Composite(state) = &self.value {
+            state.active_indices()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn open_composite_editor(
+        &mut self,
+        variant_index: usize,
+    ) -> Result<CompositeEditorSession, FieldCoercionError> {
+        if let FieldValue::Composite(state) = &self.value {
+            state.take_editor_session(&self.schema.pointer, variant_index)
+        } else {
+            Err(FieldCoercionError {
+                pointer: self.schema.pointer.clone(),
+                message: "field is not a composite".to_string(),
+            })
+        }
+    }
+
+    pub fn close_composite_editor(
+        &mut self,
+        session: CompositeEditorSession,
+        mark_dirty: bool,
+    ) {
+        if let FieldValue::Composite(state) = &self.value {
+            state.restore_editor_session(session);
+            if mark_dirty {
+                self.after_edit();
+            }
+        }
     }
 
     pub fn apply_composite_selection(&mut self, selection: usize, multi_flags: Option<Vec<bool>>) {

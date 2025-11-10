@@ -15,7 +15,7 @@ use unicode_width::UnicodeWidthStr;
 
 use textwrap::wrap;
 
-use super::{PopupRender, UiContext};
+use super::{CompositeOverlay, PopupRender, UiContext};
 
 pub fn render_body(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enable_cursor: bool) {
     if form_state.sections.is_empty() {
@@ -301,6 +301,35 @@ fn field_type_label(kind: &FieldKind) -> String {
     }
 }
 
+pub fn render_composite_overlay(frame: &mut Frame<'_>, overlay: CompositeOverlay<'_>) {
+    let base = frame.area();
+    let width = base.width.saturating_sub(base.width / 4).max(40);
+    let height = base.height.saturating_sub(base.height / 5).max(12);
+    let area = popup_rect(base, width, height);
+    frame.render_widget(Clear, area);
+
+    let block = Block::default()
+        .title(overlay.title)
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+    frame.render_widget(block.clone(), area);
+    let inner = block.inner(area);
+
+    if let Some(description) = overlay.description {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(3)])
+            .split(inner);
+        let desc = Paragraph::new(description.to_string())
+            .wrap(Wrap { trim: true })
+            .style(Style::default().fg(Color::Gray));
+        frame.render_widget(desc, layout[0]);
+        render_fields(frame, layout[1], overlay.form_state, true);
+    } else {
+        render_fields(frame, inner, overlay.form_state, true);
+    }
+}
+
 fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> FieldRender {
     let mut lines = Vec::new();
     let mut label = field.schema.display_label();
@@ -384,18 +413,41 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
             if state.variant_count() == 0 {
                 lines.push(Line::from("  No variants available in this schema."));
             } else {
-                let active = state.active_variant_details();
-                if active.is_empty() {
+                let summaries = state.active_summaries();
+                if summaries.is_empty() {
                     lines.push(Line::from("  No variant selected. Press Enter to choose."));
                 } else {
-                    lines.push(Line::from("  Active variants:"));
-                    for (title, description) in active {
-                        lines.push(Line::from(format!("    ▶ {title}")));
-                        if let Some(description) = description {
-                            if !description.is_empty() {
-                                lines.push(Line::from(format!("       {description}")));
+                    let max_render = 3usize;
+                    for summary in summaries.iter().take(max_render) {
+                        lines.push(Line::from(vec![
+                            Span::styled(
+                                format!("  ▶ {}", summary.title),
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            ),
+                        ]));
+                        if let Some(desc) = summary.description.as_ref() {
+                            if !desc.is_empty() {
+                                lines.push(Line::from(vec![
+                                    Span::raw("     "),
+                                    Span::styled(
+                                        desc.clone(),
+                                        Style::default().fg(Color::Gray),
+                                    ),
+                                ]));
                             }
                         }
+                        for line in &summary.lines {
+                            lines.push(Line::from(format!("     {line}")));
+                        }
+                        lines.push(Line::from(" "));
+                    }
+                    if summaries.len() > max_render {
+                        lines.push(Line::from(format!(
+                            "    … ({} more active variants)",
+                            summaries.len() - max_render
+                        )));
                     }
                 }
             }
