@@ -123,6 +123,29 @@ fn parse_object_fields(
             .push(field);
     }
 
+    if let Some(additional) = object.additional_properties.as_ref() {
+        let resolved = context.resolve_schema(additional)?;
+        let field_name = path_prefix
+            .last()
+            .cloned()
+            .unwrap_or_else(|| "additional".to_string());
+        let section = section_info_for_field(&resolved, &path_prefix, parent_section.as_ref());
+        meta.entry(section.id.clone())
+            .or_insert_with(|| section.clone());
+        let field = build_field_schema(
+            context,
+            &resolved,
+            &field_name,
+            path_prefix.clone(),
+            section,
+            false,
+        )?;
+        slots
+            .entry(field.section_id.clone())
+            .or_default()
+            .push(field);
+    }
+
     Ok(())
 }
 
