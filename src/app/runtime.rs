@@ -13,7 +13,7 @@ use crate::{
 };
 
 use super::{
-    input::{self, KeyCommand},
+    input::{InputRouter, KeyCommand},
     options::UiOptions,
     popup::PopupState,
     status::StatusLine,
@@ -178,6 +178,7 @@ pub(crate) struct App {
     result: Option<Value>,
     popup: Option<AppPopup>,
     composite_editor: Option<CompositeEditorOverlay>,
+    input_router: InputRouter,
 }
 
 impl App {
@@ -245,6 +246,7 @@ impl App {
             result: None,
             popup: None,
             composite_editor: None,
+            input_router: InputRouter::new(),
         }
     }
 
@@ -334,7 +336,7 @@ impl App {
             return Ok(());
         }
 
-        match input::classify(&key) {
+        match self.input_router.classify(&key) {
             KeyCommand::Save => {
                 self.exit_armed = false;
                 self.on_save();
@@ -661,7 +663,7 @@ impl App {
             return Ok(());
         }
 
-        match input::classify(&key) {
+        match self.input_router.classify(&key) {
             KeyCommand::Save | KeyCommand::EditComposite => {
                 if let Some(editor) = self.composite_editor.as_mut() {
                     editor.exit_armed = false;

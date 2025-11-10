@@ -22,44 +22,53 @@ pub enum KeyCommand {
 const CTRL_LEFT_BRACKET: char = '\u{1b}';
 const CTRL_RIGHT_BRACKET: char = '\u{1d}';
 
-pub fn classify(key: &KeyEvent) -> KeyCommand {
-    if is_prev_root_combo(key) {
-        return KeyCommand::SwitchRoot(-1);
-    }
-    if is_next_root_combo(key) {
-        return KeyCommand::SwitchRoot(1);
+#[derive(Default)]
+pub struct InputRouter;
+
+impl InputRouter {
+    pub fn new() -> Self {
+        Self
     }
 
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
-        return match key.code {
-            KeyCode::Char('s') | KeyCode::Char('S') => KeyCommand::Save,
-            KeyCode::Char('q') | KeyCode::Char('Q') => KeyCommand::Quit,
-            KeyCode::Char('c') | KeyCode::Char('C') => KeyCommand::Quit,
-            KeyCode::Char('e') | KeyCode::Char('E') => KeyCommand::EditComposite,
-            KeyCode::Char('n') | KeyCode::Char('N') => KeyCommand::ListAddEntry,
-            KeyCode::Char('d') | KeyCode::Char('D') => KeyCommand::ListRemoveEntry,
-            KeyCode::Left => KeyCommand::ListSelect(-1),
-            KeyCode::Right => KeyCommand::ListSelect(1),
-            KeyCode::Up => KeyCommand::ListMove(-1),
-            KeyCode::Down => KeyCommand::ListMove(1),
-            KeyCode::Tab => {
-                let delta = if key.modifiers.contains(KeyModifiers::SHIFT) {
-                    -1
-                } else {
-                    1
-                };
-                KeyCommand::SwitchSection(delta)
-            }
-            _ => KeyCommand::None,
-        };
-    }
+    pub fn classify(&self, key: &KeyEvent) -> KeyCommand {
+        if is_prev_root_combo(key) {
+            return KeyCommand::SwitchRoot(-1);
+        }
+        if is_next_root_combo(key) {
+            return KeyCommand::SwitchRoot(1);
+        }
 
-    match key.code {
-        KeyCode::Tab | KeyCode::Down => KeyCommand::NextField,
-        KeyCode::BackTab | KeyCode::Up => KeyCommand::PrevField,
-        KeyCode::Esc => KeyCommand::ResetStatus,
-        KeyCode::Enter => KeyCommand::TogglePopup,
-        _ => KeyCommand::Edit(*key),
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            return match key.code {
+                KeyCode::Char('s') | KeyCode::Char('S') => KeyCommand::Save,
+                KeyCode::Char('q') | KeyCode::Char('Q') => KeyCommand::Quit,
+                KeyCode::Char('c') | KeyCode::Char('C') => KeyCommand::Quit,
+                KeyCode::Char('e') | KeyCode::Char('E') => KeyCommand::EditComposite,
+                KeyCode::Char('n') | KeyCode::Char('N') => KeyCommand::ListAddEntry,
+                KeyCode::Char('d') | KeyCode::Char('D') => KeyCommand::ListRemoveEntry,
+                KeyCode::Left => KeyCommand::ListSelect(-1),
+                KeyCode::Right => KeyCommand::ListSelect(1),
+                KeyCode::Up => KeyCommand::ListMove(-1),
+                KeyCode::Down => KeyCommand::ListMove(1),
+                KeyCode::Tab => {
+                    let delta = if key.modifiers.contains(KeyModifiers::SHIFT) {
+                        -1
+                    } else {
+                        1
+                    };
+                    KeyCommand::SwitchSection(delta)
+                }
+                _ => KeyCommand::None,
+            };
+        }
+
+        match key.code {
+            KeyCode::Tab | KeyCode::Down => KeyCommand::NextField,
+            KeyCode::BackTab | KeyCode::Up => KeyCommand::PrevField,
+            KeyCode::Esc => KeyCommand::ResetStatus,
+            KeyCode::Enter => KeyCommand::TogglePopup,
+            _ => KeyCommand::Edit(*key),
+        }
     }
 }
 
