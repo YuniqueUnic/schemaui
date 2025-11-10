@@ -286,3 +286,8 @@ Recent changes stitched the plan above into the codebase:
 - **Report/docs sync**: This section tracks the November 2025 delivery so the
   tech-lead can see which roadmap items already ship versus what remains (e.g.
   section/oneOf layout polish is still outstanding).
+- **Section + OneOf/AnyOf UX**: scalar fields stay in `General`, while complex
+  objects/composites (including `additionalProperties`) gain their own section
+  tabs. Focused composite fields now render inline OneOf/AnyOf selectors with
+  highlighted variants and inline “+ Add variant” hints, matching the UX mock
+  described earlier (`src/domain/parser.rs`, `src/presentation/components.rs`).

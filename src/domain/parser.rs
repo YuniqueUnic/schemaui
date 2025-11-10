@@ -425,6 +425,20 @@ fn section_info_for_field(
         };
     }
 
+    if schema_prefers_own_section(schema) {
+        if let Some(key) = path.first() {
+            return SectionInfo {
+                id: key.clone(),
+                title: prettify_label(key),
+                description: schema
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.description.clone())
+                    .or_else(|| parent.and_then(|p| p.description.clone())),
+            };
+        }
+    }
+
     if let Some(parent_section) = parent {
         return parent_section.clone();
     }
@@ -539,6 +553,24 @@ fn has_composite_subschemas(schema: &SchemaObject) -> bool {
         .as_ref()
         .map(|subs| subs.one_of.is_some() || subs.any_of.is_some())
         .unwrap_or(false)
+}
+
+fn schema_prefers_own_section(schema: &SchemaObject) -> bool {
+    if has_composite_subschemas(schema) {
+        return true;
+    }
+    if instance_type(schema) == Some(InstanceType::Object) {
+        return true;
+    }
+    if schema
+        .object
+        .as_ref()
+        .map(|obj| obj.additional_properties.is_some())
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    false
 }
 
 struct SchemaContext<'a> {

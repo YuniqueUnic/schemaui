@@ -203,7 +203,7 @@ fn render_fields(
     if section.fields.is_empty() {
         let placeholder = Paragraph::new("This section has no fields").block(
             Block::default()
-                .title(format!("{} [{}]", section.title, section.id))
+                .title(section.title.clone())
                 .borders(Borders::ALL),
         );
         frame.render_widget(placeholder, field_area);
@@ -242,7 +242,7 @@ fn render_fields(
     let list = List::new(items)
         .block(
             Block::default()
-                .title(format!("{} [{}]", section.title, section.id))
+                .title(section.title.clone())
                 .borders(Borders::ALL),
         )
         .highlight_style(Style::default().bg(Color::DarkGray))
@@ -441,6 +441,10 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
     lines.push(Line::from(Span::styled(label, label_style)));
 
     let clamp_width = max_width.max(4) as usize;
+    if let Some(selector_lines) = composite_selector_lines(field) {
+        lines.extend(selector_lines);
+    }
+
     let value_text = field.display_value();
     let wrapped_value = wrap(&value_text, clamp_width);
     let inner_width = wrapped_value
@@ -571,4 +575,90 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
     }
 
     FieldRender { lines, cursor_hint }
+}
+
+fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
+    if let FieldValue::Composite(state) = &field.value {
+        let mut lines = Vec::new();
+        let options = state.option_titles();
+        if options.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                "  No variants available in this schema.",
+                Style::default().fg(Color::Gray),
+            )]));
+            return Some(lines);
+        }
+
+        let label = if state.is_multi() { "AnyOf" } else { "OneOf" };
+        let mut spans = Vec::new();
+        spans.push(Span::styled(
+            format!("  {label}: "),
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        ));
+        let active = state.active_flags();
+        for (idx, option) in options.iter().enumerate() {
+            if state.is_multi() {
+                let mark = if active.get(idx).copied().unwrap_or(false) {
+                    "[x]"
+                } else {
+                    "[ ]"
+                };
+                spans.push(Span::styled(
+                    format!(" {mark} "),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+            let style = if active.get(idx).copied().unwrap_or(false) {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            spans.push(Span::styled(option.clone(), style));
+            if idx + 1 != options.len() {
+                spans.push(Span::styled(
+                    if state.is_multi() { "  " } else { " | " },
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+        }
+        let hint = if state.is_multi() {
+            "  (Enter toggles, Ctrl+E opens editor)"
+        } else {
+            "  (Enter to choose variant, Ctrl+E edits)"
+        };
+        spans.push(Span::styled(hint, Style::default().fg(Color::DarkGray)));
+        lines.push(Line::from(spans));
+
+        if state.is_multi() {
+            let active_titles = options
+                .iter()
+                .zip(active.iter())
+                .filter_map(|(title, flag)| flag.then(|| title.clone()))
+                .collect::<Vec<_>>();
+            let summary = if active_titles.is_empty() {
+                "    Active variants: <none>"
+            } else {
+                "    Active variants: "
+            };
+            let mut summary_spans = vec![Span::styled(summary, Style::default().fg(Color::Gray))];
+            if !active_titles.is_empty() {
+                summary_spans.push(Span::styled(
+                    active_titles.join(", "),
+                    Style::default().fg(Color::White),
+                ));
+            }
+            summary_spans.push(Span::styled(
+                "  + Add variant (Enter)",
+                Style::default().fg(Color::Yellow),
+            ));
+            lines.push(Line::from(summary_spans));
+        }
+
+        return Some(lines);
+    }
+    None
 }

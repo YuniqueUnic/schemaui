@@ -4,6 +4,7 @@ use super::field::FieldState;
 
 #[derive(Debug, Clone)]
 pub struct SectionState {
+    #[allow(dead_code)]
     pub id: String,
     pub title: String,
     pub description: Option<String>,
