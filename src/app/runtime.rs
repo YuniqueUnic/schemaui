@@ -6,8 +6,8 @@ use serde_json::Value;
 use crate::{
     domain::FieldKind,
     form::{
-        ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand, FormState,
-        KeyValueEditorSession, apply_command,
+        apply_command, ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand,
+        FormEngine, FormState, KeyValueEditorSession,
     },
     presentation::{self, UiContext},
 };
@@ -233,6 +233,14 @@ impl App {
         Ok(false)
     }
 
+    fn dispatch_form_command(&mut self, command: FormCommand) {
+        let mut engine = FormEngine::new(&mut self.form_state, &self.validator);
+        if let Err(message) = engine.dispatch(command) {
+            self.status.set_raw(&message);
+        }
+        self.validation_errors = self.form_state.error_count();
+    }
+
     pub fn new(form_state: FormState, validator: Validator, options: UiOptions) -> Self {
         Self {
             form_state,
@@ -389,14 +397,16 @@ impl App {
                 self.try_open_composite_editor();
             }
             KeyCommand::Edit(event) => {
+                let mut edited_pointer = None;
                 if let Some(field) = self.form_state.focused_field_mut() {
                     if field.handle_key(&event) {
+                        edited_pointer = Some(field.schema.pointer.clone());
                         self.exit_armed = false;
                         self.status.editing(&field.schema.display_label());
-                        if self.options.auto_validate {
-                            self.run_validation(false);
-                        }
                     }
+                }
+                if let (Some(pointer), true) = (edited_pointer, self.options.auto_validate) {
+                    self.dispatch_form_command(FormCommand::FieldEdited { pointer });
                 }
             }
             KeyCommand::None => {}

@@ -4,4 +4,7 @@ pub enum FormCommand {
     FocusPrevField,
     FocusNextSection(i32),
     FocusNextRoot(i32),
+    FieldEdited {
+        pointer: String,
+    },
 }

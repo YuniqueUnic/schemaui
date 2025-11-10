@@ -215,6 +215,16 @@ impl FormState {
         false
     }
 
+    pub fn clear_error(&mut self, pointer: &str) {
+        for section in self.iter_sections_mut() {
+            for field in &mut section.fields {
+                if field.schema.pointer == pointer {
+                    field.clear_error();
+                }
+            }
+        }
+    }
+
     pub fn field_mut_by_pointer(&mut self, pointer: &str) -> Option<&mut FieldState> {
         for section in self.iter_sections_mut() {
             for field in &mut section.fields {
@@ -240,6 +250,18 @@ impl FormState {
     pub fn is_dirty(&self) -> bool {
         self.iter_sections()
             .any(|section| section.fields.iter().any(|field| field.dirty))
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.iter_sections()
+            .map(|section| {
+                section
+                    .fields
+                    .iter()
+                    .filter(|field| field.error.is_some())
+                    .count()
+            })
+            .sum()
     }
 
     fn advance_section_within_root(&mut self, delta: i32) {
