@@ -249,6 +249,8 @@ impl InputRouter {
     }
 
     pub fn classify(&self, key: &KeyEvent) -> KeyAction {
+        #[cfg(feature = "debug")]
+        println!("{key:?}");
         if is_prev_root_combo(key) {
             return KeyAction::RootStep(-1);
         }
@@ -290,9 +292,9 @@ impl InputRouter {
 }
 
 fn is_prev_root_combo(key: &KeyEvent) -> bool {
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
+    if key.modifiers.contains(KeyModifiers::ALT) && key.modifiers.contains(KeyModifiers::SHIFT) {
         match key.code {
-            KeyCode::Char('[') | KeyCode::Char('{') => return true,
+            KeyCode::Left | KeyCode::Char('[') => return true,
             KeyCode::Esc => return true,
             _ => {}
         }
@@ -301,9 +303,9 @@ fn is_prev_root_combo(key: &KeyEvent) -> bool {
 }
 
 fn is_next_root_combo(key: &KeyEvent) -> bool {
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
+    if key.modifiers.contains(KeyModifiers::ALT) && key.modifiers.contains(KeyModifiers::SHIFT) {
         match key.code {
-            KeyCode::Char(']') | KeyCode::Char('}') => return true,
+            KeyCode::Right | KeyCode::Char(']') => return true,
             _ => {}
         }
     }
