@@ -8,6 +8,14 @@ pub struct FormSchema {
     pub title: Option<String>,
     #[allow(dead_code)]
     pub description: Option<String>,
+    pub roots: Vec<RootSection>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RootSection {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
     pub sections: Vec<FormSection>,
 }
 
@@ -16,7 +24,9 @@ pub struct FormSection {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
+    pub path: Vec<String>,
     pub fields: Vec<FieldSchema>,
+    pub children: Vec<FormSection>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,6 +83,7 @@ pub struct FieldSchema {
     pub pointer: String,
     pub title: String,
     pub description: Option<String>,
+    #[allow(dead_code)]
     pub section_id: String,
     pub kind: FieldKind,
     pub required: bool,

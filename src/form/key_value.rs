@@ -266,14 +266,12 @@ impl KeyValueState {
             id: "key_value".to_string(),
             title: "Key/Value Entry".to_string(),
             description: None,
+            path: vec!["entry".to_string()],
+            depth: 0,
             fields: vec![key_field, value_field],
             scroll_offset: 0,
         };
-        FormState {
-            sections: vec![section],
-            section_index: 0,
-            field_index: 0,
-        }
+        FormState::from_sections("key_value", "Key/Value Entry", None, vec![section])
     }
 
     fn key_field_schema(&self) -> FieldSchema {

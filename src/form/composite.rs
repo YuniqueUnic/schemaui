@@ -503,20 +503,27 @@ impl CompositeVariantState {
     fn snapshot(&self, pointer: &str) -> Result<CompositeVariantSummary, FieldCoercionError> {
         let form = self.borrow_form(pointer)?;
         let mut lines = Vec::new();
-        if form.sections.is_empty() {
+        if form.roots.iter().all(|root| root.sections.is_empty()) {
             lines.push("No fields defined for this variant.".to_string());
         } else {
-            for section in &form.sections {
-                lines.push(format!("Section: {}", section.title));
-                if section.fields.is_empty() {
-                    lines.push("  • <empty>".to_string());
-                } else {
-                    for field in &section.fields {
-                        lines.push(format!(
-                            "  • {} = {}",
-                            field.schema.display_label(),
-                            field.display_value()
-                        ));
+            for root in &form.roots {
+                for section in &root.sections {
+                    let label = if root.title.is_empty() || root.title == section.title {
+                        format!("Section: {}", section.title)
+                    } else {
+                        format!("Section: {} › {}", root.title, section.title)
+                    };
+                    lines.push(label);
+                    if section.fields.is_empty() {
+                        lines.push("  • <empty>".to_string());
+                    } else {
+                        for field in &section.fields {
+                            lines.push(format!(
+                                "  • {} = {}",
+                                field.schema.display_label(),
+                                field.display_value()
+                            ));
+                        }
                     }
                 }
             }

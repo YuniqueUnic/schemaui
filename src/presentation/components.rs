@@ -23,23 +23,43 @@ pub fn render_body(
     form_state: &mut FormState,
     enable_cursor: bool,
 ) {
-    if form_state.sections.is_empty() {
+    if form_state.is_empty() {
         let placeholder = Paragraph::new("No editable fields in schema")
             .block(Block::default().borders(Borders::ALL));
         frame.render_widget(placeholder, area);
         return;
     }
 
-    if form_state.sections.len() > 1 {
-        let body_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Min(1)])
-            .split(area);
-        render_tabs(frame, body_chunks[0], form_state);
-        render_fields(frame, body_chunks[1], form_state, enable_cursor);
-    } else {
-        render_fields(frame, area, form_state, enable_cursor);
+    let show_root_tabs = !form_state.roots.is_empty();
+    let show_section_tabs = form_state
+        .active_root()
+        .map(|root| !root.sections.is_empty())
+        .unwrap_or(false);
+
+    let mut constraints = Vec::new();
+    if show_root_tabs {
+        constraints.push(Constraint::Length(3));
     }
+    if show_section_tabs {
+        constraints.push(Constraint::Length(3));
+    }
+    constraints.push(Constraint::Min(1));
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(area);
+
+    let mut index = 0;
+    if show_root_tabs {
+        render_root_tabs(frame, chunks[index], form_state);
+        index += 1;
+    }
+    if show_section_tabs {
+        render_section_tabs(frame, chunks[index], form_state);
+        index += 1;
+    }
+    render_fields(frame, chunks[index], form_state, enable_cursor);
 }
 
 pub fn render_footer(frame: &mut Frame<'_>, area: Rect, ctx: &UiContext<'_>) {
@@ -131,8 +151,57 @@ pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
     frame.render_stateful_widget(list, area, &mut state);
 }
 
-fn render_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
-    let total = form_state.sections.len();
+fn render_root_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
+    let titles: Vec<Line<'static>> = form_state
+        .roots
+        .iter()
+        .map(|root| Line::from(Span::raw(root.title.clone())))
+        .collect();
+    render_tab_strip(frame, area, titles, form_state.root_index, "Root Sections");
+}
+
+fn render_section_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
+    let Some(root) = form_state.active_root() else {
+        let placeholder = Paragraph::new("No sections available")
+            .block(Block::default().borders(Borders::ALL).title("Sections"));
+        frame.render_widget(placeholder, area);
+        return;
+    };
+    let titles: Vec<Line<'static>> = root
+        .sections
+        .iter()
+        .map(|section| {
+            let mut label = String::new();
+            if section.depth > 0 {
+                label.push_str(&"› ".repeat(section.depth));
+            }
+            label.push_str(&section.title);
+            Line::from(Span::raw(label))
+        })
+        .collect();
+    render_tab_strip(
+        frame,
+        area,
+        titles,
+        form_state.section_index,
+        &format!("{} Sections", root.title),
+    );
+}
+
+fn render_tab_strip(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    titles: Vec<Line<'static>>,
+    selected: usize,
+    label: &str,
+) {
+    if titles.is_empty() {
+        let placeholder = Paragraph::new("No sections available")
+            .block(Block::default().borders(Borders::ALL).title(label));
+        frame.render_widget(placeholder, area);
+        return;
+    }
+    let total = titles.len();
     let mut window = ((area.width as usize).saturating_sub(4) / 12).max(1);
     if window > total {
         window = total;
@@ -140,31 +209,22 @@ fn render_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
     let mut start = 0usize;
     if total > window {
         let half = window / 2;
-        if form_state.section_index > half {
-            start = form_state
-                .section_index
+        if selected > half {
+            start = selected
                 .saturating_sub(half)
                 .min(total.saturating_sub(window));
         }
     }
     let end = (start + window).min(total);
-    let mut titles: Vec<Line<'static>> = Vec::new();
-    let mut select_index = form_state.section_index - start;
-    if start > 0 {
-        titles.push(Line::from("«"));
-        select_index += 1;
+    let visible: Vec<Line<'static>> = titles[start..end].to_vec();
+    let mut select_index = selected.saturating_sub(start);
+    if select_index >= visible.len() {
+        select_index = visible.len().saturating_sub(1);
     }
-    titles.extend(
-        form_state.sections[start..end]
-            .iter()
-            .map(|section| Line::from(section.title.clone())),
-    );
-    if end < total {
-        titles.push(Line::from("»"));
-    }
-    let tabs = Tabs::new(titles)
+    let tabs = Tabs::new(visible)
+        .block(Block::default().borders(Borders::ALL).title(label))
         .select(select_index)
-        .block(Block::default().borders(Borders::ALL).title("Sections"))
+        .style(Style::default().fg(Color::Gray))
         .highlight_style(
             Style::default()
                 .fg(Color::Yellow)
@@ -179,7 +239,7 @@ fn render_fields(
     form_state: &mut FormState,
     enable_cursor: bool,
 ) {
-    let Some(section) = form_state.sections.get_mut(form_state.section_index) else {
+    let Some((section, selected_index)) = form_state.active_section_mut() else {
         let placeholder =
             Paragraph::new("No section selected").block(Block::default().borders(Borders::ALL));
         frame.render_widget(placeholder, area);
@@ -217,10 +277,6 @@ fn render_fields(
     let mut items = Vec::with_capacity(section.fields.len());
     let mut cursor_hint: Option<CursorHint> = None;
     let mut line_offset = 0usize;
-    let selected_index = form_state
-        .field_index
-        .min(section.fields.len().saturating_sub(1));
-
     adjust_scroll_offset(section, selected_index, field_area.height);
 
     for (idx, field) in section.fields.iter().enumerate() {

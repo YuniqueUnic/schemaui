@@ -20,7 +20,7 @@ use super::{
     validation::{ValidationOutcome, validate_form, validate_partial_form},
 };
 
-const HELP_DEFAULT: &str = "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Enter choose • Ctrl+E edit • Ctrl+S save • Ctrl+Q quit";
+const HELP_DEFAULT: &str = "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+[ / Ctrl+] switch root • Enter choose • Ctrl+E edit • Ctrl+S save • Ctrl+Q quit";
 const HELP_COLLECTION: &str = "Ctrl+N add entry • Ctrl+D remove • Ctrl+←/→ select entry • Ctrl+↑/↓ reorder • Ctrl+E edit entry";
 const HELP_OVERLAY: &str =
     "Overlay: Ctrl+S save • Esc cancel (twice to discard) • Tab navigate • Enter choose";
@@ -361,6 +361,10 @@ impl App {
                 self.form_state.focus_next_section(delta);
                 self.exit_armed = false;
             }
+            KeyCommand::SwitchRoot(delta) => {
+                self.form_state.focus_next_root(delta);
+                self.exit_armed = false;
+            }
             KeyCommand::NextField => {
                 self.form_state.focus_next_field();
                 self.exit_armed = false;
@@ -672,6 +676,12 @@ impl App {
                 if let Some(editor) = self.composite_editor.as_mut() {
                     editor.exit_armed = false;
                     editor.form_state_mut().focus_next_section(delta);
+                }
+            }
+            KeyCommand::SwitchRoot(delta) => {
+                if let Some(editor) = self.composite_editor.as_mut() {
+                    editor.exit_armed = false;
+                    editor.form_state_mut().focus_next_root(delta);
                 }
             }
             KeyCommand::NextField => {
