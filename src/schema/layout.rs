@@ -68,8 +68,7 @@ pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
     let required = required_set(object);
 
     for (name, property_schema) in &object.properties {
-        let mut path = Vec::with_capacity(1);
-        path.push(name.clone());
+        let path = vec![name.clone()];
         let resolved = resolver.resolve_schema(property_schema)?;
         if should_descend(&resolved) {
             let entry = roots
@@ -274,10 +273,10 @@ fn build_field_schema(
 
 fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<FieldKind> {
     if let Some(key_value) = key_value_field(resolver, schema)? {
-        return Ok(FieldKind::KeyValue(key_value));
+        return Ok(FieldKind::KeyValue(Box::new(key_value)));
     }
     if let Some(composite) = composite_field(resolver, schema)? {
-        return Ok(FieldKind::Composite(composite));
+        return Ok(FieldKind::Composite(Box::new(composite)));
     }
     if let Some(options) = &schema.enum_values {
         let enum_values = options
@@ -312,7 +311,9 @@ fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<F
                 | FieldKind::Composite(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
                 FieldKind::Json => {
                     if let Some(composite) = inline_object_composite(&inner)? {
-                        Ok(FieldKind::Array(Box::new(FieldKind::Composite(composite))))
+                        Ok(FieldKind::Array(Box::new(FieldKind::Composite(Box::new(
+                            composite,
+                        )))))
                     } else {
                         Ok(FieldKind::Array(Box::new(FieldKind::Json)))
                     }
@@ -361,8 +362,8 @@ fn build_key_value_from_schema(
     let object = schema.object.as_ref().expect("object schema");
     let value_resolved = resolver.resolve_schema(value_schema)?;
     let value_kind = detect_kind(resolver, &value_resolved)?;
-    let value_schema = schema_object_to_value(&value_resolved)
-        .context("failed to serialize value schema")?;
+    let value_schema =
+        schema_object_to_value(&value_resolved).context("failed to serialize value schema")?;
     let (value_title, value_description, value_default) = schema_titles(&value_resolved, "Value");
 
     let (key_schema_value, key_title, key_description, key_default) =
@@ -428,12 +429,12 @@ fn build_composite(
     for (index, variant) in schemas.iter().enumerate() {
         let resolved = resolver.resolve_schema(variant)?;
         ensure_object_schema(&resolved)?;
-        let mut schema_value = serde_json::to_value(&Schema::Object(resolved.clone()))
+        let mut schema_value = serde_json::to_value(Schema::Object(resolved.clone()))
             .context("failed to serialize composite variant schema")?;
-        if let Some(definitions) = resolver.definitions_snapshot() {
-            if let Value::Object(ref mut map) = schema_value {
-                map.entry("definitions".to_string()).or_insert(definitions);
-            }
+        if let Some(definitions) = resolver.definitions_snapshot()
+            && let Value::Object(ref mut map) = schema_value
+        {
+            map.entry("definitions".to_string()).or_insert(definitions);
         }
         let title = resolved
             .metadata
@@ -550,7 +551,7 @@ fn is_object_schema(schema: &SchemaObject) -> bool {
 
 fn instance_type(schema: &SchemaObject) -> Option<InstanceType> {
     schema.instance_type.as_ref().and_then(|kind| match kind {
-        SingleOrVec::Single(single) => Some((**single).clone()),
+        SingleOrVec::Single(single) => Some(**single),
         SingleOrVec::Vec(items) => items
             .iter()
             .cloned()
@@ -744,7 +745,9 @@ mod tests {
         });
         let form = build_form_schema(&schema).expect("schema parsed");
         let field = find_field(&form, |field| {
-            field.pointer.ends_with("/runtime/limits/requestTimeout/value")
+            field
+                .pointer
+                .ends_with("/runtime/limits/requestTimeout/value")
         })
         .expect("requestTimeout value field");
         assert_eq!(field.name, "value");
@@ -778,5 +781,4 @@ mod tests {
         }
         None
     }
-
 }

@@ -169,10 +169,10 @@ impl FieldState {
             (FieldValue::MultiSelect { options, selected }, Value::Array(items)) => {
                 let mut flags = vec![false; options.len()];
                 for item in items {
-                    if let Some(label) = item.as_str() {
-                        if let Some(pos) = options.iter().position(|opt| opt == label) {
-                            flags[pos] = true;
-                        }
+                    if let Some(label) = item.as_str()
+                        && let Some(pos) = options.iter().position(|opt| opt == label)
+                    {
+                        flags[pos] = true;
                     }
                 }
                 if selected.len() == flags.len() {
@@ -297,11 +297,11 @@ impl FieldState {
     }
 
     pub fn set_bool(&mut self, value: bool) {
-        if let FieldValue::Bool(current) = &mut self.value {
-            if *current != value {
-                *current = value;
-                self.after_edit();
-            }
+        if let FieldValue::Bool(current) = &mut self.value
+            && *current != value
+        {
+            *current = value;
+            self.after_edit();
         }
     }
 
@@ -319,11 +319,12 @@ impl FieldState {
     }
 
     pub fn set_multi_selection(&mut self, selections: &[bool]) {
-        if let FieldValue::MultiSelect { selected, .. } = &mut self.value {
-            if selected.len() == selections.len() && selected != selections {
-                selected.clone_from_slice(selections);
-                self.after_edit();
-            }
+        if let FieldValue::MultiSelect { selected, .. } = &mut self.value
+            && selected.len() == selections.len()
+            && selected != selections
+        {
+            selected.clone_from_slice(selections);
+            self.after_edit();
         }
     }
 

@@ -94,18 +94,14 @@ impl FormState {
 
     pub fn active_section_mut(&mut self) -> Option<(&mut SectionState, usize)> {
         self.normalize_focus();
-        let Some(root) = self.roots.get_mut(self.root_index) else {
-            return None;
-        };
+        let root = self.roots.get_mut(self.root_index)?;
         let section = root.sections.get_mut(self.section_index)?;
         let index = self.field_index.min(section.fields.len().saturating_sub(1));
         Some((section, index))
     }
 
     pub fn focused_field_mut(&mut self) -> Option<&mut FieldState> {
-        let Some((section, index)) = self.active_section_mut() else {
-            return None;
-        };
+        let (section, index) = self.active_section_mut()?;
         section.fields.get_mut(index)
     }
 
@@ -144,10 +140,10 @@ impl FormState {
         } else {
             self.advance_section_within_root(-1);
             self.normalize_focus();
-            if let Some(current) = self.active_section() {
-                if !current.fields.is_empty() {
-                    self.field_index = current.fields.len().saturating_sub(1);
-                }
+            if let Some(current) = self.active_section()
+                && !current.fields.is_empty()
+            {
+                self.field_index = current.fields.len().saturating_sub(1);
             }
         }
     }

@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
 use textwrap::wrap;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
     domain::FieldKind,
@@ -56,19 +56,18 @@ pub fn render_fields(
     let content_width = field_area.width.saturating_sub(4);
     let mut items = Vec::with_capacity(section.fields.len());
     let mut cursor_hint: Option<CursorHint> = None;
-    let mut line_offset = 0usize;
+    let mut field_heights = Vec::with_capacity(section.fields.len());
     adjust_scroll_offset(section, selected_index, field_area.height);
+    let viewport_top = section.scroll_offset;
 
     for (idx, field) in section.fields.iter().enumerate() {
         let render = build_field_render(field, idx == selected_index, content_width);
-        let line_count = render.lines.len();
-        if cursor_hint.is_none() {
-            if let Some(mut hint) = render.cursor_hint {
-                hint.line_offset += line_offset;
-                cursor_hint = Some(hint);
-            }
+        if idx == selected_index
+            && let Some(hint) = render.cursor_hint
+        {
+            cursor_hint = Some(hint);
         }
-        line_offset += line_count;
+        field_heights.push(render.lines.len());
         items.push(ListItem::new(render.lines));
     }
 
@@ -89,17 +88,36 @@ pub fn render_fields(
 
     frame.render_stateful_widget(list, field_area, &mut list_state);
 
-    if enable_cursor {
-        if let Some(cursor) = cursor_hint {
-            let inner_y = field_area.y.saturating_add(1);
+    if enable_cursor
+        && let (Some(cursor), Some(height)) =
+            (cursor_hint, field_heights.get(selected_index).copied())
+        && selected_index >= viewport_top
+    {
+        let mut relative_y = 0usize;
+        for idx in field_heights.iter().take(selected_index).skip(viewport_top) {
+            relative_y += field_heights[*idx];
+        }
+        let caret_line = relative_y + cursor.line_in_field.min(height.saturating_sub(1));
+        let max_visible = field_area.height.saturating_sub(3) as usize;
+        // #[cfg(debug_assertions)]
+        // println!(
+        //     "[cursor-debug] selected={} scroll_offset={} relative_y={} caret_line={} max_visible={}",
+        //     selected_index, section.scroll_offset, relative_y, caret_line, max_visible
+        // );
+        if caret_line <= max_visible {
+            let inner_y = field_area.y.saturating_add(2);
             let inner_x = field_area.x.saturating_add(1);
-            let line = cursor
-                .line_offset
-                .min(field_area.height.saturating_sub(2) as usize) as u16;
-            let cursor_y = inner_y.saturating_add(line);
+            // #[cfg(debug_assertions)]
+            // println!(
+            //     "[cursor-debug-xy] inner_y={} caret_line={} cursor_y={}",
+            //     inner_y,
+            //     caret_line,
+            //     inner_y + caret_line as u16
+            // );
+            let cursor_y = inner_y.saturating_add(caret_line as u16);
             let cursor_x = inner_x
                 .saturating_add(2)
-                .saturating_add(cursor.column_offset)
+                .saturating_add(HIGHLIGHT_WIDTH)
                 .saturating_add(cursor.value_width);
             frame.set_cursor_position((cursor_x, cursor_y));
         }
@@ -119,14 +137,15 @@ fn adjust_scroll_offset(section: &mut SectionState, selected: usize, height: u16
     }
 }
 
+const HIGHLIGHT_WIDTH: u16 = 2;
+
 struct FieldRender {
     lines: Vec<Line<'static>>,
     cursor_hint: Option<CursorHint>,
 }
 
 struct CursorHint {
-    line_offset: usize,
-    column_offset: u16,
+    line_in_field: usize,
     value_width: u16,
 }
 
@@ -179,10 +198,7 @@ fn value_panel_lines(
 ) -> (Vec<Line<'static>>, Option<CursorHint>) {
     let clamp_width = max_width.max(4) as usize;
     let value_text = field.display_value();
-    let mut wrapped_value: Vec<String> = wrap(&value_text, clamp_width)
-        .into_iter()
-        .map(|segment| segment.into_owned())
-        .collect();
+    let mut wrapped_value = wrap_preserving_spaces(&value_text, clamp_width);
     if wrapped_value.is_empty() {
         wrapped_value.push(String::new());
     }
@@ -210,7 +226,7 @@ fn value_panel_lines(
             format!("┌{}┐", border_line),
             border_style,
         )));
-        let value_line_index = lines.len();
+        let content_start = lines.len();
         for segment in &wrapped_value {
             let mut content = segment.clone();
             let mut width = UnicodeWidthStr::width(content.as_str());
@@ -228,10 +244,15 @@ fn value_panel_lines(
             format!("└{}┘", border_line),
             border_style,
         )));
+        let caret_line = content_start + wrapped_value.len().saturating_sub(1);
+        let trailing_spaces = count_trailing_spaces(&value_text);
+        let mut caret_width = last_line_width + trailing_spaces;
+        if caret_width > inner_width {
+            caret_width = inner_width;
+        }
         cursor_hint = Some(CursorHint {
-            line_offset: value_line_index,
-            column_offset: 0,
-            value_width: last_line_width as u16,
+            line_in_field: caret_line,
+            value_width: caret_width as u16,
         });
     } else {
         for segment in wrapped_value {
@@ -315,13 +336,13 @@ fn composite_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
                         .add_modifier(Modifier::BOLD),
                 ),
             ]));
-            if let Some(desc) = summary.description.as_ref() {
-                if !desc.is_empty() {
-                    lines.push(Line::from(vec![
-                        Span::raw("     "),
-                        Span::styled(desc.clone(), Style::default().fg(Color::Gray)),
-                    ]));
-                }
+            if let Some(desc) = summary.description.as_ref()
+                && !desc.is_empty()
+            {
+                lines.push(Line::from(vec![
+                    Span::raw("     "),
+                    Span::styled(desc.clone(), Style::default().fg(Color::Gray)),
+                ]));
             }
             for line in &summary.lines {
                 lines.push(Line::from(format!("     {line}")));
@@ -422,7 +443,8 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
             let active_titles = options
                 .iter()
                 .zip(active.iter())
-                .filter_map(|(title, flag)| flag.then(|| title.clone()))
+                .filter(|&(_title, flag)| *flag)
+                .map(|(title, _flag)| title.clone())
                 .collect::<Vec<_>>();
             let summary = if active_titles.is_empty() {
                 "    Active variants: <none>"
@@ -446,4 +468,32 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
         return Some(lines);
     }
     None
+}
+
+fn count_trailing_spaces(text: &str) -> usize {
+    text.chars().rev().take_while(|c| *c == ' ').count()
+}
+
+fn wrap_preserving_spaces(text: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![text.to_string()];
+    }
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    let mut current_width = 0usize;
+    for ch in text.chars() {
+        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+        if current_width + ch_width > width && !current.is_empty() {
+            lines.push(current);
+            current = String::new();
+            current_width = 0;
+        }
+        current.push(ch);
+        current_width += ch_width;
+    }
+    lines.push(current);
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
 }

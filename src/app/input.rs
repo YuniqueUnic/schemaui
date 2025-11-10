@@ -166,7 +166,7 @@ impl KeyBindingMap {
                 } else {
                     KeyActionDiscriminant::FieldStepNeg
                 };
-                self.bindings.get(&key).cloned().unwrap_or_else(|| {
+                self.bindings.get(&key).cloned().unwrap_or({
                     if delta >= 0 {
                         CommandDispatch::Form(FormCommand::FocusNextField)
                     } else {
