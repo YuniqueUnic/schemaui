@@ -309,6 +309,7 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Array(inner) => format!("{}[]", field_type_label(inner)),
         FieldKind::Json => "object".to_string(),
         FieldKind::Composite(_) => "composite".to_string(),
+        FieldKind::KeyValue(_) => "map".to_string(),
     }
 }
 
@@ -330,7 +331,11 @@ pub fn render_composite_overlay(
             overlay.title.clone()
         })
         .borders(Borders::ALL)
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+        .style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
     frame.render_widget(block.clone(), area);
     let inner = block.inner(area);
 
@@ -372,7 +377,11 @@ pub fn render_composite_overlay(
     let footer = Paragraph::new(overlay.instructions.clone())
         .wrap(Wrap { trim: true })
         .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::TOP).title("Overlay Controls"));
+        .block(
+            Block::default()
+                .borders(Borders::TOP)
+                .title("Overlay Controls"),
+        );
     frame.render_widget(footer, layout[1]);
 }
 
@@ -380,7 +389,10 @@ fn render_list_sidebar(frame: &mut Frame<'_>, area: Rect, entries: &[String], se
     let items: Vec<ListItem<'_>> = if entries.is_empty() {
         vec![ListItem::new("No entries")]
     } else {
-        entries.iter().map(|label| ListItem::new(label.clone())).collect()
+        entries
+            .iter()
+            .map(|label| ListItem::new(label.clone()))
+            .collect()
     };
     let mut state = ListState::default();
     if !entries.is_empty() {
@@ -499,22 +511,17 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
                 } else {
                     let max_render = 3usize;
                     for summary in summaries.iter().take(max_render) {
-                        lines.push(Line::from(vec![
-                            Span::styled(
-                                format!("  ▶ {}", summary.title),
-                                Style::default()
-                                    .fg(Color::Yellow)
-                                    .add_modifier(Modifier::BOLD),
-                            ),
-                        ]));
+                        lines.push(Line::from(vec![Span::styled(
+                            format!("  ▶ {}", summary.title),
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::BOLD),
+                        )]));
                         if let Some(desc) = summary.description.as_ref() {
                             if !desc.is_empty() {
                                 lines.push(Line::from(vec![
                                     Span::raw("     "),
-                                    Span::styled(
-                                        desc.clone(),
-                                        Style::default().fg(Color::Gray),
-                                    ),
+                                    Span::styled(desc.clone(), Style::default().fg(Color::Gray)),
                                 ]));
                             }
                         }

@@ -29,12 +29,27 @@ pub enum FieldKind {
     Array(Box<FieldKind>),
     Json,
     Composite(CompositeField),
+    KeyValue(KeyValueField),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompositeField {
     pub mode: CompositeMode,
     pub variants: Vec<CompositeVariant>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeyValueField {
+    pub key_title: String,
+    pub key_description: Option<String>,
+    pub key_default: Option<Value>,
+    pub key_schema: Value,
+    pub value_title: String,
+    pub value_description: Option<String>,
+    pub value_default: Option<Value>,
+    pub value_schema: Value,
+    pub value_kind: Box<FieldKind>,
+    pub entry_schema: Value,
 }
 
 #[derive(Debug, Clone, PartialEq)]

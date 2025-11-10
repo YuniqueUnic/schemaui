@@ -2,7 +2,7 @@ use std::cell::{RefCell, RefMut};
 
 use serde_json::{Map, Value};
 
-use crate::domain::{parse_form_schema, CompositeField, CompositeMode};
+use crate::domain::{CompositeField, CompositeMode, parse_form_schema};
 
 use super::{error::FieldCoercionError, state::FormState};
 
@@ -31,6 +31,7 @@ pub struct CompositeEditorSession {
     pub title: String,
     pub description: Option<String>,
     pub form_state: FormState,
+    pub schema: Value,
 }
 
 #[derive(Debug, Clone)]
@@ -162,19 +163,11 @@ impl CompositeListState {
             pointer: self.pointer.clone(),
             message: "no entry selected".to_string(),
         })?;
-        let entry = self
-            .entries
-            .get(idx)
-            .ok_or_else(|| FieldCoercionError {
-                pointer: self.pointer.clone(),
-                message: "invalid entry selection".to_string(),
-            })?;
-        let variant_index = entry
-            .state
-            .active_indices()
-            .first()
-            .copied()
-            .unwrap_or(0);
+        let entry = self.entries.get(idx).ok_or_else(|| FieldCoercionError {
+            pointer: self.pointer.clone(),
+            message: "invalid entry selection".to_string(),
+        })?;
+        let variant_index = entry.state.active_indices().first().copied().unwrap_or(0);
         let session = entry
             .state
             .take_editor_session(&entry.pointer, variant_index)?;
@@ -185,11 +178,7 @@ impl CompositeListState {
         })
     }
 
-    pub fn restore_entry_editor(
-        &mut self,
-        entry_index: usize,
-        session: CompositeEditorSession,
-    ) {
+    pub fn restore_entry_editor(&mut self, entry_index: usize, session: CompositeEditorSession) {
         if let Some(entry) = self.entries.get(entry_index) {
             entry.state.restore_editor_session(session);
         }
@@ -335,7 +324,10 @@ impl CompositeState {
     }
 
     pub fn option_titles(&self) -> Vec<String> {
-        self.variants.iter().map(|variant| variant.title.clone()).collect()
+        self.variants
+            .iter()
+            .map(|variant| variant.title.clone())
+            .collect()
     }
 
     pub fn selected_index(&self) -> Option<usize> {
@@ -397,6 +389,7 @@ impl CompositeState {
             title: variant.title.clone(),
             description: variant.description.clone(),
             form_state,
+            schema: variant.schema.clone(),
         })
     }
 
@@ -481,10 +474,7 @@ impl CompositeVariantState {
         }
         let schema = parse_form_schema(&self.schema).map_err(|err| FieldCoercionError {
             pointer: pointer.to_string(),
-            message: format!(
-                "failed to parse composite variant '{}': {err}",
-                self.title
-            ),
+            message: format!("failed to parse composite variant '{}': {err}", self.title),
         })?;
         *self.form.borrow_mut() = Some(FormState::from_schema(&schema));
         Ok(())
@@ -510,10 +500,7 @@ impl CompositeVariantState {
         *self.form.borrow_mut() = Some(form_state);
     }
 
-    fn snapshot(
-        &self,
-        pointer: &str,
-    ) -> Result<CompositeVariantSummary, FieldCoercionError> {
+    fn snapshot(&self, pointer: &str) -> Result<CompositeVariantSummary, FieldCoercionError> {
         let form = self.borrow_form(pointer)?;
         let mut lines = Vec::new();
         if form.sections.is_empty() {
