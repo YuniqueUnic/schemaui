@@ -133,7 +133,10 @@ pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
 
 fn render_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
     let total = form_state.sections.len();
-    let window = 5usize;
+    let mut window = ((area.width as usize).saturating_sub(4) / 12).max(1);
+    if window > total {
+        window = total;
+    }
     let mut start = 0usize;
     if total > window {
         let half = window / 2;
@@ -545,6 +548,20 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
         }
     }
 
+    if let Some(error) = &field.error {
+        let warning = format!("⚠ {error}");
+        for (idx, chunk) in wrap(&warning, clamp_width).iter().enumerate() {
+            let prefix = if idx == 0 { "  " } else { "    " };
+            lines.push(Line::from(vec![
+                Span::raw(prefix),
+                Span::styled(
+                    chunk.to_string(),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                ),
+            ]));
+        }
+    }
+
     let type_label = field_type_label(&field.schema.kind);
     let desc_text = match &field.schema.description {
         Some(desc) if !desc.is_empty() => format!("{type_label} | {desc}"),
@@ -559,20 +576,6 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
                 .add_modifier(Modifier::ITALIC),
         ),
     ]));
-
-    if let Some(error) = &field.error {
-        let warning = format!("⚠ {error}");
-        for (idx, chunk) in wrap(&warning, clamp_width).iter().enumerate() {
-            let prefix = if idx == 0 { "  " } else { "    " };
-            lines.push(Line::from(vec![
-                Span::raw(prefix),
-                Span::styled(
-                    chunk.to_string(),
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-            ]));
-        }
-    }
 
     FieldRender { lines, cursor_hint }
 }
