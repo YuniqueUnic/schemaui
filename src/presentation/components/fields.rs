@@ -184,7 +184,7 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
         lines.extend(summary);
     }
 
-    lines.push(meta_line(field));
+    lines.push(meta_line(field, is_selected));
 
     if let Some(error) = error_lines(field, max_width) {
         lines.extend(error);
@@ -268,11 +268,16 @@ fn value_panel_lines(
     (lines, cursor_hint)
 }
 
-fn meta_line(field: &FieldState) -> Line<'static> {
+fn meta_line(field: &FieldState, is_selected: bool) -> Line<'static> {
     let mut meta = Vec::new();
+    let type_color = if is_selected {
+        Color::Black
+    } else {
+        Color::DarkGray
+    };
     meta.push(Span::styled(
         format!("  type: {}", field_type_label(&field.schema.kind)),
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(type_color),
     ));
     if field.error.is_some() {
         meta.push(Span::styled(

@@ -91,16 +91,17 @@ pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
     }
 
     if let Some(additional) = object.additional_properties.as_ref() {
-        let resolved = resolver.resolve_schema(additional)?;
-        let field = build_field_schema(
-            &resolver,
-            &resolved,
-            "additional",
-            Vec::new(),
-            general_section_info(),
-            false,
-        )?;
-        general_fields.push((order_counter, field));
+        if let Some(resolved) = resolve_additional_properties(&resolver, additional)? {
+            let field = build_field_schema(
+                &resolver,
+                &resolved,
+                "additional",
+                Vec::new(),
+                general_section_info(),
+                false,
+            )?;
+            general_fields.push((order_counter, field));
+        }
     }
 
     general_fields.sort_by_key(|(order, _)| *order);
@@ -199,21 +200,22 @@ fn build_section_tree(
     }
 
     if let Some(additional) = object.additional_properties.as_ref() {
-        let resolved = resolver.resolve_schema(additional)?;
-        let field_name = path
-            .last()
-            .cloned()
-            .unwrap_or_else(|| "additional".to_string());
-        let field = build_field_schema(
-            resolver,
-            &resolved,
-            &field_name,
-            path.clone(),
-            section_info.clone(),
-            false,
-        )?;
-        fields.push((*order, field));
-        *order += 1;
+        if let Some(resolved) = resolve_additional_properties(resolver, additional)? {
+            let field_name = path
+                .last()
+                .cloned()
+                .unwrap_or_else(|| "additional".to_string());
+            let field = build_field_schema(
+                resolver,
+                &resolved,
+                &field_name,
+                path.clone(),
+                section_info.clone(),
+                false,
+            )?;
+            fields.push((*order, field));
+            *order += 1;
+        }
     }
 
     fields.sort_by_key(|(pos, _)| *pos);
@@ -226,6 +228,16 @@ fn build_section_tree(
         fields: fields.into_iter().map(|(_, field)| field).collect(),
         children,
     })
+}
+
+fn resolve_additional_properties(
+    resolver: &SchemaResolver<'_>,
+    schema: &Schema,
+) -> Result<Option<SchemaObject>> {
+    match schema {
+        Schema::Bool(false) => Ok(None),
+        other => resolver.resolve_schema(other).map(Some),
+    }
 }
 
 fn should_descend(schema: &SchemaObject) -> bool {
@@ -693,6 +705,35 @@ mod tests {
             }
             other => panic!("expected composite field, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn notifications_sections_do_not_duplicate_parent_field() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "notifications": {
+                    "type": "object",
+                    "properties": {
+                        "channels": {"type": "array", "items": {"type": "string"}},
+                        "templates": {
+                            "type": "object",
+                            "additionalProperties": {"type": "string"}
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            }
+        });
+        let form = build_form_schema(&schema).expect("schema parsed");
+        let notifications = form
+            .roots
+            .iter()
+            .find(|root| root.id == "notifications")
+            .expect("notifications root");
+        let section = notifications.sections.first().expect("section");
+        let names: Vec<_> = section.fields.iter().map(|field| field.name.clone()).collect();
+        assert_eq!(names, vec!["channels", "templates"]);
     }
 
     #[test]
