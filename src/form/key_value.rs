@@ -320,15 +320,25 @@ fn summarize_value(value: &Value) -> String {
         Value::Null => "null".to_string(),
         Value::Bool(flag) => flag.to_string(),
         Value::Number(num) => num.to_string(),
-        Value::String(text) => {
-            if text.len() > 12 {
-                format!("\"{}…\"", &text[..10])
-            } else {
-                format!("\"{text}\"")
-            }
-        }
+        Value::String(text) => summarize_string(text),
         Value::Array(items) => format!("array({})", items.len()),
         Value::Object(map) => format!("object({})", map.len()),
+    }
+}
+
+fn summarize_string(text: &str) -> String {
+    use unicode_width::UnicodeWidthStr;
+    const MAX_VISIBLE: usize = 36;
+    const TRUNCATE_TO: usize = MAX_VISIBLE - 12;
+    let char_count = UnicodeWidthStr::width(text);
+    if char_count > MAX_VISIBLE {
+        let mut truncated = String::new();
+        for ch in text.chars().take(TRUNCATE_TO) {
+            truncated.push(ch);
+        }
+        format!("\"{}…\"", truncated)
+    } else {
+        format!("\"{text}\"")
     }
 }
 
@@ -347,5 +357,27 @@ fn pointer_for_key(base: &str, key: &str) -> String {
         format!("{base}{encoded}")
     } else {
         format!("{base}/{}", encoded)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn summarize_value_handles_unicode_without_panic() {
+        let value = Value::String(
+            "非法所得房间abdf sgfsjadlg sadfas百度地方是灯红酒绿 啥地方 ".to_string(),
+        );
+        let summary = summarize_value(&value);
+        assert_eq!(summary, "\"非法所得房间abdf sgfsjadlg sad…\"");
+    }
+
+    #[test]
+    fn summarize_value_truncates_long_strings_on_char_boundaries() {
+        let long = "abcdefghijklmnoabcdefghijklmnoabcdefghijklmno";
+        let value = Value::String(long.to_string());
+        let summary = summarize_value(&value);
+        assert_eq!(summary, "\"abcdefghijklmnoabcdefghi…\"");
     }
 }
