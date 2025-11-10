@@ -6,7 +6,10 @@ use ratatui::{
 
 use crate::form::FormState;
 
-use super::{fields::render_fields, sections::{render_root_tabs, render_section_tabs}};
+use super::{
+    fields::render_fields,
+    sections::{render_root_tabs, render_section_tabs},
+};
 
 pub fn render_body(
     frame: &mut Frame<'_>,

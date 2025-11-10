@@ -1,6 +1,4 @@
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn popup_rect(area: Rect, width: u16, height: u16) -> Rect {
     let vertical = Layout::default()

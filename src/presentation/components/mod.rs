@@ -3,8 +3,8 @@ mod fields;
 mod footer;
 mod layout;
 mod overlay;
-mod sections;
 mod popup;
+mod sections;
 
 pub use body::render_body;
 pub use footer::render_footer;
