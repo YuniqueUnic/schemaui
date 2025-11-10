@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use jsonschema::{Validator, validator_for};
@@ -13,12 +15,12 @@ use crate::{
 };
 
 use super::{
-    input::{InputRouter, KeyCommand},
+    input::{AppCommand, CommandDispatch, InputRouter},
     options::UiOptions,
     popup::PopupState,
     status::StatusLine,
     terminal::TerminalGuard,
-    validation::{ValidationOutcome, validate_form, validate_partial_form},
+    validation::{ValidationOutcome, validate_form},
 };
 
 const HELP_DEFAULT: &str = "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+[ / Ctrl+] switch root • Enter choose • Ctrl+E edit • Ctrl+S save • Ctrl+Q quit";
@@ -116,7 +118,7 @@ struct CompositeEditorOverlay {
     list_entries: Option<Vec<String>>,
     list_selected: Option<usize>,
     instructions: String,
-    validator: Option<Validator>,
+    validator: Option<Arc<Validator>>,
 }
 
 impl CompositeEditorOverlay {
@@ -241,6 +243,138 @@ impl App {
         self.validation_errors = self.form_state.error_count();
     }
 
+    fn handle_app_command(&mut self, command: AppCommand) -> bool {
+        match command {
+            AppCommand::Save => {
+                self.exit_armed = false;
+                self.on_save();
+            }
+            AppCommand::Quit => {
+                self.on_exit();
+            }
+            AppCommand::ResetStatus => {
+                self.exit_armed = false;
+                self.status.ready();
+            }
+            AppCommand::TogglePopup => {
+                if self.try_open_popup(PopupOwner::Root) {
+                    return true;
+                }
+            }
+            AppCommand::EditComposite => {
+                self.try_open_composite_editor();
+            }
+            AppCommand::ListAddEntry => {
+                if self.handle_list_add_entry() {
+                    return true;
+                }
+            }
+            AppCommand::ListRemoveEntry => {
+                if self.handle_list_remove_entry() {
+                    return true;
+                }
+            }
+            AppCommand::ListMove(delta) => {
+                if self.handle_list_move_entry(delta) {
+                    return true;
+                }
+            }
+            AppCommand::ListSelect(delta) => {
+                if self.handle_list_select_entry(delta) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn handle_field_input(&mut self, event: &KeyEvent) {
+        if let Some(field) = self.form_state.focused_field_mut() {
+            if field.handle_key(event) {
+                let pointer = field.schema.pointer.clone();
+                self.exit_armed = false;
+                self.status.editing(&field.schema.display_label());
+                if self.options.auto_validate {
+                    self.dispatch_form_command(FormCommand::FieldEdited { pointer });
+                }
+            }
+        }
+    }
+
+    fn handle_overlay_app_command(&mut self, command: AppCommand) -> Result<bool> {
+        match command {
+            AppCommand::Save | AppCommand::EditComposite => {
+                if let Some(editor) = self.composite_editor.as_mut() {
+                    editor.exit_armed = false;
+                }
+                self.close_composite_editor(true);
+                return Ok(true);
+            }
+            AppCommand::Quit => {
+                self.close_composite_editor(false);
+                return Ok(true);
+            }
+            AppCommand::TogglePopup => {
+                if self.try_open_popup(PopupOwner::Composite) {
+                    return Ok(true);
+                }
+            }
+            AppCommand::ResetStatus => {
+                self.status.ready();
+            }
+            AppCommand::ListAddEntry => {
+                if self.handle_list_add_entry() {
+                    return Ok(true);
+                }
+            }
+            AppCommand::ListRemoveEntry => {
+                if self.handle_list_remove_entry() {
+                    return Ok(true);
+                }
+            }
+            AppCommand::ListMove(delta) => {
+                if self.handle_list_move_entry(delta) {
+                    return Ok(true);
+                }
+            }
+            AppCommand::ListSelect(delta) => {
+                if self.handle_list_select_entry(delta) {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    fn handle_overlay_field_input(&mut self, event: &KeyEvent) {
+        if let Some(editor) = self.composite_editor.as_mut() {
+            editor.exit_armed = false;
+            let label = editor.field_label.clone();
+            if let Some(field) = editor.form_state_mut().focused_field_mut() {
+                if field.handle_key(event) {
+                    self.status
+                        .editing(&format!("{} › {}", label, field.schema.display_label()));
+                    if let Some(pointer) = Some(field.schema.pointer.clone()) {
+                        self.validate_overlay_field(pointer);
+                    }
+                }
+            }
+        }
+    }
+
+    fn validate_overlay_field(&mut self, pointer: String) {
+        let Some(editor) = self.composite_editor.as_mut() else {
+            return;
+        };
+        let Some(validator) = editor.validator.clone() else {
+            return;
+        };
+        let mut engine = FormEngine::new(editor.form_state_mut(), &validator);
+        if let Err(message) = engine.dispatch(FormCommand::FieldEdited { pointer }) {
+            self.status.set_raw(&message);
+        }
+    }
+
     pub fn new(form_state: FormState, validator: Validator, options: UiOptions) -> Self {
         Self {
             form_state,
@@ -344,72 +478,24 @@ impl App {
             return Ok(());
         }
 
-        match self.input_router.classify(&key) {
-            KeyCommand::Save => {
-                self.exit_armed = false;
-                self.on_save();
-            }
-            KeyCommand::ListAddEntry => {
-                self.handle_list_add_entry();
-                return Ok(());
-            }
-            KeyCommand::ListRemoveEntry => {
-                self.handle_list_remove_entry();
-                return Ok(());
-            }
-            KeyCommand::ListMove(delta) => {
-                self.handle_list_move_entry(delta);
-                return Ok(());
-            }
-            KeyCommand::ListSelect(delta) => {
-                self.handle_list_select_entry(delta);
-                return Ok(());
-            }
-            KeyCommand::Quit => {
-                self.on_exit();
-            }
-            KeyCommand::SwitchSection(delta) => {
-                apply_command(&mut self.form_state, FormCommand::FocusNextSection(delta));
+        let dispatch = self
+            .options
+            .keymap
+            .resolve(self.input_router.classify(&key));
+        match dispatch {
+            CommandDispatch::Form(command) => {
+                self.dispatch_form_command(command);
                 self.exit_armed = false;
             }
-            KeyCommand::SwitchRoot(delta) => {
-                apply_command(&mut self.form_state, FormCommand::FocusNextRoot(delta));
-                self.exit_armed = false;
-            }
-            KeyCommand::NextField => {
-                apply_command(&mut self.form_state, FormCommand::FocusNextField);
-                self.exit_armed = false;
-            }
-            KeyCommand::PrevField => {
-                apply_command(&mut self.form_state, FormCommand::FocusPrevField);
-                self.exit_armed = false;
-            }
-            KeyCommand::ResetStatus => {
-                self.exit_armed = false;
-                self.status.ready();
-            }
-            KeyCommand::TogglePopup => {
-                if self.try_open_popup(PopupOwner::Root) {
+            CommandDispatch::App(command) => {
+                if self.handle_app_command(command) {
                     return Ok(());
                 }
             }
-            KeyCommand::EditComposite => {
-                self.try_open_composite_editor();
+            CommandDispatch::Input(event) => {
+                self.handle_field_input(&event);
             }
-            KeyCommand::Edit(event) => {
-                let mut edited_pointer = None;
-                if let Some(field) = self.form_state.focused_field_mut() {
-                    if field.handle_key(&event) {
-                        edited_pointer = Some(field.schema.pointer.clone());
-                        self.exit_armed = false;
-                        self.status.editing(&field.schema.display_label());
-                    }
-                }
-                if let (Some(pointer), true) = (edited_pointer, self.options.auto_validate) {
-                    self.dispatch_form_command(FormCommand::FieldEdited { pointer });
-                }
-            }
-            KeyCommand::None => {}
+            CommandDispatch::None => {}
         }
 
         Ok(())
@@ -673,91 +759,27 @@ impl App {
             return Ok(());
         }
 
-        match self.input_router.classify(&key) {
-            KeyCommand::Save | KeyCommand::EditComposite => {
+        let dispatch = self
+            .options
+            .keymap
+            .resolve(self.input_router.classify(&key));
+        match dispatch {
+            CommandDispatch::Form(command) => {
                 if let Some(editor) = self.composite_editor.as_mut() {
                     editor.exit_armed = false;
-                }
-                self.close_composite_editor(true);
-                return Ok(());
-            }
-            KeyCommand::Quit => {
-                self.close_composite_editor(false);
-                return Ok(());
-            }
-            KeyCommand::SwitchSection(delta) => {
-                if let Some(editor) = self.composite_editor.as_mut() {
-                    editor.exit_armed = false;
-                    let form = editor.form_state_mut();
-                    apply_command(form, FormCommand::FocusNextSection(delta));
+                    apply_command(editor.form_state_mut(), command.clone());
+                    self.run_overlay_validation();
                 }
             }
-            KeyCommand::SwitchRoot(delta) => {
-                if let Some(editor) = self.composite_editor.as_mut() {
-                    editor.exit_armed = false;
-                    let form = editor.form_state_mut();
-                    apply_command(form, FormCommand::FocusNextRoot(delta));
-                }
-            }
-            KeyCommand::NextField => {
-                if let Some(editor) = self.composite_editor.as_mut() {
-                    editor.exit_armed = false;
-                    let form = editor.form_state_mut();
-                    apply_command(form, FormCommand::FocusNextField);
-                }
-            }
-            KeyCommand::PrevField => {
-                if let Some(editor) = self.composite_editor.as_mut() {
-                    editor.exit_armed = false;
-                    let form = editor.form_state_mut();
-                    apply_command(form, FormCommand::FocusPrevField);
-                }
-            }
-            KeyCommand::ResetStatus => {
-                self.status.ready();
-            }
-            KeyCommand::TogglePopup => {
-                if self.try_open_popup(PopupOwner::Composite) {
+            CommandDispatch::App(command) => {
+                if self.handle_overlay_app_command(command)? {
                     return Ok(());
                 }
             }
-            KeyCommand::Edit(event) => {
-                if let Some(editor) = self.composite_editor.as_mut() {
-                    editor.exit_armed = false;
-                    let label = editor.field_label.clone();
-                    if let Some(field) = editor.form_state_mut().focused_field_mut() {
-                        if field.handle_key(&event) {
-                            self.status.editing(&format!(
-                                "{} › {}",
-                                label,
-                                field.schema.display_label()
-                            ));
-                            self.run_overlay_validation();
-                        }
-                    }
-                }
+            CommandDispatch::Input(event) => {
+                self.handle_overlay_field_input(&event);
             }
-            KeyCommand::ListAddEntry => {
-                if self.handle_list_add_entry() {
-                    return Ok(());
-                }
-            }
-            KeyCommand::ListRemoveEntry => {
-                if self.handle_list_remove_entry() {
-                    return Ok(());
-                }
-            }
-            KeyCommand::ListMove(delta) => {
-                if self.handle_list_move_entry(delta) {
-                    return Ok(());
-                }
-            }
-            KeyCommand::ListSelect(delta) => {
-                if self.handle_list_select_entry(delta) {
-                    return Ok(());
-                }
-            }
-            KeyCommand::None => {}
+            CommandDispatch::None => {}
         }
 
         Ok(())
@@ -809,26 +831,26 @@ impl App {
             return;
         };
         editor.validator = match &editor.session {
-            OverlaySession::Composite(session) => validator_for(&session.schema).ok(),
-            OverlaySession::KeyValue(session) => validator_for(&session.schema).ok(),
-            OverlaySession::Array(session) => validator_for(&session.schema).ok(),
+            OverlaySession::Composite(session) => validator_for(&session.schema).ok().map(Arc::new),
+            OverlaySession::KeyValue(session) => validator_for(&session.schema).ok().map(Arc::new),
+            OverlaySession::Array(session) => validator_for(&session.schema).ok().map(Arc::new),
         };
-        if editor.validator.is_some() {
-            self.run_overlay_validation();
-        }
+        self.run_overlay_validation();
     }
 
     fn run_overlay_validation(&mut self) {
-        let Some(editor) = self.composite_editor.as_mut() else {
-            return;
+        let pointer = {
+            let Some(editor) = self.composite_editor.as_mut() else {
+                return;
+            };
+            editor
+                .form_state()
+                .focused_field()
+                .map(|field| field.schema.pointer.clone())
         };
-        let Some(validator) = editor.validator.take() else {
-            return;
-        };
-        if let Err(message) = validate_partial_form(editor.form_state_mut(), &validator) {
-            self.status.set_raw(&message);
+        if let Some(pointer) = pointer {
+            self.validate_overlay_field(pointer);
         }
-        editor.validator = Some(validator);
     }
 
     fn handle_list_add_entry(&mut self) -> bool {

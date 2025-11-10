@@ -52,25 +52,3 @@ pub fn validate_form(form_state: &mut FormState, validator: &Validator) -> Valid
         }
     }
 }
-
-pub fn validate_partial_form(
-    form_state: &mut FormState,
-    validator: &Validator,
-) -> Result<(), String> {
-    match form_state.try_build_value() {
-        Ok(value) => {
-            form_state.clear_errors();
-            for error in validator.iter_errors(&value) {
-                let pointer = error.instance_path.to_string();
-                let message = error.to_string();
-                form_state.set_error(&pointer, message.clone());
-            }
-            Ok(())
-        }
-        Err(err) => {
-            form_state.clear_errors();
-            form_state.set_error(&err.pointer, err.message.clone());
-            Err(err.message)
-        }
-    }
-}
