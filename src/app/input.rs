@@ -10,6 +10,10 @@ pub enum KeyCommand {
     ResetStatus,
     TogglePopup,
     EditComposite,
+    ListAddEntry,
+    ListRemoveEntry,
+    ListMove(i32),
+    ListSelect(i32),
     Edit(KeyEvent),
     None,
 }
@@ -21,6 +25,12 @@ pub fn classify(key: &KeyEvent) -> KeyCommand {
             KeyCode::Char('q') | KeyCode::Char('Q') => KeyCommand::Quit,
             KeyCode::Char('c') | KeyCode::Char('C') => KeyCommand::Quit,
             KeyCode::Char('e') | KeyCode::Char('E') => KeyCommand::EditComposite,
+            KeyCode::Char('n') | KeyCode::Char('N') => KeyCommand::ListAddEntry,
+            KeyCode::Char('d') | KeyCode::Char('D') => KeyCommand::ListRemoveEntry,
+            KeyCode::Left => KeyCommand::ListSelect(-1),
+            KeyCode::Right => KeyCommand::ListSelect(1),
+            KeyCode::Up => KeyCommand::ListMove(-1),
+            KeyCode::Down => KeyCommand::ListMove(1),
             KeyCode::Tab => {
                 let delta = if key.modifiers.contains(KeyModifiers::SHIFT) {
                     -1

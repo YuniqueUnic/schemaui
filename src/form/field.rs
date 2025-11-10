@@ -4,7 +4,9 @@ use serde_json::Value;
 use crate::domain::{FieldKind, FieldSchema};
 
 use super::{
-    composite::{CompositeEditorSession, CompositeState},
+    composite::{
+        CompositeEditorSession, CompositeListEditorContext, CompositeListState, CompositeState,
+    },
     error::FieldCoercionError,
 };
 
@@ -22,6 +24,7 @@ pub enum FieldValue {
     },
     Array(String),
     Composite(CompositeState),
+    CompositeList(CompositeListState),
 }
 
 #[derive(Debug, Clone)]
@@ -95,7 +98,10 @@ impl FieldState {
                         selected,
                     }
                 }
-                FieldKind::Composite(_) => FieldValue::Array(default_text(&schema)),
+                FieldKind::Composite(meta) => FieldValue::CompositeList(CompositeListState::new(
+                    &schema.pointer,
+                    meta.clone(),
+                )),
                 _ => {
                     let default = schema
                         .default
@@ -208,6 +214,7 @@ impl FieldState {
             },
             FieldValue::MultiSelect { .. } => false,
             FieldValue::Composite(_) => false,
+            FieldValue::CompositeList(_) => false,
         }
     }
 
@@ -269,6 +276,56 @@ impl FieldState {
         }
     }
 
+    pub fn is_composite_list(&self) -> bool {
+        matches!(self.value, FieldValue::CompositeList(_))
+    }
+
+    pub fn composite_list_select_entry(&mut self, delta: i32) -> bool {
+        if let FieldValue::CompositeList(state) = &mut self.value {
+            state.select(delta)
+        } else {
+            false
+        }
+    }
+
+    pub fn composite_list_selected_label(&self) -> Option<String> {
+        if let FieldValue::CompositeList(state) = &self.value {
+            state.selected_label()
+        } else {
+            None
+        }
+    }
+
+    pub fn composite_list_add_entry(&mut self) -> bool {
+        if let FieldValue::CompositeList(state) = &mut self.value {
+            state.add_entry();
+            self.after_edit();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn composite_list_remove_entry(&mut self) -> bool {
+        if let FieldValue::CompositeList(state) = &mut self.value {
+            if state.remove_selected() {
+                self.after_edit();
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn composite_list_move_entry(&mut self, delta: i32) -> bool {
+        if let FieldValue::CompositeList(state) = &mut self.value {
+            if state.move_selected(delta) {
+                self.after_edit();
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn open_composite_editor(
         &mut self,
         variant_index: usize,
@@ -283,6 +340,19 @@ impl FieldState {
         }
     }
 
+    pub fn open_composite_list_editor(
+        &mut self,
+    ) -> Result<CompositeListEditorContext, FieldCoercionError> {
+        if let FieldValue::CompositeList(state) = &mut self.value {
+            state.open_selected_editor()
+        } else {
+            Err(FieldCoercionError {
+                pointer: self.schema.pointer.clone(),
+                message: "field is not a composite list".to_string(),
+            })
+        }
+    }
+
     pub fn close_composite_editor(
         &mut self,
         session: CompositeEditorSession,
@@ -290,6 +360,20 @@ impl FieldState {
     ) {
         if let FieldValue::Composite(state) = &self.value {
             state.restore_editor_session(session);
+            if mark_dirty {
+                self.after_edit();
+            }
+        }
+    }
+
+    pub fn close_composite_list_editor(
+        &mut self,
+        entry_index: usize,
+        session: CompositeEditorSession,
+        mark_dirty: bool,
+    ) {
+        if let FieldValue::CompositeList(state) = &mut self.value {
+            state.restore_entry_editor(entry_index, session);
             if mark_dirty {
                 self.after_edit();
             }
@@ -359,7 +443,20 @@ impl FieldState {
                 }
                 label
             }
-        }
+            FieldValue::CompositeList(state) => {
+                let len = state.len();
+                if len == 0 {
+                    "List: empty (Ctrl+N add)".to_string()
+                } else {
+                    let selection = state
+                        .selected_label()
+                        .unwrap_or_else(|| "<no selection>".to_string());
+                    format!(
+                        "List[{len}] • {selection} (Ctrl+Left/Right select, Ctrl+E edit)"
+                    )
+                }
+            }
+    }
     }
 
     pub fn current_value(&self) -> Result<Option<Value>, FieldCoercionError> {
@@ -392,6 +489,11 @@ impl FieldState {
             }
             (FieldKind::Composite(_), FieldValue::Composite(state)) => {
                 state.build_value(self.schema.required)
+            }
+            (FieldKind::Array(inner), FieldValue::CompositeList(state))
+                if matches!(inner.as_ref(), FieldKind::Composite(_)) =>
+            {
+                state.build_value()
             }
             (FieldKind::Composite(_), FieldValue::Text(text)) => string_value(text, &self.schema),
             _ => Ok(None),

@@ -181,5 +181,6 @@ fn empty_section() -> SectionState {
         title: "General".to_string(),
         description: None,
         fields: Vec::new(),
+        scroll_offset: 0,
     }
 }

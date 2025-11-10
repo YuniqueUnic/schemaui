@@ -8,6 +8,7 @@ pub struct SectionState {
     pub title: String,
     pub description: Option<String>,
     pub fields: Vec<FieldState>,
+    pub scroll_offset: usize,
 }
 
 impl SectionState {
@@ -24,6 +25,7 @@ impl SectionState {
             title: section.title.clone(),
             description: section.description.clone(),
             fields,
+            scroll_offset: 0,
         }
     }
 }

@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{
     domain::FieldKind,
-    form::{FieldState, FieldValue, FormState},
+    form::{FieldState, FieldValue, FormState, SectionState},
 };
 
 use unicode_width::UnicodeWidthStr;
@@ -17,7 +17,12 @@ use textwrap::wrap;
 
 use super::{CompositeOverlay, PopupRender, UiContext};
 
-pub fn render_body(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enable_cursor: bool) {
+pub fn render_body(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    form_state: &mut FormState,
+    enable_cursor: bool,
+) {
     if form_state.sections.is_empty() {
         let placeholder = Paragraph::new("No editable fields in schema")
             .block(Block::default().borders(Borders::ALL));
@@ -50,9 +55,9 @@ pub fn render_footer(frame: &mut Frame<'_>, area: Rect, ctx: &UiContext<'_>) {
     if ctx.error_count > 0 {
         status.push_str(&format!(" • {} error(s)", ctx.error_count));
     }
-    if let Some(focused) = ctx.form_state.focused_field() {
+    if let Some(label) = &ctx.focus_label {
         status.push_str(" • focus: ");
-        status.push_str(&focused.schema.display_label());
+        status.push_str(label);
     }
     if let Some(extra) = ctx.global_errors.first() {
         status.push_str(" • ");
@@ -167,8 +172,13 @@ fn render_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
     frame.render_widget(tabs, area);
 }
 
-fn render_fields(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enable_cursor: bool) {
-    let Some(section) = form_state.sections.get(form_state.section_index) else {
+fn render_fields(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    form_state: &mut FormState,
+    enable_cursor: bool,
+) {
+    let Some(section) = form_state.sections.get_mut(form_state.section_index) else {
         let placeholder =
             Paragraph::new("No section selected").block(Block::default().borders(Borders::ALL));
         frame.render_widget(placeholder, area);
@@ -210,6 +220,8 @@ fn render_fields(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enab
         .field_index
         .min(section.fields.len().saturating_sub(1));
 
+    adjust_scroll_offset(section, selected_index, field_area.height);
+
     for (idx, field) in section.fields.iter().enumerate() {
         let render = build_field_render(field, idx == selected_index, content_width);
         let line_count = render.lines.len();
@@ -226,6 +238,7 @@ fn render_fields(frame: &mut Frame<'_>, area: Rect, form_state: &FormState, enab
     let mut list_state = ListState::default();
     if !section.fields.is_empty() {
         list_state.select(Some(selected_index));
+        *list_state.offset_mut() = section.scroll_offset;
     }
 
     let list = List::new(items)
@@ -301,7 +314,11 @@ fn field_type_label(kind: &FieldKind) -> String {
     }
 }
 
-pub fn render_composite_overlay(frame: &mut Frame<'_>, overlay: CompositeOverlay<'_>) {
+pub fn render_composite_overlay(
+    frame: &mut Frame<'_>,
+    overlay: &CompositeOverlay,
+    overlay_form: &mut FormState,
+) {
     let base = frame.area();
     let width = base.width.saturating_sub(base.width / 4).max(40);
     let height = base.height.saturating_sub(base.height / 5).max(12);
@@ -309,24 +326,52 @@ pub fn render_composite_overlay(frame: &mut Frame<'_>, overlay: CompositeOverlay
     frame.render_widget(Clear, area);
 
     let block = Block::default()
-        .title(overlay.title)
+        .title(if overlay.dirty {
+            format!("{}  • DIRTY", overlay.title)
+        } else {
+            overlay.title.clone()
+        })
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
     frame.render_widget(block.clone(), area);
     let inner = block.inner(area);
 
-    if let Some(description) = overlay.description {
-        let layout = Layout::default()
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(5), Constraint::Length(2)])
+        .split(inner);
+
+    if let Some(description) = &overlay.description {
+        let sub = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3), Constraint::Min(3)])
-            .split(inner);
+            .constraints([Constraint::Length(4), Constraint::Min(1)])
+            .split(layout[0]);
         let desc = Paragraph::new(description.to_string())
             .wrap(Wrap { trim: true })
             .style(Style::default().fg(Color::Gray));
-        frame.render_widget(desc, layout[0]);
-        render_fields(frame, layout[1], overlay.form_state, true);
+        frame.render_widget(desc, sub[0]);
+        render_body(frame, sub[1], overlay_form, true);
     } else {
-        render_fields(frame, inner, overlay.form_state, true);
+        render_body(frame, layout[0], overlay_form, true);
+    }
+
+    let footer = Paragraph::new(overlay.instructions.clone())
+        .wrap(Wrap { trim: true })
+        .style(Style::default().fg(Color::Yellow))
+        .block(Block::default().borders(Borders::TOP).title("Overlay Controls"));
+    frame.render_widget(footer, layout[1]);
+}
+
+fn adjust_scroll_offset(section: &mut SectionState, selected: usize, height: u16) {
+    let window = height.saturating_sub(4) as usize;
+    if window == 0 {
+        section.scroll_offset = 0;
+        return;
+    }
+    if selected < section.scroll_offset {
+        section.scroll_offset = selected;
+    } else if selected >= section.scroll_offset + window {
+        section.scroll_offset = selected + 1 - window;
     }
 }
 
