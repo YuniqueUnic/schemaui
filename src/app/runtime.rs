@@ -986,6 +986,9 @@ impl App {
             field.composite_list_select_entry(delta)
         };
         if !changed {
+            if reopen {
+                self.try_open_composite_editor();
+            }
             return false;
         }
 
