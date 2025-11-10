@@ -4,6 +4,7 @@ use serde_json::Value;
 use crate::domain::{FieldKind, FieldSchema};
 
 use super::{
+    array::{ArrayEditorContext, ArrayEditorSession, ScalarArrayState},
     composite::{
         CompositeEditorSession, CompositeListEditorContext, CompositeListState, CompositeState,
     },
@@ -24,6 +25,7 @@ pub enum FieldValue {
         selected: Vec<bool>,
     },
     Array(String),
+    ScalarArray(ScalarArrayState),
     Composite(CompositeState),
     CompositeList(CompositeListState),
     KeyValue(KeyValueState),
@@ -47,82 +49,92 @@ pub struct FieldState {
 
 impl FieldState {
     pub fn from_schema(schema: FieldSchema) -> Self {
-        let value =
-            match &schema.kind {
-                FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Json => {
-                    FieldValue::Text(default_text(&schema))
+        let value = match &schema.kind {
+            FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Json => {
+                FieldValue::Text(default_text(&schema))
+            }
+            FieldKind::Boolean => {
+                let default = schema
+                    .default
+                    .as_ref()
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false);
+                FieldValue::Bool(default)
+            }
+            FieldKind::Enum(options) => {
+                let default_value = schema
+                    .default
+                    .as_ref()
+                    .map(value_to_string)
+                    .and_then(|value| if value.is_empty() { None } else { Some(value) })
+                    .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
+                let selected = options
+                    .iter()
+                    .position(|item| item == &default_value)
+                    .unwrap_or(0);
+                FieldValue::Enum {
+                    options: options.clone(),
+                    selected,
                 }
-                FieldKind::Boolean => {
-                    let default = schema
-                        .default
-                        .as_ref()
-                        .and_then(|value| value.as_bool())
-                        .unwrap_or(false);
-                    FieldValue::Bool(default)
-                }
+            }
+            FieldKind::Array(inner) => match inner.as_ref() {
                 FieldKind::Enum(options) => {
-                    let default_value = schema
+                    let defaults = schema
                         .default
                         .as_ref()
-                        .map(value_to_string)
-                        .and_then(|value| if value.is_empty() { None } else { Some(value) })
-                        .unwrap_or_else(|| options.first().cloned().unwrap_or_default());
-                    let selected = options
-                        .iter()
-                        .position(|item| item == &default_value)
-                        .unwrap_or(0);
-                    FieldValue::Enum {
+                        .and_then(|value| value.as_array())
+                        .map(|items| {
+                            items
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .map(str::to_string)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    let mut selected = vec![false; options.len()];
+                    for (idx, option) in options.iter().enumerate() {
+                        if defaults.iter().any(|value| value == option) {
+                            selected[idx] = true;
+                        }
+                    }
+                    FieldValue::MultiSelect {
                         options: options.clone(),
                         selected,
                     }
                 }
-                FieldKind::Array(inner) => match inner.as_ref() {
-                    FieldKind::Enum(options) => {
-                        let defaults = schema
-                            .default
-                            .as_ref()
-                            .and_then(|value| value.as_array())
-                            .map(|items| {
-                                items
-                                    .iter()
-                                    .filter_map(Value::as_str)
-                                    .map(str::to_string)
-                                    .collect::<Vec<_>>()
-                            })
-                            .unwrap_or_default();
-                        let mut selected = vec![false; options.len()];
-                        for (idx, option) in options.iter().enumerate() {
-                            if defaults.iter().any(|value| value == option) {
-                                selected[idx] = true;
-                            }
-                        }
-                        FieldValue::MultiSelect {
-                            options: options.clone(),
-                            selected,
-                        }
-                    }
-                    FieldKind::Composite(meta) => FieldValue::CompositeList(
-                        CompositeListState::new(&schema.pointer, meta, schema.default.as_ref()),
-                    ),
-                    _ => {
-                        let default = schema
-                            .default
-                            .as_ref()
-                            .and_then(|value| value.as_array())
-                            .map(|items| array_to_string(items))
-                            .unwrap_or_default();
-                        FieldValue::Array(default)
-                    }
-                },
-                FieldKind::Composite(meta) => {
-                    FieldValue::Composite(CompositeState::new(&schema.pointer, meta))
-                }
-                FieldKind::KeyValue(template) => FieldValue::KeyValue(KeyValueState::new(
+                FieldKind::Composite(meta) => FieldValue::CompositeList(CompositeListState::new(
                     &schema.pointer,
-                    template,
+                    meta,
                     schema.default.as_ref(),
                 )),
-            };
+                FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Boolean => {
+                    FieldValue::ScalarArray(ScalarArrayState::new(
+                        &schema.pointer,
+                        schema.display_label(),
+                        schema.description.clone(),
+                        inner.as_ref(),
+                        schema.default.as_ref(),
+                    ))
+                }
+                _ => {
+                    let default = schema
+                        .default
+                        .as_ref()
+                        .and_then(|value| value.as_array())
+                        .map(|items| array_to_string(items))
+                        .unwrap_or_default();
+                    FieldValue::Array(default)
+                }
+            },
+            FieldKind::Composite(meta) => {
+                FieldValue::Composite(CompositeState::new(&schema.pointer, meta))
+            }
+            FieldKind::KeyValue(template) => FieldValue::KeyValue(KeyValueState::new(
+                &schema.pointer,
+                template,
+                schema.default.as_ref(),
+            )),
+        };
 
         let mut field = FieldState {
             schema,
@@ -174,6 +186,9 @@ impl FieldState {
                 let _ = state.seed_from_value(value);
             }
             (FieldValue::CompositeList(state), Value::Array(items)) => {
+                state.seed_entries_from_array(items);
+            }
+            (FieldValue::ScalarArray(state), Value::Array(items)) => {
                 state.seed_entries_from_array(items);
             }
             (FieldValue::KeyValue(state), Value::Object(map)) => {
@@ -276,6 +291,7 @@ impl FieldState {
             FieldValue::MultiSelect { .. } => false,
             FieldValue::Composite(_) => false,
             FieldValue::CompositeList(_) => false,
+            FieldValue::ScalarArray(_) => false,
             FieldValue::KeyValue(_) => false,
         }
     }
@@ -341,7 +357,7 @@ impl FieldState {
     pub fn is_composite_list(&self) -> bool {
         matches!(
             self.value,
-            FieldValue::CompositeList(_) | FieldValue::KeyValue(_)
+            FieldValue::CompositeList(_) | FieldValue::KeyValue(_) | FieldValue::ScalarArray(_)
         )
     }
 
@@ -349,6 +365,7 @@ impl FieldState {
         match &mut self.value {
             FieldValue::CompositeList(state) => state.select(delta),
             FieldValue::KeyValue(state) => state.select(delta),
+            FieldValue::ScalarArray(state) => state.select(delta),
             _ => false,
         }
     }
@@ -357,6 +374,7 @@ impl FieldState {
         match &self.value {
             FieldValue::CompositeList(state) => state.selected_label(),
             FieldValue::KeyValue(state) => state.selected_label(),
+            FieldValue::ScalarArray(state) => state.selected_label(),
             _ => None,
         }
     }
@@ -367,6 +385,7 @@ impl FieldState {
                 state.selected_index().map(|idx| (state.summaries(), idx))
             }
             FieldValue::KeyValue(state) => state.panel(),
+            FieldValue::ScalarArray(state) => state.panel(),
             _ => None,
         }
     }
@@ -375,6 +394,7 @@ impl FieldState {
         match &self.value {
             FieldValue::CompositeList(state) => state.selected_index(),
             FieldValue::KeyValue(state) => state.selected_index(),
+            FieldValue::ScalarArray(state) => state.selected_index(),
             _ => None,
         }
     }
@@ -387,6 +407,14 @@ impl FieldState {
                 true
             }
             FieldValue::KeyValue(state) => {
+                if state.add_entry() {
+                    self.after_edit();
+                    true
+                } else {
+                    false
+                }
+            }
+            FieldValue::ScalarArray(state) => {
                 if state.add_entry() {
                     self.after_edit();
                     true
@@ -416,6 +444,14 @@ impl FieldState {
                     false
                 }
             }
+            FieldValue::ScalarArray(state) => {
+                if state.remove_selected() {
+                    self.after_edit();
+                    true
+                } else {
+                    false
+                }
+            }
             _ => false,
         }
     }
@@ -431,6 +467,14 @@ impl FieldState {
                 }
             }
             FieldValue::KeyValue(state) => {
+                if state.move_selected(delta) {
+                    self.after_edit();
+                    true
+                } else {
+                    false
+                }
+            }
+            FieldValue::ScalarArray(state) => {
                 if state.move_selected(delta) {
                     self.after_edit();
                     true
@@ -480,6 +524,17 @@ impl FieldState {
         }
     }
 
+    pub fn open_scalar_array_editor(&mut self) -> Result<ArrayEditorContext, FieldCoercionError> {
+        if let FieldValue::ScalarArray(state) = &mut self.value {
+            state.open_selected_editor()
+        } else {
+            Err(FieldCoercionError {
+                pointer: self.schema.pointer.clone(),
+                message: "field is not an array".to_string(),
+            })
+        }
+    }
+
     pub fn close_composite_editor(&mut self, session: CompositeEditorSession, mark_dirty: bool) {
         if let FieldValue::Composite(state) = &self.value {
             state.restore_editor_session(session);
@@ -519,6 +574,26 @@ impl FieldState {
             Err(FieldCoercionError {
                 pointer: self.schema.pointer.clone(),
                 message: "field is not a key/value map".to_string(),
+            })
+        }
+    }
+
+    pub fn close_scalar_array_editor(
+        &mut self,
+        entry_index: usize,
+        session: &ArrayEditorSession,
+        mark_dirty: bool,
+    ) -> Result<bool, FieldCoercionError> {
+        if let FieldValue::ScalarArray(state) = &mut self.value {
+            let changed = state.apply_editor_session(entry_index, session)?;
+            if mark_dirty && changed {
+                self.after_edit();
+            }
+            Ok(changed)
+        } else {
+            Err(FieldCoercionError {
+                pointer: self.schema.pointer.clone(),
+                message: "field is not an array".to_string(),
             })
         }
     }
@@ -597,6 +672,17 @@ impl FieldState {
                     format!("List[{len}] • {selection} (Ctrl+Left/Right select, Ctrl+E edit)")
                 }
             }
+            FieldValue::ScalarArray(state) => {
+                let len = state.len();
+                if len == 0 {
+                    "Array: empty (Ctrl+N add)".to_string()
+                } else {
+                    let selection = state
+                        .selected_label()
+                        .unwrap_or_else(|| "<no selection>".to_string());
+                    format!("Array[{len}] • {selection} (Ctrl+Left/Right select, Ctrl+E edit)")
+                }
+            }
             FieldValue::KeyValue(state) => {
                 let len = state.len();
                 if len == 0 {
@@ -646,6 +732,9 @@ impl FieldState {
                 if matches!(inner.as_ref(), FieldKind::Composite(_)) =>
             {
                 state.build_value()
+            }
+            (FieldKind::Array(_), FieldValue::ScalarArray(state)) => {
+                state.build_value(self.schema.required)
             }
             (FieldKind::Composite(_), FieldValue::Text(text)) => string_value(text, &self.schema),
             (FieldKind::KeyValue(_), FieldValue::KeyValue(state)) => {
