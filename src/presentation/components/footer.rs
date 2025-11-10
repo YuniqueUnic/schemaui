@@ -2,7 +2,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    text::Span,
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 
@@ -48,13 +48,14 @@ pub fn render_footer(frame: &mut Frame<'_>, area: Rect, ctx: &UiContext<'_>) {
         Span::styled("[ok]", Style::default().fg(Color::Green))
     };
 
-    let status_widget = Paragraph::new(vec![
+    let status_line = Line::from(vec![
         Span::raw("Status: "),
         Span::raw(status),
         Span::raw(" "),
         badge,
-    ])
-    .wrap(Wrap { trim: true })
-    .block(Block::default().borders(Borders::NONE));
+    ]);
+    let status_widget = Paragraph::new(status_line)
+        .wrap(Wrap { trim: true })
+        .block(Block::default().borders(Borders::NONE));
     frame.render_widget(status_widget, rows[1]);
 }

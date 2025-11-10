@@ -2,8 +2,8 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Tabs},
     text::Line,
+    widgets::{Block, Borders, Tabs},
 };
 
 use crate::form::FormState;
@@ -19,9 +19,7 @@ pub fn render_root_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormStat
 
 pub fn render_section_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
     let Some(root) = form_state.active_root() else {
-        let placeholder = Block::default()
-            .title("Sections")
-            .borders(Borders::ALL);
+        let placeholder = Block::default().title("Sections").borders(Borders::ALL);
         frame.render_widget(placeholder, area);
         return;
     };

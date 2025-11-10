@@ -671,4 +671,60 @@ mod tests {
             other => panic!("expected composite field, got {:?}", other),
         }
     }
+
+    #[test]
+    fn pattern_properties_become_key_value_fields() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "labels": {
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-z]+$": {"type": "string"}
+                    },
+                    "additionalProperties": false
+                }
+            }
+        });
+        let form = build_form_schema(&schema).expect("schema parsed");
+        let labels_root = form.roots.iter().find(|root| root.id == "labels").unwrap();
+        let section = labels_root.sections.first().unwrap();
+        assert_eq!(section.fields.len(), 1);
+        assert!(matches!(section.fields[0].kind, FieldKind::KeyValue(_)));
+    }
+
+    #[test]
+    fn multi_level_refs_are_resolved() {
+        let schema = json!({
+            "type": "object",
+            "definitions": {
+                "duration": {
+                    "type": "object",
+                    "properties": {
+                        "value": {"type": "integer"}
+                    }
+                },
+                "timeout": {
+                    "$ref": "#/definitions/duration"
+                }
+            },
+            "properties": {
+                "runtime": {
+                    "type": "object",
+                    "properties": {
+                        "limits": {
+                            "type": "object",
+                            "properties": {
+                                "requestTimeout": {"$ref": "#/definitions/timeout"}
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        let form = build_form_schema(&schema).expect("schema parsed");
+        let runtime = form.roots.iter().find(|root| root.id == "runtime").unwrap();
+        let limits = &runtime.sections[0].children[0];
+        assert_eq!(limits.fields[0].name, "requestTimeout");
+    }
 }

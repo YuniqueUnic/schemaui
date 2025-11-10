@@ -270,9 +270,7 @@ fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>>
         let mut lines = Vec::new();
         lines.push(Line::from(Span::styled(
             "  Error:",
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )));
         for line in wrap(message, max_width as usize) {
             lines.push(Line::from(Span::styled(
@@ -299,7 +297,8 @@ fn field_type_label(kind: &FieldKind) -> String {
 }
 
 fn composite_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
-    if let Some(summaries) = field.composite_summary() {
+    if let FieldValue::Composite(state) = &field.value {
+        let summaries = state.active_summaries();
         if summaries.is_empty() {
             return None;
         }
