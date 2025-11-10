@@ -443,23 +443,55 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
     };
     lines.push(Line::from(Span::styled(label, label_style)));
 
-    let clamp_width = max_width.max(4) as usize;
     if let Some(selector_lines) = composite_selector_lines(field) {
         lines.extend(selector_lines);
     }
 
+    let (value_panel, cursor_hint) = value_panel_lines(field, is_selected, max_width);
+    lines.extend(value_panel);
+
+    if let Some(summary) = composite_summary_lines(field) {
+        lines.extend(summary);
+    }
+
+    if let Some(summary) = repeatable_summary_lines(field) {
+        lines.extend(summary);
+    }
+
+    lines.push(meta_line(field));
+
+    if let Some(error) = error_lines(field, max_width) {
+        lines.extend(error);
+    }
+
+    FieldRender { lines, cursor_hint }
+}
+
+fn value_panel_lines(
+    field: &FieldState,
+    is_selected: bool,
+    max_width: u16,
+) -> (Vec<Line<'static>>, Option<CursorHint>) {
+    let clamp_width = max_width.max(4) as usize;
     let value_text = field.display_value();
-    let wrapped_value = wrap(&value_text, clamp_width);
+    let mut wrapped_value: Vec<String> = wrap(&value_text, clamp_width)
+        .into_iter()
+        .map(|segment| segment.into_owned())
+        .collect();
+    if wrapped_value.is_empty() {
+        wrapped_value.push(String::new());
+    }
     let inner_width = wrapped_value
         .iter()
-        .map(|line| UnicodeWidthStr::width(line.as_ref()))
+        .map(|line| UnicodeWidthStr::width(line.as_str()))
         .max()
         .unwrap_or(0);
     let last_line_width = wrapped_value
         .last()
-        .map(|line| UnicodeWidthStr::width(line.as_ref()))
+        .map(|line| UnicodeWidthStr::width(line.as_str()))
         .unwrap_or(0);
     let mut cursor_hint = None;
+    let mut lines = Vec::new();
 
     if is_selected {
         let border_width = inner_width.saturating_add(2);
@@ -475,7 +507,7 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
         )));
         let value_line_index = lines.len();
         for segment in &wrapped_value {
-            let mut content = segment.to_string();
+            let mut content = segment.clone();
             let mut width = UnicodeWidthStr::width(content.as_str());
             while width < inner_width {
                 content.push(' ');
@@ -502,72 +534,21 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
         for segment in &wrapped_value {
             lines.push(Line::from(vec![
                 Span::raw("  "),
-                Span::styled(segment.to_string(), Style::default().fg(Color::White)),
+                Span::styled(segment.clone(), Style::default().fg(Color::White)),
             ]));
         }
     }
 
-    if is_selected {
-        if let FieldValue::Composite(state) = &field.value {
-            if state.variant_count() == 0 {
-                lines.push(Line::from("  No variants available in this schema."));
-            } else {
-                let summaries = state.active_summaries();
-                if summaries.is_empty() {
-                    lines.push(Line::from("  No variant selected. Press Enter to choose."));
-                } else {
-                    let max_render = 3usize;
-                    for summary in summaries.iter().take(max_render) {
-                        lines.push(Line::from(vec![Span::styled(
-                            format!("  ▶ {}", summary.title),
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        )]));
-                        if let Some(desc) = summary.description.as_ref() {
-                            if !desc.is_empty() {
-                                lines.push(Line::from(vec![
-                                    Span::raw("     "),
-                                    Span::styled(desc.clone(), Style::default().fg(Color::Gray)),
-                                ]));
-                            }
-                        }
-                        for line in &summary.lines {
-                            lines.push(Line::from(format!("     {line}")));
-                        }
-                        lines.push(Line::from(" "));
-                    }
-                    if summaries.len() > max_render {
-                        lines.push(Line::from(format!(
-                            "    … ({} more active variants)",
-                            summaries.len() - max_render
-                        )));
-                    }
-                }
-            }
-        }
-    }
+    (lines, cursor_hint)
+}
 
-    if let Some(error) = &field.error {
-        let warning = format!("⚠ {error}");
-        for (idx, chunk) in wrap(&warning, clamp_width).iter().enumerate() {
-            let prefix = if idx == 0 { "  " } else { "    " };
-            lines.push(Line::from(vec![
-                Span::raw(prefix),
-                Span::styled(
-                    chunk.to_string(),
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                ),
-            ]));
-        }
-    }
-
+fn meta_line(field: &FieldState) -> Line<'static> {
     let type_label = field_type_label(&field.schema.kind);
     let desc_text = match &field.schema.description {
         Some(desc) if !desc.is_empty() => format!("{type_label} | {desc}"),
         _ => type_label,
     };
-    lines.push(Line::from(vec![
+    Line::from(vec![
         Span::raw("  "),
         Span::styled(
             desc_text,
@@ -575,9 +556,92 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
                 .fg(Color::Gray)
                 .add_modifier(Modifier::ITALIC),
         ),
-    ]));
+    ])
+}
 
-    FieldRender { lines, cursor_hint }
+fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>> {
+    let error = field.error.as_ref()?;
+    let clamp_width = max_width.max(4) as usize;
+    let warning = format!("⚠ {error}");
+    let mut lines = Vec::new();
+    for (idx, chunk) in wrap(&warning, clamp_width).iter().enumerate() {
+        let prefix = if idx == 0 { "  " } else { "    " };
+        lines.push(Line::from(vec![
+            Span::raw(prefix),
+            Span::styled(
+                chunk.to_string(),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+        ]));
+    }
+    Some(lines)
+}
+
+fn composite_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
+    if let FieldValue::Composite(state) = &field.value {
+        let mut lines = Vec::new();
+        if state.variant_count() == 0 {
+            lines.push(Line::from("  No variants available in this schema."));
+            return Some(lines);
+        }
+        let summaries = state.active_summaries();
+        if summaries.is_empty() {
+            lines.push(Line::from("  No variant selected. Press Enter to choose."));
+            return Some(lines);
+        }
+        let max_render = 2usize;
+        for summary in summaries.iter().take(max_render) {
+            lines.push(Line::from(vec![Span::styled(
+                format!("  ▶ {}", summary.title),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )]));
+            if let Some(desc) = summary.description.as_ref() {
+                if !desc.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::raw("     "),
+                        Span::styled(desc.clone(), Style::default().fg(Color::Gray)),
+                    ]));
+                }
+            }
+            for line in &summary.lines {
+                lines.push(Line::from(format!("     {line}")));
+            }
+            lines.push(Line::from(" "));
+        }
+        if summaries.len() > max_render {
+            lines.push(Line::from(format!(
+                "    … ({} more active variants)",
+                summaries.len() - max_render
+            )));
+        }
+        return Some(lines);
+    }
+    None
+}
+
+fn repeatable_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
+    if let Some((entries, selected)) = field.composite_list_panel() {
+        if entries.is_empty() {
+            return None;
+        }
+        let mut lines = Vec::new();
+        lines.push(Line::from("  Entries:"));
+        let max_render = 4usize;
+        for (idx, entry) in entries.iter().enumerate().take(max_render) {
+            let marker = if idx == selected { "»" } else { " " };
+            lines.push(Line::from(format!("  {marker} {entry}")));
+        }
+        if entries.len() > max_render {
+            lines.push(Line::from(format!(
+                "    … {} more entries",
+                entries.len() - max_render
+            )));
+        }
+        return Some(lines);
+    }
+    None
 }
 
 fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {

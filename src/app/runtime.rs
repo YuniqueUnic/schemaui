@@ -833,14 +833,14 @@ impl App {
         } else {
             self.status.set_raw("Added entry");
         }
-        if reopen {
-            self.try_open_composite_editor();
-        }
         if self.options.auto_validate {
             self.run_validation(false);
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
+        if reopen {
+            self.try_open_composite_editor();
+        }
         true
     }
 
@@ -875,14 +875,14 @@ impl App {
         } else {
             self.status.set_raw("List is now empty");
         }
-        if reopen {
-            self.try_open_composite_editor();
-        }
         if self.options.auto_validate {
             self.run_validation(false);
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
+        if reopen {
+            self.try_open_composite_editor();
+        }
         true
     }
 
@@ -914,14 +914,14 @@ impl App {
         if let Some(label) = moved_label {
             self.status.set_raw(&format!("Moved entry to {}", label));
         }
-        if reopen {
-            self.try_open_composite_editor();
-        }
         if self.options.auto_validate {
             self.run_validation(false);
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
+        if reopen {
+            self.try_open_composite_editor();
+        }
         true
     }
 
@@ -952,11 +952,11 @@ impl App {
                 self.status.set_raw(&format!("Selected entry {}", label));
             }
         }
+        self.refresh_list_overlay_panel();
+        self.run_overlay_validation();
         if reopen {
             self.try_open_composite_editor();
         }
-        self.refresh_list_overlay_panel();
-        self.run_overlay_validation();
         true
     }
 
