@@ -732,7 +732,11 @@ mod tests {
             .find(|root| root.id == "notifications")
             .expect("notifications root");
         let section = notifications.sections.first().expect("section");
-        let names: Vec<_> = section.fields.iter().map(|field| field.name.clone()).collect();
+        let names: Vec<_> = section
+            .fields
+            .iter()
+            .map(|field| field.name.clone())
+            .collect();
         assert_eq!(names, vec!["channels", "templates"]);
     }
 

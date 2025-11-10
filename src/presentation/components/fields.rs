@@ -13,11 +13,33 @@ use crate::{
     form::{FieldState, FieldValue, FormState, SectionState},
 };
 
+#[derive(Clone, Copy)]
+pub struct FieldRenderOptions {
+    pub highlight_style: Style,
+}
+
+impl Default for FieldRenderOptions {
+    fn default() -> Self {
+        Self {
+            highlight_style: Style::default().bg(Color::DarkGray),
+        }
+    }
+}
+
+impl FieldRenderOptions {
+    pub fn overlay() -> Self {
+        Self {
+            highlight_style: Style::default(),
+        }
+    }
+}
+
 pub fn render_fields(
     frame: &mut Frame<'_>,
     area: Rect,
     form_state: &mut FormState,
     enable_cursor: bool,
+    options: FieldRenderOptions,
 ) {
     let Some((section, selected_index)) = form_state.active_section_mut() else {
         let placeholder =
@@ -83,7 +105,7 @@ pub fn render_fields(
                 .title(section.title.clone())
                 .borders(Borders::ALL),
         )
-        .highlight_style(Style::default().bg(Color::DarkGray))
+        .highlight_style(options.highlight_style)
         .highlight_symbol("» ");
 
     frame.render_stateful_widget(list, field_area, &mut list_state);
