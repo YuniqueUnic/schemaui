@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{
     domain::FieldKind,
-    form::{FieldState, FormState},
+    form::{FieldState, FieldValue, FormState},
 };
 
 use unicode_width::UnicodeWidthStr;
@@ -376,6 +376,29 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
                 Span::raw("  "),
                 Span::styled(segment.to_string(), Style::default().fg(Color::White)),
             ]));
+        }
+    }
+
+    if is_selected {
+        if let FieldValue::Composite(state) = &field.value {
+            if state.variant_count() == 0 {
+                lines.push(Line::from("  No variants available in this schema."));
+            } else {
+                let active = state.active_variant_details();
+                if active.is_empty() {
+                    lines.push(Line::from("  No variant selected. Press Enter to choose."));
+                } else {
+                    lines.push(Line::from("  Active variants:"));
+                    for (title, description) in active {
+                        lines.push(Line::from(format!("    ▶ {title}")));
+                        if let Some(description) = description {
+                            if !description.is_empty() {
+                                lines.push(Line::from(format!("       {description}")));
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

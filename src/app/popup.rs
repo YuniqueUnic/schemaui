@@ -1,5 +1,5 @@
 use crate::{
-    form::{FieldState, FieldValue},
+    form::{CompositePopupData, FieldState, FieldValue},
     presentation::PopupRender,
 };
 
@@ -40,8 +40,22 @@ impl PopupState {
                     multi: false,
                     toggles: Vec::new(),
                 }),
+                FieldValue::Composite(_) => field
+                    .composite_popup()
+                    .map(|data| Self::from_composite(field, data)),
                 _ => None,
             },
+        }
+    }
+
+    fn from_composite(field: &FieldState, data: CompositePopupData) -> Self {
+        Self {
+            field_pointer: field.schema.pointer.clone(),
+            title: field.schema.display_label(),
+            options: data.options,
+            selected: data.selected,
+            multi: data.multi,
+            toggles: data.active,
         }
     }
 
