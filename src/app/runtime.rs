@@ -811,6 +811,11 @@ impl App {
             return false;
         };
 
+        let reopen = self.overlay_targets_pointer(&pointer);
+        if reopen {
+            self.close_composite_editor(true);
+        }
+
         let selection_label = {
             let Some(field) = self.form_state.field_mut_by_pointer(&pointer) else {
                 return false;
@@ -828,12 +833,14 @@ impl App {
         } else {
             self.status.set_raw("Added entry");
         }
+        if reopen {
+            self.try_open_composite_editor();
+        }
         if self.options.auto_validate {
             self.run_validation(false);
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
-        self.reopen_overlay_if_needed(&pointer);
         true
     }
 
@@ -843,6 +850,11 @@ impl App {
                 .set_raw("Focus a repeatable field before Ctrl+D remove");
             return false;
         };
+
+        let reopen = self.overlay_targets_pointer(&pointer);
+        if reopen {
+            self.close_composite_editor(true);
+        }
 
         let removed = {
             let Some(field) = self.form_state.field_mut_by_pointer(&pointer) else {
@@ -863,12 +875,14 @@ impl App {
         } else {
             self.status.set_raw("List is now empty");
         }
+        if reopen {
+            self.try_open_composite_editor();
+        }
         if self.options.auto_validate {
             self.run_validation(false);
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
-        self.reopen_overlay_if_needed(&pointer);
         true
     }
 
@@ -878,6 +892,11 @@ impl App {
                 .set_raw("Focus a repeatable field before Ctrl+↑/↓ move");
             return false;
         };
+
+        let reopen = self.overlay_targets_pointer(&pointer);
+        if reopen {
+            self.close_composite_editor(true);
+        }
 
         let moved_label = {
             let Some(field) = self.form_state.field_mut_by_pointer(&pointer) else {
@@ -895,12 +914,14 @@ impl App {
         if let Some(label) = moved_label {
             self.status.set_raw(&format!("Moved entry to {}", label));
         }
+        if reopen {
+            self.try_open_composite_editor();
+        }
         if self.options.auto_validate {
             self.run_validation(false);
         }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
-        self.reopen_overlay_if_needed(&pointer);
         true
     }
 
@@ -910,6 +931,11 @@ impl App {
                 .set_raw("Focus a repeatable field before Ctrl+←/→ select");
             return false;
         };
+
+        let reopen = self.overlay_targets_pointer(&pointer);
+        if reopen {
+            self.close_composite_editor(true);
+        }
 
         let changed = {
             let Some(field) = self.form_state.field_mut_by_pointer(&pointer) else {
@@ -926,23 +952,19 @@ impl App {
                 self.status.set_raw(&format!("Selected entry {}", label));
             }
         }
+        if reopen {
+            self.try_open_composite_editor();
+        }
         self.refresh_list_overlay_panel();
         self.run_overlay_validation();
-        self.reopen_overlay_if_needed(&pointer);
         true
     }
 
-    fn reopen_overlay_if_needed(&mut self, pointer: &str) {
-        let needs = self
-            .composite_editor
+    fn overlay_targets_pointer(&self, pointer: &str) -> bool {
+        self.composite_editor
             .as_ref()
             .map(|editor| editor.field_pointer == pointer)
-            .unwrap_or(false);
-        if !needs {
-            return;
-        }
-        self.close_composite_editor(true);
-        self.try_open_composite_editor();
+            .unwrap_or(false)
     }
 
     fn refresh_list_overlay_panel(&mut self) {
