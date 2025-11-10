@@ -1,6 +1,6 @@
 use std::cell::{RefCell, RefMut};
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::domain::{parse_form_schema, CompositeField, CompositeMode};
 
@@ -63,14 +63,20 @@ struct CompositeListEntry {
 }
 
 impl CompositeListState {
-    pub fn new(pointer: &str, template: CompositeField) -> Self {
-        Self {
+    pub fn new(pointer: &str, template: &CompositeField, defaults: Option<&Value>) -> Self {
+        let mut state = Self {
             pointer: pointer.to_string(),
-            template,
+            template: template.clone(),
             entries: Vec::new(),
             selected: 0,
             counter: 0,
+        };
+
+        if let Some(Value::Array(items)) = defaults {
+            state.seed_entries_from_array(items);
         }
+
+        state
     }
 
     pub fn len(&self) -> usize {
@@ -141,6 +147,14 @@ impl CompositeListState {
         Some(format!("#{} {}", idx + 1, entry.state.summary()))
     }
 
+    pub fn summaries(&self) -> Vec<String> {
+        self.entries
+            .iter()
+            .enumerate()
+            .map(|(idx, entry)| format!("#{} {}", idx + 1, entry.state.summary()))
+            .collect()
+    }
+
     pub fn open_selected_editor(
         &mut self,
     ) -> Result<CompositeListEditorContext, FieldCoercionError> {
@@ -199,6 +213,22 @@ impl CompositeListState {
             entry.state.rebind_pointer(&pointer);
         }
     }
+
+    pub fn seed_entries_from_array(&mut self, items: &[Value]) {
+        self.entries.clear();
+        for (index, item) in items.iter().enumerate() {
+            let pointer = format!("{}/entry_{}", self.pointer, index);
+            let mut state = CompositeState::new(&pointer, &self.template);
+            let _ = state.seed_from_value(item);
+            self.entries.push(CompositeListEntry { pointer, state });
+        }
+        self.counter = self.entries.len();
+        if self.entries.is_empty() {
+            self.selected = 0;
+        } else if self.selected >= self.entries.len() {
+            self.selected = self.entries.len().saturating_sub(1);
+        }
+    }
 }
 
 impl CompositeState {
@@ -252,6 +282,33 @@ impl CompositeState {
 
     pub fn rebind_pointer(&mut self, pointer: &str) {
         self.pointer = pointer.to_string();
+    }
+
+    fn pick_variant_index(&self, value: &Value) -> usize {
+        if let Value::Object(obj) = value {
+            for (idx, variant) in self.variants.iter().enumerate() {
+                if variant.matches_value(obj) {
+                    return idx;
+                }
+            }
+        }
+        0
+    }
+
+    pub fn seed_from_value(&mut self, value: &Value) -> Result<(), FieldCoercionError> {
+        if self.variants.is_empty() {
+            return Ok(());
+        }
+        let target = self.pick_variant_index(value);
+        let pointer = self.pointer.clone();
+        for (idx, variant) in self.variants.iter_mut().enumerate() {
+            variant.active = idx == target;
+            if variant.active {
+                let mut form = variant.borrow_form(&pointer)?;
+                form.seed_from_value(value);
+            }
+        }
+        Ok(())
     }
 
     pub fn is_multi(&self) -> bool {
@@ -482,6 +539,19 @@ impl CompositeVariantState {
             description: self.description.clone(),
             lines,
         })
+    }
+
+    fn matches_value(&self, value: &Map<String, Value>) -> bool {
+        if let Some(props) = self.schema.get("properties").and_then(Value::as_object) {
+            for (key, schema) in props {
+                if let Some(expected) = schema.get("const") {
+                    if value.get(key) != Some(expected) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     }
 }
 

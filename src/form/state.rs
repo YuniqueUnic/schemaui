@@ -114,6 +114,16 @@ impl FormState {
         Ok(root)
     }
 
+    pub fn seed_from_value(&mut self, value: &Value) {
+        for section in &mut self.sections {
+            for field in &mut section.fields {
+                if let Some(subvalue) = value_at_path(value, &field.schema.path) {
+                    field.seed_value(subvalue);
+                }
+            }
+        }
+    }
+
     pub fn clear_errors(&mut self) {
         for section in &mut self.sections {
             for field in &mut section.fields {
@@ -137,6 +147,17 @@ impl FormState {
     pub fn field_mut_by_pointer(&mut self, pointer: &str) -> Option<&mut FieldState> {
         for section in &mut self.sections {
             for field in &mut section.fields {
+                if field.schema.pointer == pointer {
+                    return Some(field);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn field_by_pointer(&self, pointer: &str) -> Option<&FieldState> {
+        for section in &self.sections {
+            for field in &section.fields {
                 if field.schema.pointer == pointer {
                     return Some(field);
                 }
@@ -183,4 +204,17 @@ fn empty_section() -> SectionState {
         fields: Vec::new(),
         scroll_offset: 0,
     }
+}
+
+fn value_at_path<'a>(value: &'a Value, path: &[String]) -> Option<&'a Value> {
+    let mut current = value;
+    for segment in path {
+        match current {
+            Value::Object(map) => {
+                current = map.get(segment)?;
+            }
+            _ => return None,
+        }
+    }
+    Some(current)
 }
