@@ -19,7 +19,17 @@ pub enum KeyCommand {
     None,
 }
 
+const CTRL_LEFT_BRACKET: char = '\u{1b}';
+const CTRL_RIGHT_BRACKET: char = '\u{1d}';
+
 pub fn classify(key: &KeyEvent) -> KeyCommand {
+    if is_prev_root_combo(key) {
+        return KeyCommand::SwitchRoot(-1);
+    }
+    if is_next_root_combo(key) {
+        return KeyCommand::SwitchRoot(1);
+    }
+
     if key.modifiers.contains(KeyModifiers::CONTROL) {
         return match key.code {
             KeyCode::Char('s') | KeyCode::Char('S') => KeyCommand::Save,
@@ -28,8 +38,6 @@ pub fn classify(key: &KeyEvent) -> KeyCommand {
             KeyCode::Char('e') | KeyCode::Char('E') => KeyCommand::EditComposite,
             KeyCode::Char('n') | KeyCode::Char('N') => KeyCommand::ListAddEntry,
             KeyCode::Char('d') | KeyCode::Char('D') => KeyCommand::ListRemoveEntry,
-            KeyCode::Char('[') | KeyCode::Char('{') => KeyCommand::SwitchRoot(-1),
-            KeyCode::Char(']') | KeyCode::Char('}') => KeyCommand::SwitchRoot(1),
             KeyCode::Left => KeyCommand::ListSelect(-1),
             KeyCode::Right => KeyCommand::ListSelect(1),
             KeyCode::Up => KeyCommand::ListMove(-1),
@@ -53,4 +61,27 @@ pub fn classify(key: &KeyEvent) -> KeyCommand {
         KeyCode::Enter => KeyCommand::TogglePopup,
         _ => KeyCommand::Edit(*key),
     }
+}
+
+fn is_prev_root_combo(key: &KeyEvent) -> bool {
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        match key.code {
+            KeyCode::Char('[') | KeyCode::Char('{') => return true,
+            KeyCode::Esc => return true,
+            KeyCode::Char(ch) if ch == CTRL_LEFT_BRACKET => return true,
+            _ => {}
+        }
+    }
+    matches!(key.code, KeyCode::Char(ch) if ch == CTRL_LEFT_BRACKET)
+}
+
+fn is_next_root_combo(key: &KeyEvent) -> bool {
+    if key.modifiers.contains(KeyModifiers::CONTROL) {
+        match key.code {
+            KeyCode::Char(']') | KeyCode::Char('}') => return true,
+            KeyCode::Char(ch) if ch == CTRL_RIGHT_BRACKET => return true,
+            _ => {}
+        }
+    }
+    matches!(key.code, KeyCode::Char(ch) if ch == CTRL_RIGHT_BRACKET)
 }
