@@ -1,224 +1,288 @@
-# SchemaUI OneOf/AnyOf 实施计划
+# Composite/KeyValue Roadmap
 
-> 目标：让 SchemaUI 在 TUI 中完整支持 JSON Schema 的 `oneOf`、`anyOf` 组合字段，覆盖从解析→状态管理→交互→序列化的全链路，并解决 CJK 光标宽度问题。
+This document synthesizes the latest requirements for SchemaUI’s dynamic form
+runtime. It is meant to brief the tech-lead and serve as a hand-off for
+engineers who will implement the next set of features. All file paths are
+workspace-relative.
 
 ---
 
-## 1. 架构概览
+## 1. Current Architecture (as of 2025‑11‑10)
 
-```
-┌────────────┐      ┌─────────────┐      ┌───────────────┐      ┌───────────────┐
-│ JSON Schema│ ──▶ │ Domain Layer│ ──▶ │ State Layer    │ ──▶ │ Presentation/UI │
-└────────────┘      │ (parser.rs) │      │ (FormState)    │      │ (components.rs) │
-                     └─────────────┘      └───────────────┘      └───────────────┘
-                           │                      │                          │
-                           ▼                      ▼                          ▼
-                     CompositeField         CompositeState            输入/渲染逻辑
-                           │                      │                          │
-                           └──────────────▶ Runtime/App ◀────────────── Popup/Input
-```
+| Layer        | Responsibility                                                                      | Key files                                                                                |
+| ------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Parser       | Translate JSON Schema into `FormSchema`/`FieldSchema`, detect composites and arrays | `src/domain/parser.rs`, `src/domain/schema.rs`                                           |
+| Form State   | Hold `SectionState`, `FieldState`, nested `CompositeState` / `CompositeListState`   | `src/form/state.rs`, `src/form/field.rs`, `src/form/composite.rs`, `src/form/section.rs` |
+| Runtime      | Event loop, input classification, overlay management, validation                    | `src/app/input.rs`, `src/app/runtime.rs`, `src/app/popup.rs`                             |
+| Presentation | Render sections, fields, status/actions bars, overlays                              | `src/presentation/components.rs`, `src/presentation/view.rs`                             |
+| Docs         | README + internal report                                                            | `README.md`, `report-composite.md` (this file)                                           |
 
-- **Domain Layer**：识别 `oneOf/anyOf`，生成 `FieldKind::Composite(CompositeField)`。
-- **State Layer**：`FieldValue::Composite(CompositeState)` 懒加载子 `FormState`，负责激活/切换与 JSON 收集。
-- **Presentation/UI**：渲染组合字段面板 + 子表单，使用 popup/快捷键切换或添加变体。
-- **Runtime/Input**：监听 `KeyCommand`，调用 `CompositeState` API。
+Recent upgrades (Nov 2025) already added:
 
-## 2. 模块设计
+- Composite overlay with list sidebar, Ctrl+E editing, Ctrl+N/D/←/→/↑/↓ list
+  management.
+- Default seeding via `FieldState::seed_value` and `FormState::seed_from_value`.
+- Section scrolling, improved footer/actions bar, inline error wrapping.
 
-### 2.1 Domain（`src/domain/schema.rs` & `parser.rs`）
+---
+
+## 2. New Requirements Overview
+
+| Theme                                      | Goal                                                                                                                  | Primary Deliverables                                                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AdditionalProperties / KeyValue Editor** | Provide structure editing for schema-defined maps so users never type raw JSON                                        | New `FieldKind::KeyValue` (or reuse existing `FieldKind::Json` with metadata), `KeyValueState`, key validator, value editor that reuses composite overlay |
+| **Overlay-Level Validation**               | Run `jsonschema::Validator` after each field edit within overlays to surface errors immediately                       | Local validator instance + error mapper + visual cues identical to main form                                                                              |
+| **Documentation / Help**                   | Keep README + in-app actions accurate per context (standard fields, composite lists, key/value editing)               | README shortcuts table, contextual actions ribbon, updated HELP_TEXT                                                                                      |
+| **Section & OneOf/AnyOf UX**               | Clarify section rules (scalar → General, object/composite → dedicated section) and show intuitive OneOf/AnyOf headers | Parser tweak + UI layout similar to spec in TODO                                                                                                          |
+
+---
+
+## 3. AdditionalProperties Key/Value Editor
+
+### 3.1 Data Model
+
+- **New FieldKind**: extend `src/domain/schema.rs` with
+  `FieldKind::KeyValue(Box<FieldKind>)` where the inner kind describes the value
+  schema. When schema has `additionalProperties: { anyOf: [...] }`, wrap it in a
+  composite-aware kind.
+- **FieldState**: add `FieldValue::KeyValue(KeyValueState)` where
+  `KeyValueState` holds:
+  ```rust
+  pub struct KeyValueState {
+      pub entries: Vec<KeyValueEntry>,
+      pub selected: usize,
+  }
+
+  pub struct KeyValueEntry {
+      pub key_field: FieldState,              // handles string + validation
+      pub value_field: FieldState,            // may be composite / list / scalar
+      pub pointer: String,                    // e.g. "/featureFlags/production"
+  }
+  ```
+- Keys follow JSON Schema rules: use `FieldState` for the key itself so we can
+  reuse `field.seed_value` and validation logic. For uniqueness, maintain a
+  `HashSet` on `KeyValueState` and poke `FieldCoercionError` if duplicates
+  appear.
+
+### 3.2 Parser Changes
+
+1. When `ObjectValidation.additional_properties` is present:
+   - Build `FieldSchema` with `FieldKind::KeyValue(Box<FieldKind>)`.
+   - Use the current property `path_prefix` so values insert under
+     `/section/field/key`.
+   - Persist metadata (pattern, minLength, etc.) onto the key schema.
+
+2. For `anyOf`/`oneOf` inside `additionalProperties`, rely on existing
+   `CompositeField` generation so value editor is consistent.
+
+### 3.3 Runtime & UI
+
+- **List interactions**: reuse the existing list shortcuts (Ctrl+N/D/←/→/↑/↓),
+  but operate on `KeyValueState.entries`.
+- **Overlay**: pressing Ctrl+E on a KeyValue field opens the composite overlay:
+  - Left sidebar shows keys in order (e.g. `#1 production`, `#2 staging`).
+  - Right panel renders key editor on top (string input) followed by value
+    editor (scalar/composite). Example ASCII:
+    ```
+    KeyValue Overlay: featureFlags
+    ┌ Sidebar (#1 production) (#2 beta-users) ┐ ┌ Key Editor ┐
+    │ Ctrl+N add • Ctrl+D delete             │ │ Key: [production     ] │
+    └────────────────────────────────────────┘ │ Value: (oneOf combo)  │
+    ```
+- **Serialization**: `FieldState::current_value` for KeyValue iterates entries,
+  obtains `key_field.current_value()` (string) and `value_field.current_value()`
+  (Value), then builds a `serde_json::Map`.
+
+### 3.4 Example Code Snippets
+
 ```rust
-#[derive(Debug, Clone, PartialEq)]
-pub enum FieldKind {
-    String, Integer, Number, Boolean,
-    Enum(Vec<String>), Array(Box<FieldKind>), Json,
-    Composite(CompositeField),
-}
+// src/form/field.rs (construction)
+FieldKind::KeyValue(inner) => FieldValue::KeyValue(
+    KeyValueState::new(&schema.pointer, inner.as_ref(), schema.default.as_ref())
+);
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct CompositeField {
-    pub mode: CompositeMode,            // OneOf or AnyOf
-    pub variants: Vec<CompositeVariant> // 原始 schema JSON + metadata
+// src/form/composite.rs or new keyvalue module
+impl KeyValueState {
+    pub fn insert_entry(&mut self) -> usize { /* reuse list logic */ }
+    pub fn remove_entry(&mut self, index: usize) -> bool { /* ... */ }
+    pub fn try_build_object(&self) -> Result<Value, FieldCoercionError> { /* ... */ }
 }
 ```
-- `build_composite()` 负责遍历 `oneOf`/`anyOf` 数组，解析 `$ref` 并保留完整 schema JSON。
-- 数组元素若包含组合 schema，则 `FieldKind::Array(Box::new(FieldKind::Composite))`。
 
-### 2.2 State（`src/form/field.rs` & `form/state.rs`）
+---
+
+## 4. Overlay-Level Validation
+
+### 4.1 Triggers
+
+- Run validation **after each edit** (called from `FieldState::handle_key` or
+  list operations). For text input we debounce at “editing finished” events:
+  e.g. Enter, blur, or when popup closes.
+
+### 4.2 Implementation
+
+1. **Local Validator**: overlay already stores a `CompositeEditorSession` with
+   its own `FormState`. Add `validator: Validator` (precompiled for the variant)
+   so overlay can call `validator.iter_errors(&value)`.
+2. **Error Mapping**: reuse `FormState::set_error(pointer, message)` inside
+   overlay `FormState`. For entries inside KeyValue/CompositeList, sanitize
+   pointer (e.g. `/featureFlags/production/type`).
+3. **UI Feedback**: `render_body` already draws inline error lines. After
+   validation, the red wrapped messages appear just like the main form.
+4. **Save Semantics**: On Ctrl+S we still run global validation, but even if
+   overlay has errors we allow exit (per requirement). However, we skip writing
+   to temp file until global validation passes.
+
+Pseudo-code:
+
 ```rust
-#[derive(Debug, Clone)]
-pub enum FieldValue {
-    Text(String), Bool(bool), Enum { .. }, MultiSelect { .. }, Array(String),
-    Composite(CompositeState),
-}
-
-#[derive(Debug, Clone)]
-pub struct CompositeState {
-    mode: CompositeMode,
-    variants: Vec<CompositeVariantState>,
-}
-
-pub struct CompositeVariantState {
-    pub id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub schema: Value,
-    pub active: bool,
-    pub form: Option<FormState>, // 懒加载
-}
-```
-关键点：
-1. **懒加载 FormState**：首次访问某个 variant 的表单时，根据 `schema` 动态调用 `FormState::from_schema` 生成子树。
-2. **状态 API**：`activate_one_of(id)`、`toggle_any_of(id)`、`summary()`、`to_value()`。
-3. **序列化**：
-   - OneOf ⇒ 取 active variant 的 `FormState::try_build_value()`，并与 `type`/常量字段合并。
-   - AnyOf ⇒ 对每个 active variant 执行同样逻辑，结果拼接成数组。
-
-### 2.3 Presentation（`src/presentation/components.rs` & `view.rs`）
-- **Header 区**：
-  - OneOf：显示 `OneOf: [SQL|NoSQL]`，使用左右按键/Enter 触发 popup 单选。
-  - AnyOf：显示 `AnyOf: [Email, SMS, Webhook] +`，`+` 调起多选 popup。
-- **子表单渲染**：调用 `render_fields` 递归渲染 `variant.form`，并以缩进/边框区分。
-- **CJK 光标**：使用 `unicode-width = 0.2.0` 计算宽度，确保边框/光标对齐。
-
-### 2.4 Runtime/Input（`src/app/runtime.rs`, `input.rs`, `popup.rs`）
-- `KeyCommand` 新增：`CycleOneOf`, `AddAnyOfVariant`, `RemoveAnyOfVariant` 等。
-- `PopupState` 扩展：
-  - OneOf：单选模式。
-  - AnyOf：多选模式，`Space` 切换，`Enter` 应用。
-- `App::handle_key` 调用 `CompositeState` API → 触发 `FormState` 更新。
-
-## 3. 运作流程
-```mermaid
-flowchart LR
-    Schema -->|parse_form_schema| Domain
-    Domain -->|FieldKind::Composite| State
-    State -->|CompositeState::summary| UI
-    UI -->|KeyCommand::Cycle| Runtime
-    Runtime -->|activate/toggle| State
-    State -->|try_build_value| Save(JSON)
-```
-
-1. **初始化**：解析 schema → 为组合字段生成 `CompositeState`（默认 OneOf 第一个 active）。
-2. **用户操作**：
-   - OneOf：`Enter` 打开单选 popup，选择后 `CompositeState::activate_one_of`，同时懒加载/重渲染子表单。
-   - AnyOf：`Enter` 或 `Ctrl+A` 打开多选 popup，返回一组 active 变体，逐个懒加载子表单。
-3. **渲染**：`render_fields` 根据 `CompositeState` 渲染 header + 子表单；CJK 文本按宽度 wrap，光标定位准确。
-4. **保存**：`FormState::try_build_value` 会整合 active 变体的 JSON，生成与 schema 匹配的结构。
-
-## 4. 实施步骤与里程碑
-
-| 阶段 | 主要任务 | 产出 |
-| ---- | -------- | ---- |
-| A | 扩展 Domain（已完成） | `FieldKind::Composite`, parser 支持 oneOf/anyOf |
-| B | 状态层实现 | `CompositeState` + 懒加载 `FormState`，`current_value` 输出真实 JSON |
-| C | UI & 交互 | OneOf/AnyOf 选择面板 + 子表单渲染 + popup 扩展 |
-| D | CJK 光标（已完成） | `unicode-width` 计算宽度，修复中文光标 |
-| E | 回归/示例 | `src/main.rs` 示例跑通，输出 JSON 验证 |
-
-## 5. 代码示例
-
-### 5.1 解析组合字段
-```rust
-fn build_composite(
-    context: &SchemaContext<'_>,
-    mode: CompositeMode,
-    schemas: &[Schema],
-) -> Result<Option<CompositeField>> {
-    if schemas.is_empty() { return Ok(None); }
-    let variants = schemas.iter().enumerate().map(|(index, variant)| {
-        let resolved = context.resolve_schema(variant)?;
-        ensure_object_schema(&resolved)?;
-        Ok(CompositeVariant {
-            id: format!("variant_{}", index),
-            title: resolved.metadata.and_then(|m| m.title.clone())
-                        .unwrap_or_else(|| format!("Variant {}", index + 1)),
-            description: resolved.metadata.and_then(|m| m.description.clone()),
-            schema: serde_json::to_value(&Schema::Object(resolved))?,
-        })
-    }).collect::<Result<Vec<_>>>()?;
-    Ok(Some(CompositeField { mode, variants }))
-}
-```
-
-### 5.2 构建子 FormState
-```rust
-impl CompositeVariantState {
-    fn ensure_form(&mut self) -> &mut FormState {
-        if self.form.is_none() {
-            self.form = Some(FormState::from_schema(&parse_form_schema(&self.schema).unwrap()));
-        }
-        self.form.as_mut().unwrap()
-    }
-}
-```
-
-### 5.3 序列化输出
-```rust
-match (&self.schema.kind, &self.value) {
-    (FieldKind::Composite(_), FieldValue::Composite(state)) => {
-        match state.mode {
-            CompositeMode::OneOf => state.active_variant()
-                .and_then(|variant| variant.ensure_form().try_build_value().ok()),
-            CompositeMode::AnyOf => {
-                let mut arr = Vec::new();
-                for variant in state.active_variants() {
-                    if let Ok(val) = variant.ensure_form().try_build_value() {
-                        arr.push(val);
-                    }
+fn overlay_validate(&mut self) {
+    if let Some(editor) = self.composite_editor.as_mut() {
+        let mut form = editor.form_state_mut();
+        match form.try_build_value() {
+            Ok(value) => {
+                editor.validator.reset_errors();
+                for err in editor.validator.iter_errors(&value) {
+                    form.set_error(&err.instance_path.to_string(), err.to_string());
                 }
-                Ok(Some(Value::Array(arr)))
             }
+            Err(err) => form.set_error(&err.pointer, err.message),
         }
     }
-    // ...
 }
 ```
 
-### 5.4 UI 渲染（伪代码）
-```rust
-fn render_composite(field: &FieldState, area: Rect, frame: &mut Frame<'_>) {
-    match field.value {
-        FieldValue::Composite(state) => {
-            render_composite_header(state, area, frame);
-            for variant in state.active_variants() {
-                let child_area = next_block(area);
-                render_fields(frame, child_area, variant.ensure_form(), true);
-            }
-        }
-        _ => {}
-    }
-}
+Call `overlay_validate()` whenever:
+
+- `FieldState::handle_key` returns true inside overlay mode.
+- List/KeyValue operations change entries.
+- Popup selection updates a value.
+
+---
+
+## 5. Section & OneOf/AnyOf UI
+
+### 5.1 Section Rules
+
+- Scalars (`type: string/integer/...`) stay in the default “General” section.
+- Objects with `properties` or composite semantics become their own section.
+  Parser already checks `has_composite_subschemas`; expand logic so
+  `additionalProperties` fields create a section named after the parent key
+  (e.g. `featureFlags`).
+
+### 5.2 UI Layout
+
+- Section header shows tabs as plain titles (no `[id]` suffix).
+- For OneOf:
+  ```
+  Section: DataStore
+  OneOf: [ SQL Database | NoSQL Database ]
+  ──────────────────────────────────────────
+  [Variant fields render here]
+  ```
+- For AnyOf, show chips + “+ Add variant” button that triggers multi-select
+  popup. Each chosen variant renders beneath the control.
+
+Implementation pointers:
+
+- `render_fields` should render a small control block before the child form when
+  `FieldKind::Composite` is focused. We can reuse existing
+  `FieldValue::Composite` summary but convert it to actual UI controls
+  (tabs/chips).
+- Shortcut: Enter still opens popup; we can also add `Ctrl+[` / `Ctrl+]` to
+  cycle OneOf variants later if needed.
+
+---
+
+## 6. Documentation & Contextual Help
+
+| Context          | Actions ribbon content                                  | Files to edit                                                      |
+| ---------------- | ------------------------------------------------------- | ------------------------------------------------------------------ |
+| Default form     | Existing navigation/save shortcuts                      | `src/presentation/components.rs`                                   |
+| Composite list   | Add `Ctrl+N/D/←/→/↑/↓` hints                            | `src/app/runtime.rs` (HELP_TEXT), `src/presentation/components.rs` |
+| Key/Value editor | Add `Ctrl+Enter` rename? (optional) plus list shortcuts | same as above                                                      |
+| README           | New “Keyboard Shortcuts” table broken down by context   | `README.md`                                                        |
+| Report           | Keep this document in sync                              | `report-composite.md`                                              |
+
+Example README section:
+
+```markdown
+### Keyboard Shortcuts
+
+| Context          | Keys            | Description                   |
+| ---------------- | --------------- | ----------------------------- |
+| Global           | Ctrl+S          | Save (run validation)         |
+| Composite List   | Ctrl+N / Ctrl+D | Add / remove entry            |
+| Key/Value Editor | Ctrl+E          | Open overlay for selected key |
 ```
 
-## 6. 风险与缓解
+---
 
-| 风险 | 影响 | 应对 |
-| ---- | ---- | ---- |
-| FormState 递归引用导致无限大小 | 编译失败 | 采用 `Option<Box<FormState>>` + 懒加载 |
-| AnyOf 变体过多导致 UI 混乱 | 操作复杂 | 支持折叠/滚动、状态栏提示快捷键 |
-| JSON 合并逻辑复杂（尤其中台 type 字段） | 序列化错误 | 在 Domain 层保存必要的常量字段，序列化时显式合并 |
-| 性能 | 大 schema 渲染缓慢 | 只有 active 变体才创建/渲染 FormState |
+## 7. Delivery Plan
 
-## 7. 示例运作
-- 用户选择 `dataStore` → OneOf → `SQL`：展示 `connection.driver/dsn` 等字段 → 保存后输出：
-```json
-"dataStore": {
-  "type": "sql",
-  "connection": { "driver": "postgres", ... }
-}
+| Step | Description                                                              | Main files                                                                                   | Expected Tests                                      |
+| ---- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1    | Introduce `FieldKind::KeyValue`, parser wiring, `KeyValueState` skeleton | `src/domain/schema.rs`, `src/domain/parser.rs`, `src/form/field.rs`, `src/form/composite.rs` | `cargo check` + unit tests for `KeyValueState`      |
+| 2    | UI & runtime for key list overlay (reuse composite overlay, add sidebar) | `src/app/runtime.rs`, `src/presentation/components.rs`, `src/app/input.rs`                   | Manual run with sample schema (featureFlags)        |
+| 3    | Overlay validator (local `Validator`, inline errors)                     | `src/app/runtime.rs`, `src/form/state.rs`, `src/app/validation.rs`                           | Unit test covering error mapping, manual validation |
+| 4    | Section/OneOf/AnyOf header refactor                                      | `src/domain/parser.rs`, `src/presentation/components.rs`                                     | Visual check with `main.rs` schema                  |
+| 5    | Contextual help + README updates                                         | `src/presentation/components.rs`, `README.md`, this report                                   | Doc review                                          |
+| 6    | End-to-end regression                                                    | `cargo check`, `cargo clippy`, `cargo test` (future)                                         | Ensure no regressions                               |
+
+---
+
+## 8. Sample Workflows (FeatureFlags)
+
+1. User focuses `featureFlags` field (KeyValue).
+2. Presses `Ctrl+N` → new entry `#1 key-1` appears; key input gains focus.
+3. Types `production`, overlay validation runs; if pattern fails, inline red
+   text shows immediately.
+4. Presses `Ctrl+E` to edit value: overlay opens with key editor + value
+   composite (AnyOf chips).
+5. Chooses `boolean` variant from popup; toggles value.
+6. Presses `Ctrl+S`: overlay validation + global validation run; status shows
+   success or aggregated errors.
+
+Data path:
+
 ```
-- 用户在 `logging.outputs` 中添加 `console` + `file`：
-```json
-"outputs": [
-  { "type": "console", "colored": true },
-  { "type": "file", "path": "/var/log/app.log" }
-]
+JSON Schema -> FieldKind::KeyValue -> FieldState::KeyValueState
+           -> FormState::try_build_value -> serde_json::Map -> Validator
 ```
 
-## 8. 当前状态与下一步
-- ✅ Domain parser & FieldValue 占位、CJK 光标
-- ⏳ 下一步（需实现）：
-  1. 在 `CompositeVariantState` 中真正挂载子 FormState 并输出 JSON。
-  2. UI 组合控件（header + popup + 子表单）。
-  3. 回归 `src/main.rs` 示例，确保全链路正确。
+---
 
+## 9. Open Questions (Track in TODO-questions.md)
+
+- Do we need persistence for user-defined key order (store in schema metadata)?
+  A: yes, keep the order as user set
+- Should key rename propagate pointers for nested composite states? A: yes. must
+  sync to avoid json path issue.
+- Will we support drag-and-drop ordering in the future (beyond keyboard)? A: no,
+  no need to do it yet.
+
+Once these decisions are locked, the implementation can proceed according to
+Section 7. This report should be shared with the tech-lead for approval before
+coding starts.
+
+---
+
+## 10. Implementation Status (2025-11-10)
+
+Recent changes stitched the plan above into the codebase:
+
+- **Key/Value editor (AdditionalProperties)**: `FieldKind::KeyValue` now
+  represents map schemas and is backed by `KeyValueState` with full entry
+  management (`src/domain/schema.rs`, `src/form/key_value.rs`). Runtime list
+  shortcuts work for both composite lists and key/value maps, and Ctrl+E opens
+  the dedicated overlay (`src/app/runtime.rs`).
+- **Overlay-level validation**: Every overlay owns a scoped `jsonschema`
+  validator. Keystrokes, popup selections, and entry operations trigger
+  `validate_partial_form`, immediately surfacing errors without waiting for a
+  global save (`src/app/runtime.rs`, `src/app/validation.rs`).
+- **Dynamic help/actions**: The footer now shows context-aware shortcuts (base
+  navigation, list/map management, overlay controls), and the README documents
+  the same table to keep user-facing docs in sync (`README.md`).
+- **Report/docs sync**: This section tracks the November 2025 delivery so the
+  tech-lead can see which roadmap items already ship versus what remains (e.g.
+  section/oneOf layout polish is still outstanding).
