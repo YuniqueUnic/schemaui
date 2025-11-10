@@ -41,8 +41,7 @@ impl<'a> FormEngine<'a> {
                     let err_pointer = error.instance_path.to_string();
                     if err_pointer == pointer {
                         matched = true;
-                        self.state
-                            .set_error(&err_pointer, error.to_string());
+                        self.state.set_error(&err_pointer, error.to_string());
                     }
                 }
                 if !matched {

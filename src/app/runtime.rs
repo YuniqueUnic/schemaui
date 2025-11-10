@@ -6,8 +6,8 @@ use serde_json::Value;
 use crate::{
     domain::FieldKind,
     form::{
-        apply_command, ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand,
-        FormEngine, FormState, KeyValueEditorSession,
+        ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand, FormEngine, FormState,
+        KeyValueEditorSession, apply_command,
     },
     presentation::{self, UiContext},
 };
