@@ -4,6 +4,7 @@ mod app;
 mod domain;
 mod form;
 mod presentation;
+mod schema;
 
 pub use app::{SchemaUI, UiOptions};
 

@@ -6,7 +6,8 @@ use serde_json::Value;
 use crate::{
     domain::FieldKind,
     form::{
-        ArrayEditorSession, CompositeEditorSession, FieldState, FormState, KeyValueEditorSession,
+        ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand, FormState,
+        KeyValueEditorSession, apply_command,
     },
     presentation::{self, UiContext},
 };
@@ -358,19 +359,19 @@ impl App {
                 self.on_exit();
             }
             KeyCommand::SwitchSection(delta) => {
-                self.form_state.focus_next_section(delta);
+                apply_command(&mut self.form_state, FormCommand::FocusNextSection(delta));
                 self.exit_armed = false;
             }
             KeyCommand::SwitchRoot(delta) => {
-                self.form_state.focus_next_root(delta);
+                apply_command(&mut self.form_state, FormCommand::FocusNextRoot(delta));
                 self.exit_armed = false;
             }
             KeyCommand::NextField => {
-                self.form_state.focus_next_field();
+                apply_command(&mut self.form_state, FormCommand::FocusNextField);
                 self.exit_armed = false;
             }
             KeyCommand::PrevField => {
-                self.form_state.focus_prev_field();
+                apply_command(&mut self.form_state, FormCommand::FocusPrevField);
                 self.exit_armed = false;
             }
             KeyCommand::ResetStatus => {
@@ -675,25 +676,29 @@ impl App {
             KeyCommand::SwitchSection(delta) => {
                 if let Some(editor) = self.composite_editor.as_mut() {
                     editor.exit_armed = false;
-                    editor.form_state_mut().focus_next_section(delta);
+                    let form = editor.form_state_mut();
+                    apply_command(form, FormCommand::FocusNextSection(delta));
                 }
             }
             KeyCommand::SwitchRoot(delta) => {
                 if let Some(editor) = self.composite_editor.as_mut() {
                     editor.exit_armed = false;
-                    editor.form_state_mut().focus_next_root(delta);
+                    let form = editor.form_state_mut();
+                    apply_command(form, FormCommand::FocusNextRoot(delta));
                 }
             }
             KeyCommand::NextField => {
                 if let Some(editor) = self.composite_editor.as_mut() {
                     editor.exit_armed = false;
-                    editor.form_state_mut().focus_next_field();
+                    let form = editor.form_state_mut();
+                    apply_command(form, FormCommand::FocusNextField);
                 }
             }
             KeyCommand::PrevField => {
                 if let Some(editor) = self.composite_editor.as_mut() {
                     editor.exit_armed = false;
-                    editor.form_state_mut().focus_prev_field();
+                    let form = editor.form_state_mut();
+                    apply_command(form, FormCommand::FocusPrevField);
                 }
             }
             KeyCommand::ResetStatus => {
