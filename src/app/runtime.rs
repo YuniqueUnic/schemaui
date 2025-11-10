@@ -5,7 +5,9 @@ use serde_json::Value;
 
 use crate::{
     domain::FieldKind,
-    form::{CompositeEditorSession, FieldState, FormState, KeyValueEditorSession},
+    form::{
+        ArrayEditorSession, CompositeEditorSession, FieldState, FormState, KeyValueEditorSession,
+    },
     presentation::{self, UiContext},
 };
 
@@ -61,6 +63,7 @@ struct AppPopup {
 enum OverlaySession {
     Composite(CompositeEditorSession),
     KeyValue(KeyValueEditorSession),
+    Array(ArrayEditorSession),
 }
 
 impl OverlaySession {
@@ -68,6 +71,7 @@ impl OverlaySession {
         match self {
             OverlaySession::Composite(session) => &session.form_state,
             OverlaySession::KeyValue(session) => &session.form_state,
+            OverlaySession::Array(session) => &session.form_state,
         }
     }
 
@@ -75,6 +79,7 @@ impl OverlaySession {
         match self {
             OverlaySession::Composite(session) => &mut session.form_state,
             OverlaySession::KeyValue(session) => &mut session.form_state,
+            OverlaySession::Array(session) => &mut session.form_state,
         }
     }
 
@@ -86,6 +91,7 @@ impl OverlaySession {
         match self {
             OverlaySession::Composite(session) => &session.title,
             OverlaySession::KeyValue(_) => "Entry",
+            OverlaySession::Array(session) => &session.title,
         }
     }
 
@@ -93,6 +99,7 @@ impl OverlaySession {
         match self {
             OverlaySession::Composite(session) => session.description.clone(),
             OverlaySession::KeyValue(_) => None,
+            OverlaySession::Array(session) => session.description.clone(),
         }
     }
 }
@@ -155,6 +162,7 @@ enum CompositeOverlayTarget {
     Field,
     ListEntry { entry_index: usize },
     KeyValueEntry { entry_index: usize },
+    ArrayEntry { entry_index: usize },
 }
 
 pub(crate) struct App {
@@ -520,6 +528,44 @@ impl App {
                     Err(err) => self.status.set_raw(&err.message),
                 }
             }
+            FieldKind::Array(inner)
+                if matches!(
+                    inner.as_ref(),
+                    FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Boolean
+                ) =>
+            {
+                let pointer = field.schema.pointer.clone();
+                let label = field.schema.display_label();
+                let (panel_entries, panel_selected) = field
+                    .composite_list_panel()
+                    .unwrap_or_else(|| (Vec::new(), 0));
+                match field.open_scalar_array_editor() {
+                    Ok(context) => {
+                        self.popup = None;
+                        let mut overlay = CompositeEditorOverlay::new(
+                            pointer,
+                            label,
+                            OverlaySession::Array(context.session),
+                        );
+                        overlay.target = CompositeOverlayTarget::ArrayEntry {
+                            entry_index: context.entry_index,
+                        };
+                        overlay.display_title =
+                            format!("Edit {} – {}", overlay.field_label, context.entry_label);
+                        overlay.display_description = Some(context.entry_label.clone());
+                        if !panel_entries.is_empty() {
+                            overlay.set_list_panel(panel_entries, panel_selected);
+                        }
+                        self.composite_editor = Some(overlay);
+                        self.status.set_raw(
+                            "Array editor: Ctrl+S save • Esc cancel (Esc twice to discard)",
+                        );
+                        self.refresh_list_overlay_panel();
+                        self.setup_overlay_validator();
+                    }
+                    Err(err) => self.status.set_raw(&err.message),
+                }
+            }
             _ => {
                 self.status
                     .set_raw("Focus a composite or composite list field before editing");
@@ -554,6 +600,22 @@ impl App {
                         if let Some(field) = self.form_state.field_mut_by_pointer(&pointer) {
                             if let Err(err) =
                                 field.close_key_value_editor(entry_index, session, true)
+                            {
+                                self.status.set_raw(&err.message);
+                                self.composite_editor = Some(editor);
+                                self.popup = None;
+                                restored = true;
+                            }
+                        }
+                    }
+                }
+            }
+            CompositeOverlayTarget::ArrayEntry { entry_index } => {
+                if let OverlaySession::Array(ref session) = editor.session {
+                    if commit {
+                        if let Some(field) = self.form_state.field_mut_by_pointer(&pointer) {
+                            if let Err(err) =
+                                field.close_scalar_array_editor(entry_index, session, true)
                             {
                                 self.status.set_raw(&err.message);
                                 self.composite_editor = Some(editor);
@@ -704,6 +766,7 @@ impl App {
                 editor.target,
                 CompositeOverlayTarget::ListEntry { .. }
                     | CompositeOverlayTarget::KeyValueEntry { .. }
+                    | CompositeOverlayTarget::ArrayEntry { .. }
             ) {
                 return Some(editor.field_pointer.clone());
             }
@@ -721,6 +784,7 @@ impl App {
         editor.validator = match &editor.session {
             OverlaySession::Composite(session) => validator_for(&session.schema).ok(),
             OverlaySession::KeyValue(session) => validator_for(&session.schema).ok(),
+            OverlaySession::Array(session) => validator_for(&session.schema).ok(),
         };
         if editor.validator.is_some() {
             self.run_overlay_validation();
@@ -743,7 +807,7 @@ impl App {
     fn handle_list_add_entry(&mut self) -> bool {
         let Some(pointer) = self.list_field_pointer() else {
             self.status
-                .set_raw("Focus a composite list field before Ctrl+N add");
+                .set_raw("Focus a repeatable field before Ctrl+N add");
             return false;
         };
 
@@ -775,7 +839,7 @@ impl App {
     fn handle_list_remove_entry(&mut self) -> bool {
         let Some(pointer) = self.list_field_pointer() else {
             self.status
-                .set_raw("Focus a composite list field before Ctrl+D remove");
+                .set_raw("Focus a repeatable field before Ctrl+D remove");
             return false;
         };
 
@@ -809,7 +873,7 @@ impl App {
     fn handle_list_move_entry(&mut self, delta: i32) -> bool {
         let Some(pointer) = self.list_field_pointer() else {
             self.status
-                .set_raw("Focus a composite list field before Ctrl+↑/↓ move");
+                .set_raw("Focus a repeatable field before Ctrl+↑/↓ move");
             return false;
         };
 
@@ -840,7 +904,7 @@ impl App {
     fn handle_list_select_entry(&mut self, delta: i32) -> bool {
         let Some(pointer) = self.list_field_pointer() else {
             self.status
-                .set_raw("Focus a composite list field before Ctrl+←/→ select");
+                .set_raw("Focus a repeatable field before Ctrl+←/→ select");
             return false;
         };
 
@@ -868,7 +932,12 @@ impl App {
         let Some(editor) = self.composite_editor.as_mut() else {
             return;
         };
-        if !matches!(editor.target, CompositeOverlayTarget::ListEntry { .. }) {
+        if !matches!(
+            editor.target,
+            CompositeOverlayTarget::ListEntry { .. }
+                | CompositeOverlayTarget::KeyValueEntry { .. }
+                | CompositeOverlayTarget::ArrayEntry { .. }
+        ) {
             return;
         }
         let pointer = editor.field_pointer.clone();
@@ -892,6 +961,9 @@ impl App {
                 *entry_index = idx;
             }
             (CompositeOverlayTarget::KeyValueEntry { entry_index }, Some(idx)) => {
+                *entry_index = idx;
+            }
+            (CompositeOverlayTarget::ArrayEntry { entry_index }, Some(idx)) => {
                 *entry_index = idx;
             }
             _ => {}
