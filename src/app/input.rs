@@ -9,6 +9,7 @@ pub enum KeyCommand {
     PrevField,
     ResetStatus,
     TogglePopup,
+    EditComposite,
     Edit(KeyEvent),
     None,
 }
@@ -19,6 +20,7 @@ pub fn classify(key: &KeyEvent) -> KeyCommand {
             KeyCode::Char('s') | KeyCode::Char('S') => KeyCommand::Save,
             KeyCode::Char('q') | KeyCode::Char('Q') => KeyCommand::Quit,
             KeyCode::Char('c') | KeyCode::Char('C') => KeyCommand::Quit,
+            KeyCode::Char('e') | KeyCode::Char('E') => KeyCommand::EditComposite,
             KeyCode::Tab => {
                 let delta = if key.modifiers.contains(KeyModifiers::SHIFT) {
                     -1

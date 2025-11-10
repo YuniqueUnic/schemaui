@@ -1,4 +1,4 @@
 mod components;
 mod view;
 
-pub use view::{PopupRender, UiContext, draw};
+pub use view::{CompositeOverlay, PopupRender, UiContext, draw};
