@@ -121,7 +121,7 @@ impl FormState {
         if self.field_index + 1 < section.fields.len() {
             self.field_index += 1;
         } else {
-            self.advance_section_within_root(1);
+            self.advance_section(1);
             self.field_index = 0;
             self.normalize_focus();
         }
@@ -138,7 +138,7 @@ impl FormState {
         if self.field_index > 0 {
             self.field_index -= 1;
         } else {
-            self.advance_section_within_root(-1);
+            self.advance_section(-1);
             self.normalize_focus();
             if let Some(current) = self.active_section()
                 && !current.fields.is_empty()
@@ -150,7 +150,7 @@ impl FormState {
 
     pub fn focus_next_section(&mut self, delta: i32) {
         self.normalize_focus();
-        self.advance_section_within_root(delta);
+        self.advance_section(delta);
         self.normalize_focus();
     }
 
@@ -260,17 +260,21 @@ impl FormState {
             .sum()
     }
 
-    fn advance_section_within_root(&mut self, delta: i32) {
-        if self.roots.is_empty() {
+    fn advance_section(&mut self, delta: i32) {
+        let positions = self.section_positions();
+        if positions.is_empty() {
             return;
         }
-        let len = self.roots[self.root_index].sections.len() as i32;
-        if len == 0 {
-            return;
-        }
-        let mut next = self.section_index as i32 + delta;
+        let current_idx = positions
+            .iter()
+            .position(|&(root, section)| root == self.root_index && section == self.section_index)
+            .unwrap_or(0);
+        let len = positions.len() as i32;
+        let mut next = current_idx as i32 + delta;
         next = ((next % len) + len) % len;
-        self.section_index = next as usize;
+        let (root_index, section_index) = positions[next as usize];
+        self.root_index = root_index;
+        self.section_index = section_index;
         self.field_index = 0;
     }
 
@@ -322,6 +326,16 @@ impl FormState {
         self.roots
             .iter_mut()
             .flat_map(|root| root.sections.iter_mut())
+    }
+
+    fn section_positions(&self) -> Vec<(usize, usize)> {
+        let mut positions = Vec::new();
+        for (root_idx, root) in self.roots.iter().enumerate() {
+            for (section_idx, _section) in root.sections.iter().enumerate() {
+                positions.push((root_idx, section_idx));
+            }
+        }
+        positions
     }
 }
 
