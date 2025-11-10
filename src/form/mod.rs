@@ -13,6 +13,6 @@ pub use array::ArrayEditorSession;
 pub use composite::CompositeEditorSession;
 pub use field::{CompositePopupData, FieldState, FieldValue};
 pub use key_value::KeyValueEditorSession;
-pub use reducers::apply_command;
+pub use reducers::{apply_command, FormEngine};
 pub use section::SectionState;
 pub use state::FormState;
