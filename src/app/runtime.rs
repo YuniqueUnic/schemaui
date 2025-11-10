@@ -68,6 +68,9 @@ struct CompositeEditorOverlay {
     session: CompositeEditorSession,
     target: CompositeOverlayTarget,
     exit_armed: bool,
+    list_entries: Option<Vec<String>>,
+    list_selected: Option<usize>,
+    instructions: String,
 }
 
 impl CompositeEditorOverlay {
@@ -82,7 +85,18 @@ impl CompositeEditorOverlay {
             session,
             target: CompositeOverlayTarget::Field,
             exit_armed: false,
+            list_entries: None,
+            list_selected: None,
+            instructions: "Ctrl+S save • Esc cancel (Esc twice to discard)".to_string(),
         }
+    }
+
+    fn set_list_panel(&mut self, entries: Vec<String>, selected: usize) {
+        self.list_entries = Some(entries);
+        self.list_selected = Some(selected);
+        self.instructions = "Ctrl+S save • Esc cancel (Esc twice to discard) • Ctrl+N add • \
+            Ctrl+D remove • Ctrl+←/→ select • Ctrl+↑/↓ reorder"
+            .to_string();
     }
 
     fn form_state(&self) -> &FormState {
@@ -199,33 +213,33 @@ impl App {
             None
         };
 
-        let focus_label = if let Some(editor) = self.composite_editor.as_ref() {
-            let child = editor
-                .form_state()
-                .focused_field()
-                .map(|field| field.schema.display_label())
-                .unwrap_or_else(|| "<none>".to_string());
-            Some(format!("{} › {}", editor.field_label, child))
-        } else {
-            self.form_state
-                .focused_field()
-                .map(|field| field.schema.display_label())
+        let (focus_label, overlay_form_state, overlay_meta) = match self.composite_editor.as_mut() {
+            Some(editor) => {
+                let child = editor
+                    .form_state()
+                    .focused_field()
+                    .map(|field| field.schema.display_label())
+                    .unwrap_or_else(|| "<none>".to_string());
+                let label = format!("{} › {}", editor.field_label, child);
+                let dirty = editor.form_state().is_dirty();
+                let meta = presentation::CompositeOverlay {
+                    title: editor.display_title.clone(),
+                    description: editor.display_description.clone(),
+                    dirty,
+                    instructions: editor.instructions.clone(),
+                    list_entries: editor.list_entries.clone(),
+                    list_selected: editor.list_selected,
+                };
+                (Some(label), Some(editor.form_state_mut()), Some(meta))
+            }
+            None => (
+                self.form_state
+                    .focused_field()
+                    .map(|field| field.schema.display_label()),
+                None,
+                None,
+            ),
         };
-
-        let mut overlay_form_state: Option<&mut FormState> = None;
-        let mut overlay_meta: Option<presentation::CompositeOverlay> = None;
-
-        if let Some(editor) = self.composite_editor.as_mut() {
-            let dirty = editor.form_state().is_dirty();
-            overlay_meta = Some(presentation::CompositeOverlay {
-                title: editor.display_title.clone(),
-                description: editor.display_description.clone(),
-                dirty,
-                instructions: "Ctrl+S save • Esc cancel (press Esc twice to discard)"
-                    .to_string(),
-            });
-            overlay_form_state = Some(editor.form_state_mut());
-        }
 
         let form_dirty = self.form_state.is_dirty();
 
@@ -266,24 +280,20 @@ impl App {
                 self.on_save();
             }
             KeyCommand::ListAddEntry => {
-                if self.handle_list_add_entry() {
-                    return Ok(());
-                }
+                self.handle_list_add_entry();
+                return Ok(());
             }
             KeyCommand::ListRemoveEntry => {
-                if self.handle_list_remove_entry() {
-                    return Ok(());
-                }
+                self.handle_list_remove_entry();
+                return Ok(());
             }
             KeyCommand::ListMove(delta) => {
-                if self.handle_list_move_entry(delta) {
-                    return Ok(());
-                }
+                self.handle_list_move_entry(delta);
+                return Ok(());
             }
             KeyCommand::ListSelect(delta) => {
-                if self.handle_list_select_entry(delta) {
-                    return Ok(());
-                }
+                self.handle_list_select_entry(delta);
+                return Ok(());
             }
             KeyCommand::Quit => {
                 self.on_exit();
@@ -389,6 +399,9 @@ impl App {
             FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Composite(_)) => {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
+                let (panel_entries, panel_selected) = field
+                    .composite_list_panel()
+                    .unwrap_or_else(|| (Vec::new(), 0));
                 match field.open_composite_list_editor() {
                     Ok(context) => {
                         self.popup = None;
@@ -400,11 +413,15 @@ impl App {
                             "Edit {} – {}",
                             overlay.field_label, context.entry_label
                         );
-                        overlay.display_description = Some(context.entry_label);
+                        overlay.display_description = Some(context.entry_label.clone());
+                        if !panel_entries.is_empty() {
+                            overlay.set_list_panel(panel_entries, panel_selected);
+                        }
                         self.composite_editor = Some(overlay);
                         self.status.set_raw(
                             "Composite list editor: Ctrl+S save • Esc cancel (Esc twice to discard)",
                         );
+                        self.refresh_list_overlay_panel();
                     }
                     Err(err) => self.status.set_raw(&err.message),
                 }
@@ -507,10 +524,26 @@ impl App {
                     }
                 }
             }
-            KeyCommand::ListAddEntry
-            | KeyCommand::ListRemoveEntry
-            | KeyCommand::ListMove(_)
-            | KeyCommand::ListSelect(_) => {}
+            KeyCommand::ListAddEntry => {
+                if self.handle_list_add_entry() {
+                    return Ok(());
+                }
+            }
+            KeyCommand::ListRemoveEntry => {
+                if self.handle_list_remove_entry() {
+                    return Ok(());
+                }
+            }
+            KeyCommand::ListMove(delta) => {
+                if self.handle_list_move_entry(delta) {
+                    return Ok(());
+                }
+            }
+            KeyCommand::ListSelect(delta) => {
+                if self.handle_list_select_entry(delta) {
+                    return Ok(());
+                }
+            }
             KeyCommand::None => {}
         }
 
@@ -540,28 +573,32 @@ impl App {
         }
     }
 
-    fn focused_composite_list_field_mut(&mut self) -> Option<&mut FieldState> {
-        self.form_state.focused_field_mut().and_then(|field| {
-            if field.is_composite_list() {
-                Some(field)
-            } else {
-                None
+    fn list_field_pointer(&self) -> Option<String> {
+        if let Some(editor) = &self.composite_editor {
+            if matches!(editor.target, CompositeOverlayTarget::ListEntry { .. }) {
+                return Some(editor.field_pointer.clone());
             }
-        })
+        }
+        self.form_state
+            .focused_field()
+            .filter(|field| field.is_composite_list())
+            .map(|field| field.schema.pointer.clone())
     }
 
     fn handle_list_add_entry(&mut self) -> bool {
-        let selection_label = match self.focused_composite_list_field_mut() {
-            Some(field) => {
-                if field.composite_list_add_entry() {
-                    field.composite_list_selected_label()
-                } else {
-                    return false;
-                }
-            }
-            None => {
-                self.status
-                    .set_raw("Focus a composite list field before Ctrl+N add");
+        let Some(pointer) = self.list_field_pointer() else {
+            self.status
+                .set_raw("Focus a composite list field before Ctrl+N add");
+            return false;
+        };
+
+        let selection_label = {
+            let Some(field) = self.form_state.field_mut_by_pointer(&pointer) else {
+                return false;
+            };
+            if field.composite_list_add_entry() {
+                field.composite_list_selected_label()
+            } else {
                 return false;
             }
         };
@@ -575,28 +612,31 @@ impl App {
         if self.options.auto_validate {
             self.run_validation(false);
         }
+        self.refresh_list_overlay_panel();
         true
     }
 
     fn handle_list_remove_entry(&mut self) -> bool {
-        let selection_label = match self.focused_composite_list_field_mut() {
-            Some(field) => {
-                if field.composite_list_remove_entry() {
-                    field.composite_list_selected_label()
-                } else {
-                    self.status.set_raw("No entry to remove");
-                    return false;
-                }
-            }
-            None => {
-                self.status
-                    .set_raw("Focus a composite list field before Ctrl+D remove");
+        let Some(pointer) = self.list_field_pointer() else {
+            self.status
+                .set_raw("Focus a composite list field before Ctrl+D remove");
+            return false;
+        };
+
+        let removed = {
+            let Some(field) = self.form_state.field_mut_by_pointer(&pointer) else {
+                return false;
+            };
+            if field.composite_list_remove_entry() {
+                field.composite_list_selected_label()
+            } else {
+                self.status.set_raw("No entry to remove");
                 return false;
             }
         };
         self.exit_armed = false;
         self.status.value_updated();
-        if let Some(label) = selection_label {
+        if let Some(label) = removed {
             self.status
                 .set_raw(&format!("Removed entry • now at {label}"));
         } else {
@@ -605,56 +645,95 @@ impl App {
         if self.options.auto_validate {
             self.run_validation(false);
         }
+        self.refresh_list_overlay_panel();
         true
     }
 
     fn handle_list_move_entry(&mut self, delta: i32) -> bool {
-        let selection_label = match self.focused_composite_list_field_mut() {
-            Some(field) => {
-                if field.composite_list_move_entry(delta) {
-                    field.composite_list_selected_label()
-                } else {
-                    self.status.set_raw("Cannot move entry further");
-                    return false;
-                }
-            }
-            None => {
-                self.status
-                    .set_raw("Focus a composite list field before Ctrl+↑/↓ move");
+        let Some(pointer) = self.list_field_pointer() else {
+            self.status
+                .set_raw("Focus a composite list field before Ctrl+↑/↓ move");
+            return false;
+        };
+
+        let moved_label = {
+            let Some(field) = self.form_state.field_mut_by_pointer(&pointer) else {
+                return false;
+            };
+            if field.composite_list_move_entry(delta) {
+                field.composite_list_selected_label()
+            } else {
+                self.status.set_raw("Cannot move entry further");
                 return false;
             }
         };
         self.exit_armed = false;
         self.status.value_updated();
-        if let Some(label) = selection_label {
+        if let Some(label) = moved_label {
             self.status
                 .set_raw(&format!("Moved entry to {}", label));
         }
         if self.options.auto_validate {
             self.run_validation(false);
         }
+        self.refresh_list_overlay_panel();
         true
     }
 
     fn handle_list_select_entry(&mut self, delta: i32) -> bool {
-        let selection_label = match self.focused_composite_list_field_mut() {
-            Some(field) => {
-                if field.composite_list_select_entry(delta) {
-                    field.composite_list_selected_label()
-                } else {
-                    return false;
-                }
-            }
-            None => {
-                self.status
-                    .set_raw("Focus a composite list field before Ctrl+←/→ select");
-                return false;
-            }
+        let Some(pointer) = self.list_field_pointer() else {
+            self.status
+                .set_raw("Focus a composite list field before Ctrl+←/→ select");
+            return false;
         };
-        if let Some(label) = selection_label {
-            self.status.set_raw(&format!("Selected entry {}", label));
+
+        let changed = {
+            let Some(field) = self.form_state.field_mut_by_pointer(&pointer) else {
+                return false;
+            };
+            field.composite_list_select_entry(delta)
+        };
+        if !changed {
+            return false;
         }
+
+        if let Some(field) = self.form_state.field_by_pointer(&pointer) {
+            if let Some(label) = field.composite_list_selected_label() {
+                self.status.set_raw(&format!("Selected entry {}", label));
+            }
+        }
+        self.refresh_list_overlay_panel();
         true
+    }
+
+    fn refresh_list_overlay_panel(&mut self) {
+        let Some(editor) = self.composite_editor.as_mut() else {
+            return;
+        };
+        if !matches!(editor.target, CompositeOverlayTarget::ListEntry { .. }) {
+            return;
+        }
+        let pointer = editor.field_pointer.clone();
+        let (panel, label, idx) = match self.form_state.field_by_pointer(&pointer) {
+            Some(field) => (
+                field.composite_list_panel(),
+                field.composite_list_selected_label(),
+                field.composite_list_selected_index(),
+            ),
+            None => return,
+        };
+        if let Some((entries, selected)) = panel {
+            editor.set_list_panel(entries, selected);
+        }
+        if let Some(label) = label {
+            editor.display_title = format!("Edit {} – {}", editor.field_label, label);
+            editor.display_description = Some(label);
+        }
+        if let (Some(idx), CompositeOverlayTarget::ListEntry { entry_index }) =
+            (idx, &mut editor.target)
+        {
+            *entry_index = idx;
+        }
     }
 
     fn on_save(&mut self) {

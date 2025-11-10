@@ -100,7 +100,8 @@ impl FieldState {
                 }
                 FieldKind::Composite(meta) => FieldValue::CompositeList(CompositeListState::new(
                     &schema.pointer,
-                    meta.clone(),
+                    meta,
+                    schema.default.as_ref(),
                 )),
                 _ => {
                     let default = schema
@@ -117,12 +118,66 @@ impl FieldState {
             }
         };
 
-        FieldState {
+        let mut field = FieldState {
             schema,
             value,
             dirty: false,
             error: None,
+        };
+
+        if let Some(default) = field.schema.default.clone() {
+            field.seed_value(&default);
         }
+
+        field
+    }
+
+    pub fn seed_value(&mut self, value: &Value) {
+        match (&mut self.value, value) {
+            (FieldValue::Text(buffer), Value::String(text)) => {
+                *buffer = text.clone();
+            }
+            (FieldValue::Text(buffer), Value::Number(num)) => {
+                *buffer = num.to_string();
+            }
+            (FieldValue::Bool(current), Value::Bool(flag)) => {
+                *current = *flag;
+            }
+            (FieldValue::Enum { options, selected }, Value::String(choice)) => {
+                if let Some(idx) = options.iter().position(|opt| opt == choice) {
+                    *selected = idx;
+                }
+            }
+            (
+                FieldValue::MultiSelect { options, selected },
+                Value::Array(items),
+            ) => {
+                let mut flags = vec![false; options.len()];
+                for item in items {
+                    if let Some(label) = item.as_str() {
+                        if let Some(pos) = options.iter().position(|opt| opt == label) {
+                            flags[pos] = true;
+                        }
+                    }
+                }
+                if selected.len() == flags.len() {
+                    selected.clone_from_slice(&flags);
+                }
+            }
+            (FieldValue::Array(buffer), Value::Array(items)) => {
+                *buffer = array_to_string(items);
+            }
+            (FieldValue::Composite(state), Value::Object(_)) => {
+                let _ = state.seed_from_value(value);
+            }
+            (FieldValue::CompositeList(state), Value::Array(items)) => {
+                state.seed_entries_from_array(items);
+            }
+            _ => {}
+        }
+
+        self.dirty = false;
+        self.error = None;
     }
 
     pub fn handle_key(&mut self, key: &KeyEvent) -> bool {
@@ -291,6 +346,24 @@ impl FieldState {
     pub fn composite_list_selected_label(&self) -> Option<String> {
         if let FieldValue::CompositeList(state) = &self.value {
             state.selected_label()
+        } else {
+            None
+        }
+    }
+
+    pub fn composite_list_panel(&self) -> Option<(Vec<String>, usize)> {
+        if let FieldValue::CompositeList(state) = &self.value {
+            state
+                .selected_index()
+                .map(|idx| (state.summaries(), idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn composite_list_selected_index(&self) -> Option<usize> {
+        if let FieldValue::CompositeList(state) = &self.value {
+            state.selected_index()
         } else {
             None
         }

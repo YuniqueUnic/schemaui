@@ -32,6 +32,8 @@ pub struct CompositeOverlay {
     pub description: Option<String>,
     pub dirty: bool,
     pub instructions: String,
+    pub list_entries: Option<Vec<String>>,
+    pub list_selected: Option<usize>,
 }
 
 pub fn draw(

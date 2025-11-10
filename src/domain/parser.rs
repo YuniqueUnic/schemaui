@@ -81,7 +81,15 @@ fn parse_object_fields(
         next_path.push(name.clone());
         let resolved = context.resolve_schema(property_schema)?;
 
-        if is_object_schema(&resolved) {
+        let descend = is_object_schema(&resolved)
+            && resolved
+                .object
+                .as_ref()
+                .map(|obj| !obj.properties.is_empty())
+                .unwrap_or(false)
+            && !has_composite_subschemas(&resolved);
+
+        if descend {
             let next_section = section_info_for_object(&resolved, name, parent_section.as_ref());
             meta.entry(next_section.id.clone())
                 .or_insert_with(|| next_section.clone());
@@ -415,6 +423,14 @@ fn ensure_object_schema(schema: &SchemaObject) -> Result<()> {
     } else {
         bail!("schema must describe an object")
     }
+}
+
+fn has_composite_subschemas(schema: &SchemaObject) -> bool {
+    schema
+        .subschemas
+        .as_ref()
+        .map(|subs| subs.one_of.is_some() || subs.any_of.is_some())
+        .unwrap_or(false)
 }
 
 struct SchemaContext<'a> {
