@@ -51,6 +51,31 @@ fn main() -> color_eyre::Result<()> {
 }
 ```
 
+### Entry & Exit Layers
+
+- **Unified ingestion**: `SchemaUI::from_data_str` / `SchemaUI::from_data_value` convert JSON/TOML/YAML payloads into JSON Schema documents. Every observed value becomes the corresponding field's `default`, so the generated TUI is pre-populated with the original configuration.
+- **Format features**: enable the `yaml` and/or `toml` crate features (or `all_formats`) to turn on the respective parsers and serializers. JSON support ships with the base crate.
+- **Output control**: configure serialization via `OutputOptions`, choosing a `DocumentFormat`, pretty-print toggle, and one or more `OutputDestination`s (`Stdout` or `File`).
+
+```rust
+use schemaui::{DocumentFormat, OutputDestination, OutputOptions, SchemaUI};
+
+fn run_from_file(raw: &str) -> color_eyre::Result<()> {
+    let ui = SchemaUI::from_data_str(raw, DocumentFormat::Yaml)?
+        .with_title("Runtime Config")
+        .with_output(
+            OutputOptions::new(DocumentFormat::Toml)
+                .with_pretty(true)
+                .with_destinations(vec![
+                    OutputDestination::Stdout,
+                    OutputDestination::file("./config.out.toml"),
+                ]),
+        );
+    ui.run()?;
+    Ok(())
+}
+```
+
 ### 支持的 JSON Schema 结构
 
 - **多 Root / Section**：顶层属性映射为 Root Tab，嵌套对象递归展开为 Section 树，自动生成层级标题。
