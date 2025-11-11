@@ -149,6 +149,7 @@ schemaui \
 - Formats can be inferred from file extensions or forced via `--schema-format` / `--config-format`.
 - Outputs are routed through the exit layer: mix `--stdout`, repeated `--output <path>`, or rely on the default temp file `/tmp/schemaui.yaml`. Disable the fallback with `--no-temp-file` or relocate it via `--temp-file`.
 - Titles and other options chain directly through `SchemaUI`, so the CLI mirrors the library flow: load → merge defaults → render TUI → emit the edited configuration in the requested format(s).
+- The CLI now lives in the sibling crate `schemaui-cli`. Run it via `cargo run -p schemaui-cli -- <args>` inside this workspace, or install it with `cargo install --path schemaui-cli` to obtain a standalone `schemaui-cli` binary.
 
 ### 许可证
 

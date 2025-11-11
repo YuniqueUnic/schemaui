@@ -90,18 +90,18 @@ pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
         }
     }
 
-    if let Some(additional) = object.additional_properties.as_ref() {
-        if let Some(resolved) = resolve_additional_properties(&resolver, additional)? {
-            let field = build_field_schema(
-                &resolver,
-                &resolved,
-                "additional",
-                Vec::new(),
-                general_section_info(),
-                false,
-            )?;
-            general_fields.push((order_counter, field));
-        }
+    if let Some(additional) = object.additional_properties.as_ref()
+        && let Some(resolved) = resolve_additional_properties(&resolver, additional)?
+    {
+        let field = build_field_schema(
+            &resolver,
+            &resolved,
+            "additional",
+            Vec::new(),
+            general_section_info(),
+            false,
+        )?;
+        general_fields.push((order_counter, field));
     }
 
     general_fields.sort_by_key(|(order, _)| *order);
@@ -199,23 +199,23 @@ fn build_section_tree(
         }
     }
 
-    if let Some(additional) = object.additional_properties.as_ref() {
-        if let Some(resolved) = resolve_additional_properties(resolver, additional)? {
-            let field_name = path
-                .last()
-                .cloned()
-                .unwrap_or_else(|| "additional".to_string());
-            let field = build_field_schema(
-                resolver,
-                &resolved,
-                &field_name,
-                path.clone(),
-                section_info.clone(),
-                false,
-            )?;
-            fields.push((*order, field));
-            *order += 1;
-        }
+    if let Some(additional) = object.additional_properties.as_ref()
+        && let Some(resolved) = resolve_additional_properties(resolver, additional)?
+    {
+        let field_name = path
+            .last()
+            .cloned()
+            .unwrap_or_else(|| "additional".to_string());
+        let field = build_field_schema(
+            resolver,
+            &resolved,
+            &field_name,
+            path.clone(),
+            section_info.clone(),
+            false,
+        )?;
+        fields.push((*order, field));
+        *order += 1;
     }
 
     fields.sort_by_key(|(pos, _)| *pos);
