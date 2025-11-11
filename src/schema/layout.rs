@@ -307,33 +307,32 @@ fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<F
         Some(InstanceType::Number) => Ok(FieldKind::Number),
         Some(InstanceType::Boolean) => Ok(FieldKind::Boolean),
         Some(InstanceType::Object) => Ok(FieldKind::Json),
-        Some(InstanceType::Array) => {
-            let array = schema
-                .array
-                .as_ref()
-                .context("array schema must define items")?;
-            let inner = resolve_array_items(resolver, array)?;
-            let inner_kind = detect_kind(resolver, &inner)?;
-            match inner_kind {
-                FieldKind::String
-                | FieldKind::Integer
-                | FieldKind::Number
-                | FieldKind::Boolean
-                | FieldKind::Enum(_)
-                | FieldKind::Composite(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
-                FieldKind::Json => {
-                    if let Some(composite) = inline_object_composite(&inner)? {
-                        Ok(FieldKind::Array(Box::new(FieldKind::Composite(Box::new(
-                            composite,
-                        )))))
-                    } else {
-                        Ok(FieldKind::Array(Box::new(FieldKind::Json)))
+        Some(InstanceType::Array) => match schema.array.as_ref() {
+            Some(array) if array.items.is_some() => {
+                let inner = resolve_array_items(resolver, array)?;
+                let inner_kind = detect_kind(resolver, &inner)?;
+                match inner_kind {
+                    FieldKind::String
+                    | FieldKind::Integer
+                    | FieldKind::Number
+                    | FieldKind::Boolean
+                    | FieldKind::Enum(_)
+                    | FieldKind::Composite(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
+                    FieldKind::Json => {
+                        if let Some(composite) = inline_object_composite(&inner)? {
+                            Ok(FieldKind::Array(Box::new(FieldKind::Composite(Box::new(
+                                composite,
+                            )))))
+                        } else {
+                            Ok(FieldKind::Array(Box::new(FieldKind::Json)))
+                        }
                     }
+                    FieldKind::KeyValue(_) => bail!("arrays of key/value maps are not supported"),
+                    FieldKind::Array(_) => bail!("nested arrays are not supported"),
                 }
-                FieldKind::KeyValue(_) => bail!("arrays of key/value maps are not supported"),
-                FieldKind::Array(_) => bail!("nested arrays are not supported"),
             }
-        }
+            _ => Ok(FieldKind::Array(Box::new(FieldKind::Json))),
+        },
         Some(other) => bail!("unsupported field type {other:?}"),
     }
 }

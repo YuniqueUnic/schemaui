@@ -28,10 +28,6 @@ struct Cli {
     #[arg(long = "schema-inline", value_name = "TEXT", conflicts_with = "schema")]
     schema_inline: Option<String>,
 
-    /// Explicit schema format (json/yaml/toml). Defaults to file extension or json.
-    #[arg(long = "schema-format", value_name = "FORMAT")]
-    schema_format: Option<String>,
-
     /// Optional config data used to seed defaults ("-" reads from stdin)
     #[arg(short = 'c', long = "config", alias = "data", value_name = "PATH")]
     config: Option<String>,
@@ -45,24 +41,16 @@ struct Cli {
     )]
     config_inline: Option<String>,
 
-    /// Explicit config format (json/yaml/toml). Defaults to file extension or json.
-    #[arg(long = "config-format", alias = "data-format", value_name = "FORMAT")]
-    config_format: Option<String>,
-
     /// Title shown at the top of the UI
     #[arg(long = "title", value_name = "TEXT")]
     title: Option<String>,
-
-    /// Output format for the final document (json/yaml/toml)
-    #[arg(long = "output-format", value_name = "FORMAT")]
-    output_format: Option<String>,
 
     /// Write the final document to stdout
     #[arg(long = "stdout")]
     stdout: bool,
 
     /// Additional output file destinations
-    #[arg(long = "output", value_name = "PATH")]
+    #[arg(short = 'o', long = "output", value_name = "PATH")]
     output_files: Vec<PathBuf>,
 
     /// Override the default temp file location (only used when no other destinations are set)
@@ -76,6 +64,10 @@ struct Cli {
     /// Emit compact JSON/TOML rather than pretty formatting
     #[arg(long = "no-pretty")]
     no_pretty: bool,
+
+    /// Overwrite output files even if they already exist
+    #[arg(short = 'f', long = "force", short_alias = 'y', alias = "yes")]
+    force: bool,
 }
 
 fn main() -> Result<()> {
@@ -92,26 +84,20 @@ fn main() -> Result<()> {
         ));
     }
 
-    let (schema_format, schema_source) =
-        resolve_format(cli.schema_format.as_deref(), cli.schema.as_deref())?;
-    let (config_format, config_source) =
-        resolve_format(cli.config_format.as_deref(), cli.config.as_deref())?;
+    let schema_hint = resolve_format_hint(cli.schema.as_deref());
+    let config_hint = resolve_format_hint(cli.config.as_deref());
 
     let schema_value = load_optional_value(
         cli.schema.as_deref(),
         cli.schema_inline.as_deref(),
-        schema_format,
-        schema_source,
+        schema_hint.format,
         "schema",
-        Some(false),
     )?;
     let config_value = load_optional_value(
         cli.config.as_deref(),
         cli.config_inline.as_deref(),
-        config_format,
-        config_source,
+        config_hint.format,
         "config",
-        None,
     )?;
 
     if schema_value.is_none() && config_value.is_none() {
@@ -133,7 +119,12 @@ fn main() -> Result<()> {
         ui = ui.with_default_data(defaults);
     }
 
-    let output_settings = build_output_options(&cli)?;
+    let (output_settings, output_paths) = build_output_options(
+        &cli,
+        config_hint.extension_value(),
+        schema_hint.extension_value(),
+    )?;
+    ensure_output_paths_available(&output_paths, cli.force)?;
     if let Some(options) = output_settings {
         ui = ui.with_output(options);
     }
@@ -143,51 +134,51 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FormatSource {
-    Explicit,
-    Extension,
-    Default,
+#[derive(Debug, Clone, Copy)]
+struct FormatHint {
+    format: DocumentFormat,
+    from_extension: bool,
 }
 
-fn resolve_format(
-    keyword: Option<&str>,
-    path_hint: Option<&str>,
-) -> Result<(DocumentFormat, FormatSource)> {
-    if let Some(value) = keyword {
-        return DocumentFormat::from_keyword(value)
-            .map(|format| (format, FormatSource::Explicit))
-            .map_err(Report::msg);
+impl FormatHint {
+    fn extension_value(&self) -> Option<DocumentFormat> {
+        self.from_extension.then_some(self.format)
     }
+}
+
+fn resolve_format_hint(path_hint: Option<&str>) -> FormatHint {
     if let Some(path) = path_hint {
         if path != "-" {
             if let Some(format) = DocumentFormat::from_extension(Path::new(path)) {
-                return Ok((format, FormatSource::Extension));
+                return FormatHint {
+                    format,
+                    from_extension: true,
+                };
             }
         }
     }
-    Ok((DocumentFormat::default(), FormatSource::Default))
+    FormatHint {
+        format: DocumentFormat::default(),
+        from_extension: false,
+    }
 }
 
 fn load_optional_value(
     spec: Option<&str>,
     inline: Option<&str>,
     format: DocumentFormat,
-    format_source: FormatSource,
     label: &str,
-    allow_guess_override: Option<bool>,
 ) -> Result<Option<Value>> {
-    let allow_guess = allow_guess_override.unwrap_or(format_source != FormatSource::Explicit);
     if let Some(contents) = inline {
-        return parse_contents(contents, format, label, allow_guess).map(Some);
+        return parse_contents(contents, format, label).map(Some);
     }
     match spec {
-        Some(path) => load_value(path, format, label, allow_guess).map(Some),
+        Some(path) => load_value(path, format, label).map(Some),
         None => Ok(None),
     }
 }
 
-fn load_value(spec: &str, format: DocumentFormat, label: &str, allow_guess: bool) -> Result<Value> {
+fn load_value(spec: &str, format: DocumentFormat, label: &str) -> Result<Value> {
     let contents = if spec == "-" {
         let mut buffer = String::new();
         io::stdin()
@@ -197,18 +188,13 @@ fn load_value(spec: &str, format: DocumentFormat, label: &str, allow_guess: bool
     } else {
         fs::read_to_string(spec).wrap_err_with(|| format!("failed to read {label} file {spec}"))?
     };
-    parse_contents(&contents, format, label, allow_guess)
+    parse_contents(&contents, format, label)
 }
 
-fn parse_contents(
-    contents: &str,
-    format: DocumentFormat,
-    label: &str,
-    allow_guess: bool,
-) -> Result<Value> {
+fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result<Value> {
     match parse_document_str(contents, format) {
         Ok(value) => Ok(value),
-        Err(primary) if allow_guess => {
+        Err(primary) => {
             for candidate in DocumentFormat::available_formats() {
                 if candidate == format {
                     continue;
@@ -222,10 +208,6 @@ fn parse_contents(
                 format_list()
             )))
         }
-        Err(err) => Err(Report::msg(format!(
-            "failed to parse {label} as {}: {err}",
-            format
-        ))),
     }
 }
 
@@ -237,35 +219,98 @@ fn format_list() -> String {
     items.join(", ")
 }
 
-fn build_output_options(cli: &Cli) -> Result<Option<OutputOptions>> {
-    let format = if let Some(value) = cli.output_format.as_deref() {
-        DocumentFormat::from_keyword(value).map_err(Report::msg)?
-    } else {
-        DocumentFormat::default()
-    };
-
+fn build_output_options(
+    cli: &Cli,
+    config_hint: Option<DocumentFormat>,
+    schema_hint: Option<DocumentFormat>,
+) -> Result<(Option<OutputOptions>, Vec<PathBuf>)> {
     let mut destinations = Vec::new();
+    let mut files = Vec::new();
+
     if cli.stdout {
         destinations.push(OutputDestination::Stdout);
     }
     for path in &cli.output_files {
+        files.push(path.clone());
         destinations.push(OutputDestination::file(path));
     }
 
-    if destinations.is_empty() {
+    if files.is_empty() && !cli.stdout {
         if cli.no_temp_file {
-            return Ok(None);
+            return Ok((None, files));
         }
         let fallback = cli
             .temp_file
             .clone()
             .unwrap_or_else(|| PathBuf::from(DEFAULT_TEMP_FILE));
+        files.push(fallback.clone());
         destinations.push(OutputDestination::file(fallback));
     }
 
-    Ok(Some(OutputOptions {
-        format,
-        pretty: !cli.no_pretty,
-        destinations,
-    }))
+    if destinations.is_empty() {
+        return Ok((None, files));
+    }
+
+    let stdout_only = files.is_empty() && cli.stdout;
+    let format = infer_output_format(&files, stdout_only, config_hint, schema_hint)?;
+
+    Ok((
+        Some(OutputOptions {
+            format,
+            pretty: !cli.no_pretty,
+            destinations,
+        }),
+        files,
+    ))
+}
+
+fn infer_output_format(
+    file_paths: &[PathBuf],
+    stdout_only: bool,
+    config_hint: Option<DocumentFormat>,
+    schema_hint: Option<DocumentFormat>,
+) -> Result<DocumentFormat> {
+    if let Some((first, rest)) = file_paths.split_first() {
+        let format = infer_format_from_filename(first)?;
+        for path in rest {
+            let next = infer_format_from_filename(path)?;
+            if next != format {
+                return Err(eyre!(
+                    "output files use mixed formats; expected all extensions to match {}",
+                    format
+                ));
+            }
+        }
+        return Ok(format);
+    }
+    if stdout_only {
+        if let Some(format) = config_hint.or(schema_hint) {
+            return Ok(format);
+        }
+    }
+    Ok(DocumentFormat::default())
+}
+
+fn infer_format_from_filename(path: &Path) -> Result<DocumentFormat> {
+    DocumentFormat::from_extension(path).ok_or_else(|| {
+        eyre!(
+            "cannot infer format from output file {} (use .json/.yaml/.toml)",
+            path.display()
+        )
+    })
+}
+
+fn ensure_output_paths_available(paths: &[PathBuf], force: bool) -> Result<()> {
+    if force {
+        return Ok(());
+    }
+    for path in paths {
+        if path.exists() {
+            return Err(eyre!(
+                "failed to write: file {} already exists (pass --force to overwrite)",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
 }
