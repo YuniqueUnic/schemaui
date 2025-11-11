@@ -41,6 +41,73 @@ pub fn schema_from_data_value(value: &Value) -> Value {
     schema
 }
 
+/// Merge user-provided data into an existing schema as `default` values.
+pub fn schema_with_defaults(schema: &Value, defaults: &Value) -> Value {
+    let mut enriched = schema.clone();
+    apply_defaults(&mut enriched, defaults);
+    enriched
+}
+
+fn apply_defaults(schema: &mut Value, defaults: &Value) {
+    let Value::Object(schema_obj) = schema else {
+        return;
+    };
+
+    schema_obj.insert("default".to_string(), defaults.clone());
+
+    if let (Some(Value::Object(properties)), Some(default_map)) =
+        (schema_obj.get_mut("properties"), defaults.as_object())
+    {
+        for (key, property_schema) in properties {
+            if let Some(value) = default_map.get(key) {
+                apply_defaults(property_schema, value);
+            }
+        }
+    }
+
+    if let Some(default_array) = defaults.as_array() {
+        match schema_obj.get_mut("items") {
+            Some(Value::Array(items)) => {
+                if items.len() == 1 {
+                    if let Some(first) = default_array.first() {
+                        if let Some(first_schema) = items.get_mut(0) {
+                            apply_defaults(first_schema, first);
+                        }
+                    }
+                } else {
+                    for (idx, item_schema) in items.iter_mut().enumerate() {
+                        if let Some(value) = default_array.get(idx) {
+                            apply_defaults(item_schema, value);
+                        }
+                    }
+                }
+            }
+            Some(item_schema) if item_schema.is_object() => {
+                if let Some(first) = default_array.first() {
+                    apply_defaults(item_schema, first);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(Value::Array(one_of)) = schema_obj.get_mut("oneOf") {
+        for variant in one_of {
+            apply_defaults(variant, defaults);
+        }
+    }
+    if let Some(Value::Array(any_of)) = schema_obj.get_mut("anyOf") {
+        for variant in any_of {
+            apply_defaults(variant, defaults);
+        }
+    }
+    if let Some(Value::Array(all_of)) = schema_obj.get_mut("allOf") {
+        for variant in all_of {
+            apply_defaults(variant, defaults);
+        }
+    }
+}
+
 fn infer_schema(value: &Value) -> Value {
     match value {
         Value::Null => schema_with_type("null", value),
@@ -162,5 +229,39 @@ mod tests {
         let parsed = parse_document_str(raw, DocumentFormat::Toml).unwrap();
         assert_eq!(parsed["enabled"], Value::Bool(true));
         assert_eq!(parsed["name"], json!("dev"));
+    }
+
+    #[test]
+    fn merges_defaults_into_existing_schema() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "host": {"type": "string"},
+                "port": {"type": "integer"}
+            }
+        });
+        let defaults = json!({"host": "localhost", "port": 8080});
+        let enriched = schema_with_defaults(&schema, &defaults);
+        assert_eq!(
+            enriched["properties"]["host"]["default"],
+            json!("localhost")
+        );
+        assert_eq!(enriched["properties"]["port"]["default"], json!(8080));
+        assert_eq!(enriched["default"], defaults);
+    }
+
+    #[test]
+    fn merges_array_defaults() {
+        let schema = json!({
+            "type": "array",
+            "items": {"type": "object", "properties": {"tag": {"type": "string"}}}
+        });
+        let defaults = json!([{ "tag": "api" }]);
+        let enriched = schema_with_defaults(&schema, &defaults);
+        assert_eq!(enriched["default"], defaults);
+        assert_eq!(
+            enriched["items"]["properties"]["tag"]["default"],
+            json!("api")
+        );
     }
 }
