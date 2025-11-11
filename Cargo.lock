@@ -1416,6 +1416,7 @@ dependencies = [
  "jsonschema",
  "percent-encoding",
  "ratatui",
+ "regex",
  "schemars",
  "serde",
  "serde_json",
