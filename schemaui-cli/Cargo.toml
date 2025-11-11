@@ -5,7 +5,14 @@ edition = "2024"
 authors = ["unic <yuniqueunic@gmail.com>"]
 description = "CLI wrapper for schemaui, rendering JSON Schemas as TUIs"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yuniqueunic/schemaui"
+repository = "https://github.com/yuniqueunic/schemaui/schemaui-cli"
+keywords = ["tui", "schema", "configuration", "terminal", "cross-platform"]
+categories = ["command-line-interface", "config"]
+readme = "../docs/en/cli_usage.md"
+
+[[bin]]
+name = "schemaui"
+path = "src/main.rs"
 
 [dependencies]
 schemaui = { path = ".." }
@@ -14,12 +21,11 @@ color-eyre = "0.6"
 clap = { version = "4.5", features = ["derive"] }
 
 [features]
-default = ["json"]
-full = ["all_formats"]
+default = ["full"]
+full = ["json", "yaml", "toml"]
 json = ["schemaui/json"]
 yaml = ["schemaui/yaml"]
 toml = ["schemaui/toml"]
-all_formats = ["json", "yaml", "toml"]
 
 [dev-dependencies]
 assert_cmd = "2"

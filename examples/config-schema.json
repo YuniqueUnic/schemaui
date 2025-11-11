@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "用户注册信息",
+  "type": "object",
+  "required": ["username", "email", "age"],
+  "properties": {
+    "username": {
+      "type": "string",
+      "description": "用户名，只允许字母、数字和下划线",
+      "default" : "unic@me",
+      "pattern": "^[a-zA-Z0-9_]+$",
+      "minLength": 3,
+      "maxLength": 20
+    },
+    "email": {
+      "type": "string",
+      "description": "电子邮箱地址",
+      "pattern": "^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$",
+      "maxLength": 100
+    },
+    "age": {
+      "type": "integer",
+      "description": "年龄",
+      "minimum": 18,
+      "maximum": 120
+    },
+    "phone": {
+      "type": "string",
+      "description": "手机号（可选）",
+      "pattern": "^1[3-9]\\d{9}$"
+    },
+    "website": {
+      "type": "string",
+      "description": "个人网站（可选）",
+      "default":"https://www.yunique.top",
+      "format": "uri"
+    },
+    "tags": {
+      "type": "array",
+      "description": "用户标签（可选）",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 10,
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}
