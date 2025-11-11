@@ -166,9 +166,13 @@ App runtime           # 事件循环 / overlay / 状态栏 / 持久化
     会根据配置输出并自动追加换行、flush。
 - **CLI (`schemaui-cli` crate)**
   - 使用 `clap` 解析
-    `--schema`、`--config`、`--*-inline`、`--output-format`、`--stdout`
+    `--schema`、`--config`、`--*-inline`、`--stdout`、`-o/--output`
     等参数，并通过 `schemaui` 库 API 完成入口→TUI→出口流程。
   - 默认防止 schema 与 config 同时从 STDIN 读取（提示使用 inline
     方式）；支持多输出（stdout + 文件），以及 `/tmp/schemaui.yaml` 作为回退。
+    当存在文件输出时，序列化格式依据第一个路径的扩展名自动推断；纯 stdout
+    会继承输入文件类型或回退 JSON。
+  - 写入前所有目标路径都会检查是否存在，默认禁止覆盖。用户需显式传入
+    `--force`/`--yes`（`-f`/`-y`）才会允许覆盖。
   - CLI 与库通过 workspace 解耦：`schemaui` 仅暴露 API，`schemaui-cli`
     负责终端体验，便于在其他仓库中复用库而不引入 CLI 依赖。

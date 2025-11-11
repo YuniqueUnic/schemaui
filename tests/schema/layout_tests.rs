@@ -165,6 +165,26 @@ fn pattern_properties_become_key_value_fields() {
 }
 
 #[test]
+fn arrays_without_item_schema_fallback_to_json_array() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "expose_headers": {
+                "type": "array",
+                "description": "headers exposed via CORS"
+            }
+        }
+    });
+    let form = build_form_schema(&schema).expect("schema parsed");
+    let field = find_field(&form, |field| field.name == "expose_headers")
+        .expect("expose_headers field");
+    match &field.kind {
+        FieldKind::Array(inner) => assert!(matches!(inner.as_ref(), FieldKind::Json)),
+        other => panic!("expected array kind, got {:?}", other),
+    }
+}
+
+#[test]
 fn multi_level_refs_are_resolved() {
     let schema = json!({
         "type": "object",

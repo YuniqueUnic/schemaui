@@ -47,18 +47,24 @@ CLI 通过 `schemaui::io::input` 提供的工具加载 Schema 和配置样本：
   `$ref`、`properties`、`patternProperties` 等节点递归注入默认值，确保 TUI
   载入时即显示真实数据。
 
-当 `--config-format` 未显式指定且解析失败时，CLI 会依次尝试 **JSON → YAML → TOML**（取决于编译特性）来自动判定文件类型，因此即使配置文件没有扩展名也能被识别。若用户强制提供 `--config-format yaml` 等参数，则跳过自动检测并直接按指定格式解析。
+CLI 总是先依据文件扩展名决定解析格式：`config.yaml` → YAML、`schema.toml` → TOML。
+若扩展名缺失或解析失败，则自动按照 **JSON → YAML → TOML**（取决于编译特性）依次回退，直到成功或耗尽格式，这样即便文件没有扩展名也能被识别。
 
 ## 3. 输出与持久化
 
-`schemaui-cli` 使用 `OutputOptions` 将 TUI 的最终结果写回：
+- `--stdout`：将结果写入标准输出（若没有文件输出，则格式继承配置/Schema
+  的扩展名，否则默认 JSON）。
+- `-o, --output <path>`：可重复使用；`path` 的扩展名（`.json`/`.yaml`/`.toml`）
+  用于决定序列化格式，多个输出必须共享相同的扩展名。
+- `--temp-file` / `--no-temp-file`：当未提供输出且未指定 `--stdout` 时，默认写入
+  `/tmp/schemaui.yaml`（可更改）。`--no-temp-file` 会彻底禁用该回退。
+- `--no-pretty`：关闭美化输出。
+- `--force`/`--yes` (`-f`/`-y`)：允许覆盖已经存在的输出文件。默认行为一旦发现
+  目标文件存在就会报错并终止，避免误写入。
 
-- `--stdout`：将 JSON/TOML/YAML 输出到标准输出。
-- `--output <path>`：可重复使用，写入多个文件；会自动在末尾追加换行并 flush。
-- `--output-format <json|yaml|toml>`：控制序列化格式，默认 JSON。
-- `--no-pretty`：关闭美化输出，生成单行紧凑文本。
-- 当未配置任何目的地时，CLI 会写入 `/tmp/schemaui.yaml`（或通过 `--temp-file`
-  指定的路径）；可用 `--no-temp-file` 禁用该回退。
+在至少存在一个文件输出时，CLI 按第一个路径的扩展名挑选格式；在纯 stdout
+场景下则优先继承 `--config` / `--schema`
+的文件扩展名（若无任何提示，则使用 JSON）。
 
 底层实现：
 
@@ -73,21 +79,19 @@ ui = ui.with_output(options);
 
 ## 4. 完整参数速查
 
-| 参数                     | 说明                                                      |
-| ------------------------ | --------------------------------------------------------- |
-| `-s, --schema <PATH>`    | Schema 文件或 `-` 代表 stdin                              |
-| `--schema-inline <TEXT>` | 直接传入 Schema 字符串，与 `--schema` 互斥                |
-| `--schema-format <json\|yaml\|toml>` | 强制指定 Schema 格式（默认根据扩展名/JSON） |
-| `-c, --config <PATH>`    | 配置样本文件或 stdin                                      |
-| `--config-inline <TEXT>` | 内联配置，与 `--config` 互斥                              |
-| `--config-format <json\|yaml\|toml>` | 强制指定配置格式；未指定时启用自动检测 |
-| `--title <TEXT>`         | 自定义 TUI 标题                                           |
-| `--output-format <json\|yaml\|toml>` | 输出序列化格式，默认 JSON |
-| `--stdout`               | 输出到标准输出                                            |
-| `--output <PATH>`        | 追加输出文件，可多次使用                                  |
-| `--temp-file <PATH>`     | 当未指定输出时的回退文件路径（默认 `/tmp/schemaui.yaml`） |
-| `--no-temp-file`         | 禁用回退文件                                              |
-| `--no-pretty`            | 关闭美化输出                                              |
+| 参数                        | 说明                                                                 |
+| --------------------------- | -------------------------------------------------------------------- |
+| `-s, --schema <PATH>`       | Schema 文件或 `-` 代表 stdin                                         |
+| `--schema-inline <TEXT>`    | 直接传入 Schema 字符串，与 `--schema` 互斥                           |
+| `-c, --config <PATH>`       | 配置样本文件或 stdin                                                 |
+| `--config-inline <TEXT>`    | 内联配置，与 `--config` 互斥                                         |
+| `--title <TEXT>`            | 自定义 TUI 标题                                                      |
+| `--stdout`                  | 输出到标准输出                                                       |
+| `-o, --output <PATH>`       | 追加输出文件，可多次使用；扩展名决定序列化格式                       |
+| `--temp-file <PATH>`        | 当未指定输出时的回退文件路径（默认 `/tmp/schemaui.yaml`）            |
+| `--no-temp-file`            | 禁用回退文件                                                         |
+| `--no-pretty`               | 关闭美化输出                                                         |
+| `-f, --force` / `-y, --yes` | 允许覆盖已存在的输出文件，否则检测到冲突会直接报错并中止             |
 
 ## 5. 运行示例
 
@@ -97,9 +101,8 @@ ui = ui.with_output(options);
 schemaui-cli \
   --schema ./schema.json \
   --config ./config.yaml \
-  --output-format toml \
   --stdout \
-  --output ./config.out.toml
+  -o ./config.out.toml
 ```
 
 ### 仅有配置（自动推断 Schema）
@@ -119,6 +122,7 @@ schemaui-cli --schema-inline '{"type":"object","properties":{"host":{"type":"str
 
 - 当参数冲突（例如同时指定 `--schema` 与 `--schema-inline`）或 STDIN
   被重复请求时，CLI 会输出错误并以非零退出码结束。
+- 写入阶段若目标文件已存在且未提供 `--force`/`--yes`，会立即报错并退出，防止误覆盖。
 - `schema_with_defaults`、`parse_document_str`
   在解析失败时，也会连同具体格式提示信息一起返回，例如
   `failed to parse config as yaml`。

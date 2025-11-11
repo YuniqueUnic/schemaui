@@ -184,7 +184,6 @@ The built-in `schemaui` binary wraps the library in a configurable workflow:
 schemaui \
   --schema ./schema.json \
   --config ./config.yaml \
-  --output-format json \
   --stdout \
   --output ./config.out.json
 ```
@@ -196,11 +195,17 @@ schemaui \
   other stream.
 - To avoid double reads, only one of schema/config may use `-` simultaneously
   (use inline flags when both need piped content).
-- Formats can be inferred from file extensions or forced via `--schema-format` /
-  `--config-format`.
+- Formats are inferred from file names. The CLI tries the extension first
+  (e.g., `.yaml`, `.toml`), then falls back through the enabled formats until
+  parsing succeeds.
 - Outputs are routed through the exit layer: mix `--stdout`, repeated
-  `--output <path>`, or rely on the default temp file `/tmp/schemaui.yaml`.
-  Disable the fallback with `--no-temp-file` or relocate it via `--temp-file`.
+  `--output <path>` (short `-o`), or rely on the default temp file
+  `/tmp/schemaui.yaml`. Disable the fallback with `--no-temp-file` or relocate
+  it via `--temp-file`. The serializer uses the first output file’s extension
+  (or the fallback file) to pick JSON/TOML/YAML; pure `--stdout` sessions fall
+  back to the config/schema hint or JSON.
+- File safety: writing to an existing file now fails with an explicit error.
+  Pass `--force`/`--yes` (`-f`/`-y`) to overwrite.
 - Titles and other options chain directly through `SchemaUI`, so the CLI mirrors
   the library flow: load → merge defaults → render TUI → emit the edited
   configuration in the requested format(s).
@@ -209,7 +214,7 @@ schemaui \
   workspace 中运行 `cargo run -p schemaui-cli -- ...`，或执行
   `cargo install --path schemaui-cli` 安装独立二进制。CLI 默认启用
   `json`/`yaml` 特性（可通过 `--features toml` 等方式扩展），并会在
-  未显式指定 `--config-format` 时自动依次尝试 JSON → YAML → TOML（取决于编译特性），让没有扩展名的配置文件也能被正确识别。
+  当扩展名缺失或解析失败时，会自动依次尝试 JSON → YAML → TOML（取决于编译特性），让没有扩展名的配置文件也能被正确识别。
 
 ### 许可证
 
