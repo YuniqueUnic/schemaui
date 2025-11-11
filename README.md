@@ -1,9 +1,8 @@
 ## schemaui
 
-**schemaui** turns JSON Schema definitions into a terminal-first configuration experience.  
-It parses schemas (including `$ref`, `oneOf`, `anyOf`, nested objects, arrays, key/value maps, etc.), maps them into a focusable form tree, renders a Ratatui-based UI, and performs JSON Schema validation after every edit.
+**schemaui** 是一个将 JSON Schema 动态映射为终端用户界面（TUI）的 Rust 库。它能够解析复杂的 Schema（包含 `$ref`、`oneOf`/`anyOf`、多层级 Section、数组、Key/Value 结构等），构建可聚焦的表单树，并在用户每一次编辑后立即通过 `jsonschema::Validator` 进行校验，确保配置数据始终有效。
 
-### Quick start
+### 快速上手
 
 ```toml
 [dependencies]
@@ -52,87 +51,67 @@ fn main() -> color_eyre::Result<()> {
 }
 ```
 
-### Features at a glance
+### 支持的 JSON Schema 结构
 
-- **Rich schema support**: nested roots/sections, composites (`oneOf`/`anyOf`), scalar & composite lists, key/value maps, enums, `$ref` chains, pattern properties.
-- **Deterministic mapping pipeline**: loader → resolver → layout builder → `FormState` (see [structure_design.md](structure_design.md)).
-- **Live validation**: every successful edit runs through `jsonschema::Validator`. Errors are surfaced inline and summarized in the status line.
-- **Overlay editors**: complex fields (composites, arrays, key/value) open as focused overlays with their own form state and validator.
-- **Keyboard-first UX**: input routing maps key chords to semantic actions so the UI stays responsive in every context.
-- **Color-eyre integration**: panic hooks restore the terminal and render rich diagnostics when something goes wrong.
+- **多 Root / Section**：顶层属性映射为 Root Tab，嵌套对象递归展开为 Section 树，自动生成层级标题。
+- **嵌套字段与列表**：对象/数组可无限嵌套；标量数组以逗号列表呈现，可重复的 composite/kv 列表拥有独立的条目面板与 overlay。
+- **`$ref` 链与 JSON Pointer**：`schema::resolver` 会在布局之前解析所有引用，因此引用字段与 inline 定义具有完全一致的渲染与验证行为。
+- **`oneOf` / `anyOf`**：渲染为 Variant 选择器，选择后会打开 overlay，根据所选模式实时验证并同步回主表单。
+- **`patternProperties` / `additionalProperties:false`**：映射为 Key/Value 编辑器或受限对象；所有关键字（类型、枚举、范围、长度等）在 UI 中即时反馈。
 
-### Schema coverage
+### 映射与校验管线
 
-- **Multiple roots & sections** – each top-level property becomes a root tab; nested objects become sections (recursively) with breadcrumb-style labels.
-- **Nested structures** – objects/arrays can nest arbitrarily; scalar arrays render as comma lists, composite arrays/key/value maps open repeatable editors.
-- **References** – `$ref` (definitions + JSON pointers) are resolved before layout, so referenced schemas behave exactly like inline definitions.
-- **Composites** – `oneOf`/`anyOf` render as variant selectors; picking a variant opens an overlay bound to the chosen subschema.
-- **Validation keywords** – type, enum, numeric ranges, `patternProperties`, `additionalProperties:false`, etc., are enforced both during editing and on save.
+1. **schema::loader** 读取 JSON Schema 并生成 `RootSchema`。
+2. **schema::resolver** 提前解析 `$ref` 与指针引用，确保后续阶段拿到完全展开的 `SchemaObject`。
+3. **schema::layout::build_form_schema** 根据元信息构造 `FormSchema`：
+   - 把顶层属性转换为 RootSection。
+   - 将嵌套对象展开为扁平 Section 列表，记录 `depth` 以渲染层级缩进。
+   - 根据实例类型映射到 `FieldKind`（文本、枚举、复合、数组、KV 等）。
+4. **form::state::FormState** 基于 `FormSchema` 初始化 `FieldState`，维护 root/section/field 的焦点索引与 dirty/错误状态。
+5. **form::reducers::FormEngine** 接收 `FormCommand`，在 `FieldEdited` 时使用 `jsonschema::Validator` 校验完整 JSON，错误信息映射回对应字段。
+6. **app::runtime::App** 驱动事件循环、状态栏与 overlay；`InputRouter` 将按键映射为 `KeyAction` → `CommandDispatch`。
+7. **presentation::components** 使用 Ratatui 渲染根标签、Section、Field 列表、弹窗、状态栏与 overlay。
 
-### Validation & feedback loop
+### TUI 组成与模块化
 
-1. User edits a field (main form or overlay).
-2. `FormState` marks the field dirty and dispatches `FormCommand::FieldEdited`.
-3. `FormEngine` rebuilds the JSON value and feeds it to `jsonschema::Validator`.
-4. Errors for the focused pointer are written back to `FieldState::error`, immediately reflected in the UI (red annotations + status line message).
-5. Saving reruns the validator against the entire form; passing validation yields the final JSON value.
+- **Root Tabs**：展示 Schema 的根节点，`Ctrl+J / Ctrl+L` 或 `Alt+Shift+[ / ]` 切换。Root/Section 的焦点索引用统一算法循环前进/后退。
+- **Section Tabs**：针对当前 Root 的所有 Section 展示面包屑式标签，`Ctrl+Tab`/`Ctrl+Shift+Tab` 在 Section 之间跳转。
+- **Field 列表**：`fields.rs` 负责渲染标签、值摘要、类型信息与错误提示；`FieldState` 中的 `display_value`/`meta_line` 控制具体样式。
+- **Overlay**：`app::runtime::overlay` 将 composite、list、kv、array 编辑封装为独立表单，包含自有 validator、指引文字与列表侧边栏，只有 `Ctrl+S` 或 `Esc`（二次确认）才会退出。
+- **状态/帮助栏**：`status::StatusLine` 根据当前上下文展示 dirty 状态、校验结果、快捷键提示。
 
-### TUI composition
+### 快捷键设计
 
-- **Root tabs** across the top show each schema root; `Ctrl+[ / Ctrl+]` or `Ctrl+J / Ctrl+L` (terminal-friendly) switches roots.
-- **Section tabs** track nested groups. Navigation (`Tab`, `Shift+Tab`, arrow keys) wraps seamlessly across sections and roots.
-- **Field list** renders labels, selectors, summaries, type metadata, and validation errors.
-- **Status/help footer** displays current action hints, dirty state, and validation summaries.
-- **Overlays** (composites, arrays, key/value) are mini forms with their own list panel, instructions, and validator; they never close unless the user commits (`Ctrl+S`) or explicitly cancels (`Esc` twice when dirty).
-
-### Keyboard shortcuts
-
-| Context | Keys | Action |
+| 上下文 | 快捷键 | 功能 |
 | --- | --- | --- |
-| Navigation | `Tab` / `Shift+Tab` | Move across fields/sections (wraps across roots) |
-|  | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Jump entire sections (also wraps roots) |
-|  | `Alt+Shift+[ / ]` or `Alt+Shift+← / →` | Switch root tabs |
-| Field interaction | `Enter` | Open popup or variant selector |
-|  | `Esc` | Reset status / close popup (twice to discard overlays) |
-| Persistence | `Ctrl+S` | Save + validate |
-|  | `Ctrl+Q` | Quit (prompts when dirty) |
-| Collections & maps | `Ctrl+N` / `Ctrl+D` | Add / remove entry |
-|  | `Ctrl+←` / `Ctrl+→` | Select previous/next entry |
-|  | `Ctrl+↑` / `Ctrl+↓` | Reorder entry |
-| Composite overlay | `Ctrl+E` | Open editor for composite / complex field |
-| Overlay specific | `Ctrl+S` / `Esc` | Commit overlay / close overlay (double `Esc` to discard) |
-|  | `Tab` / `Shift+Tab` | Navigate overlay fields |
+| 全局导航 | `Tab` / `Shift+Tab` | 在字段之间移动（越界时在 root/section 间循环） |
+|  | `Ctrl+Tab` / `Ctrl+Shift+Tab` | 在 Section 间跳转 |
+|  | `Ctrl+J` / `Ctrl+L` 或 `Alt+Shift+[ / ]` | 切换 Root Tab |
+| 字段交互 | `Enter` | 打开枚举/变体弹窗或 overlay |
+|  | `Esc` | 关闭弹窗或 overlay（脏数据需二次确认） |
+| 持久化 | `Ctrl+S` | 保存并重新校验整个表单 |
+|  | `Ctrl+Q` | 退出应用（脏数据时提示） |
+| 列表/映射 | `Ctrl+N` / `Ctrl+D` | 添加 / 删除条目 |
+|  | `Ctrl+←` / `Ctrl+→` | 选择前一/后一条目 |
+|  | `Ctrl+↑` / `Ctrl+↓` | 调整条目顺序 |
+| Overlay | `Ctrl+E` | 从主界面进入 overlay 编辑 |
+|  | `Ctrl+S` / `Esc` / `Tab` | Overlay 内保存 / 关闭 / 导航 |
 
-### Architecture
+### 测试
 
-1. **Schema ingestion** (`schema::loader`, `schema::resolver`, `schema::layout`): parses JSON Schema into a `FormSchema` composed of roots, sections, and typed fields.
-2. **Form model** (`form::state`, `form::field`, `form::key_value`, `form::composite`): holds focus, field values, dirty/error flags, and validates edits via `FormEngine`.
-3. **Runtime** (`app::runtime` and submodules): event loop, error/status handling, overlay orchestration, persistence, auto-validation, and input routing.
-4. **Presentation** (`presentation::components`): Ratatui widgets for roots, sections, fields, overlay panes, and status/footer.
-
-Read the in-depth breakdown in [structure_design.md](structure_design.md).
-
-### Testing
-
-All tests live under `tests/` and mirror the module layout. They are compiled into each module with `include!` so private APIs remain testable.
-
-Run the suite with:
+项目测试集中于 `tests/` 目录，按照模块划分：`tests/form`、`tests/schema`、`tests/app`、`tests/presentation`。每个源码模块通过 `include!(...)` 引入对应测试文件，即便内部函数是 `pub(super)` 也能被验证：
 
 ```bash
 cargo test
 ```
 
-### License
+### 许可证
 
-Dual-licensed under either:
+- Apache License 2.0（[LICENSE-APACHE](LICENSE-APACHE) / <http://www.apache.org/licenses/LICENSE-2.0>）
+- MIT License（[LICENSE](LICENSE) / <http://opensource.org/licenses/MIT>）
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
-- MIT License ([LICENSE](LICENSE) or <http://opensource.org/licenses/MIT>)
+### 参与贡献
 
-### Contributing
-
-Contributions are welcome! Please:
-
-1. Format & lint (`cargo fmt && cargo check`)
-2. Add/extend tests under `tests/…`
-3. Describe changes clearly in PRs
+1. 先 `cargo fmt && cargo check` 确保风格与编译通过。
+2. 在 `tests/<module>/` 下补充或更新对应测试。
+3. 提交 PR 时说明设计动机，并保持 KISS / SOLID 的模块化原则。

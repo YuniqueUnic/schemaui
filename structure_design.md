@@ -1,118 +1,116 @@
-# schemaui Structure & Design Notes
+# schemaui 设计说明
 
-This document explains how schemaui maps JSON Schema documents into a navigable TUI, the modules involved in each stage, and the guiding principles for validation, overlays, and keyboard ergonomics.
+本文记录 schemaui 如何把 JSON Schema 映射为 TUI、各模块的职责以及键盘、校验与测试策略。
 
-## 1. Guiding principles
+## 1. 设计原则
 
-- **Schema fidelity** – every construct that is legal in JSON Schema draft-07 (objects, arrays, `$ref`, `patternProperties`, `oneOf`/`anyOf`) must have a deterministic mapping to widgets.
-- **Form-first thinking** – schema information is normalized into a `FormSchema`/`FormState` structure before any rendering happens. Drawing code never inspects raw schema JSON.
-- **KISS & SOLID** – modules are cohesive (loader/resolver/layout, form state, runtime, presentation). Public APIs stay narrow (`SchemaUI`, `UiOptions`), while submodules communicate via well-defined structs.
-- **Validation everywhere** – user edits run through `jsonschema::Validator` automatically. Overlays get their own validator derived from the focused subschema.
-- **Keyboard determinism** – every key chord maps to a semantic `KeyAction`, then to a `FormCommand` or `AppCommand`. The same chord behaves identically whether the user is editing the main form or an overlay.
+- **Schema 保真**：支持 draft-07 中常见结构（对象、数组、`$ref`、`patternProperties`、`oneOf`/`anyOf` 等），并提供确定性的控件映射。
+- **Form 优先**：所有 Schema 信息都会先转换为 `FormSchema`/`FormState`，渲染层永远不直接解析原始 JSON。
+- **模块内聚**：loader/resolver/layout、form state、runtime、presentation 彼此解耦，公共 API 仅暴露 `SchemaUI`、`UiOptions` 等必要入口。
+- **全链路校验**：任何一次编辑（包括 overlay）都会触发 `jsonschema::Validator`；错误即时反馈到字段和状态栏。
+- **键盘一致性**：按键先被 `InputRouter` 分类为语义化 `KeyAction`，再由 `KeyBindingMap` 映射到 `FormCommand`/`AppCommand`，主界面和 overlay 共用同一套行为。
 
-## 2. Pipeline overview
+## 2. 管线总览
 
-```text
-JSON Schema
+```
+JSON Schema (serde_json::Value)
    │
    ▼
-schema::loader          // parses draft-07 documents via schemars
+schema::loader        # 读取/构建 RootSchema
    │
    ▼
-schema::resolver        // resolves $ref (definitions + JSON Pointer references)
+schema::resolver      # 解析 $ref / JSON Pointer
    │
    ▼
 schema::layout::build_form_schema
-   │   • assigns roots (top-level properties)
-   │   • flattens nested objects into Section trees
-   │   • maps instance types → FieldKind (string, enum, composite, key/value, etc.)
+   │   - 生成 RootSection / FormSection
+   │   - 展平嵌套 Section、记录 depth
+   │   - 映射字段类型为 FieldKind（string/enum/composite/...）
    ▼
-FormSchema              // declarative description of roots/sections/fields
+FormSchema            # 纯描述性的表单结构
    │
    ▼
-FormState               // runtime values, focus indices, dirty/error flags
+FormState             # 运行态值、聚焦索引、错误/脏状态
    │
-   ├─ FormEngine        // dispatches FormCommand & runs jsonschema validation
-   └─ FieldState        // per-field value handling (text, lists, key/value, composites)
+   ├─ FormEngine      # 分发 FormCommand，驱动 jsonschema 验证
+   └─ FieldState      # 负责输入、列表/overlay 操作、值序列化
    ▼
-App runtime             // event loop, overlays, persistence, keyboard routing
+App runtime           # 事件循环 / overlay / 状态栏 / 持久化
    │
-   └─ presentation      // Ratatui components for tabs, body, overlays, status/footer
+   └─ presentation    # Ratatui 组件：tabs、field 列表、overlay、footer
 ```
 
-### Schema mapping highlights
+### 映射要点
 
-| Schema construct | FieldKind / UI element |
+| Schema 结构 | FieldKind / UI 控件 |
 | --- | --- |
-| `type: string / integer / number` | Text input with numeric helpers (←/→ increments for numeric types) |
-| `type: boolean` | Checkbox / toggle |
-| `enum` | Select list (popup) |
-| `oneOf` / `anyOf` | Composite selector + overlay editor |
-| Arrays of scalars | Multi-line editor with summary lines |
-| Arrays of composites | Repeatable list + overlay per entry |
-| `patternProperties` / `additionalProperties` objects | Key/Value editor |
-| `$ref` chains | Resolved eagerly by `SchemaResolver` and merged into the layout tree |
+| `type: string/integer/number` | 文本输入（整数/浮点支持 `←/→` 调整） |
+| `type: boolean` | Toggle/checkbox |
+| `enum` | Popup 选择器 |
+| `oneOf` / `anyOf` | 变体选择 + overlay 表单 |
+| 标量数组 | 文本列表 + overlay（需时） |
+| Composite/KeyValue 列表 | 列表面板 + overlay（含增删改移动） |
+| `patternProperties` / `additionalProperties:false` | Key/Value 编辑器或限制性对象 |
+| `$ref` 链 | 由 resolver 展开后，与 inline 字段一致 |
 
-## 3. Form layer
+## 3. Form 层
 
-- **FormSchema** (in `domain::schema`) stores `RootSection`, `FormSection`, and `FieldSchema`. `schema::layout` is the only module that constructs it.
-- **FormState** (in `form::state`) keeps:
-  - `roots`: vector of `RootSectionState` (flattened sections with depth info)
-  - `root_index`, `section_index`, `field_index` for focus
-  - `FieldState` instances with current value, dirty bit, and validation error
-- **Navigation helpers**:
-  - `focus_next_field` / `focus_prev_field` now wrap across sections and roots via `advance_section`.
-  - `focus_next_section(delta)` cycles the flattened root order to keep Tab, Shift+Tab, and arrow keys consistent.
-- **Validation**:
-  - `FormEngine::dispatch` handles `FieldEdited { pointer }` commands by running `jsonschema::Validator` against the fully built JSON value and back-propagating errors to fields.
-  - Overlay editors spin up their own `Validator` via `validator_for` so nested forms can be validated without leaving the overlay.
+- `domain::schema`：定义 `FormSchema`、`RootSection`、`FormSection`、`FieldSchema`。
+- `form::state::FormState`：
+  - 维护 `roots`（包含扁平 Section 与深度信息）。
+  - 维护 `root_index`/`section_index`/`field_index`；`advance_section` 保证 Tab/箭头可在 root 之间循环。
+  - 提供 `focused_field`、`field_by_pointer` 等查询方法。
+- `form::field`（拆分为 `value.rs`、`convert.rs`、`state/*`）：
+  - `builder.rs` 根据 `FieldSchema` 初始化值。
+  - `input.rs` 处理普通输入控件。
+  - `lists.rs` 负责 composite/list/kv/array 的增删改、overlay 交互及 `close_*` 操作。
+  - `value_ops.rs` 提供 `display_value`、`current_value`、`seed_value`、错误状态管理。
+- `form::key_value`、`form::composite`、`form::array`：分别封装特定编辑器的状态同步与 overlay 会话。
 
-## 4. Runtime & presentation layering
+## 4. Runtime 与展示层
 
-- **`app::runtime::App`** orchestrates the program:
-  - wraps terminal setup/teardown (`TerminalGuard`) and installs a panic hook that restores the TTY before delegating to `color-eyre`.
-  - holds `StatusLine`, global errors, save/exit state, and the current popup/overlay.
-  - draws the UI by passing `FormState` and optional overlay state into `presentation::draw`.
-- **Overlay handling** (`app::runtime::overlay`):
-  - `OverlaySession` wraps the specific editor type (composite, key/value, scalar array).
-  - `CompositeEditorOverlay` tracks panel metadata, instructions, and validator state.
-  - Overlay-specific `impl App` blocks live in `overlay.rs`, keeping `mod.rs` lean (< 800 lines).
-- **List operations** (`app::runtime::list_ops`): add/remove/move/select logic is encapsulated so both root form and overlay reuse it without duplication.
-- **Presentation** (`presentation::components`):
-  - `sections.rs` renders root/section tabs.
-  - `fields.rs` renders each section's field list, caret positioning, summaries, and meta lines.
-  - `overlay.rs` draws the composite overlay shell with optional side panels.
-  - `footer.rs` shows help/status/validation summaries.
+- `app::runtime::App`：
+  - 封装 terminal 生命周期（`terminal::TerminalGuard`）与 panic hook（崩溃时退出备用屏，配合 `color-eyre` 输出栈）。
+  - 保存 `StatusLine`、全局错误、保存/退出状态、当前 popup/overlay。
+  - `handle_key` → `InputRouter::classify` → `KeyBindingMap::resolve` → 调用 FormCommand/AppCommand。
+- `app::runtime::overlay`：包含 `OverlaySession`、`CompositeEditorOverlay`、overlay 验证/保存/关闭逻辑。
+- `app::runtime::list_ops`：将列表增删改、选择抽成通用方法，主表单与 overlay 共享。
+- `presentation::components`：
+  - `sections.rs` 渲染 root/section tabs。
+  - `fields.rs` 渲染字段列表、光标、meta 行、错误信息。
+  - `overlay.rs` 绘制 overlay 主体 + 侧栏。
+  - `footer.rs` 绘制帮助/状态栏。
 
-## 5. Input & shortcuts
+## 5. 输入与快捷键
 
-- **`app::input::InputRouter`** classifies `KeyEvent` into high-level `KeyAction` variants (field/section/root steps, save, quit, list operations, etc.).
-- **`KeyBindingMap`** maps `KeyAction` → `CommandDispatch` (either a `FormCommand`, `AppCommand`, or raw input event). Custom keymaps can override defaults.
-- **Command flow**:
-  1. Read `crossterm::event::KeyEvent`.
-  2. `InputRouter::classify` returns a `KeyAction`.
-  3. `KeyBindingMap::resolve` maps into a `CommandDispatch`.
-  4. `App::handle_key` either dispatches to `FormEngine`, executes an `AppCommand`, or routes raw input to the focused field.
-- The shortcut table duplicated in the README lists the canonical chords.
+- `app::input::InputRouter`：
+  - 识别 `Ctrl+J/L`（或 `Ctrl+[ / ]`）为 Root 步进；`Ctrl+Tab`/`Ctrl+Shift+Tab` 为 Section 步进；`Ctrl+N/D/←/→/↑/↓` 对应列表操作；`Ctrl+E/S/Q` 等全局命令；其他键默认下沉给字段。
+- `KeyBindingMap`：内建默认映射，并允许用户在 `UiOptions` 覆盖特定 `KeyAction`。
+- 统一的 `CommandDispatch`（Form/App/Input）确保主界面与 overlay 共享同一套输入语义。
 
-## 6. Error handling & validation UX
+## 6. 校验与错误体验
 
-- `color-eyre` is installed in `main` and a panic hook (in `terminal.rs`) ensures raw mode is disabled and the alternate screen is exited before printing stack traces.
-- Status line helpers differentiate between "ready", "value updated", "pending exit", and validation error states.
-- Popups and overlays always clear `status` messages to explain the current focus (e.g., list instructions, overlay save hints).
+- `FormEngine::dispatch` 在 `FieldEdited` 时：
+  1. 调用 `FormState::try_build_value` 组装整体 JSON；
+  2. 使用 `jsonschema::Validator` 校验；
+  3. 将错误信息写回匹配的字段，并在状态栏提示。
+- overlay 内部使用 `validator_for` 针对当前子 Schema 构建临时 validator，实现即时校验。
+- `status::StatusLine` 提供 `ready`/`value_updated`/`issues_remaining` 等语义信息；popup/overlay 会覆盖状态文案给出操作提示。
 
-## 7. Tests & directory layout
+## 7. 测试组织
 
-- All tests live under `tests/` and mirror the source tree (`tests/form`, `tests/schema`, ...). They are `include!`-ed from the respective modules so private APIs remain testable.
-- Current coverage includes:
-  - `tests/form/key_value_tests.rs` → Unicode-safe summarization and truncation logic.
-  - `tests/form/state_tests.rs` → cross-root navigation guarantees for fields & sections.
-  - `tests/schema/layout_tests.rs` → schema-to-form mapping invariants (nested sections, composites, key/value, refs).
-- Adding new tests follows the same pattern: place them under `tests/<module>/…` and include them via `concat!(env!("CARGO_MANIFEST_DIR"), ...)` in the corresponding module.
+- 测试文件全部位于 `tests/`：`tests/form/*`、`tests/schema/*`、`tests/app/*`、`tests/presentation/*`。
+- 每个源码模块通过 `include!(concat!(env!("CARGO_MANIFEST_DIR"), ...))` 引入对应测试文件，既能访问私有 API，又保持结构清晰。
+- 当前测试覆盖：
+  - form：字段导航（跨 root 循环）、KeyValue Unicode 处理。
+  - schema：layout 映射、resolver `$ref`/Pointer 解析。
+  - app：输入路由（root/section 快捷键）。
+  - presentation：字段 meta 行配色。
+- 新增功能时，请按照模块新增相应测试文件。
 
-## 8. Working philosophy
+## 8. 研发准则
 
-- Keep each file under ~600 lines where practical (the largest runtime pieces were split into `overlay.rs`, `list_ops.rs`, and `mod.rs`).
-- Prefer mature crates (jsonschema, ratatui, color-eyre, crossterm) over bespoke implementations.
-- Small helper modules (`overlay.rs`, `list_ops.rs`, etc.) make it easy to reason about cross-cutting behaviors (popups, lists, overlays) without bloating `App`.
-- Documentation should evolve with code; README targets users, while this file is the living design record for contributors.
+- 单个文件建议控制在 600 行以内；对于体量较大的逻辑（如 `runtime`、`field state`）必须拆分子模块。
+- 优先使用成熟库（jsonschema、ratatui、crossterm、color-eyre），避免重复造轮子。
+- 保持 KISS、SOLID：函数专注单一职责，模块之间通过明确的数据结构交互。
+- 文档与代码同步演进：README 面向使用者，`structure_design.md` 记录实现细节，方便后来者快速接手。
