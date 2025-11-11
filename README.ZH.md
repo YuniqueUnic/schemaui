@@ -7,7 +7,7 @@
 ![Deps.rs Crate Dependencies (latest)](https://img.shields.io/deps-rs/schemaui/latest)
 
 <div align="center">
-<img src="./docs/schemaui-demo.gif" width="500">
+<img src="https://github.com/YuniqueUnic/schemaui/blob/master/docs/schemaui-demo.gif?raw=true" width="500">
 
 [English](./README.md) | [中文文档](./README.ZH.md)
 </div>
