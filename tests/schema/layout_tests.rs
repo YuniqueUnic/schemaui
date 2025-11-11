@@ -146,6 +146,35 @@ fn notifications_sections_do_not_duplicate_parent_field() {
 }
 
 #[test]
+fn additional_properties_true_does_not_add_phantom_field() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "room": {
+                "type": "object",
+                "properties": {
+                    "max_size": {"type": "integer"}
+                },
+                "additionalProperties": true
+            }
+        }
+    });
+    let form = build_form_schema(&schema).expect("schema parsed");
+    let room = form
+        .roots
+        .iter()
+        .find(|root| root.id == "room")
+        .expect("room root");
+    let section = room.sections.first().expect("room section");
+    assert!(
+        section.fields.iter().all(|field| field.name != "room"),
+        "room section should only contain actual child fields"
+    );
+    let names: Vec<_> = section.fields.iter().map(|field| field.name.clone()).collect();
+    assert_eq!(names, vec!["max_size"]);
+}
+
+#[test]
 fn pattern_properties_become_key_value_fields() {
     let schema = json!({
         "type": "object",

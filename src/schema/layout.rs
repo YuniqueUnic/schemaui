@@ -236,6 +236,7 @@ fn resolve_additional_properties(
 ) -> Result<Option<SchemaObject>> {
     match schema {
         Schema::Bool(false) => Ok(None),
+        Schema::Bool(true) => Ok(None),
         other => resolver.resolve_schema(other).map(Some),
     }
 }

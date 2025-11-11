@@ -249,7 +249,12 @@ impl App {
                     Err(err) => self.status.set_raw(&err.message),
                 }
             }
-            FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::KeyValue(_)) => {
+            FieldKind::Array(inner)
+                if matches!(
+                    inner.as_ref(),
+                    FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Boolean
+                ) =>
+            {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
                 let (panel_entries, panel_selected) = field
@@ -563,5 +568,61 @@ impl App {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        app::options::UiOptions,
+        domain::{FieldKind, FieldSchema},
+        form::{FieldState, FormState, SectionState},
+    };
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    fn scalar_array_field_state() -> FieldState {
+        let schema = FieldSchema {
+            name: "allowed_methods".to_string(),
+            path: vec!["allowed_methods".to_string()],
+            pointer: "/allowed_methods".to_string(),
+            title: "Allowed Methods".to_string(),
+            description: None,
+            section_id: "app".to_string(),
+            kind: FieldKind::Array(Box::new(FieldKind::String)),
+            required: false,
+            default: Some(json!(["GET"])),
+            metadata: HashMap::new(),
+        };
+        FieldState::from_schema(schema)
+    }
+
+    fn build_app_with_scalar_array() -> App {
+        let section = SectionState {
+            id: "section".to_string(),
+            title: "Section".to_string(),
+            description: None,
+            path: vec!["app".to_string()],
+            depth: 0,
+            fields: vec![scalar_array_field_state()],
+            scroll_offset: 0,
+        };
+        let form_state = FormState::from_sections("app", "App", None, vec![section]);
+        let validator = validator_for(&json!({"type": "object"})).expect("validator");
+        App::new(form_state, validator, UiOptions::default())
+    }
+
+    #[test]
+    fn ctrl_e_opens_scalar_array_overlay() {
+        let mut app = build_app_with_scalar_array();
+        app.try_open_composite_editor();
+        assert!(
+            matches!(
+                app.composite_editor.as_ref().map(|overlay| &overlay.target),
+                Some(CompositeOverlayTarget::ArrayEntry { .. })
+            ),
+            "scalar arrays should open overlay via Ctrl+E"
+        );
     }
 }

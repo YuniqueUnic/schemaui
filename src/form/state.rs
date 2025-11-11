@@ -199,6 +199,14 @@ impl FormState {
         }
     }
 
+    pub fn mark_clean(&mut self) {
+        for section in self.iter_sections_mut() {
+            for field in &mut section.fields {
+                field.dirty = false;
+            }
+        }
+    }
+
     pub fn set_error(&mut self, pointer: &str, message: String) -> bool {
         for section in self.iter_sections_mut() {
             for field in &mut section.fields {
@@ -308,6 +316,18 @@ impl FormState {
         if self.section_index >= section_len {
             self.section_index = section_len - 1;
         }
+
+        if !self.section_has_fields(self.root_index, self.section_index) {
+            if let Some(index) = self.first_focusable_section_in_root(self.root_index) {
+                self.section_index = index;
+            } else if let Some((root_idx, section_idx)) =
+                self.focusable_section_positions().first().copied()
+            {
+                self.root_index = root_idx;
+                self.section_index = section_idx;
+            }
+        }
+
         let field_len = self.roots[self.root_index].sections[self.section_index]
             .fields
             .len();
@@ -329,6 +349,27 @@ impl FormState {
     }
 
     fn section_positions(&self) -> Vec<(usize, usize)> {
+        let focusable = self.focusable_section_positions();
+        if focusable.is_empty() {
+            self.all_section_positions()
+        } else {
+            focusable
+        }
+    }
+
+    fn focusable_section_positions(&self) -> Vec<(usize, usize)> {
+        let mut positions = Vec::new();
+        for (root_idx, root) in self.roots.iter().enumerate() {
+            for (section_idx, section) in root.sections.iter().enumerate() {
+                if !section.fields.is_empty() {
+                    positions.push((root_idx, section_idx));
+                }
+            }
+        }
+        positions
+    }
+
+    fn all_section_positions(&self) -> Vec<(usize, usize)> {
         let mut positions = Vec::new();
         for (root_idx, root) in self.roots.iter().enumerate() {
             for (section_idx, _section) in root.sections.iter().enumerate() {
@@ -336,6 +377,24 @@ impl FormState {
             }
         }
         positions
+    }
+
+    fn section_has_fields(&self, root_idx: usize, section_idx: usize) -> bool {
+        self.roots
+            .get(root_idx)
+            .and_then(|root| root.sections.get(section_idx))
+            .map(|section| !section.fields.is_empty())
+            .unwrap_or(false)
+    }
+
+    fn first_focusable_section_in_root(&self, root_idx: usize) -> Option<usize> {
+        self.roots.get(root_idx).and_then(|root| {
+            root.sections
+                .iter()
+                .enumerate()
+                .find(|(_, section)| !section.fields.is_empty())
+                .map(|(idx, _)| idx)
+        })
     }
 }
 
