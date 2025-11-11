@@ -92,20 +92,26 @@ fn main() -> Result<()> {
         ));
     }
 
-    let schema_format = resolve_format(cli.schema_format.as_deref(), cli.schema.as_deref())?;
-    let config_format = resolve_format(cli.config_format.as_deref(), cli.config.as_deref())?;
+    let (schema_format, schema_source) =
+        resolve_format(cli.schema_format.as_deref(), cli.schema.as_deref())?;
+    let (config_format, config_source) =
+        resolve_format(cli.config_format.as_deref(), cli.config.as_deref())?;
 
     let schema_value = load_optional_value(
         cli.schema.as_deref(),
         cli.schema_inline.as_deref(),
         schema_format,
+        schema_source,
         "schema",
+        Some(false),
     )?;
     let config_value = load_optional_value(
         cli.config.as_deref(),
         cli.config_inline.as_deref(),
         config_format,
+        config_source,
         "config",
+        None,
     )?;
 
     if schema_value.is_none() && config_value.is_none() {
@@ -137,36 +143,51 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn resolve_format(keyword: Option<&str>, path_hint: Option<&str>) -> Result<DocumentFormat> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FormatSource {
+    Explicit,
+    Extension,
+    Default,
+}
+
+fn resolve_format(
+    keyword: Option<&str>,
+    path_hint: Option<&str>,
+) -> Result<(DocumentFormat, FormatSource)> {
     if let Some(value) = keyword {
-        return DocumentFormat::from_keyword(value).map_err(Report::msg);
+        return DocumentFormat::from_keyword(value)
+            .map(|format| (format, FormatSource::Explicit))
+            .map_err(Report::msg);
     }
     if let Some(path) = path_hint {
         if path != "-" {
             if let Some(format) = DocumentFormat::from_extension(Path::new(path)) {
-                return Ok(format);
+                return Ok((format, FormatSource::Extension));
             }
         }
     }
-    Ok(DocumentFormat::default())
+    Ok((DocumentFormat::default(), FormatSource::Default))
 }
 
 fn load_optional_value(
     spec: Option<&str>,
     inline: Option<&str>,
     format: DocumentFormat,
+    format_source: FormatSource,
     label: &str,
+    allow_guess_override: Option<bool>,
 ) -> Result<Option<Value>> {
+    let allow_guess = allow_guess_override.unwrap_or(format_source != FormatSource::Explicit);
     if let Some(contents) = inline {
-        return parse_contents(contents, format, label).map(Some);
+        return parse_contents(contents, format, label, allow_guess).map(Some);
     }
     match spec {
-        Some(path) => load_value(path, format, label).map(Some),
+        Some(path) => load_value(path, format, label, allow_guess).map(Some),
         None => Ok(None),
     }
 }
 
-fn load_value(spec: &str, format: DocumentFormat, label: &str) -> Result<Value> {
+fn load_value(spec: &str, format: DocumentFormat, label: &str, allow_guess: bool) -> Result<Value> {
     let contents = if spec == "-" {
         let mut buffer = String::new();
         io::stdin()
@@ -176,12 +197,44 @@ fn load_value(spec: &str, format: DocumentFormat, label: &str) -> Result<Value> 
     } else {
         fs::read_to_string(spec).wrap_err_with(|| format!("failed to read {label} file {spec}"))?
     };
-    parse_contents(&contents, format, label)
+    parse_contents(&contents, format, label, allow_guess)
 }
 
-fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result<Value> {
-    parse_document_str(contents, format)
-        .map_err(|err| Report::msg(format!("failed to parse {label} as {}: {err}", format)))
+fn parse_contents(
+    contents: &str,
+    format: DocumentFormat,
+    label: &str,
+    allow_guess: bool,
+) -> Result<Value> {
+    match parse_document_str(contents, format) {
+        Ok(value) => Ok(value),
+        Err(primary) if allow_guess => {
+            for candidate in DocumentFormat::available_formats() {
+                if candidate == format {
+                    continue;
+                }
+                if let Ok(value) = parse_document_str(contents, candidate) {
+                    return Ok(value);
+                }
+            }
+            Err(Report::msg(format!(
+                "failed to parse {label}: tried {} (first error: {primary})",
+                format_list()
+            )))
+        }
+        Err(err) => Err(Report::msg(format!(
+            "failed to parse {label} as {}: {err}",
+            format
+        ))),
+    }
+}
+
+fn format_list() -> String {
+    let items: Vec<String> = DocumentFormat::available_formats()
+        .into_iter()
+        .map(|fmt| fmt.to_string())
+        .collect();
+    items.join(", ")
 }
 
 fn build_output_options(cli: &Cli) -> Result<Option<OutputOptions>> {

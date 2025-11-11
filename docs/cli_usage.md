@@ -47,6 +47,8 @@ CLI 通过 `schemaui::io::input` 提供的工具加载 Schema 和配置样本：
   `$ref`、`properties`、`patternProperties` 等节点递归注入默认值，确保 TUI
   载入时即显示真实数据。
 
+当 `--config-format` 未显式指定且解析失败时，CLI 会依次尝试 **JSON → YAML → TOML**（取决于编译特性）来自动判定文件类型，因此即使配置文件没有扩展名也能被识别。若用户强制提供 `--config-format yaml` 等参数，则跳过自动检测并直接按指定格式解析。
+
 ## 3. 输出与持久化
 
 `schemaui-cli` 使用 `OutputOptions` 将 TUI 的最终结果写回：
@@ -75,12 +77,12 @@ ui = ui.with_output(options);
 | ------------------------ | --------------------------------------------------------- |
 | `-s, --schema <PATH>`    | Schema 文件或 `-` 代表 stdin                              |
 | `--schema-inline <TEXT>` | 直接传入 Schema 字符串，与 `--schema` 互斥                |
-| `--schema-format <json   | yaml                                                      |
+| `--schema-format <json\|yaml\|toml>` | 强制指定 Schema 格式（默认根据扩展名/JSON） |
 | `-c, --config <PATH>`    | 配置样本文件或 stdin                                      |
 | `--config-inline <TEXT>` | 内联配置，与 `--config` 互斥                              |
-| `--config-format <json   | yaml                                                      |
+| `--config-format <json\|yaml\|toml>` | 强制指定配置格式；未指定时启用自动检测 |
 | `--title <TEXT>`         | 自定义 TUI 标题                                           |
-| `--output-format <json   | yaml                                                      |
+| `--output-format <json\|yaml\|toml>` | 输出序列化格式，默认 JSON |
 | `--stdout`               | 输出到标准输出                                            |
 | `--output <PATH>`        | 追加输出文件，可多次使用                                  |
 | `--temp-file <PATH>`     | 当未指定输出时的回退文件路径（默认 `/tmp/schemaui.yaml`） |
@@ -134,3 +136,24 @@ CLI 与库完全解耦：
 如需扩展 CLI（例如添加配置文件、热加载、脚本化钩子），建议在
 `schemaui-cli/src/main.rs` 基础上继续扩展，或在其他仓库中复用 `schemaui`
 提供的入口/出口层。
+
+## 8. 编译特性
+
+`schemaui-cli` 将 `schemaui` 的格式特性透传为自身特性：
+
+| CLI Feature | 说明 |
+| --- | --- |
+| `json`（默认） | 启用 JSON 解析/输出（始终可用） |
+| `yaml`（默认） | 启用 YAML 解析/输出与自动检测 |
+| `toml` | 启用 TOML 解析/输出与自动检测 |
+| `all_formats` | 同时启用 `json`/`yaml`/`toml` |
+
+例如：
+
+```bash
+cargo run -p schemaui-cli --no-default-features --features all_formats -- --schema schema.json --config config
+
+cargo install --path schemaui-cli --no-default-features --features json
+```
+
+自动检测与输出能力会随所启用的格式特性一起裁剪：若禁用了 `yaml` 或 `toml`，CLI 的检测流程会自动跳过相应格式，只尝试剩余的类型。

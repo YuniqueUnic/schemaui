@@ -61,4 +61,14 @@ impl DocumentFormat {
         items.push("toml");
         items
     }
+
+    pub fn available_formats() -> Vec<DocumentFormat> {
+        #[allow(unused_mut)]
+        let mut formats = vec![DocumentFormat::Json];
+        #[cfg(feature = "yaml")]
+        formats.push(DocumentFormat::Yaml);
+        #[cfg(feature = "toml")]
+        formats.push(DocumentFormat::Toml);
+        formats
+    }
 }

@@ -207,7 +207,9 @@ schemaui \
 - CLI 的详细使用说明见
   [`docs/cli_usage.md`](docs/cli_usage.md)：该文档覆盖参数列表、输入/输出策略、错误处理与示例命令。一般情况下，可在
   workspace 中运行 `cargo run -p schemaui-cli -- ...`，或执行
-  `cargo install --path schemaui-cli` 安装独立二进制。
+  `cargo install --path schemaui-cli` 安装独立二进制。CLI 默认启用
+  `json`/`yaml` 特性（可通过 `--features toml` 等方式扩展），并会在
+  未显式指定 `--config-format` 时自动依次尝试 JSON → YAML → TOML（取决于编译特性），让没有扩展名的配置文件也能被正确识别。
 
 ### 许可证
 
