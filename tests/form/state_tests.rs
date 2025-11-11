@@ -119,3 +119,27 @@ fn section_navigation_cycles_ordered_tree() {
     assert_eq!(state.root_index, 0);
     assert_eq!(state.section_index, 0);
 }
+
+#[test]
+fn skips_empty_sections_when_focusing() {
+    let empty = mk_section("app", &[]);
+    let server = mk_section("server", &["host"]);
+    let storage = mk_section("storage", &["path"]);
+    let mut state = FormState {
+        roots: vec![RootSectionState {
+            id: "app".into(),
+            title: "App".into(),
+            description: None,
+            sections: vec![empty, server, storage],
+        }],
+        root_index: 0,
+        section_index: 0,
+        field_index: 0,
+    };
+    state.normalize_focus();
+    assert_eq!(state.section_index, 1, "should jump to first populated section");
+    state.focus_next_section(1);
+    assert_eq!(state.section_index, 2, "Ctrl+Tab should skip empty sections");
+    state.focus_next_section(1);
+    assert_eq!(state.section_index, 1, "wrap keeps focusable sections only");
+}

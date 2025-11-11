@@ -329,8 +329,11 @@ impl App {
 
     fn on_save(&mut self) {
         if let Some(value) = self.run_validation(true) {
-            self.status.set_raw("Configuration saved");
+            self.status
+                .set_raw("Configuration saved. Press Ctrl+Q to exit.");
             self.result = Some(value);
+            self.form_state.mark_clean();
+            self.exit_armed = false;
         }
     }
 
@@ -341,7 +344,6 @@ impl App {
             return;
         }
         self.should_quit = true;
-        self.result = None;
     }
 
     fn run_validation(&mut self, announce: bool) -> Option<Value> {
@@ -372,5 +374,52 @@ impl App {
                 None
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{app::options::UiOptions, schema::build_form_schema};
+    use jsonschema::validator_for;
+    use serde_json::json;
+
+    fn app_with_single_field() -> App {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"}
+            }
+        });
+        let form_schema = build_form_schema(&schema).expect("schema");
+        let form_state = FormState::from_schema(&form_schema);
+        let validator = validator_for(&schema).expect("validator");
+        App::new(form_state, validator, UiOptions::default())
+    }
+
+    #[test]
+    fn exit_after_save_keeps_last_saved_result() {
+        let mut app = app_with_single_field();
+        app.on_save();
+        assert!(app.result.is_some(), "save should populate result");
+        assert_eq!(
+            app.status.message(),
+            "Configuration saved. Press Ctrl+Q to exit."
+        );
+        assert!(
+            !app.form_state.is_dirty(),
+            "successful save should clear dirty flags"
+        );
+        assert!(!app.exit_armed, "save should reset exit confirmation");
+        app.on_exit();
+        assert!(app.result.is_some(), "exiting should keep last saved value");
+        assert!(app.should_quit, "exit flag should be set");
+    }
+
+    #[test]
+    fn exit_without_save_leaves_result_empty() {
+        let mut app = app_with_single_field();
+        app.on_exit();
+        assert!(app.result.is_none(), "no save means no result");
     }
 }
