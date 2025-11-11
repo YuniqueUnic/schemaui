@@ -24,17 +24,30 @@ struct Cli {
     #[arg(short = 's', long = "schema", value_name = "PATH")]
     schema: Option<String>,
 
+    /// Inline JSON Schema contents (mutually exclusive with --schema)
+    #[arg(long = "schema-inline", value_name = "TEXT", conflicts_with = "schema")]
+    schema_inline: Option<String>,
+
     /// Explicit schema format (json/yaml/toml). Defaults to file extension or json.
     #[arg(long = "schema-format", value_name = "FORMAT")]
     schema_format: Option<String>,
 
     /// Optional config data used to seed defaults ("-" reads from stdin)
-    #[arg(short = 'd', long = "data", value_name = "PATH")]
-    data: Option<String>,
+    #[arg(short = 'c', long = "config", alias = "data", value_name = "PATH")]
+    config: Option<String>,
 
-    /// Explicit data format (json/yaml/toml). Defaults to file extension or json.
-    #[arg(long = "data-format", value_name = "FORMAT")]
-    data_format: Option<String>,
+    /// Inline config snapshot (mutually exclusive with --config)
+    #[arg(
+        long = "config-inline",
+        alias = "data-inline",
+        value_name = "TEXT",
+        conflicts_with = "config"
+    )]
+    config_inline: Option<String>,
+
+    /// Explicit config format (json/yaml/toml). Defaults to file extension or json.
+    #[arg(long = "config-format", alias = "data-format", value_name = "FORMAT")]
+    config_format: Option<String>,
 
     /// Title shown at the top of the UI
     #[arg(long = "title", value_name = "TEXT")]
@@ -69,17 +82,37 @@ fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = Cli::parse();
 
-    let schema_format = resolve_format(cli.schema_format.as_deref(), cli.schema.as_deref())?;
-    let data_format = resolve_format(cli.data_format.as_deref(), cli.data.as_deref())?;
-
-    let schema_value = load_optional_value(cli.schema.as_deref(), schema_format, "schema")?;
-    let data_value = load_optional_value(cli.data.as_deref(), data_format, "data")?;
-
-    if schema_value.is_none() && data_value.is_none() {
-        return Err(eyre!("provide at least --schema or --data"));
+    if cli.schema_inline.is_none()
+        && cli.config_inline.is_none()
+        && cli.schema.as_deref() == Some("-")
+        && cli.config.as_deref() == Some("-")
+    {
+        return Err(eyre!(
+            "cannot read schema and config from stdin at the same time; use --schema-inline or --config-inline"
+        ));
     }
 
-    let schema = match (schema_value, data_value.as_ref()) {
+    let schema_format = resolve_format(cli.schema_format.as_deref(), cli.schema.as_deref())?;
+    let config_format = resolve_format(cli.config_format.as_deref(), cli.config.as_deref())?;
+
+    let schema_value = load_optional_value(
+        cli.schema.as_deref(),
+        cli.schema_inline.as_deref(),
+        schema_format,
+        "schema",
+    )?;
+    let config_value = load_optional_value(
+        cli.config.as_deref(),
+        cli.config_inline.as_deref(),
+        config_format,
+        "config",
+    )?;
+
+    if schema_value.is_none() && config_value.is_none() {
+        return Err(eyre!("provide at least --schema or --config"));
+    }
+
+    let schema = match (schema_value, config_value.as_ref()) {
         (Some(schema), Some(defaults)) => schema_with_defaults(&schema, defaults),
         (Some(schema), None) => schema,
         (None, Some(defaults)) => schema_from_data_value(defaults),
@@ -90,7 +123,7 @@ fn main() -> Result<()> {
     if let Some(title) = cli.title.as_ref() {
         ui = ui.with_title(title.clone());
     }
-    if let Some(defaults) = data_value.as_ref() {
+    if let Some(defaults) = config_value.as_ref() {
         ui = ui.with_default_data(defaults);
     }
 
@@ -120,9 +153,13 @@ fn resolve_format(keyword: Option<&str>, path_hint: Option<&str>) -> Result<Docu
 
 fn load_optional_value(
     spec: Option<&str>,
+    inline: Option<&str>,
     format: DocumentFormat,
     label: &str,
 ) -> Result<Option<Value>> {
+    if let Some(contents) = inline {
+        return parse_contents(contents, format, label).map(Some);
+    }
     match spec {
         Some(path) => load_value(path, format, label).map(Some),
         None => Ok(None),
@@ -139,9 +176,12 @@ fn load_value(spec: &str, format: DocumentFormat, label: &str) -> Result<Value> 
     } else {
         fs::read_to_string(spec).wrap_err_with(|| format!("failed to read {label} file {spec}"))?
     };
-    let value = parse_document_str(&contents, format)
-        .map_err(|err| Report::msg(format!("failed to parse {label} as {}: {err}", format)))?;
-    Ok(value)
+    parse_contents(&contents, format, label)
+}
+
+fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result<Value> {
+    parse_document_str(contents, format)
+        .map_err(|err| Report::msg(format!("failed to parse {label} as {}: {err}", format)))
 }
 
 fn build_output_options(cli: &Cli) -> Result<Option<OutputOptions>> {

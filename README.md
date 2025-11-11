@@ -138,15 +138,16 @@ The built-in `schemaui` binary wraps the library in a configurable workflow:
 ```bash
 schemaui \
   --schema ./schema.json \
-  --data ./config.yaml \
+  --config ./config.yaml \
   --output-format json \
   --stdout \
   --output ./config.out.json
 ```
 
-- `--schema` / `--data` accept file paths or `-` (stdin) and support JSON/TOML/YAML. When both are supplied, the schema remains authoritative while the data snapshot becomes the set of defaults.
-- Formats can be inferred from file extensions or forced via `--*-format json|yaml|toml`.
-- Outputs are routed through the exit layer: mix `--stdout`, repeated `--output <path>`, or let the default temp file `/tmp/schemaui.yaml` capture results. Disable the fallback with `--no-temp-file` or relocate it via `--temp-file`.
+- `--schema` / `--config` accept file paths or `-` (stdin) and support JSON/TOML/YAML. When both are supplied, the schema stays authoritative while the config snapshot seeds defaults. Passing literal payloads is also possible through `--schema-inline` / `--config-inline`, which keeps stdin free for the other stream.
+- To avoid double reads, only one of schema/config may use `-` simultaneously (use inline flags when both need piped content).
+- Formats can be inferred from file extensions or forced via `--schema-format` / `--config-format`.
+- Outputs are routed through the exit layer: mix `--stdout`, repeated `--output <path>`, or rely on the default temp file `/tmp/schemaui.yaml`. Disable the fallback with `--no-temp-file` or relocate it via `--temp-file`.
 - Titles and other options chain directly through `SchemaUI`, so the CLI mirrors the library flow: load → merge defaults → render TUI → emit the edited configuration in the requested format(s).
 
 ### 许可证
