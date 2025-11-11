@@ -1,0 +1,121 @@
+use crate::domain::{FieldKind, FieldSchema};
+
+fn mk_field(name: &str) -> FieldState {
+    FieldState::from_schema(FieldSchema {
+        name: name.to_string(),
+        path: vec![name.to_string()],
+        pointer: format!("/{name}"),
+        title: name.to_string(),
+        description: None,
+        section_id: "test".to_string(),
+        kind: FieldKind::String,
+        required: false,
+        default: None,
+        metadata: Default::default(),
+    })
+}
+
+fn mk_section(id: &str, fields: &[&str]) -> SectionState {
+    SectionState {
+        id: id.to_string(),
+        title: id.to_string(),
+        description: None,
+        path: vec![id.to_string()],
+        depth: 0,
+        fields: fields.iter().map(|name| mk_field(name)).collect(),
+        scroll_offset: 0,
+    }
+}
+
+#[test]
+fn field_navigation_wraps_across_roots() {
+    let root_a = RootSectionState {
+        id: "a".into(),
+        title: "A".into(),
+        description: None,
+        sections: vec![mk_section("a/one", &["a1", "a2"])],
+    };
+    let root_b = RootSectionState {
+        id: "b".into(),
+        title: "B".into(),
+        description: None,
+        sections: vec![mk_section("b/one", &["b1"]), mk_section("b/two", &["b2"])],
+    };
+    let mut state = FormState {
+        roots: vec![root_a, root_b],
+        root_index: 0,
+        section_index: 0,
+        field_index: 1,
+    };
+    state.focus_next_field();
+    assert_eq!(state.root_index, 1);
+    assert_eq!(state.section_index, 0);
+    assert_eq!(state.field_index, 0);
+    state.focus_next_field();
+    assert_eq!(state.section_index, 1);
+    assert_eq!(state.field_index, 0);
+    state.focus_next_field();
+    assert_eq!(state.root_index, 0);
+    assert_eq!(state.section_index, 0);
+    assert_eq!(state.field_index, 0);
+}
+
+#[test]
+fn field_navigation_wraps_backwards_across_roots() {
+    let root_a = RootSectionState {
+        id: "a".into(),
+        title: "A".into(),
+        description: None,
+        sections: vec![mk_section("a/one", &["a1"])],
+    };
+    let root_b = RootSectionState {
+        id: "b".into(),
+        title: "B".into(),
+        description: None,
+        sections: vec![mk_section("b/one", &["b1", "b2"])],
+    };
+    let mut state = FormState {
+        roots: vec![root_a, root_b],
+        root_index: 0,
+        section_index: 0,
+        field_index: 0,
+    };
+    state.focus_prev_field();
+    assert_eq!(state.root_index, 1);
+    assert_eq!(state.section_index, 0);
+    assert_eq!(state.field_index, 1);
+}
+
+#[test]
+fn section_navigation_cycles_ordered_tree() {
+    let sections_a = vec![mk_section("auth", &["user"]), mk_section("db", &["url"])];
+    let sections_b = vec![mk_section("cache", &["ttl"])];
+    let mut state = FormState {
+        roots: vec![
+            RootSectionState {
+                id: "runtime".into(),
+                title: "Runtime".into(),
+                description: None,
+                sections: sections_a,
+            },
+            RootSectionState {
+                id: "ops".into(),
+                title: "Ops".into(),
+                description: None,
+                sections: sections_b,
+            },
+        ],
+        root_index: 0,
+        section_index: 0,
+        field_index: 0,
+    };
+    state.focus_next_section(1);
+    assert_eq!(state.root_index, 0);
+    assert_eq!(state.section_index, 1);
+    state.focus_next_section(1);
+    assert_eq!(state.root_index, 1);
+    assert_eq!(state.section_index, 0);
+    state.focus_next_section(1);
+    assert_eq!(state.root_index, 0);
+    assert_eq!(state.section_index, 0);
+}
