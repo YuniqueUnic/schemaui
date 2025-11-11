@@ -1,4 +1,5 @@
 mod input;
+mod keymap;
 mod options;
 mod popup;
 mod runtime;

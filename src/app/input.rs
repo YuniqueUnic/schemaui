@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::KeyEvent;
 
 use crate::form::FormCommand;
 
-#[derive(Debug, Clone)]
+use super::keymap;
+
+#[derive(Debug, Clone, Copy)]
 pub enum KeyAction {
     Save,
     Quit,
@@ -251,64 +253,8 @@ impl InputRouter {
     pub fn classify(&self, key: &KeyEvent) -> KeyAction {
         #[cfg(feature = "debug")]
         println!("{key:?}");
-        if is_prev_root_combo(key) {
-            return KeyAction::RootStep(-1);
-        }
-        if is_next_root_combo(key) {
-            return KeyAction::RootStep(1);
-        }
-
-        if key.modifiers.contains(KeyModifiers::CONTROL) {
-            return match key.code {
-                KeyCode::Char('s') | KeyCode::Char('S') => KeyAction::Save,
-                KeyCode::Char('q') | KeyCode::Char('Q') => KeyAction::Quit,
-                KeyCode::Char('c') | KeyCode::Char('C') => KeyAction::Quit,
-                KeyCode::Char('e') | KeyCode::Char('E') => KeyAction::EditComposite,
-                KeyCode::Char('n') | KeyCode::Char('N') => KeyAction::ListAddEntry,
-                KeyCode::Char('d') | KeyCode::Char('D') => KeyAction::ListRemoveEntry,
-                KeyCode::Left => KeyAction::ListSelect(-1),
-                KeyCode::Right => KeyAction::ListSelect(1),
-                KeyCode::Up => KeyAction::ListMove(-1),
-                KeyCode::Down => KeyAction::ListMove(1),
-                KeyCode::Tab => {
-                    if key.modifiers.contains(KeyModifiers::SHIFT) {
-                        KeyAction::SectionStep(-1)
-                    } else {
-                        KeyAction::SectionStep(1)
-                    }
-                }
-                _ => KeyAction::None,
-            };
-        }
-
-        match key.code {
-            KeyCode::Tab | KeyCode::Down => KeyAction::FieldStep(1),
-            KeyCode::BackTab | KeyCode::Up => KeyAction::FieldStep(-1),
-            KeyCode::Esc => KeyAction::ResetStatus,
-            KeyCode::Enter => KeyAction::TogglePopup,
-            _ => KeyAction::Input(*key),
-        }
+        keymap::classify_key(key).unwrap_or(KeyAction::Input(*key))
     }
-}
-
-fn is_prev_root_combo(key: &KeyEvent) -> bool {
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
-        match key.code {
-            KeyCode::Char('j') | KeyCode::Char('J') => return true,
-            _ => {}
-        }
-    }
-    false
-}
-
-fn is_next_root_combo(key: &KeyEvent) -> bool {
-    if key.modifiers.contains(KeyModifiers::CONTROL) {
-        match key.code {
-            KeyCode::Char('l') | KeyCode::Char('L') => return true,
-            _ => {}
-        }
-    }
-    false
 }
 
 #[cfg(test)]

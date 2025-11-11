@@ -1,7 +1,7 @@
 use serde_json::json;
 
 fn main() -> anyhow::Result<()> {
-    let schema = json!({
+    let _schema = json!({
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "Service Config",
         "description": "Edit service configuration interactively",

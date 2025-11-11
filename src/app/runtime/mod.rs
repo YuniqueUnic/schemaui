@@ -10,6 +10,7 @@ use crate::{
 
 use super::{
     input::{AppCommand, CommandDispatch, InputRouter},
+    keymap::{self, KeymapContext},
     options::UiOptions,
     popup::PopupState,
     status::StatusLine,
@@ -21,11 +22,6 @@ mod list_ops;
 mod overlay;
 
 use overlay::CompositeEditorOverlay;
-
-const HELP_DEFAULT: &str = "Tab/Shift+Tab navigate • Ctrl+Tab switch section • Ctrl+[ / Ctrl+] switch root • Enter choose • Ctrl+E edit • Ctrl+S save • Ctrl+Q quit";
-const HELP_COLLECTION: &str = "Ctrl+N add entry • Ctrl+D remove • Ctrl+←/→ select entry • Ctrl+↑/↓ reorder • Ctrl+E edit entry";
-const HELP_OVERLAY: &str =
-    "Overlay: Ctrl+S save • Esc cancel (twice to discard) • Tab navigate • Enter choose";
 
 #[derive(Clone, Copy)]
 enum PopupOwner {
@@ -58,15 +54,16 @@ impl App {
         if !self.options.show_help {
             return None;
         }
-        if self.composite_editor.is_some() {
-            return Some(HELP_OVERLAY.to_string());
-        }
-        if let Some(field) = self.form_state.focused_field()
+        let context = if self.composite_editor.is_some() {
+            KeymapContext::Overlay
+        } else if let Some(field) = self.form_state.focused_field()
             && field.is_composite_list()
         {
-            return Some(HELP_COLLECTION.to_string());
-        }
-        Some(HELP_DEFAULT.to_string())
+            KeymapContext::Collection
+        } else {
+            KeymapContext::Default
+        };
+        keymap::help_text(context)
     }
 
     fn handle_popup_key(&mut self, key: KeyEvent) -> Result<bool> {

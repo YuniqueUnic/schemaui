@@ -272,7 +272,7 @@ fn meta_line(field: &FieldState, is_selected: bool) -> Line<'static> {
     let mut meta = Vec::new();
     let type_style = if is_selected {
         Style::default()
-            .fg(Color::Black)
+            .fg(Color::Blue)
             .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::DarkGray)

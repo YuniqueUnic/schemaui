@@ -5,6 +5,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use jsonschema::{Validator, validator_for};
 
 use crate::{
+    app::keymap::{self, KeymapContext},
     domain::FieldKind,
     form::{
         ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand, FormEngine, FormState,
@@ -105,6 +106,7 @@ impl CompositeEditorOverlay {
     pub(super) fn new(field_pointer: String, field_label: String, session: OverlaySession) -> Self {
         let display_title = format!("Edit {} – {}", field_label, session.title());
         let display_description = session.description();
+        let instructions = overlay_help_string();
         Self {
             field_pointer,
             field_label,
@@ -115,7 +117,7 @@ impl CompositeEditorOverlay {
             exit_armed: false,
             list_entries: None,
             list_selected: None,
-            instructions: "Ctrl+S save • Esc cancel (Esc twice to discard)".to_string(),
+            instructions,
             validator: None,
         }
     }
@@ -131,9 +133,7 @@ impl CompositeEditorOverlay {
     pub(super) fn set_list_panel(&mut self, entries: Vec<String>, selected: usize) {
         self.list_entries = Some(entries);
         self.list_selected = Some(selected);
-        self.instructions = "Ctrl+S save • Esc cancel (Esc twice to discard) • Ctrl+N add • \
-            Ctrl+D remove • Ctrl+←/→ select • Ctrl+↑/↓ reorder"
-            .to_string();
+        self.instructions = overlay_help_string();
     }
 
     pub(super) fn dirty(&self) -> bool {
@@ -148,7 +148,20 @@ pub(super) enum CompositeOverlayTarget {
     ArrayEntry { entry_index: usize },
 }
 
+fn overlay_help_string() -> String {
+    keymap::help_text(KeymapContext::Overlay)
+        .unwrap_or_else(|| "Ctrl+S save • Esc cancel".to_string())
+}
+
 impl App {
+    fn set_overlay_status_message(&mut self) {
+        if let Some(help) = keymap::help_text(KeymapContext::Overlay) {
+            self.status.set_raw(&format!("Overlay: {help}"));
+        } else {
+            self.status.set_raw("Overlay editor");
+        }
+    }
+
     pub(super) fn try_open_composite_editor(&mut self) {
         if self.composite_editor.is_some() {
             return;
@@ -175,9 +188,7 @@ impl App {
                             label,
                             OverlaySession::Composite(session),
                         ));
-                        self.status.set_raw(
-                            "Composite editor: Ctrl+S save • Esc cancel (Esc twice to discard)",
-                        );
+                        self.set_overlay_status_message();
                         self.setup_overlay_validator();
                     }
                     Err(err) => self.status.set_raw(&err.message),
@@ -207,9 +218,7 @@ impl App {
                             overlay.set_list_panel(panel_entries, panel_selected);
                         }
                         self.composite_editor = Some(overlay);
-                        self.status.set_raw(
-                            "Composite list editor: Ctrl+S save • Esc cancel (Esc twice to discard)",
-                        );
+                        self.set_overlay_status_message();
                         self.refresh_list_overlay_panel();
                         self.setup_overlay_validator();
                     }
@@ -240,9 +249,7 @@ impl App {
                             overlay.set_list_panel(panel_entries, panel_selected);
                         }
                         self.composite_editor = Some(overlay);
-                        self.status.set_raw(
-                            "Key/value editor: Ctrl+S save • Esc cancel (Esc twice to discard)",
-                        );
+                        self.set_overlay_status_message();
                         self.refresh_list_overlay_panel();
                         self.setup_overlay_validator();
                     }
@@ -278,9 +285,7 @@ impl App {
                             overlay.set_list_panel(panel_entries, panel_selected);
                         }
                         self.composite_editor = Some(overlay);
-                        self.status.set_raw(
-                            "Array editor: Ctrl+S save • Esc cancel (Esc twice to discard)",
-                        );
+                        self.set_overlay_status_message();
                         self.refresh_list_overlay_panel();
                         self.setup_overlay_validator();
                     }

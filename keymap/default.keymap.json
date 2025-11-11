@@ -1,0 +1,121 @@
+[
+  {
+    "id": "field.next",
+    "description": "Next field",
+    "contexts": ["default", "overlay"],
+    "action": { "kind": "FieldStep", "delta": 1 },
+    "combos": ["Tab", "Down"]
+  },
+  {
+    "id": "field.prev",
+    "description": "Previous field",
+    "contexts": ["default", "overlay"],
+    "action": { "kind": "FieldStep", "delta": -1 },
+    "combos": ["BackTab", "Up"]
+  },
+  {
+    "id": "section.next",
+    "description": "Next section",
+    "contexts": ["default"],
+    "action": { "kind": "SectionStep", "delta": 1 },
+    "combos": ["Ctrl+Tab"]
+  },
+  {
+    "id": "section.prev",
+    "description": "Previous section",
+    "contexts": ["default"],
+    "action": { "kind": "SectionStep", "delta": -1 },
+    "combos": ["Ctrl+Shift+Tab"]
+  },
+  {
+    "id": "root.next",
+    "description": "Next root tab",
+    "contexts": ["default"],
+    "action": { "kind": "RootStep", "delta": 1 },
+    "combos": ["Ctrl+L"]
+  },
+  {
+    "id": "root.prev",
+    "description": "Previous root tab",
+    "contexts": ["default"],
+    "action": { "kind": "RootStep", "delta": -1 },
+    "combos": ["Ctrl+J"]
+  },
+  {
+    "id": "popup.toggle",
+    "description": "Open popup / apply selection",
+    "contexts": ["default"],
+    "action": { "kind": "TogglePopup" },
+    "combos": ["Enter"]
+  },
+  {
+    "id": "composite.edit",
+    "description": "Open composite editor",
+    "contexts": ["default", "collection"],
+    "action": { "kind": "EditComposite" },
+    "combos": ["Ctrl+E"]
+  },
+  {
+    "id": "list.add",
+    "description": "Add entry",
+    "contexts": ["collection", "overlay"],
+    "action": { "kind": "ListAddEntry" },
+    "combos": ["Ctrl+N"]
+  },
+  {
+    "id": "list.remove",
+    "description": "Remove entry",
+    "contexts": ["collection", "overlay"],
+    "action": { "kind": "ListRemoveEntry" },
+    "combos": ["Ctrl+D"]
+  },
+  {
+    "id": "list.select.prev",
+    "description": "Select previous entry",
+    "contexts": ["collection", "overlay"],
+    "action": { "kind": "ListSelect", "delta": -1 },
+    "combos": ["Ctrl+Left"]
+  },
+  {
+    "id": "list.select.next",
+    "description": "Select next entry",
+    "contexts": ["collection", "overlay"],
+    "action": { "kind": "ListSelect", "delta": 1 },
+    "combos": ["Ctrl+Right"]
+  },
+  {
+    "id": "list.move.up",
+    "description": "Move entry up",
+    "contexts": ["collection", "overlay"],
+    "action": { "kind": "ListMove", "delta": -1 },
+    "combos": ["Ctrl+Up"]
+  },
+  {
+    "id": "list.move.down",
+    "description": "Move entry down",
+    "contexts": ["collection", "overlay"],
+    "action": { "kind": "ListMove", "delta": 1 },
+    "combos": ["Ctrl+Down"]
+  },
+  {
+    "id": "app.save",
+    "description": "Save & validate",
+    "contexts": ["default", "overlay"],
+    "action": { "kind": "Save" },
+    "combos": ["Ctrl+S"]
+  },
+  {
+    "id": "app.quit",
+    "description": "Quit (confirm if dirty)",
+    "contexts": ["default"],
+    "action": { "kind": "Quit" },
+    "combos": ["Ctrl+Q", "Ctrl+C"]
+  },
+  {
+    "id": "status.reset",
+    "description": "Cancel / clear status (Esc twice discards overlays)",
+    "contexts": ["default", "overlay"],
+    "action": { "kind": "ResetStatus" },
+    "combos": ["Esc"]
+  }
+]
