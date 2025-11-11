@@ -54,6 +54,7 @@ fn main() -> color_eyre::Result<()> {
 ### Entry & Exit Layers
 
 - **Unified ingestion**: `SchemaUI::from_data_str` / `SchemaUI::from_data_value` convert JSON/TOML/YAML payloads into JSON Schema documents. Every observed value becomes the corresponding field's `default`, so the generated TUI is pre-populated with the original configuration.
+- **Schema + snapshot merge**: call `schema_with_defaults`, `SchemaUI::from_schema_and_data`, or `SchemaUI::with_default_data` to blend an explicit JSON Schema with a JSON/TOML/YAML instance. The schema keeps all validation keywords while inheriting real-world defaults from the snapshot.
 - **Format features**: enable the `yaml` and/or `toml` crate features (or `all_formats`) to turn on the respective parsers and serializers. JSON support ships with the base crate.
 - **Output control**: configure serialization via `OutputOptions`, choosing a `DocumentFormat`, pretty-print toggle, and one or more `OutputDestination`s (`Stdout` or `File`).
 
@@ -129,6 +130,24 @@ fn run_from_file(raw: &str) -> color_eyre::Result<()> {
 ```bash
 cargo test
 ```
+
+### CLI Usage
+
+The built-in `schemaui` binary wraps the library in a configurable workflow:
+
+```bash
+schemaui \
+  --schema ./schema.json \
+  --data ./config.yaml \
+  --output-format json \
+  --stdout \
+  --output ./config.out.json
+```
+
+- `--schema` / `--data` accept file paths or `-` (stdin) and support JSON/TOML/YAML. When both are supplied, the schema remains authoritative while the data snapshot becomes the set of defaults.
+- Formats can be inferred from file extensions or forced via `--*-format json|yaml|toml`.
+- Outputs are routed through the exit layer: mix `--stdout`, repeated `--output <path>`, or let the default temp file `/tmp/schemaui.yaml` capture results. Disable the fallback with `--no-temp-file` or relocate it via `--temp-file`.
+- Titles and other options chain directly through `SchemaUI`, so the CLI mirrors the library flow: load → merge defaults → render TUI → emit the edited configuration in the requested format(s).
 
 ### 许可证
 

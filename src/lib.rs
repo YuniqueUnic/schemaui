@@ -10,7 +10,9 @@ mod schema;
 pub use app::{SchemaUI, UiOptions};
 pub use io::{
     DocumentFormat,
-    input::{parse_document_str, schema_from_data_str, schema_from_data_value},
+    input::{
+        parse_document_str, schema_from_data_str, schema_from_data_value, schema_with_defaults,
+    },
     output::{OutputDestination, OutputOptions},
 };
 

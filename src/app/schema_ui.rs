@@ -46,6 +46,11 @@ impl SchemaUI {
         Ok(Self::new(schema))
     }
 
+    pub fn from_schema_and_data(schema: Value, defaults: Value) -> Self {
+        let enriched = io::input::schema_with_defaults(&schema, &defaults);
+        Self::new(enriched)
+    }
+
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
@@ -58,6 +63,11 @@ impl SchemaUI {
 
     pub fn with_output(mut self, output: OutputOptions) -> Self {
         self.output = Some(output);
+        self
+    }
+
+    pub fn with_default_data(mut self, defaults: &Value) -> Self {
+        self.schema = io::input::schema_with_defaults(&self.schema, defaults);
         self
     }
 
