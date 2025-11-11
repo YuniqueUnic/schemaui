@@ -1,8 +1,9 @@
 use std::{fmt, path::Path};
 
 /// Supported data formats for input/output layers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DocumentFormat {
+    #[default]
     Json,
     #[cfg(feature = "yaml")]
     Yaml,
@@ -19,12 +20,6 @@ impl fmt::Display for DocumentFormat {
             #[cfg(feature = "toml")]
             DocumentFormat::Toml => write!(f, "toml"),
         }
-    }
-}
-
-impl Default for DocumentFormat {
-    fn default() -> Self {
-        DocumentFormat::Json
     }
 }
 
@@ -58,6 +53,7 @@ impl DocumentFormat {
     }
 
     pub fn keyword_list() -> Vec<&'static str> {
+        #[allow(unused_mut)]
         let mut items = vec!["json"];
         #[cfg(feature = "yaml")]
         items.push("yaml");

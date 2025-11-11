@@ -104,24 +104,24 @@ impl DefaultApplier {
                 }
             }
 
-            if let Some(additional_schema) = schema_obj.get("additionalProperties") {
-                if additional_schema.is_object() {
-                    let excluded: HashSet<&str> = schema_obj
-                        .get("properties")
-                        .and_then(Value::as_object)
-                        .map(|props| props.keys().map(|k| k.as_str()).collect())
-                        .unwrap_or_default();
-                    let extras = default_map
-                        .iter()
-                        .filter(|(key, _)| !excluded.contains(key.as_str()))
-                        .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect::<Map<_, _>>();
-                    if !extras.is_empty() {
-                        tasks.push((
-                            child_pointer(pointer, &["additionalProperties"]),
-                            Cow::Owned(Value::Object(extras)),
-                        ));
-                    }
+            if let Some(additional_schema) = schema_obj.get("additionalProperties")
+                && additional_schema.is_object()
+            {
+                let excluded: HashSet<&str> = schema_obj
+                    .get("properties")
+                    .and_then(Value::as_object)
+                    .map(|props| props.keys().map(|k| k.as_str()).collect())
+                    .unwrap_or_default();
+                let extras = default_map
+                    .iter()
+                    .filter(|(key, _)| !excluded.contains(key.as_str()))
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Map<_, _>>();
+                if !extras.is_empty() {
+                    tasks.push((
+                        child_pointer(pointer, &["additionalProperties"]),
+                        Cow::Owned(Value::Object(extras)),
+                    ));
                 }
             }
 
@@ -151,27 +151,27 @@ impl DefaultApplier {
             }
         }
 
-        if let Some(default_array) = defaults.as_array() {
-            if let Some(items) = schema_obj.get("items") {
-                match items {
-                    Value::Array(tuple) => {
-                        for (idx, _) in tuple.iter().enumerate() {
-                            if let Some(value) = default_array.get(idx) {
-                                let idx_str = idx.to_string();
-                                tasks.push((
-                                    child_pointer(pointer, &["items", &idx_str]),
-                                    Cow::Borrowed(value),
-                                ));
-                            }
+        if let Some(default_array) = defaults.as_array()
+            && let Some(items) = schema_obj.get("items")
+        {
+            match items {
+                Value::Array(tuple) => {
+                    for (idx, _) in tuple.iter().enumerate() {
+                        if let Some(value) = default_array.get(idx) {
+                            let idx_str = idx.to_string();
+                            tasks.push((
+                                child_pointer(pointer, &["items", &idx_str]),
+                                Cow::Borrowed(value),
+                            ));
                         }
                     }
-                    Value::Object(_) => {
-                        if let Some(first) = default_array.first() {
-                            tasks.push((child_pointer(pointer, &["items"]), Cow::Borrowed(first)));
-                        }
-                    }
-                    _ => {}
                 }
+                Value::Object(_) => {
+                    if let Some(first) = default_array.first() {
+                        tasks.push((child_pointer(pointer, &["items"]), Cow::Borrowed(first)));
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -188,13 +188,12 @@ impl DefaultApplier {
         }
 
         let mut ref_targets = Vec::new();
-        if let Some(Value::String(reference)) = schema_obj.get("$ref") {
-            if let Some(target_pointer) = pointer_from_reference(reference) {
-                if self.active_refs.insert(target_pointer.clone()) {
-                    ref_targets.push(target_pointer.clone());
-                    tasks.push((target_pointer, Cow::Borrowed(defaults)));
-                }
-            }
+        if let Some(Value::String(reference)) = schema_obj.get("$ref")
+            && let Some(target_pointer) = pointer_from_reference(reference)
+            && self.active_refs.insert(target_pointer.clone())
+        {
+            ref_targets.push(target_pointer.clone());
+            tasks.push((target_pointer, Cow::Borrowed(defaults)));
         }
         for (child_pointer, value) in tasks {
             self.apply_at(root, &child_pointer, value.as_ref());
@@ -235,6 +234,7 @@ fn pattern_defaults(pattern: &str, defaults: &Map<String, Value>) -> Option<Map<
     }
 }
 
+#[allow(clippy::if_same_then_else)]
 fn child_pointer(base: &str, segments: &[&str]) -> String {
     let mut pointer = base.to_string();
     for segment in segments {
@@ -303,21 +303,41 @@ fn array_schema(items: &[Value]) -> Value {
 
 fn infer_items_schema(items: &[Value]) -> Option<Value> {
     let (first, rest) = items.split_first()?;
-    if rest.is_empty() {
-        return Some(infer_schema(first));
-    }
 
-    let mut variants = vec![infer_schema(first)];
+    let first_schema = infer_schema(first);
+    let first_signature = strip_defaults(&first_schema);
+    let mut variants = vec![(first_schema, first_signature)];
+
     for item in rest {
         let schema = infer_schema(item);
-        if !variants.iter().any(|existing| existing == &schema) {
-            variants.push(schema);
+        let signature = strip_defaults(&schema);
+        if !variants.iter().any(|(_, existing)| *existing == signature) {
+            variants.push((schema, signature));
         }
     }
+
     if variants.len() == 1 {
-        variants.pop()
+        variants.pop().map(|(schema, _)| schema)
     } else {
-        Some(json!({ "anyOf": variants }))
+        let schemas: Vec<Value> = variants.into_iter().map(|(schema, _)| schema).collect();
+        Some(json!({ "anyOf": schemas }))
+    }
+}
+
+fn strip_defaults(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let mut sanitized = Map::new();
+            for (key, subvalue) in map {
+                if key == "default" {
+                    continue;
+                }
+                sanitized.insert(key.clone(), strip_defaults(subvalue));
+            }
+            Value::Object(sanitized)
+        }
+        Value::Array(items) => Value::Array(items.iter().map(strip_defaults).collect()),
+        other => other.clone(),
     }
 }
 
