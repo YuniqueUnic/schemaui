@@ -221,6 +221,7 @@ fn pointer_from_reference(reference: &str) -> Option<String> {
 
 fn pattern_defaults(pattern: &str, defaults: &Map<String, Value>) -> Option<Map<String, Value>> {
     let regex = Regex::new(pattern).ok()?;
+
     let mut matched = Map::new();
     for (key, value) in defaults {
         if regex.is_match(key) {
