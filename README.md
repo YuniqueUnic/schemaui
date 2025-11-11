@@ -1,8 +1,21 @@
 # schemaui
 
+[![Crates.io](https://img.shields.io/crates/v/schemaui.svg)](https://crates.io/crates/schemaui)
+[![Documentation](https://docs.rs/schemaui/badge.svg)](https://docs.rs/schemaui)
+[![License](https://img.shields.io/crates/l/schemaui)](https://github.com/yuniqueunic/schemaui#license)
+![Crates.io Total Downloads](https://img.shields.io/crates/d/schemaui)
+![Deps.rs Crate Dependencies (latest)](https://img.shields.io/deps-rs/schemaui/latest)
+
+<div align="center">
+<img src="./docs/schemaui-demo.gif" width="500">
+
+[English](./README.md) | [中文文档](./README.ZH.md)
+</div>
+
 `schemaui` turns JSON Schema documents into fully interactive terminal UIs
-powered by `ratatui`, `crossterm`, and `jsonschema`. The library parses rich
-schemas (nested sections, `$ref`, `oneOf`/`anyOf`, arrays, key/value maps,
+powered by `ratatui`, `crossterm`, and `jsonschema`. 
+
+The library parses rich schemas (nested sections, `$ref`, arrays, key/value maps,
 pattern properties…) into a navigable form tree, renders it as a keyboard-first
 editor, and validates the result after every edit so users always see the full
 list of issues before saving.
@@ -10,7 +23,7 @@ list of issues before saving.
 ## Feature Highlights
 
 - **Schema fidelity** – draft-07 compatible, including `$ref`, `definitions`,
-  `oneOf`/`anyOf`, `patternProperties`, enums, numeric ranges, and deeply nested
+   `patternProperties`, enums, numeric ranges, and nested
   objects/arrays.
 - **Sections & overlays** – top-level properties become root tabs, nested
   objects are flattened into sections, and complex nodes (composites, key/value
@@ -78,19 +91,48 @@ fn main() -> color_eyre::Result<()> {
 }
 ```
 
-## Input & Output Layer
+## Architecture Snapshot
+
+```
+┌─────────────┐   parse/merge    ┌───────────────┐   layout + typing   ┌─────────────┐
+│ io::input   ├─────────────────▶│ schema::*     ├────────────────────▶│ form::*     │
+└─────────────┘                  │ (loader /     │                     │ (state,     │
+                                 │ resolver /    │                     │ sections,   │
+┌─────────────┐   emit Value     │ layout)       │   FormState         │ reducers)   │
+│ io::output  ◀──────────────────┴───────────────┘                     └────────┬────┘
+└─────────────┘                                                      focus/edits│
+                                                                                │
+                                                                     ┌──────────▼────────┐
+                                                                     │ app::runtime      │
+                                                                     │ (InputRouter,     │
+                                                                     │ overlays, status) │
+                                                                     └──────────┬────────┘
+                                                                                │ draw
+                                                                     ┌──────────▼────────┐
+                                                                     │ presentation::*   │
+                                                                     │ (ratatui view)    │
+                                                                     └───────────────────┘
+```
+
+This layout mirrors the actual modules under `src/`, making it easy to map any
+code change to its architectural responsibility.
+
+## Input & Output Design
 
 - `io::input::parse_document_str` converts JSON/YAML/TOML (via `serde_json`,
   `serde_yaml`, `toml`) into `serde_json::Value`. Feature flags (`json`, `yaml`,
   `toml`, `all_formats`) keep dependencies lean.
-- `schema_from_data_value/str` infers a schema from a concrete config snapshot,
-  adding `$schema` and `default` hints everywhere.
-- `schema_with_defaults` merges a canonical schema with user data, propagating
+- `schema_from_data_value/str` infers schemas from live configs, injecting
+  draft-07 metadata and defaults so UIs load pre-existing values.
+- `schema_with_defaults` merges canonical schemas with user data, propagating
   defaults through `properties`, `patternProperties`, `additionalProperties`,
-  and `$ref` targets.
-- `io::output::OutputOptions` controls the serialization format, prettiness, and
-  a list of `OutputDestination` (stdout or file paths). Multiple destinations
-  are supported; conflicts are reported unless `--force` is used in the CLI.
+  `dependencies`, `dependentSchemas`, arrays, and `$ref` targets without
+  mutating the original tree.
+- `io::output::OutputOptions` encapsulates serialization format, pretty/compact
+  toggle, and a vector of `OutputDestination::{Stdout, File}`. Multiple
+  destinations are supported; conflicts are caught before emission.
+- `SchemaUI::with_output` wires these options into the runtime so the final
+  `serde_json::Value` can be written automatically after the session ends.
 
 ## JSON Schema → TUI Mapping
 
@@ -121,6 +163,25 @@ management and validation can map errors back precisely.
 - Overlays (composite variants, key/value maps, list entries) spin up their own
   validators built from the sub-schema currently being edited, so issues surface
   before leaving the overlay.
+
+```
+┌─────────────┐ parse schema ┌─────────────────┐ inflate state  ┌────────────┐
+│ SchemaUI::run├────────────▶│ domain::parse   ├───────────────▶│ FormState  │
+└─────┬───────┘              │ (schema::layout)│                └─────┬──────┘
+      │ validator_for()      └─────────────────┘                edits │
+      │                                                        ┌──────▼─────────┐
+      └────────────────────────────────────────────────────── ▶│ app::runtime   │
+                                                               │ (status, input)│
+                                                               └──────┬─────────┘
+                                                                      │ FormCommand
+                                                               ┌──────▼──────────┐
+                                                               │ FormEngine      │
+                                                               │ + jsonschema    │
+                                                               └─────────────────┘
+```
+
+`App` is the sole owner of `FormState`; even overlay edits flow through
+`FormEngine` so validation rules stay centralized.
 
 ## TUI Building Blocks & Shortcuts
 
@@ -177,7 +238,7 @@ overlays, and documentation all consume a single source of truth.
   ```
 
 - **Macro + parser** – `app::keymap::keymap_source!()` `include_str!`s the JSON,
-  `std::sync::LazyLock` parses it once at startup, and each combo is compiled
+  `once_cell::sync::Lazy` parses it once at startup, and each combo is compiled
   into a `KeyPattern` (key code, required modifiers, pretty display string).
 - **Integration** – `InputRouter::classify` delegates to `keymap::classify_key`,
   which returns the `KeyAction` embedded in the JSON. `keymap::help_text`
@@ -187,33 +248,147 @@ overlays, and documentation all consume a single source of truth.
   should expose the help text, and wire the resulting `KeyAction` inside
   `KeyBindingMap` if a new semantic command is introduced.
 
+## Runtime Layers
+
+| Layer               | Module(s)                                                                  | Responsibilities                                                                |
+| ------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Ingestion           | `io::input`, `schema::loader`, `schema::resolver`                          | Parse JSON/TOML/YAML, resolve `$ref`, and normalize metadata.                   |
+| Layout typing       | `schema::layout`                                                           | Produce `FormSchema` (roots/sections/fields) from resolved schemas.             |
+| Form state          | `form::state`, `form::section`, `form::field`                              | Track focus, pointers, dirty flags, coercions, and errors.                      |
+| Commands & reducers | `form::actions`, `form::reducers`, `app::validation`                       | Define `FormCommand`, mutate state, and route validation results.               |
+| Runtime controller  | `app::runtime`, `app::overlay`, `app::popup`, `app::status`, `app::keymap` | Event loop, InputRouter dispatch, overlay lifecycle, help text, status updates. |
+| Presentation        | `presentation::view`, `presentation::components::*`                        | Render tabs, field lists, popups, overlays, and footer via `ratatui`.           |
+
+Each module is kept under ~600 LOC (hard cap 800) to honor the KISS principle
+and make refactors manageable.
+
 ## CLI (`schemaui-cli`)
 
+```bash
+cargo install schemaui-cli
+# It will be installed to `~/.cargo/bin` and renamed to `schemaui`
+# so you should use it like this: `schemaui -c xxx`
 ```
+
+
+```bash
 schemaui \
   --schema ./schema.json \
   --config ./defaults.yaml \
-  -o ./config.toml ./config.json -o -
+  -o - \
+  -o ./config.toml ./config.json
 ```
 
-- `--schema SPEC`, `--config SPEC` accept file paths, inline JSON/TOML/YAML
-  blobs, or `-` for stdin. If both streams need piping, send one as inline text.
-- The CLI aggregates I/O errors so users see every malformed input/output path
-  at once instead of failing fast.
-- `-o/--output DEST...` may be repeated; pass `-` to include stdout. When no
-  explicit destination is present, the tool falls back to a temp file unless
-  `--no-temp-file` is set. Formats are inferred from the first file extension or
-  the input hints; a warning is emitted if the requested format is gated behind
-  a disabled feature.
-- `--force`/`--yes` allows overwriting existing files. Without it, collisions
-  are reported through the shared diagnostic collector.
+```
+┌────────┐  clap args   ┌──────────────┐ read stdin/files ┌─────────────┐
+│  CLI   ├─────────────▶│ InputSource  ├─────────────────▶│ io::input   │
+└────┬───┘              └──────┬───────┘                  └────┬────────┘
+     │ diagnostics             │ schema/default Value          │
+┌────▼─────────┐        ┌──────▼──────┐                        |
+│Diagnostic    │◀───────┤ FormatHint  │                        │
+│Collector     │        └──────┬──────┘                        │
+└────┬─────────┘               │ pass if clean                 │
+     │                         │                               │
+┌────▼────────┐  build options └────────────┐                  │
+│Output logic ├────────────────────────────▶│ OutputOptions    │
+└────┬────────┘                             └────────────┬─────┘
+     │ SchemaUI::new / with_*                        ┌───▼────────┐
+     └──────────────────────────────────────────────▶│ SchemaUI   │
+                                                     │ (library)  │
+                                                     └────────────┘
+```
+
+- Inputs – `--schema` / `--config` accept file paths, inline payloads, or `-`
+  for stdin (but not both simultaneously). If only config is provided the CLI
+  infers a schema via `schema_from_data_value`.
+- Diagnostics – `DiagnosticCollector` accumulates format issues, feature flag
+  mismatches, stdin conflicts, and existing output files before execution.
+- Outputs – `-o/--output` is repeatable and may mix file paths with `-` for
+  stdout. When no destination is set, the tool writes to `/tmp/schemaui.json`
+  unless `--no-temp-file` is passed. Extensions dictate formats; conflicting
+  extensions are rejected.
+- Flags – `--no-pretty` toggles compact output, `--force/--yes` allows
+  overwriting files, and `--title` wires through to `SchemaUI::with_title`.
+
+## Key Dependencies
+
+| Crate                                       | Purpose                                                  |
+| ------------------------------------------- | -------------------------------------------------------- |
+| `serde`, `serde_json`, `serde_yaml`, `toml` | Parsing and serializing schema/config data.              |
+| `schemars`                                  | Draft-07 schema representation used by `schema::layout`. |
+| `jsonschema`                                | Runtime validation for forms and overlays.               |
+| `ratatui`                                   | Rendering widgets, layouts, overlays, and footer.        |
+| `crossterm`                                 | Terminal events consumed by `InputRouter`.               |
+| `indexmap`                                  | Order-preserving maps for schema traversal.              |
+| `once_cell`                                 | Lazy parsing of the keymap JSON.                         |
+| `clap`, `color-eyre` (CLI)                  | Argument parsing and ergonomic diagnostics.              |
+
+## Documentation Map
+
+- `README.md` – overview + architecture snapshot.
+- `docs/en/structure_design.md` – detailed schema/layout/runtime design with flow
+  diagrams.
+- `docs/en/cli_usage.md` – CLI-specific manual (inputs, outputs, piping, samples).
 
 ## Development
 
 - Run `cargo fmt && cargo test` regularly; most modules embed their tests by
   `include!`ing files from `tests/` so private APIs stay covered.
-- `structure_design.md` documents the full architecture (I/O logic, schema
-  pipeline, runtime layering, overlays, validation strategy, keyboard map). Keep
-  that file up-to-date when adding new features.
+- Keep modules below ~600 LOC (hard cap 800). Split helpers as soon as behavior
+  grows to keep KISS intact.
+- Prefer mature crates (`serde_*`, `schemars`, `jsonschema`, `ratatui`,
+  `crossterm`) over bespoke code unless the change is trivial.
+- Update `docs/*` whenever pipelines, shortcuts, or CLI semantics evolve so
+  user-facing documentation stays truthful.
+
+## References
+
+1. https://github.com/rjsf-team/react-jsonschema-form
+2. https://ui-schema.bemit.codes/examples
+
+## Roadmap
+
+- [x] parse json schema at runtime and generate a TUI
+- [ ] parse json schema at runtime and generate a Web UI
+- [ ] parse json schema at compile time Then generate the code for TUI, expose nessessary APIs for runtime.
+- [ ] parse json schema at compile time Then generate the code for Web UI, expose nessessary APIs for runtime.
+- [ ] parse json schema at runtime and generate a Interactive CLI
+- [ ] parse json schema at compile time Then generate the code for Interactive CLI, expose nessessary APIs for runtime.
+
+
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or
+  http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+### Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 Happy hacking!
+
+## Star History
+
+<a href="https://www.star-history.com/#YuniqueUnic/schemaui&type=date&legend=top-left">
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="
+      https://api.star-history.com/svg?repos=YuniqueUnic/schemaui&type=date&legend=top-left&theme=dark
+    "
+  />
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="
+      https://api.star-history.com/svg?repos=YuniqueUnic/schemaui&type=date&legend=top-left
+    "
+  />
+  <img
+    alt="Star History Chart"
+    src="https://api.star-history.com/svg?repos=YuniqueUnic/schemaui&type=date&legend=top-left"
+  />
+</picture>
+</a>
