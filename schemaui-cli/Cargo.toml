@@ -14,7 +14,8 @@ color-eyre = "0.6"
 clap = { version = "4.5", features = ["derive"] }
 
 [features]
-default = ["json", "yaml"]
+default = ["json"]
+full = ["all_formats"]
 json = ["schemaui/json"]
 yaml = ["schemaui/yaml"]
 toml = ["schemaui/toml"]
