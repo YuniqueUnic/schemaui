@@ -268,12 +268,19 @@ fn value_panel_lines(
     (lines, cursor_hint)
 }
 
-fn meta_line(field: &FieldState, _is_selected: bool) -> Line<'static> {
+fn meta_line(field: &FieldState, is_selected: bool) -> Line<'static> {
     let mut meta = Vec::new();
+    let type_style = if is_selected {
+        Style::default()
+            .fg(Color::Black)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
 
     meta.push(Span::styled(
         format!("  type: {}", field_type_label(&field.schema.kind)),
-        Style::default().fg(Color::DarkGray),
+        type_style,
     ));
     if field.error.is_some() {
         meta.push(Span::styled(
@@ -318,6 +325,16 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Composite(_) => "composite".to_string(),
         FieldKind::KeyValue(_) => "map".to_string(),
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/presentation/fields_tests.rs"
+    ));
 }
 
 fn composite_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {

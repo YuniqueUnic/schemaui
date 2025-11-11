@@ -310,3 +310,13 @@ fn is_next_root_combo(key: &KeyEvent) -> bool {
     }
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/app/input_tests.rs"
+    ));
+}
