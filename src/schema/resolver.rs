@@ -71,3 +71,13 @@ impl<'a> SchemaResolver<'a> {
         bail!("unsupported reference {reference}")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/schema/resolver_tests.rs"
+    ));
+}
