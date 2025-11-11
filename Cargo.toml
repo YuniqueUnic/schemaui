@@ -12,15 +12,15 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 
 [features]
-default = ["tui", "yaml"]
+default = ["tui", "json", "yaml"]
 full = ["all_formats", "tui", "web"]
 tui = []
 web = []
 
 all_formats = ["json", "yaml", "toml"]
 json = []
-yaml = []
-toml = []
+yaml = ["dep:serde_yaml"]
+toml = ["dep:toml"]
 
 compile_time = []
 # use debug features for debugging which is more flexible than debug_assertions
@@ -42,8 +42,8 @@ textwrap = "0.16"
 
 # For serialization formats
 serde_json = "1"
-serde_yaml = "0.9"
-toml = "0.9"
+serde_yaml = { version = "0.9", optional = true }
+toml = { version = "0.9", optional = true }
 
 [[example]]
 name = "jsonattr"
