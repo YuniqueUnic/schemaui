@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.3.0...schemaui-v0.3.1) - 2025-11-12
+
+### Fixed
+
+- fix build and ci to trigger the latest
+
+### Other
+
+- *(cd)* update upload-rust-binary-action configuration
+
 ## [0.2.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.2.0...schemaui-cli-v0.2.1) - 2025-11-12
 
 ### Added
