@@ -1,11 +1,12 @@
 /target
 instructions.txt
 
-# 忽略整个 docs 目录
-docs/
+docs/**/*.md
+docs/**/*.gif
 !docs/**/cli_usage*.md
 !docs/**/structure_design*.md
 !docs/**/*demo.gif
+
 
 
 # General
