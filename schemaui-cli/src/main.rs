@@ -1,3 +1,5 @@
+#![doc = include_str!("../../docs/en/cli_usage.md")]
+
 use std::fmt::Write as FmtWrite;
 use std::fs;
 use std::io::{self, Read};

@@ -10,21 +10,21 @@
 <img src="https://github.com/YuniqueUnic/schemaui/blob/master/docs/schemaui-demo.gif?raw=true" width="500">
 
 [English](./README.md) | [中文文档](./README.ZH.md)
+
 </div>
 
 `schemaui` turns JSON Schema documents into fully interactive terminal UIs
-powered by `ratatui`, `crossterm`, and `jsonschema`. 
+powered by `ratatui`, `crossterm`, and `jsonschema`.
 
-The library parses rich schemas (nested sections, `$ref`, arrays, key/value maps,
-pattern properties…) into a navigable form tree, renders it as a keyboard-first
-editor, and validates the result after every edit so users always see the full
-list of issues before saving.
+The library parses rich schemas (nested sections, `$ref`, arrays, key/value
+maps, pattern properties…) into a navigable form tree, renders it as a
+keyboard-first editor, and validates the result after every edit so users always
+see the full list of issues before saving.
 
 ## Feature Highlights
 
 - **Schema fidelity** – draft-07 compatible, including `$ref`, `definitions`,
-   `patternProperties`, enums, numeric ranges, and nested
-  objects/arrays.
+  `patternProperties`, enums, numeric ranges, and nested objects/arrays.
 - **Sections & overlays** – top-level properties become root tabs, nested
   objects are flattened into sections, and complex nodes (composites, key/value
   collections, array entries) open dedicated overlays with their own validators.
@@ -270,7 +270,6 @@ cargo install schemaui-cli
 # so you should use it like this: `schemaui -c xxx`
 ```
 
-
 ```bash
 schemaui \
   --schema ./schema.json \
@@ -326,9 +325,10 @@ schemaui \
 ## Documentation Map
 
 - `README.md` – overview + architecture snapshot.
-- `docs/en/structure_design.md` – detailed schema/layout/runtime design with flow
-  diagrams.
-- `docs/en/cli_usage.md` – CLI-specific manual (inputs, outputs, piping, samples).
+- `docs/en/structure_design.md` – detailed schema/layout/runtime design with
+  flow diagrams.
+- `docs/en/cli_usage.md` – CLI-specific manual (inputs, outputs, piping,
+  samples).
 
 ## Development
 
@@ -350,11 +350,13 @@ schemaui \
 
 - [x] parse json schema at runtime and generate a TUI
 - [ ] parse json schema at runtime and generate a Web UI
-- [ ] parse json schema at compile time Then generate the code for TUI, expose nessessary APIs for runtime.
-- [ ] parse json schema at compile time Then generate the code for Web UI, expose nessessary APIs for runtime.
+- [ ] parse json schema at compile time Then generate the code for TUI, expose
+      necessary APIs for runtime.
+- [ ] parse json schema at compile time Then generate the code for Web UI,
+      expose necessary APIs for runtime.
 - [ ] parse json schema at runtime and generate a Interactive CLI
-- [ ] parse json schema at compile time Then generate the code for Interactive CLI, expose nessessary APIs for runtime.
-
+- [ ] parse json schema at compile time Then generate the code for Interactive
+      CLI, expose necessary APIs for runtime.
 
 Licensed under either of
 

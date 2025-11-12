@@ -221,7 +221,7 @@ Form focus ──Ctrl+E──▶ try_open_composite_editor
 | Sections    | `Ctrl+Tab` / `Ctrl+Shift+Tab`              | Jump between sections in the current root           |
 | Roots       | `Ctrl+J` / `Ctrl+L`                        | Jump between root tabs                              |
 | Popups      | `Enter` (open/apply), `Esc` (close/reset)  | Manage enums/composites                             |
-| Lists       | `Ctrl+N`, `Ctrl+D`, `Ctrl+←/→`, `Ctrl+↑/↓`| Add/delete/select/reorder entries                   |
+| Lists       | `Ctrl+N`, `Ctrl+D`, `Ctrl+←/→`, `Ctrl+↑/↓` | Add/delete/select/reorder entries                   |
 | Overlay     | `Ctrl+E`                                   | Launch editor for composites/key-value/list entries |
 | Persistence | `Ctrl+S`                                   | Save + validate                                     |
 | Exit        | `Ctrl+Q`, `Ctrl+C`                         | Arm quit / confirm quit                             |
@@ -251,9 +251,9 @@ identically unless explicitly overridden.
 └────┬───┘     └─────────┬─────┘               │ (library)    │        └────┬───────┘
      │ diagnostics       │ format hint         └─────┬────────┘             │  writes
 ┌────▼─────────┐         │ DocumentFormat            │ validator            ▼  files/stdout
-│Diagnostic    │◀────────┘ (extension or default)    │                      
-│Collector     │                                     ▼                      
-└──────────────┘                               Interactive UI       
+│Diagnostic    │◀────────┘ (extension or default)    │
+│Collector     │                                     ▼
+└──────────────┘                               Interactive UI
 ```
 
 ## 9. Public APIs & Output Hooks

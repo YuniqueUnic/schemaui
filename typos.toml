@@ -10,5 +10,6 @@ locale = "en"
 [default.extend-words]
 # 项目特定词汇（避免误报）
 # 例如：helo = "helo"
-"iif" = "iif"
-"oif" = "oif"
+iif = "iif"
+oif = "oif"
+ratatui = "ratatui"

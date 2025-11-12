@@ -27,8 +27,8 @@ schemaui --help             # 二进制文件通过 clap 元数据命名为 `sch
 └────┬───┘     └─────────┬─────┘               │ (library)    │        └────┬───────┘
      │ diagnostics       │ format hint         └─────┬────────┘             │  writes
 ┌────▼─────────┐         │ DocumentFormat            │ validator            ▼  files/stdout
-│Diagnostic    │◀────────┘ (extension or default)    │                      
-│Collector     │                                     ▼                      
+│Diagnostic    │◀────────┘ (extension or default)    │
+│Collector     │                                     ▼
 └──────────────┘                               Interactive UI
 ```
 

@@ -10,6 +10,7 @@
 <img src="https://github.com/YuniqueUnic/schemaui/blob/master/docs/schemaui-demo.gif?raw=true" width="500">
 
 [English](./README.md) | [中文文档](./README.ZH.md)
+
 </div>
 
 `schemaui` 将 JSON Schema
@@ -24,10 +25,11 @@
 - **部分和覆盖层** –
   顶层属性成为根标签，嵌套对象被展平为部分，复杂节点（复合体、键值集合、数组条目）打开具有自身验证器的专用覆盖层。
 - **即时验证** –
-  每次按键都可以触发`jsonschema::Validator`，所有错误（字段作用域+全局）都被收集并一起显示。
-- **可插拔的I/O** –
-  `io::input`可以处理JSON/YAML/TOML（通过功能标志），而`io::output`可以输出到标准输出和/或任何启用格式的多个文件。
-- **内置CLI** –
+  每次按键都可以触发`jsonschema::Validator`，所有错误（字段作用域 +
+  全局）都被收集并一起显示。
+- **可插拔的 I/O** – `io::input`可以处理
+  JSON/YAML/TOML（通过功能标志），而`io::output`可以输出到标准输出和/或任何启用格式的多个文件。
+- **内置 CLI** –
   `schemaui-cli`提供了与库相同的流程，包括多目标输出、stdin/内联规范和聚合诊断。
 
 ## 快速开始
@@ -77,7 +79,7 @@ fn main() -> color_eyre::Result<()> {
     });
 
     let value = SchemaUI::new(schema)
-        .with_title("SchemaUI演示")
+        .with_title("SchemaUI 演示")
         .run()?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
@@ -111,8 +113,10 @@ fn main() -> color_eyre::Result<()> {
 
 ## 输入与输出设计
 
-- `io::input::parse_document_str`将JSON/YAML/TOML（通过`serde_json`、`serde_yaml`、`toml`）转换为`serde_json::Value`。功能标志（`json`、`yaml`、`toml`、`all_formats`）保持依赖项精简。
-- `schema_from_data_value/str`从活动配置中推断模式，注入草稿-07元数据和默认值，以便UI加载现有值。
+- `io::input::parse_document_str`将
+  JSON/YAML/TOML（通过`serde_json`、`serde_yaml`、`toml`）转换为`serde_json::Value`。功能标志（`json`、`yaml`、`toml`、`all_formats`）保持依赖项精简。
+- `schema_from_data_value/str`从活动配置中推断模式，注入草稿 -07
+  元数据和默认值，以便 UI 加载现有值。
 - `schema_with_defaults`将规范模式与用户数据合并，通过`properties`、`patternProperties`、`additionalProperties`、`dependencies`、`dependentSchemas`、数组和`$ref`目标传播默认值，而不修改原始树。
 - `io::output::OutputOptions`封装了序列化格式、美观/紧凑切换以及`OutputDestination::{Stdout, File}`的向量。支持多个目标；冲突在输出前被捕获。
 - `SchemaUI::with_output`将这些选项集成到运行时中，以便在会话结束后自动写入最终的`serde_json::Value`。
@@ -121,17 +125,18 @@ fn main() -> color_eyre::Result<()> {
 
 `schema::layout::build_form_schema`遍历完全解析的模式，并将每个子树映射为`FormSection`/`FieldSchema`：
 
-| 模式功能                                                     | 结果控件                                              |
-| ------------------------------------------------------------ | ----------------------------------------------------- |
-| `type: string`, `integer`, `number`                          | 带有数值保护的内联文本编辑器                          |
-| `type: boolean`                                              | 切换/复选框                                           |
-| `enum`                                                       | 弹出选择器（单选或多选用于数组枚举）                  |
-| 数组                                                         | 内联列表摘要+每个项目的覆盖层编辑器                   |
-| `patternProperties`, `propertyNames`, `additionalProperties` | 带有模式支持验证的键值编辑器                          |
-| `$ref`, `definitions`                                        | 在布局前解析；被视为内联模式                          |
-| `oneOf` / `anyOf`                                            | 变体选择器+覆盖层表单，将非活动变体排除在最终负载之外 |
+| 模式功能                                                     | 结果控件                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------- |
+| `type: string`, `integer`, `number`                          | 带有数值保护的内联文本编辑器                            |
+| `type: boolean`                                              | 切换/复选框                                             |
+| `enum`                                                       | 弹出选择器（单选或多选用于数组枚举）                    |
+| 数组                                                         | 内联列表摘要 + 每个项目的覆盖层编辑器                   |
+| `patternProperties`, `propertyNames`, `additionalProperties` | 带有模式支持验证的键值编辑器                            |
+| `$ref`, `definitions`                                        | 在布局前解析；被视为内联模式                            |
+| `oneOf` / `anyOf`                                            | 变体选择器 + 覆盖层表单，将非活动变体排除在最终负载之外 |
 
-根对象生成标签；嵌套对象成为带有面包屑标题的部分。每个字段记录其JSON指针（例如`/runtime/http/port`），以便焦点管理和验证可以精确映射错误。
+根对象生成标签；嵌套对象成为带有面包屑标题的部分。每个字段记录其 JSON
+指针（例如`/runtime/http/port`），以便焦点管理和验证可以精确映射错误。
 
 ## 验证生命周期
 
@@ -160,13 +165,14 @@ fn main() -> color_eyre::Result<()> {
 ## TUI 构建块与快捷键
 
 - **快捷键单一来源** –
-  `keymap/default.keymap.json`列出了每个快捷键（上下文、组合键、动作）。`app::keymap::keymap_source!()`宏将此文件拉入二进制文件中，`InputRouter`使用它对`KeyEvent`进行分类，运行时页脚从相同的数据中呈现帮助文本——保持文档和行为DRY。
+  `keymap/default.keymap.json`列出了每个快捷键（上下文、组合键、动作）。`app::keymap::keymap_source!()`宏将此文件拉入二进制文件中，`InputRouter`使用它对`KeyEvent`进行分类，运行时页脚从相同的数据中呈现帮助文本——保持文档和行为
+  DRY。
 - **根标签与部分** –
   焦点通过`Ctrl+J / Ctrl+L`（根）和`Ctrl+Tab / Ctrl+Shift+Tab`（部分）循环。普通`Tab`/`Shift+Tab`在各个字段之间移动。
 - **字段** –
   渲染标签、描述和内联错误消息。枚举/复合字段显示当前选择；数组总结长度和选定条目。
-- **弹出窗口与覆盖层** –
-  按下`Enter`键打开枚举/oneOf选择器的弹出窗口；`Ctrl+E`打开复合编辑器的全屏覆盖层。覆盖层暴露集合快捷键（`Ctrl+N`、`Ctrl+D`、`Ctrl+←/→`、`Ctrl+↑/↓`）以及`Ctrl+S`提交。
+- **弹出窗口与覆盖层** – 按下`Enter`键打开枚举/oneOf
+  选择器的弹出窗口；`Ctrl+E`打开复合编辑器的全屏覆盖层。覆盖层暴露集合快捷键（`Ctrl+N`、`Ctrl+D`、`Ctrl+←/→`、`Ctrl+↑/↓`）以及`Ctrl+S`提交。
 - **状态与帮助** –
   页脚突出显示脏状态、未解决的验证错误和上下文感知帮助文本。当自动验证启用时，每次编辑都会立即更新这些计数器。
 
@@ -178,7 +184,7 @@ fn main() -> color_eyre::Result<()> {
 | 选择   | `Enter`                             | 打开弹出窗口/应用选择    |
 | 编辑   | `Ctrl+E`                            | 启动复合编辑器           |
 | 状态   | `Esc`                               | 清除状态或关闭弹出窗口   |
-| 持久化 | `Ctrl+S`                            | 保存+验证                |
+| 持久化 | `Ctrl+S`                            | 保存 + 验证              |
 | 退出   | `Ctrl+Q` / `Ctrl+C`                 | 退出（如果脏则需要确认） |
 | 集合   | `Ctrl+N` / `Ctrl+D`                 | 添加/删除条目            |
 |        | `Ctrl+←/→`, `Ctrl+↑/↓`              | 选择/重新排序条目        |
@@ -188,8 +194,8 @@ fn main() -> color_eyre::Result<()> {
 
 将每个快捷键放入`keymap/default.keymap.json`中，以便运行时逻辑、帮助覆盖层和文档都使用单一信息源。
 
-- **格式** –
-  每个JSON对象声明一个`id`、人类可读的`description`、`contexts`（任何`"default"`、`"collection"`、`"overlay"`），一个`action`区分联合类型以及文本`combos`列表。例如：
+- **格式** – 每个 JSON
+  对象声明一个`id`、人类可读的`description`、`contexts`（任何`"default"`、`"collection"`、`"overlay"`），一个`action`区分联合类型以及文本`combos`列表。例如：
 
   ```json
   {
@@ -201,25 +207,27 @@ fn main() -> color_eyre::Result<()> {
   }
   ```
 
-- **宏+解析器** – `app::keymap::keymap_source!()` `include_str!`s
+- **宏 + 解析器** – `app::keymap::keymap_source!()` `include_str!`s
   JSON，`once_cell::sync::Lazy`在启动时一次解析，并将每个组合键编译为`KeyPattern`（键码、所需修饰符、美观显示字符串）。
 - **集成** –
-  `InputRouter::classify`委托给`keymap::classify_key`，该函数返回嵌入在JSON中的`KeyAction`。`keymap::help_text`根据`KeymapContext`过滤绑定，连接用于`StatusLine`和覆盖层说明的片段。
-- **扩展** –
-  要添加快捷键，编辑JSON，选择暴露帮助文本的上下文，并在引入新的语义命令时在`KeyBindingMap`中连接结果`KeyAction`。
+  `InputRouter::classify`委托给`keymap::classify_key`，该函数返回嵌入在 JSON
+  中的`KeyAction`。`keymap::help_text`根据`KeymapContext`过滤绑定，连接用于`StatusLine`和覆盖层说明的片段。
+- **扩展** – 要添加快捷键，编辑
+  JSON，选择暴露帮助文本的上下文，并在引入新的语义命令时在`KeyBindingMap`中连接结果`KeyAction`。
 
 ## 运行时层
 
-| 层           | 模块(s)                                                                    | 责任                                                           |
+| 层           | 模块 (s)                                                                   | 责任                                                           |
 | ------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| 摄取         | `io::input`, `schema::loader`, `schema::resolver`                          | 解析JSON/TOML/YAML，解析`$ref`，并规范化元数据。               |
+| 摄取         | `io::input`, `schema::loader`, `schema::resolver`                          | 解析 JSON/TOML/YAML，解析`$ref`，并规范化元数据。              |
 | 布局类型     | `schema::layout`                                                           | 从解析后的模式生成`FormSchema`（根/部分/字段）。               |
 | 表单状态     | `form::state`, `form::section`, `form::field`                              | 跟踪焦点、指针、脏标志、强制转换和错误。                       |
 | 命令与简化器 | `form::actions`, `form::reducers`, `app::validation`                       | 定义`FormCommand`，突变状态，并路由验证结果。                  |
 | 运行时控制器 | `app::runtime`, `app::overlay`, `app::popup`, `app::status`, `app::keymap` | 事件循环，输入路由器分发，覆盖层生命周期，帮助文本，状态更新。 |
 | 呈现         | `presentation::view`, `presentation::components::*`                        | 通过`ratatui`呈现标签、字段列表、弹出窗口、覆盖层和页脚。      |
 
-每个模块保持在约600行代码以下（硬上限800），以尊重KISS原则并使重构易于管理。
+每个模块保持在约 600 行代码以下（硬上限 800），以尊重 KISS
+原则并使重构易于管理。
 
 ## CLI (`schemaui-cli`)
 
@@ -260,7 +268,8 @@ schemaui \
 ```
 
 - 输入 – `--schema` /
-  `--config`接受文件路径、内联有效载荷或`-`用于标准输入（但不能同时使用两者）。如果只提供配置，CLI通过`schema_from_data_value`推断模式。
+  `--config`接受文件路径、内联有效载荷或`-`用于标准输入（但不能同时使用两者）。如果只提供配置，CLI
+  通过`schema_from_data_value`推断模式。
 - 诊断 –
   `DiagnosticCollector`累积格式问题、功能标志不匹配、标准输入冲突和现有输出文件，以执行前的诊断。
 - 输出 –
@@ -270,29 +279,31 @@ schemaui \
 
 ## 关键依赖项
 
-| 库                                          | 用途                                      |
-| ------------------------------------------- | ----------------------------------------- |
-| `serde`, `serde_json`, `serde_yaml`, `toml` | 解析和序列化模式/配置数据。               |
-| `schemars`                                  | 草稿-07模式表示，由`schema::layout`使用。 |
-| `jsonschema`                                | 表单和覆盖层的运行时验证。                |
-| `ratatui`                                   | 渲染小部件、布局、覆盖层和页脚。          |
-| `crossterm`                                 | 输入路由器消耗的终端事件。                |
-| `indexmap`                                  | 模式遍历的顺序保持映射。                  |
-| `once_cell`                                 | 懒解析快捷键JSON。                        |
-| `clap`, `color-eyre` (CLI)                  | 参数解析和用户友好的诊断。                |
+| 库                                          | 用途                                        |
+| ------------------------------------------- | ------------------------------------------- |
+| `serde`, `serde_json`, `serde_yaml`, `toml` | 解析和序列化模式/配置数据。                 |
+| `schemars`                                  | 草稿 -07 模式表示，由`schema::layout`使用。 |
+| `jsonschema`                                | 表单和覆盖层的运行时验证。                  |
+| `ratatui`                                   | 渲染小部件、布局、覆盖层和页脚。            |
+| `crossterm`                                 | 输入路由器消耗的终端事件。                  |
+| `indexmap`                                  | 模式遍历的顺序保持映射。                    |
+| `once_cell`                                 | 懒解析快捷键 JSON。                         |
+| `clap`, `color-eyre` (CLI)                  | 参数解析和用户友好的诊断。                  |
 
 ## 文档映射
 
-- `README.md` – 概述+架构快照。
+- `README.md` – 概述 + 架构快照。
 - `docs/structure_design.md` – 详细的模式/布局/运行时设计，带有流程图。
-- `docs/cli_usage.md` – CLI特定手册（输入、输出、管道、示例）。
+- `docs/cli_usage.md` – CLI 特定手册（输入、输出、管道、示例）。
 
 ## 开发
 
-- 定期运行`cargo fmt && cargo test`；大多数模块通过`include!`嵌入`tests/`中的文件，以覆盖私有API。
-- 将模块保持在约600行代码以下（硬上限800）。一旦行为增长，就拆分帮助程序，以保持KISS完整。
+- 定期运行`cargo fmt && cargo test`；大多数模块通过`include!`嵌入`tests/`中的文件，以覆盖私有
+  API。
+- 将模块保持在约 600 行代码以下（硬上限
+  800）。一旦行为增长，就拆分帮助程序，以保持 KISS 完整。
 - 优先使用成熟的库（`serde_*`、`schemars`、`jsonschema`、`ratatui`、`crossterm`、`once_cell`），除非更改微不足道，否则不要编写定制代码。
-- 每当管道、快捷键或CLI语义演变时，更新`docs/*`，以确保面向用户文档的真实性。
+- 每当管道、快捷键或 CLI 语义演变时，更新`docs/*`，以确保面向用户文档的真实性。
 
 ## 参考项目
 
@@ -314,7 +325,8 @@ schemaui \
 
 - Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) 或
   http://www.apache.org/licenses/LICENSE-2.0 )
-- MIT license ([LICENSE-MIT](LICENSE-MIT) 或 http://opensource.org/licenses/MIT )
+- MIT license ([LICENSE-MIT](LICENSE-MIT) 或 http://opensource.org/licenses/MIT
+  )
 
 ### 贡献
 

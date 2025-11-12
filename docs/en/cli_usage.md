@@ -28,9 +28,9 @@ schemaui --help             # binary is named `schemaui` via the clap metadata
 └────┬───┘     └─────────┬─────┘               │ (library)    │        └────┬───────┘
      │ diagnostics       │ format hint         └─────┬────────┘             │  writes
 ┌────▼─────────┐         │ DocumentFormat            │ validator            ▼  files/stdout
-│Diagnostic    │◀────────┘ (extension or default)    │                      
-│Collector     │                                     ▼                      
-└──────────────┘                               Interactive UI               
+│Diagnostic    │◀────────┘ (extension or default)    │
+│Collector     │                                     ▼
+└──────────────┘                               Interactive UI
 ```
 
 Key components:
@@ -162,5 +162,5 @@ CLI and host applications automatically reflect build-time capabilities.
 - Combine `-o -` with file outputs to tee the result into CI logs while still
   writing to disk.
 
-With these patterns you can script `schemaui` confidently in CI/CD pipelines
-or developer tooling.
+With these patterns you can script `schemaui` confidently in CI/CD pipelines or
+developer tooling.
