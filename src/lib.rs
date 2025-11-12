@@ -1,3 +1,4 @@
+#![allow(clippy::doc_overindented_list_items)]
 #![doc = include_str!("../README.md")]
 
 mod app;

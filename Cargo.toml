@@ -59,6 +59,13 @@ name = "schemars"
 path = "examples/schemars.rs"
 
 
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"
+
 [package.metadata.release]
 pre-release-replacements = [
     { file = "README.md", search = "schemaui = \"[0-9]+\\.[0-9]+\\.[0-9]+[^\"]*\"", replace = "schemaui = \"{{version}}\"" },

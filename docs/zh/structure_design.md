@@ -224,8 +224,8 @@ Form focus ──Ctrl+E──▶ try_open_composite_editor
 └────┬───┘     └─────────┬─────┘               │ (library)    │        └────┬───────┘
      │ diagnostics       │ format hint         └─────┬────────┘             │  writes
 ┌────▼─────────┐         │ DocumentFormat            │ validator            ▼  files/stdout
-│Diagnostic    │◀────────┘ (extension or default)    │                      
-│Collector     │                                     ▼                      
+│Diagnostic    │◀────────┘ (extension or default)    │
+│Collector     │                                     ▼
 └──────────────┘                               Interactive UI
 ```
 
