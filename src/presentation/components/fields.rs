@@ -10,7 +10,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
     domain::FieldKind,
-    form::{FieldState, FieldValue, FormState, SectionState},
+    form::{FieldState, FormState, SectionState},
 };
 
 pub fn render_fields(
@@ -201,18 +201,13 @@ fn info_line(field: &FieldState, is_selected: bool) -> Line<'static> {
     let mut spans = vec![Span::styled(label, label_style)];
 
     if field.dirty {
-        spans.push(Span::styled(
-            "  ·dirty",
-            Style::default().fg(Color::Yellow),
-        ));
+        spans.push(Span::styled("  ·dirty", Style::default().fg(Color::Yellow)));
     }
 
     if field.error.is_some() {
         spans.push(Span::styled(
             "  ·invalid",
-            Style::default()
-                .fg(Color::Red)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         ));
     }
 
@@ -322,12 +317,7 @@ fn meta_lines(field: &FieldState, is_selected: bool, max_width: u16) -> Vec<Line
     let width = max_width.max(4) as usize;
     wrap(&content, width)
         .into_iter()
-        .map(|line| {
-            Line::from(Span::styled(
-                format!("  {}", line.into_owned()),
-                style,
-            ))
-        })
+        .map(|line| Line::from(Span::styled(format!("  {}", line.into_owned()), style)))
         .collect()
 }
 
@@ -373,46 +363,43 @@ mod tests {
 }
 
 fn composite_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
-    if let FieldValue::Composite(state) = &field.value {
-        let summaries = state.active_summaries();
-        if summaries.is_empty() {
-            return None;
-        }
-        let mut lines = Vec::new();
-        lines.push(Line::from("  Active variants:"));
-        let max_render = 3usize;
-        for summary in summaries.iter().take(max_render) {
-            lines.push(Line::from(vec![
-                Span::styled("  • ", Style::default().fg(Color::Gray)),
-                Span::styled(
-                    summary.title.clone(),
-                    Style::default()
-                        .fg(Color::Magenta)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]));
-            if let Some(desc) = summary.description.as_ref()
-                && !desc.is_empty()
-            {
-                lines.push(Line::from(vec![
-                    Span::raw("     "),
-                    Span::styled(desc.clone(), Style::default().fg(Color::Gray)),
-                ]));
-            }
-            for line in &summary.lines {
-                lines.push(Line::from(format!("     {line}")));
-            }
-            lines.push(Line::from(" "));
-        }
-        if summaries.len() > max_render {
-            lines.push(Line::from(format!(
-                "    … ({} more active variants)",
-                summaries.len() - max_render
-            )));
-        }
-        return Some(lines);
+    let summaries = field.composite_variant_summaries()?;
+    if summaries.is_empty() {
+        return None;
     }
-    None
+    let mut lines = Vec::new();
+    lines.push(Line::from("  Active variants:"));
+    let max_render = 3usize;
+    for summary in summaries.iter().take(max_render) {
+        lines.push(Line::from(vec![
+            Span::styled("  • ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                summary.title.clone(),
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+        if let Some(desc) = summary.description.as_ref()
+            && !desc.is_empty()
+        {
+            lines.push(Line::from(vec![
+                Span::raw("     "),
+                Span::styled(desc.clone(), Style::default().fg(Color::Gray)),
+            ]));
+        }
+        for line in &summary.lines {
+            lines.push(Line::from(format!("     {line}")));
+        }
+        lines.push(Line::from(" "));
+    }
+    if summaries.len() > max_render {
+        lines.push(Line::from(format!(
+            "    … ({} more active variants)",
+            summaries.len() - max_render
+        )));
+    }
+    Some(lines)
 }
 
 fn repeatable_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
@@ -439,90 +426,87 @@ fn repeatable_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
 }
 
 fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
-    if let FieldValue::Composite(state) = &field.value {
-        let mut lines = Vec::new();
-        let options = state.option_titles();
-        if options.is_empty() {
-            lines.push(Line::from(vec![Span::styled(
-                "  No variants available in this schema.",
-                Style::default().fg(Color::Gray),
-            )]));
-            return Some(lines);
-        }
-
-        let label = if state.is_multi() { "AnyOf" } else { "OneOf" };
-        let mut spans = Vec::new();
-        spans.push(Span::styled(
-            format!("  {label}: "),
-            Style::default()
-                .fg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-        ));
-        let active = state.active_flags();
-        for (idx, option) in options.iter().enumerate() {
-            if state.is_multi() {
-                let mark = if active.get(idx).copied().unwrap_or(false) {
-                    "[x]"
-                } else {
-                    "[ ]"
-                };
-                spans.push(Span::styled(
-                    format!(" {mark} "),
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-            let style = if active.get(idx).copied().unwrap_or(false) {
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::Gray)
-            };
-            spans.push(Span::styled(option.clone(), style));
-            if idx + 1 != options.len() {
-                spans.push(Span::styled(
-                    if state.is_multi() { "  " } else { " | " },
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
-        }
-        let hint = if state.is_multi() {
-            "  (Enter toggles, Ctrl+E opens editor)"
-        } else {
-            "  (Enter to choose variant, Ctrl+E edits)"
-        };
-        spans.push(Span::styled(hint, Style::default().fg(Color::DarkGray)));
-        lines.push(Line::from(spans));
-
-        if state.is_multi() {
-            let active_titles = options
-                .iter()
-                .zip(active.iter())
-                .filter(|&(_title, flag)| *flag)
-                .map(|(title, _flag)| title.clone())
-                .collect::<Vec<_>>();
-            let summary = if active_titles.is_empty() {
-                "    Active variants: <none>"
-            } else {
-                "    Active variants: "
-            };
-            let mut summary_spans = vec![Span::styled(summary, Style::default().fg(Color::Gray))];
-            if !active_titles.is_empty() {
-                summary_spans.push(Span::styled(
-                    active_titles.join(", "),
-                    Style::default().fg(Color::White),
-                ));
-            }
-            summary_spans.push(Span::styled(
-                "  + Add variant (Enter)",
-                Style::default().fg(Color::Yellow),
-            ));
-            lines.push(Line::from(summary_spans));
-        }
-
+    let view = field.composite_selector_view()?;
+    let mut lines = Vec::new();
+    if view.options.is_empty() {
+        lines.push(Line::from(vec![Span::styled(
+            "  No variants available in this schema.",
+            Style::default().fg(Color::Gray),
+        )]));
         return Some(lines);
     }
-    None
+
+    let label = if view.multi { "AnyOf" } else { "OneOf" };
+    let mut spans = Vec::new();
+    spans.push(Span::styled(
+        format!("  {label}: "),
+        Style::default()
+            .fg(Color::Magenta)
+            .add_modifier(Modifier::BOLD),
+    ));
+    for (idx, option) in view.options.iter().enumerate() {
+        if view.multi {
+            let mark = if view.active.get(idx).copied().unwrap_or(false) {
+                "[x]"
+            } else {
+                "[ ]"
+            };
+            spans.push(Span::styled(
+                format!(" {mark} "),
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+        let style = if view.active.get(idx).copied().unwrap_or(false) {
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Gray)
+        };
+        spans.push(Span::styled(option.clone(), style));
+        if idx + 1 != view.options.len() {
+            spans.push(Span::styled(
+                if view.multi { "  " } else { " | " },
+                Style::default().fg(Color::DarkGray),
+            ));
+        }
+    }
+    let hint = if view.multi {
+        "  (Enter toggles, Ctrl+E opens editor)"
+    } else {
+        "  (Enter to choose variant, Ctrl+E edits)"
+    };
+    spans.push(Span::styled(hint, Style::default().fg(Color::DarkGray)));
+    lines.push(Line::from(spans));
+
+    if view.multi {
+        let active_titles = view
+            .options
+            .iter()
+            .zip(view.active.iter())
+            .filter(|(_, flag)| **flag)
+            .map(|(title, _)| title.clone())
+            .collect::<Vec<_>>();
+        let summary = if active_titles.is_empty() {
+            "    Active variants: <none>"
+        } else {
+            "    Active variants: "
+        };
+        let mut summary_spans = vec![Span::styled(summary, Style::default().fg(Color::Gray))];
+        if !active_titles.is_empty() {
+            summary_spans.push(Span::styled(
+                active_titles.join(", "),
+                Style::default().fg(Color::White),
+            ));
+        }
+        summary_spans.push(Span::styled(
+            "  + Add variant (Enter)",
+            Style::default().fg(Color::Yellow),
+        ));
+        lines.push(Line::from(summary_spans));
+    }
+
+    Some(lines)
 }
 
 fn count_trailing_spaces(text: &str) -> usize {

@@ -1,202 +1,101 @@
-use super::super::value::{CompositePopupData, FieldValue};
+use super::super::value::{ComponentKind, CompositePopupData, CompositeSelectorView, EnumStateRef};
 use super::FieldState;
 use crate::form::error::FieldCoercionError;
 use crate::form::{
     array::{ArrayEditorContext, ArrayEditorSession},
-    composite::{CompositeEditorSession, CompositeListEditorContext},
+    composite::{CompositeEditorSession, CompositeListEditorContext, CompositeVariantSummary},
     key_value::{KeyValueEditorContext, KeyValueEditorSession},
 };
 
 impl FieldState {
+    pub fn composite_selector_view(&self) -> Option<CompositeSelectorView> {
+        self.component.composite_selector()
+    }
+
+    pub fn composite_variant_summaries(&self) -> Option<Vec<CompositeVariantSummary>> {
+        self.component.composite_summaries()
+    }
+
+    pub fn bool_value(&self) -> Option<bool> {
+        self.component.bool_value()
+    }
+
+    pub fn enum_state(&self) -> Option<EnumStateRef<'_>> {
+        self.component.enum_state()
+    }
+
     pub fn composite_popup(&self) -> Option<CompositePopupData> {
-        if let FieldValue::Composite(state) = &self.value {
-            let options = state.option_titles();
-            if options.is_empty() {
-                return None;
-            }
-            let selected = state.selected_index().unwrap_or(0).min(options.len() - 1);
-            let active = state.active_flags();
-            let multi = state.is_multi();
-            return Some(CompositePopupData {
-                options,
-                selected,
-                multi,
-                active,
-            });
-        }
-        None
+        self.component.composite_popup()
     }
 
     pub fn active_composite_variants(&self) -> Vec<usize> {
-        if let FieldValue::Composite(state) = &self.value {
-            state.active_indices()
-        } else {
-            Vec::new()
-        }
+        self.component.active_composite_variants()
     }
 
     pub fn is_composite_list(&self) -> bool {
         matches!(
-            self.value,
-            FieldValue::CompositeList(_) | FieldValue::KeyValue(_) | FieldValue::ScalarArray(_)
+            self.component.kind(),
+            ComponentKind::CompositeList | ComponentKind::KeyValue | ComponentKind::ScalarArray
         )
     }
 
     pub fn multi_states(&self) -> Option<&[bool]> {
-        if let FieldValue::MultiSelect { selected, .. } = &self.value {
-            Some(selected)
-        } else {
-            None
-        }
+        self.component.multi_state().map(|state| state.selected)
     }
 
     pub fn multi_options(&self) -> Option<&[String]> {
-        if let FieldValue::MultiSelect { options, .. } = &self.value {
-            Some(options)
-        } else {
-            None
-        }
+        self.component.multi_state().map(|state| state.options)
     }
 
     pub fn apply_composite_selection(&mut self, selection: usize, multi_flags: Option<Vec<bool>>) {
-        if let FieldValue::Composite(state) = &mut self.value {
-            let changed = if state.is_multi() {
-                if let Some(flags) = multi_flags {
-                    state.apply_multi(&flags)
-                } else {
-                    false
-                }
-            } else {
-                state.apply_single(selection)
-            };
-            if changed {
-                self.after_edit();
-            }
+        if self
+            .component
+            .apply_composite_selection(selection, multi_flags)
+        {
+            self.after_edit();
         }
     }
 
     pub fn composite_list_select_entry(&mut self, delta: i32) -> bool {
-        match &mut self.value {
-            FieldValue::CompositeList(state) => state.select(delta),
-            FieldValue::KeyValue(state) => state.select(delta),
-            FieldValue::ScalarArray(state) => state.select(delta),
-            _ => false,
-        }
+        self.component.collection_select(delta)
     }
 
     pub fn composite_list_selected_label(&self) -> Option<String> {
-        match &self.value {
-            FieldValue::CompositeList(state) => state.selected_label(),
-            FieldValue::KeyValue(state) => state.selected_label(),
-            FieldValue::ScalarArray(state) => state.selected_label(),
-            _ => None,
-        }
+        self.component.collection_selected_label()
     }
 
     pub fn composite_list_panel(&self) -> Option<(Vec<String>, usize)> {
-        match &self.value {
-            FieldValue::CompositeList(state) => {
-                state.selected_index().map(|idx| (state.summaries(), idx))
-            }
-            FieldValue::KeyValue(state) => state.panel(),
-            FieldValue::ScalarArray(state) => state.panel(),
-            _ => None,
-        }
+        self.component.collection_panel()
     }
 
     pub fn composite_list_selected_index(&self) -> Option<usize> {
-        match &self.value {
-            FieldValue::CompositeList(state) => state.selected_index(),
-            FieldValue::KeyValue(state) => state.selected_index(),
-            FieldValue::ScalarArray(state) => state.selected_index(),
-            _ => None,
-        }
+        self.component.collection_selected_index()
     }
 
     pub fn composite_list_add_entry(&mut self) -> bool {
-        match &mut self.value {
-            FieldValue::CompositeList(state) => {
-                state.add_entry();
-                self.after_edit();
-                true
-            }
-            FieldValue::KeyValue(state) => {
-                if state.add_entry() {
-                    self.after_edit();
-                    true
-                } else {
-                    false
-                }
-            }
-            FieldValue::ScalarArray(state) => {
-                if state.add_entry() {
-                    self.after_edit();
-                    true
-                } else {
-                    false
-                }
-            }
-            _ => false,
+        if self.component.collection_add() {
+            self.after_edit();
+            true
+        } else {
+            false
         }
     }
 
     pub fn composite_list_remove_entry(&mut self) -> bool {
-        match &mut self.value {
-            FieldValue::CompositeList(state) => {
-                if state.remove_selected() {
-                    self.after_edit();
-                    true
-                } else {
-                    false
-                }
-            }
-            FieldValue::KeyValue(state) => {
-                if state.remove_selected() {
-                    self.after_edit();
-                    true
-                } else {
-                    false
-                }
-            }
-            FieldValue::ScalarArray(state) => {
-                if state.remove_selected() {
-                    self.after_edit();
-                    true
-                } else {
-                    false
-                }
-            }
-            _ => false,
+        if self.component.collection_remove() {
+            self.after_edit();
+            true
+        } else {
+            false
         }
     }
 
     pub fn composite_list_move_entry(&mut self, delta: i32) -> bool {
-        match &mut self.value {
-            FieldValue::CompositeList(state) => {
-                if state.move_selected(delta) {
-                    self.after_edit();
-                    true
-                } else {
-                    false
-                }
-            }
-            FieldValue::KeyValue(state) => {
-                if state.move_selected(delta) {
-                    self.after_edit();
-                    true
-                } else {
-                    false
-                }
-            }
-            FieldValue::ScalarArray(state) => {
-                if state.move_selected(delta) {
-                    self.after_edit();
-                    true
-                } else {
-                    false
-                }
-            }
-            _ => false,
+        if self.component.collection_move(delta) {
+            self.after_edit();
+            true
+        } else {
+            false
         }
     }
 
@@ -204,58 +103,31 @@ impl FieldState {
         &mut self,
         variant_index: usize,
     ) -> Result<CompositeEditorSession, FieldCoercionError> {
-        if let FieldValue::Composite(state) = &self.value {
-            state.take_editor_session(&self.schema.pointer, variant_index)
-        } else {
-            Err(FieldCoercionError {
-                pointer: self.schema.pointer.clone(),
-                message: "field is not a composite".to_string(),
-            })
-        }
+        self.component
+            .open_composite_editor(&self.schema.pointer, variant_index)
     }
 
     pub fn open_composite_list_editor(
         &mut self,
     ) -> Result<CompositeListEditorContext, FieldCoercionError> {
-        if let FieldValue::CompositeList(state) = &mut self.value {
-            state.open_selected_editor()
-        } else {
-            Err(FieldCoercionError {
-                pointer: self.schema.pointer.clone(),
-                message: "field is not a composite list".to_string(),
-            })
-        }
+        self.component
+            .open_composite_list_editor(&self.schema.pointer)
     }
 
     pub fn open_key_value_editor(&mut self) -> Result<KeyValueEditorContext, FieldCoercionError> {
-        if let FieldValue::KeyValue(state) = &mut self.value {
-            state.open_selected_editor()
-        } else {
-            Err(FieldCoercionError {
-                pointer: self.schema.pointer.clone(),
-                message: "field is not a key/value map".to_string(),
-            })
-        }
+        self.component.open_key_value_editor(&self.schema.pointer)
     }
 
     pub fn open_scalar_array_editor(&mut self) -> Result<ArrayEditorContext, FieldCoercionError> {
-        if let FieldValue::ScalarArray(state) = &mut self.value {
-            state.open_selected_editor()
-        } else {
-            Err(FieldCoercionError {
-                pointer: self.schema.pointer.clone(),
-                message: "field is not an array".to_string(),
-            })
-        }
+        self.component
+            .open_scalar_array_editor(&self.schema.pointer)
     }
 
     pub fn close_composite_editor(&mut self, session: CompositeEditorSession, mark_dirty: bool) {
-        if let FieldValue::Composite(state) = &self.value {
-            state.restore_editor_session(session);
-            if mark_dirty {
-                self.after_edit();
-            }
+        if mark_dirty {
+            self.after_edit();
         }
+        self.component.restore_composite_editor(session);
     }
 
     pub fn close_composite_list_editor(
@@ -264,11 +136,10 @@ impl FieldState {
         session: CompositeEditorSession,
         mark_dirty: bool,
     ) {
-        if let FieldValue::CompositeList(state) = &mut self.value {
-            state.restore_entry_editor(entry_index, session);
-            if mark_dirty {
-                self.after_edit();
-            }
+        self.component
+            .restore_composite_list_editor(entry_index, session);
+        if mark_dirty {
+            self.after_edit();
         }
     }
 
@@ -278,18 +149,13 @@ impl FieldState {
         session: &KeyValueEditorSession,
         mark_dirty: bool,
     ) -> Result<bool, FieldCoercionError> {
-        if let FieldValue::KeyValue(state) = &mut self.value {
-            let changed = state.apply_editor_session(entry_index, session)?;
-            if mark_dirty && changed {
-                self.after_edit();
-            }
-            Ok(changed)
-        } else {
-            Err(FieldCoercionError {
-                pointer: self.schema.pointer.clone(),
-                message: "field is not a key/value map".to_string(),
-            })
+        let changed = self
+            .component
+            .apply_key_value_editor(entry_index, session)?;
+        if mark_dirty && changed {
+            self.after_edit();
         }
+        Ok(changed)
     }
 
     pub fn close_scalar_array_editor(
@@ -298,17 +164,12 @@ impl FieldState {
         session: &ArrayEditorSession,
         mark_dirty: bool,
     ) -> Result<bool, FieldCoercionError> {
-        if let FieldValue::ScalarArray(state) = &mut self.value {
-            let changed = state.apply_editor_session(entry_index, session)?;
-            if mark_dirty && changed {
-                self.after_edit();
-            }
-            Ok(changed)
-        } else {
-            Err(FieldCoercionError {
-                pointer: self.schema.pointer.clone(),
-                message: "field is not an array".to_string(),
-            })
+        let changed = self
+            .component
+            .apply_scalar_array_editor(entry_index, session)?;
+        if mark_dirty && changed {
+            self.after_edit();
         }
+        Ok(changed)
     }
 }
