@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/yuniqueunic/schemaui/schemaui-cli"
 keywords = ["tui", "schema", "configuration", "terminal", "cross-platform"]
 categories = ["command-line-interface", "config"]
-readme = "../docs/en/cli_usage.md"
+readme = "cli_usage.md"
 
 [[bin]]
 name = "schemaui"
