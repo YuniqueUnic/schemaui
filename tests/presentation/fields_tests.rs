@@ -20,17 +20,23 @@ fn make_field() -> FieldState {
 #[test]
 fn meta_line_selected_uses_dark_text() {
     let field = make_field();
-    let line = meta_line(&field, true);
-    let span = line.spans.first().expect("type span");
-    assert_eq!(span.style.fg, Some(Color::Black));
+    let lines = meta_lines(&field, true, 40);
+    let span = lines
+        .first()
+        .and_then(|line| line.spans.first())
+        .expect("type span");
+    assert_eq!(span.style.fg, Some(Color::Blue));
     assert!(span.style.add_modifier.contains(Modifier::BOLD));
 }
 
 #[test]
 fn meta_line_unselected_uses_gray() {
     let field = make_field();
-    let line = meta_line(&field, false);
-    let span = line.spans.first().expect("type span");
+    let lines = meta_lines(&field, false, 40);
+    let span = lines
+        .first()
+        .and_then(|line| line.spans.first())
+        .expect("type span");
     assert_eq!(span.style.fg, Some(Color::DarkGray));
     assert!(!span.style.add_modifier.contains(Modifier::BOLD));
 }

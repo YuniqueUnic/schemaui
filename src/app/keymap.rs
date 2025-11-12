@@ -215,7 +215,10 @@ impl CodeMatcher {
     }
 
     fn allows_extra_shift(&self) -> bool {
-        matches!(self, CodeMatcher::Alpha(_))
+        matches!(
+            self,
+            CodeMatcher::Alpha(_) | CodeMatcher::Literal(KeyCode::BackTab)
+        )
     }
 }
 

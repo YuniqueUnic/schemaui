@@ -105,6 +105,20 @@ fn main() -> Result<()> {
 
     diagnostics.into_result()?;
 
+    let mut schema_value = schema_value;
+    let mut config_value = config_value;
+
+    if schema_value.is_none() {
+        if let Some(config_doc) = config_value.as_ref()
+            && looks_like_json_schema(config_doc)
+        {
+            eprintln!(
+                "detected JSON Schema provided via --config; treating it as the active schema"
+            );
+            schema_value = config_value.take();
+        }
+    }
+
     if schema_value.is_none() && config_value.is_none() {
         return Err(eyre!("provide at least --schema or --config"));
     }
@@ -280,6 +294,80 @@ fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result
                 format_list()
             )))
         }
+    }
+}
+
+fn looks_like_json_schema(value: &Value) -> bool {
+    let obj = match value.as_object() {
+        Some(map) => map,
+        None => return false,
+    };
+
+    if obj
+        .get("properties")
+        .and_then(Value::as_object)
+        .map(|props| props.len())
+        .unwrap_or(0)
+        == 0
+    {
+        return false;
+    }
+
+    if obj.contains_key("$schema") {
+        return true;
+    }
+
+    if matches!(obj.get("type"), Some(Value::String(t)) if t == "object") {
+        return true;
+    }
+
+    if let Some(props) = obj.get("properties").and_then(Value::as_object) {
+        let mut scored = 0usize;
+        for value in props.values() {
+            if let Some(prop_obj) = value.as_object() {
+                if prop_obj.contains_key("type")
+                    || prop_obj.contains_key("properties")
+                    || prop_obj.contains_key("items")
+                    || prop_obj.contains_key("$ref")
+                {
+                    scored += 1;
+                }
+            }
+        }
+        if scored > 0 {
+            return true;
+        }
+    }
+
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::looks_like_json_schema;
+    use serde_json::json;
+
+    #[test]
+    fn detects_json_schema_shape() {
+        let doc = json!({
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {
+                "username": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}}
+            }
+        });
+        assert!(looks_like_json_schema(&doc));
+    }
+
+    #[test]
+    fn ignores_regular_config_documents() {
+        let doc = json!({
+            "username": "unic",
+            "tags": ["alpha"],
+            "properties": "not a schema"
+        });
+        assert!(!looks_like_json_schema(&doc));
     }
 }
 

@@ -153,6 +153,37 @@ struct CursorHint {
 
 fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> FieldRender {
     let mut lines = Vec::new();
+    lines.push(info_line(field, is_selected));
+
+    if is_selected {
+        if let Some(selector_lines) = composite_selector_lines(field) {
+            lines.extend(selector_lines);
+        }
+    }
+
+    let (value_panel, cursor_hint) = value_panel_lines(field, is_selected, max_width);
+    lines.extend(value_panel);
+
+    if is_selected {
+        if let Some(summary) = composite_summary_lines(field) {
+            lines.extend(summary);
+        }
+
+        if let Some(summary) = repeatable_summary_lines(field) {
+            lines.extend(summary);
+        }
+    }
+
+    lines.extend(meta_lines(field, is_selected, max_width));
+
+    if let Some(error) = error_lines(field, max_width) {
+        lines.extend(error);
+    }
+
+    FieldRender { lines, cursor_hint }
+}
+
+fn info_line(field: &FieldState, is_selected: bool) -> Line<'static> {
     let mut label = field.schema.display_label();
     if field.schema.required {
         label.push_str(" *");
@@ -167,30 +198,25 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
             .fg(Color::Cyan)
             .add_modifier(Modifier::BOLD)
     };
-    lines.push(Line::from(Span::styled(label, label_style)));
+    let mut spans = vec![Span::styled(label, label_style)];
 
-    if let Some(selector_lines) = composite_selector_lines(field) {
-        lines.extend(selector_lines);
+    if field.dirty {
+        spans.push(Span::styled(
+            "  ·dirty",
+            Style::default().fg(Color::Yellow),
+        ));
     }
 
-    let (value_panel, cursor_hint) = value_panel_lines(field, is_selected, max_width);
-    lines.extend(value_panel);
-
-    if let Some(summary) = composite_summary_lines(field) {
-        lines.extend(summary);
+    if field.error.is_some() {
+        spans.push(Span::styled(
+            "  ·invalid",
+            Style::default()
+                .fg(Color::Red)
+                .add_modifier(Modifier::BOLD),
+        ));
     }
 
-    if let Some(summary) = repeatable_summary_lines(field) {
-        lines.extend(summary);
-    }
-
-    lines.push(meta_line(field, is_selected));
-
-    if let Some(error) = error_lines(field, max_width) {
-        lines.extend(error);
-    }
-
-    FieldRender { lines, cursor_hint }
+    Line::from(spans)
 }
 
 fn value_panel_lines(
@@ -268,9 +294,24 @@ fn value_panel_lines(
     (lines, cursor_hint)
 }
 
-fn meta_line(field: &FieldState, is_selected: bool) -> Line<'static> {
-    let mut meta = Vec::new();
-    let type_style = if is_selected {
+fn meta_lines(field: &FieldState, is_selected: bool, max_width: u16) -> Vec<Line<'static>> {
+    let mut parts = Vec::new();
+    parts.push(format!("type: {}", field_type_label(&field.schema.kind)));
+    if let Some(desc) = field
+        .schema
+        .description
+        .as_ref()
+        .map(|d| d.trim())
+        .filter(|d| !d.is_empty())
+    {
+        parts.push(format!("desc: {}", desc));
+    }
+    let content = parts.join(" | ");
+    if content.is_empty() {
+        return Vec::new();
+    }
+
+    let style = if is_selected {
         Style::default()
             .fg(Color::Blue)
             .add_modifier(Modifier::BOLD)
@@ -278,22 +319,16 @@ fn meta_line(field: &FieldState, is_selected: bool) -> Line<'static> {
         Style::default().fg(Color::DarkGray)
     };
 
-    meta.push(Span::styled(
-        format!("  type: {}", field_type_label(&field.schema.kind)),
-        type_style,
-    ));
-    if field.error.is_some() {
-        meta.push(Span::styled(
-            "  • invalid",
-            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-        ));
-    } else if field.dirty {
-        meta.push(Span::styled(
-            "  • dirty",
-            Style::default().fg(Color::Yellow),
-        ));
-    }
-    Line::from(meta)
+    let width = max_width.max(4) as usize;
+    wrap(&content, width)
+        .into_iter()
+        .map(|line| {
+            Line::from(Span::styled(
+                format!("  {}", line.into_owned()),
+                style,
+            ))
+        })
+        .collect()
 }
 
 fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>> {
