@@ -15,7 +15,7 @@ cargo run -p schemaui-cli -- --schema ./schema.json --config ./config.yaml
 ### 安装为二进制文件
 
 ```bash
-cargo install --path schemaui-cli --locked
+cargo install schemaui-cli
 schemaui --help             # 二进制文件通过 clap 元数据命名为 `schemaui`
 ```
 
