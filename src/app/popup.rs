@@ -1,5 +1,5 @@
 use crate::{
-    form::{CompositePopupData, FieldState, FieldValue},
+    form::{CompositePopupData, FieldState},
     presentation::PopupRender,
 };
 
@@ -14,38 +14,42 @@ pub(crate) struct PopupState {
 
 impl PopupState {
     pub(crate) fn from_field(field: &FieldState) -> Option<Self> {
-        match (field.multi_options(), field.multi_states()) {
-            (Some(options), Some(states)) => Some(Self {
+        if let (Some(options), Some(states)) = (field.multi_options(), field.multi_states()) {
+            return Some(Self {
                 field_pointer: field.schema.pointer.clone(),
                 title: field.schema.display_label(),
                 options: options.to_vec(),
                 selected: 0,
                 multi: true,
                 toggles: states.to_vec(),
-            }),
-            _ => match &field.value {
-                FieldValue::Bool(current) => Some(Self {
-                    field_pointer: field.schema.pointer.clone(),
-                    title: field.schema.display_label(),
-                    options: vec!["true".to_string(), "false".to_string()],
-                    selected: if *current { 0 } else { 1 },
-                    multi: false,
-                    toggles: Vec::new(),
-                }),
-                FieldValue::Enum { options, selected } => Some(Self {
-                    field_pointer: field.schema.pointer.clone(),
-                    title: field.schema.display_label(),
-                    options: options.clone(),
-                    selected: *selected,
-                    multi: false,
-                    toggles: Vec::new(),
-                }),
-                FieldValue::Composite(_) => field
-                    .composite_popup()
-                    .map(|data| Self::from_composite(field, data)),
-                _ => None,
-            },
+            });
         }
+
+        if let Some(value) = field.bool_value() {
+            return Some(Self {
+                field_pointer: field.schema.pointer.clone(),
+                title: field.schema.display_label(),
+                options: vec!["true".to_string(), "false".to_string()],
+                selected: if value { 0 } else { 1 },
+                multi: false,
+                toggles: Vec::new(),
+            });
+        }
+
+        if let Some(state) = field.enum_state() {
+            return Some(Self {
+                field_pointer: field.schema.pointer.clone(),
+                title: field.schema.display_label(),
+                options: state.options.to_vec(),
+                selected: state.selected,
+                multi: false,
+                toggles: Vec::new(),
+            });
+        }
+
+        field
+            .composite_popup()
+            .map(|data| Self::from_composite(field, data))
     }
 
     fn from_composite(field: &FieldState, data: CompositePopupData) -> Self {

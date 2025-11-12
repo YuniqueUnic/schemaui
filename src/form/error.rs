@@ -11,3 +11,12 @@ impl std::fmt::Display for FieldCoercionError {
 }
 
 impl std::error::Error for FieldCoercionError {}
+
+impl FieldCoercionError {
+    pub fn unsupported(pointer: &str, action: &str) -> Self {
+        Self {
+            pointer: pointer.to_string(),
+            message: format!("field does not support {action}"),
+        }
+    }
+}

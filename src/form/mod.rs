@@ -11,7 +11,7 @@ mod state;
 pub use actions::FormCommand;
 pub use array::ArrayEditorSession;
 pub use composite::CompositeEditorSession;
-pub use field::{CompositePopupData, FieldState, FieldValue};
+pub use field::{CompositePopupData, FieldState};
 pub use key_value::KeyValueEditorSession;
 pub use reducers::{FormEngine, apply_command};
 pub use section::SectionState;
