@@ -5,7 +5,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use jsonschema::{Validator, validator_for};
 
 use crate::{
-    app::keymap::{self, KeymapContext},
+    app::keymap::KeymapContext,
     domain::FieldKind,
     form::{
         ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand, FormEngine, FormState,
@@ -103,10 +103,14 @@ pub(super) struct CompositeEditorOverlay {
 }
 
 impl CompositeEditorOverlay {
-    pub(super) fn new(field_pointer: String, field_label: String, session: OverlaySession) -> Self {
+    pub(super) fn new(
+        field_pointer: String,
+        field_label: String,
+        session: OverlaySession,
+        instructions: String,
+    ) -> Self {
         let display_title = format!("Edit {} – {}", field_label, session.title());
         let display_description = session.description();
-        let instructions = overlay_help_string();
         Self {
             field_pointer,
             field_label,
@@ -133,7 +137,6 @@ impl CompositeEditorOverlay {
     pub(super) fn set_list_panel(&mut self, entries: Vec<String>, selected: usize) {
         self.list_entries = Some(entries);
         self.list_selected = Some(selected);
-        self.instructions = overlay_help_string();
     }
 
     pub(super) fn dirty(&self) -> bool {
@@ -148,18 +151,16 @@ pub(super) enum CompositeOverlayTarget {
     ArrayEntry { entry_index: usize },
 }
 
-fn overlay_help_string() -> String {
-    keymap::help_text(KeymapContext::Overlay)
-        .unwrap_or_else(|| "Ctrl+S save • Esc cancel".to_string())
-}
-
 impl App {
     fn set_overlay_status_message(&mut self) {
-        if let Some(help) = keymap::help_text(KeymapContext::Overlay) {
-            self.status.set_raw(&format!("Overlay: {help}"));
-        } else {
-            self.status.set_raw("Overlay editor");
-        }
+        let help = self.overlay_help_text();
+        self.status.set_raw(&format!("Overlay: {help}"));
+    }
+
+    fn overlay_help_text(&self) -> String {
+        self.keymap_store
+            .help_text(KeymapContext::Overlay)
+            .unwrap_or_else(|| "Ctrl+S save • Esc cancel".to_string())
     }
 
     pub(super) fn try_open_composite_editor(&mut self) {
@@ -187,6 +188,7 @@ impl App {
                             pointer,
                             label,
                             OverlaySession::Composite(session),
+                            self.overlay_help_text(),
                         ));
                         self.set_overlay_status_message();
                         self.setup_overlay_validator();
@@ -207,6 +209,7 @@ impl App {
                             pointer,
                             label,
                             OverlaySession::Composite(context.session),
+                            self.overlay_help_text(),
                         );
                         overlay.target = CompositeOverlayTarget::ListEntry {
                             entry_index: context.entry_index,
@@ -238,6 +241,7 @@ impl App {
                             pointer,
                             label,
                             OverlaySession::KeyValue(context.session),
+                            self.overlay_help_text(),
                         );
                         overlay.target = CompositeOverlayTarget::KeyValueEntry {
                             entry_index: context.entry_index,
@@ -274,6 +278,7 @@ impl App {
                             pointer,
                             label,
                             OverlaySession::Array(context.session),
+                            self.overlay_help_text(),
                         );
                         overlay.target = CompositeOverlayTarget::ArrayEntry {
                             entry_index: context.entry_index,

@@ -1,6 +1,6 @@
+mod components;
 mod convert;
 mod state;
-mod value;
 
+pub use components::CompositePopupData;
 pub use state::FieldState;
-pub use value::CompositePopupData;

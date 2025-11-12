@@ -1,0 +1,90 @@
+use serde_json::Value;
+
+use crate::domain::{FieldSchema, KeyValueField};
+use crate::form::error::FieldCoercionError;
+use crate::form::key_value::{KeyValueEditorContext, KeyValueEditorSession, KeyValueState};
+
+use super::helpers::{format_collection_value, list_hint_for};
+use super::{ComponentKind, FieldComponent};
+
+#[derive(Debug, Clone)]
+pub struct KeyValueComponent {
+    state: KeyValueState,
+}
+
+impl KeyValueComponent {
+    pub fn new(pointer: &str, template: &KeyValueField, default: Option<&Value>) -> Self {
+        Self {
+            state: KeyValueState::new(pointer, template, default),
+        }
+    }
+}
+
+impl FieldComponent for KeyValueComponent {
+    fn kind(&self) -> ComponentKind {
+        ComponentKind::KeyValue
+    }
+
+    fn display_value(&self, _schema: &FieldSchema) -> String {
+        format_collection_value(
+            "Map",
+            self.state.len(),
+            self.state.selected_label(),
+            list_hint_for(ComponentKind::KeyValue),
+        )
+    }
+
+    fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {
+        if let Value::Object(map) = value {
+            self.state.seed_entries_from_object(map);
+        }
+    }
+
+    fn current_value(&self, schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
+        self.state.build_value(schema.required)
+    }
+
+    fn collection_panel(&self) -> Option<(Vec<String>, usize)> {
+        self.state.panel()
+    }
+
+    fn collection_selected_label(&self) -> Option<String> {
+        self.state.selected_label()
+    }
+
+    fn collection_selected_index(&self) -> Option<usize> {
+        self.state.selected_index()
+    }
+
+    fn collection_select(&mut self, delta: i32) -> bool {
+        self.state.select(delta)
+    }
+
+    fn collection_add(&mut self) -> bool {
+        self.state.add_entry()
+    }
+
+    fn collection_remove(&mut self) -> bool {
+        self.state.remove_selected()
+    }
+
+    fn collection_move(&mut self, delta: i32) -> bool {
+        self.state.move_selected(delta)
+    }
+
+    fn open_key_value_editor(
+        &mut self,
+        pointer: &str,
+    ) -> Result<KeyValueEditorContext, FieldCoercionError> {
+        let _ = pointer;
+        self.state.open_selected_editor()
+    }
+
+    fn apply_key_value_editor(
+        &mut self,
+        entry_index: usize,
+        session: &KeyValueEditorSession,
+    ) -> Result<bool, FieldCoercionError> {
+        self.state.apply_editor_session(entry_index, session)
+    }
+}

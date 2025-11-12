@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use jsonschema::validator_for;
 use serde_json::Value;
+use std::{sync::Arc, time::Duration};
 
 use crate::{
     domain::parse_form_schema,
@@ -11,7 +12,7 @@ use crate::{
     },
 };
 
-use super::{options::UiOptions, runtime::App};
+use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions, runtime::App};
 
 #[derive(Debug)]
 pub struct SchemaUI {
@@ -68,6 +69,37 @@ impl SchemaUI {
 
     pub fn with_default_data(mut self, defaults: &Value) -> Self {
         self.schema = io::input::schema_with_defaults(&self.schema, defaults);
+        self
+    }
+
+    pub fn with_keymap(mut self, keymap: KeyBindingMap) -> Self {
+        self.options = self.options.clone().with_keymap(keymap);
+        self
+    }
+
+    pub fn with_keymap_json(mut self, json: &str) -> Result<Self> {
+        let store = KeymapStore::from_json(json)?;
+        self.options = self.options.clone().with_keymap_store(Arc::new(store));
+        Ok(self)
+    }
+
+    pub fn with_auto_validate(mut self, enabled: bool) -> Self {
+        self.options = self.options.clone().with_auto_validate(enabled);
+        self
+    }
+
+    pub fn with_help(mut self, show: bool) -> Self {
+        self.options = self.options.clone().with_help(show);
+        self
+    }
+
+    pub fn with_confirm_exit(mut self, confirm: bool) -> Self {
+        self.options = self.options.clone().with_confirm_exit(confirm);
+        self
+    }
+
+    pub fn with_tick_rate(mut self, tick_rate: Duration) -> Self {
+        self.options = self.options.clone().with_tick_rate(tick_rate);
         self
     }
 

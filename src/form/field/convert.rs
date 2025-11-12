@@ -4,14 +4,6 @@ use crate::domain::{FieldKind, FieldSchema};
 
 use crate::form::error::FieldCoercionError;
 
-pub(super) fn default_text(schema: &FieldSchema) -> String {
-    schema
-        .default
-        .as_ref()
-        .map(value_to_string)
-        .unwrap_or_default()
-}
-
 pub(super) fn value_to_string(value: &Value) -> String {
     match value {
         Value::String(text) => text.clone(),
