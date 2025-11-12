@@ -1,12 +1,15 @@
+use crate::app::{
+    input::{InputRouter, KeyAction},
+    keymap,
+};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
     KeyEvent::new(code, modifiers)
 }
 
-#[test]
 fn router() -> InputRouter {
-    InputRouter::new(super::keymap::default_store())
+    InputRouter::new(keymap::default_store())
 }
 
 #[test]

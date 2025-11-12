@@ -7,6 +7,9 @@ pub mod io;
 mod presentation;
 mod schema;
 
+#[cfg(test)]
+pub(crate) mod tests;
+
 pub use app::{SchemaUI, UiOptions};
 pub use io::{
     DocumentFormat,

@@ -51,13 +51,3 @@ pub(crate) fn list_hint_for(kind: ComponentKind) -> &'static str {
         _ => "",
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/form/component_collection_tests.rs"
-    ));
-}

@@ -258,13 +258,3 @@ impl InputRouter {
         self.store.classify(key).unwrap_or(KeyAction::Input(*key))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/app/input_tests.rs"
-    ));
-}

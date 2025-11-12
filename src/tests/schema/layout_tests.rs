@@ -1,3 +1,9 @@
+use crate::{
+    domain::{FieldKind, FieldSchema, FormSchema, FormSection},
+    schema::layout::build_form_schema,
+};
+use serde_json::{Value, json};
+
 #[test]
 fn builds_nested_sections_and_general_root() {
     let schema = json!({
@@ -170,16 +176,18 @@ fn additional_properties_true_does_not_add_phantom_field() {
         section.fields.iter().all(|field| field.name != "room"),
         "room section should only contain actual child fields"
     );
-    let names: Vec<_> = section.fields.iter().map(|field| field.name.clone()).collect();
+    let names: Vec<_> = section
+        .fields
+        .iter()
+        .map(|field| field.name.clone())
+        .collect();
     assert_eq!(names, vec!["max_size"]);
 }
 
 #[test]
 fn sample_config_schema_keeps_only_user_fields() {
-    let schema: Value = serde_json::from_str(
-        include_str!("../../examples/config-schema.json"),
-    )
-    .expect("example schema");
+    let schema: Value = serde_json::from_str(include_str!("../../../examples/config-schema.json"))
+        .expect("example schema");
     let form = build_form_schema(&schema).expect("schema parsed");
     assert_eq!(form.roots.len(), 1, "only general root expected");
     let general = form
@@ -188,7 +196,11 @@ fn sample_config_schema_keeps_only_user_fields() {
         .find(|root| root.id == "general")
         .expect("general root");
     let section = general.sections.first().expect("section");
-    let names: Vec<_> = section.fields.iter().map(|field| field.name.clone()).collect();
+    let names: Vec<_> = section
+        .fields
+        .iter()
+        .map(|field| field.name.clone())
+        .collect();
     assert!(names.contains(&"username".to_string()));
     assert!(names.contains(&"email".to_string()));
     assert!(names.contains(&"phone".to_string()));
@@ -229,8 +241,8 @@ fn arrays_without_item_schema_fallback_to_json_array() {
         }
     });
     let form = build_form_schema(&schema).expect("schema parsed");
-    let field = find_field(&form, |field| field.name == "expose_headers")
-        .expect("expose_headers field");
+    let field =
+        find_field(&form, |field| field.name == "expose_headers").expect("expose_headers field");
     match &field.kind {
         FieldKind::Array(inner) => assert!(matches!(inner.as_ref(), FieldKind::Json)),
         other => panic!("expected array kind, got {:?}", other),

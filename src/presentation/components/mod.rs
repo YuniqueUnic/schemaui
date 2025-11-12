@@ -1,5 +1,5 @@
 mod body;
-mod fields;
+pub(crate) mod fields;
 mod footer;
 mod layout;
 mod overlay;

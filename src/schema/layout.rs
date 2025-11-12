@@ -586,14 +586,3 @@ fn has_composite_subschemas(schema: &SchemaObject) -> bool {
         .map(|subs| subs.one_of.is_some() || subs.any_of.is_some())
         .unwrap_or(false)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/schema/layout_tests.rs"
-    ));
-}

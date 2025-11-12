@@ -54,13 +54,3 @@ impl FieldComponent for TextComponent {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/form/component_text_tests.rs"
-    ));
-}

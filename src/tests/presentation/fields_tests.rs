@@ -1,5 +1,8 @@
-use crate::domain::{FieldKind, FieldSchema};
-use crate::form::FieldState;
+use crate::{
+    domain::{FieldKind, FieldSchema},
+    form::FieldState,
+    presentation::components::fields::meta_lines,
+};
 use ratatui::style::{Color, Modifier};
 
 fn make_field() -> FieldState {

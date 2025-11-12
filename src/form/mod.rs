@@ -2,8 +2,8 @@ pub mod actions;
 mod array;
 mod composite;
 mod error;
-mod field;
-mod key_value;
+pub(crate) mod field;
+pub(crate) mod key_value;
 pub mod reducers;
 mod section;
 mod state;
@@ -16,3 +16,5 @@ pub use key_value::KeyValueEditorSession;
 pub use reducers::{FormEngine, apply_command};
 pub use section::SectionState;
 pub use state::FormState;
+#[cfg(test)]
+pub(crate) use state::RootSectionState;

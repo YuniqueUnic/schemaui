@@ -1,6 +1,8 @@
+use crate::{
+    domain::{FieldKind, FieldSchema},
+    form::field::components::{FieldComponent, TextComponent},
+};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-
-use crate::domain::{FieldKind, FieldSchema};
 
 fn integer_schema() -> FieldSchema {
     FieldSchema {
@@ -20,7 +22,7 @@ fn integer_schema() -> FieldSchema {
 #[test]
 fn text_component_supports_numeric_stepper() {
     let schema = integer_schema();
-    let mut component = super::TextComponent::new(&schema);
+    let mut component = TextComponent::new(&schema);
     let key = KeyEvent::new(KeyCode::Right, KeyModifiers::NONE);
     assert!(component.handle_key(&schema, &key));
     assert_eq!(component.display_value(&schema), "1");
@@ -32,7 +34,7 @@ fn text_component_supports_numeric_stepper() {
 #[test]
 fn text_component_rejects_control_characters() {
     let schema = integer_schema();
-    let mut component = super::TextComponent::new(&schema);
+    let mut component = TextComponent::new(&schema);
     let ctrl_a = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
     assert!(!component.handle_key(&schema, &ctrl_a));
     assert_eq!(component.display_value(&schema), "");
