@@ -4,7 +4,7 @@ members = ["schemaui-cli"]
 [package]
 name = "schemaui"
 authors = ["unic <yuniqueunic@gmail.com>"]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 keywords = ["tui", "schema", "configuration", "terminal", "cross-platform"]
 categories = ["command-line-interface", "config"]
