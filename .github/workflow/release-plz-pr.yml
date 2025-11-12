@@ -1,0 +1,40 @@
+name: release-plz-pr
+
+on:
+  push:
+    branches:
+      - main
+    # 忽略只修改了这些文件的 push（通常是 release-plz 的更改）
+    paths-ignore:
+      - "CHANGELOG.md"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+  schedule:
+    - cron: "0 0 * * MON"
+
+jobs:
+  release-plz-pr:
+    name: Create Release PR
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run release-plz PR
+        uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

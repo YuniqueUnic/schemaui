@@ -1,0 +1,49 @@
+name: release-plz-release
+
+on:
+  push:
+    branches:
+      - main
+    # 只在这些文件被修改时触发（通常是 release-plz PR 被合并）
+    paths:
+      - "CHANGELOG.md"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  release-plz-release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'YuniqueUnic'
+    permissions:
+      pull-requests: write
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate GitHub token
+        uses: actions/create-github-app-token@v2
+        id: generate-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Run release-plz release
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}

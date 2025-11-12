@@ -1,0 +1,81 @@
+# prek configuration for Rust projects
+# https://github.com/j178/prek
+
+minimum_prek_version: 0.2.0
+
+repos:
+  - repo: "https://github.com/pre-commit/pre-commit-hooks"
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+        exclude: "^docs/.*demo.*"
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  - repo: https://github.com/YuniqueUnic/autocorrect-pre-commit
+    rev: 2.14.0
+    hooks:
+      - id: autocorrect-fix
+
+  - repo: https://github.com/bneijt/deno-pre-commit
+    rev: 2.5.0
+    hooks:
+      - id: deno-fmt
+        exclude_types: ["javascript", "jsx", "ts", "tsx", "json"]
+
+  - repo: local
+    hooks:
+      - id: rustfmt
+        name: rustfmt
+        entry: cargo fmt --all -- --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: clippy
+        name: clippy
+        entry: cargo clippy --all-features -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: cargo-check
+        name: cargo check
+        entry: cargo check --all-features
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [push]
+
+  - repo: local
+    hooks:
+      - id: cargo-test
+        name: cargo test
+        entry: cargo test --all-features
+        language: system
+        pass_filenames: false
+        stages: [push]
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.38.1
+    hooks:
+      - id: typos
+
+  - repo: local
+    hooks:
+      - id: forbid-env-files
+        name: Block .env files
+        entry: "Blocking .env files from being committed"
+        language: fail
+        files: '^\.env(\.|$)'
+        exclude: '^\.env\.docker$'

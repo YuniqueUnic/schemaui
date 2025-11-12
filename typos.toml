@@ -1,0 +1,14 @@
+# typos 配置文件 - 拼写检查配置
+# https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = ["target/", "Cargo.lock", ".git/", "*.svg", "*.png", "*.jpg"]
+
+[default]
+locale = "en"
+
+[default.extend-words]
+# 项目特定词汇（避免误报）
+# 例如：helo = "helo"
+"iif" = "iif"
+"oif" = "oif"

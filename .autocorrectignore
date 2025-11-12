@@ -1,0 +1,7 @@
+node_modules
+vendor
+dist
+build
+*.min.js
+*.min.css
+*.json
