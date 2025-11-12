@@ -155,10 +155,8 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
     let mut lines = Vec::new();
     lines.push(info_line(field, is_selected));
 
-    if is_selected {
-        if let Some(selector_lines) = composite_selector_lines(field) {
-            lines.extend(selector_lines);
-        }
+    if is_selected && let Some(selector_lines) = composite_selector_lines(field) {
+        lines.extend(selector_lines);
     }
 
     let (value_panel, cursor_hint) = value_panel_lines(field, is_selected, max_width);

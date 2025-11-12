@@ -67,10 +67,10 @@ impl FieldComponent for EnumComponent {
     }
 
     fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {
-        if let Some(text) = value.as_str() {
-            if let Some(idx) = self.options.iter().position(|opt| opt == text) {
-                self.selected = idx;
-            }
+        if let Some(text) = value.as_str()
+            && let Some(idx) = self.options.iter().position(|opt| opt == text)
+        {
+            self.selected = idx;
         }
     }
 
