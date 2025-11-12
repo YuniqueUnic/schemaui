@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
 use serde_json::Value;
+use std::sync::Arc;
 
 use crate::{
     form::{FormCommand, FormEngine, FormState},
@@ -10,7 +11,7 @@ use crate::{
 
 use super::{
     input::{AppCommand, CommandDispatch, InputRouter},
-    keymap::{self, KeymapContext},
+    keymap::{KeymapContext, KeymapStore},
     options::UiOptions,
     popup::PopupState,
     status::StatusLine,
@@ -47,6 +48,7 @@ pub(crate) struct App {
     popup: Option<AppPopup>,
     composite_editor: Option<CompositeEditorOverlay>,
     input_router: InputRouter,
+    keymap_store: Arc<KeymapStore>,
 }
 
 impl App {
@@ -63,7 +65,7 @@ impl App {
         } else {
             KeymapContext::Default
         };
-        keymap::help_text(context)
+        self.keymap_store.help_text(context)
     }
 
     fn handle_popup_key(&mut self, key: KeyEvent) -> Result<bool> {
@@ -169,6 +171,7 @@ impl App {
     }
 
     pub fn new(form_state: FormState, validator: Validator, options: UiOptions) -> Self {
+        let keymap_store = options.keymap_store.clone();
         Self {
             form_state,
             validator,
@@ -181,7 +184,8 @@ impl App {
             result: None,
             popup: None,
             composite_editor: None,
-            input_router: InputRouter::new(),
+            input_router: InputRouter::new(keymap_store.clone()),
+            keymap_store,
         }
     }
 

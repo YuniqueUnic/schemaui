@@ -5,7 +5,7 @@ mod value_ops;
 
 use crate::domain::FieldSchema;
 
-use super::value::{ComponentKind, FieldComponent};
+use super::components::{ComponentKind, FieldComponent};
 
 #[derive(Debug, Clone)]
 pub struct FieldState {

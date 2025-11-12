@@ -1,4 +1,6 @@
-use super::super::value::{ComponentKind, CompositePopupData, CompositeSelectorView, EnumStateRef};
+use super::super::components::{
+    ComponentKind, CompositePopupData, CompositeSelectorView, EnumStateRef,
+};
 use super::FieldState;
 use crate::form::error::FieldCoercionError;
 use crate::form::{

@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crossterm::event::KeyEvent;
 
 use crate::form::FormCommand;
 
-use super::keymap;
+use super::keymap::KeymapStore;
 
 #[derive(Debug, Clone, Copy)]
 pub enum KeyAction {
@@ -242,18 +243,19 @@ impl Default for KeyBindingMap {
     }
 }
 
-#[derive(Default)]
-pub struct InputRouter;
+pub struct InputRouter {
+    store: Arc<KeymapStore>,
+}
 
 impl InputRouter {
-    pub fn new() -> Self {
-        Self
+    pub fn new(store: Arc<KeymapStore>) -> Self {
+        Self { store }
     }
 
     pub fn classify(&self, key: &KeyEvent) -> KeyAction {
         #[cfg(feature = "debug")]
         println!("{key:?}");
-        keymap::classify_key(key).unwrap_or(KeyAction::Input(*key))
+        self.store.classify(key).unwrap_or(KeyAction::Input(*key))
     }
 }
 

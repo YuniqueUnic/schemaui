@@ -1,6 +1,7 @@
+use anyhow::{Result, anyhow};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::Deserialize;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use super::input::KeyAction;
 
@@ -16,7 +17,7 @@ macro_rules! keymap_source {
 pub(super) use keymap_source;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(super) enum KeymapContext {
+pub(crate) enum KeymapContext {
     Default,
     Collection,
     Overlay,
@@ -59,6 +60,7 @@ enum RawAction {
     ListSelect { delta: i32 },
 }
 
+#[derive(Clone, Debug)]
 struct KeyBinding {
     action: KeyAction,
     contexts: Vec<KeymapContext>,
@@ -67,44 +69,37 @@ struct KeyBinding {
 }
 
 impl KeyBinding {
-    fn from_raw(raw: RawEntry) -> Self {
+    fn from_raw(raw: RawEntry) -> Result<Self> {
         let contexts = raw
             .contexts
             .iter()
             .filter_map(|ctx| KeymapContext::from_str(ctx))
             .collect::<Vec<_>>();
-        assert!(
-            !contexts.is_empty(),
-            "keymap entry {} must declare at least one context",
-            raw.id
-        );
+        if contexts.is_empty() {
+            return Err(anyhow!("keymap entry {} must declare contexts", raw.id));
+        }
         let action = raw.action.into_action();
-        let combos = raw
-            .combos
-            .iter()
-            .map(|combo| {
-                KeyPattern::parse(combo).unwrap_or_else(|err| {
-                    panic!("failed to parse combo '{combo}' for {}: {err}", raw.id)
-                })
-            })
-            .collect::<Vec<_>>();
-        assert!(
-            !combos.is_empty(),
-            "keymap entry {} must declare combos",
-            raw.id
-        );
+        let mut combos = Vec::with_capacity(raw.combos.len());
+        for combo in raw.combos {
+            let pattern = KeyPattern::parse(&combo)
+                .map_err(|err| anyhow!("failed to parse combo '{combo}' for {}: {err}", raw.id))?;
+            combos.push(pattern);
+        }
+        if combos.is_empty() {
+            return Err(anyhow!("keymap entry {} must declare combos", raw.id));
+        }
         let combos_display = combos
             .iter()
             .map(|pattern| pattern.display.clone())
             .collect::<Vec<_>>()
             .join("/");
         let snippet = format!("{combos_display} -> {}", raw.description);
-        Self {
+        Ok(Self {
             action,
             contexts,
             combos,
             snippet,
-        }
+        })
     }
 
     fn matches(&self, key: &KeyEvent) -> Option<KeyAction> {
@@ -115,6 +110,7 @@ impl KeyBinding {
     }
 }
 
+#[derive(Clone, Debug)]
 struct KeyPattern {
     matcher: CodeMatcher,
     required: KeyModifiers,
@@ -175,7 +171,7 @@ impl KeyPattern {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum CodeMatcher {
     Literal(KeyCode),
     Alpha(char),
@@ -241,27 +237,57 @@ impl RawAction {
     }
 }
 
-static KEYMAP: LazyLock<Vec<KeyBinding>> = LazyLock::new(|| {
-    let raw_entries: Vec<RawEntry> =
-        serde_json::from_str(keymap_source!()).expect("invalid keymap/default.keymap.json");
-    raw_entries.into_iter().map(KeyBinding::from_raw).collect()
-});
-
-pub(super) fn classify_key(key: &KeyEvent) -> Option<KeyAction> {
-    KEYMAP.iter().find_map(|binding| binding.matches(key))
+#[derive(Debug, Clone)]
+pub(crate) struct KeymapStore {
+    bindings: Arc<Vec<KeyBinding>>,
 }
 
-pub(super) fn help_text(context: KeymapContext) -> Option<String> {
-    let snippets = KEYMAP
-        .iter()
-        .filter(|binding| binding.contexts.contains(&context))
-        .map(|binding| binding.snippet.clone())
-        .collect::<Vec<_>>();
-    if snippets.is_empty() {
-        None
-    } else {
-        Some(snippets.join(" • "))
+impl KeymapStore {
+    pub fn from_json(raw: &str) -> Result<Self> {
+        let entries: Vec<RawEntry> = serde_json::from_str(raw)?;
+        Self::from_entries(entries)
     }
+
+    pub fn builtin() -> Self {
+        Self::from_json(keymap_source!()).expect("invalid keymap/default.keymap.json")
+    }
+
+    fn from_entries(entries: Vec<RawEntry>) -> Result<Self> {
+        let mut bindings = Vec::with_capacity(entries.len());
+        for entry in entries {
+            bindings.push(KeyBinding::from_raw(entry)?);
+        }
+        Ok(Self {
+            bindings: Arc::new(bindings),
+        })
+    }
+
+    pub fn classify(&self, key: &KeyEvent) -> Option<KeyAction> {
+        self.bindings
+            .iter()
+            .find_map(|binding| binding.matches(key))
+    }
+
+    pub fn help_text(&self, context: KeymapContext) -> Option<String> {
+        let snippets = self
+            .bindings
+            .iter()
+            .filter(|binding| binding.contexts.contains(&context))
+            .map(|binding| binding.snippet.clone())
+            .collect::<Vec<_>>();
+        if snippets.is_empty() {
+            None
+        } else {
+            Some(snippets.join(" • "))
+        }
+    }
+}
+
+static DEFAULT_STORE: LazyLock<Arc<KeymapStore>> =
+    LazyLock::new(|| Arc::new(KeymapStore::builtin()));
+
+pub(crate) fn default_store() -> Arc<KeymapStore> {
+    DEFAULT_STORE.clone()
 }
 
 fn modifiers_include(actual: KeyModifiers, required: KeyModifiers) -> bool {

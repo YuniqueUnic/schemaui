@@ -1,6 +1,6 @@
 use crate::domain::{FieldKind, FieldSchema};
 
-use super::super::value::{
+use super::super::components::{
     ArrayBufferComponent, BoolComponent, CompositeComponent, CompositeListComponent, EnumComponent,
     FieldComponent, KeyValueComponent, MultiSelectComponent, ScalarArrayComponent, TextComponent,
 };
