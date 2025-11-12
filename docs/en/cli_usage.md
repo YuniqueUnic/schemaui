@@ -16,7 +16,7 @@ cargo run -p schemaui-cli -- --schema ./schema.json --config ./config.yaml
 ### Install as a binary
 
 ```bash
-cargo install --path schemaui-cli --locked
+cargo install schemaui-cli
 schemaui --help             # binary is named `schemaui` via the clap metadata
 ```
 

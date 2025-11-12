@@ -41,7 +41,7 @@ see the full list of issues before saving.
 
 ```toml
 [dependencies]
-schemaui = "0.2.0"
+schemaui = "0.3.1"
 serde_json = "1"
 ```
 

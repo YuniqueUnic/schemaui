@@ -69,4 +69,5 @@ strip = "debuginfo"
 [package.metadata.release]
 pre-release-replacements = [
     { file = "README.md", search = "schemaui = \"[0-9]+\\.[0-9]+\\.[0-9]+[^\"]*\"", replace = "schemaui = \"{{version}}\"" },
+    { file = "README.ZH.md", search = "schemaui = \"[0-9]+\\.[0-9]+\\.[0-9]+[^\"]*\"", replace = "schemaui = \"{{version}}\"" },
 ]

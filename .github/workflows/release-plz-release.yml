@@ -42,9 +42,40 @@ jobs:
           permission-pull-requests: read
 
       - name: Run release-plz release
+        id: release_step
         uses: release-plz/action@v0.5
         with:
           command: release
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Sync README versions
+        id: sync_readme
+        env:
+          PACKAGE_NAME: ${{ steps.release_step.outputs.package_name }}
+          RELEASE_VERSION: ${{ steps.release_step.outputs.version }}
+        if: ${{ steps.release_step.outputs.version != '' }}
+        run: |
+          echo "Package name: $PACKAGE_NAME"
+          echo "Release version: $RELEASE_VERSION"
+
+          if [ "$PACKAGE_NAME" != "schemaui" ]; then
+            echo "Skipping README sync because package is $PACKAGE_NAME (not schemaui)"
+            exit 0
+          fi
+
+          echo "Syncing README versions to $RELEASE_VERSION"
+          sed -i "s/schemaui = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/schemaui = \"$RELEASE_VERSION\"/" README.md
+          sed -i "s/schemaui = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/schemaui = \"$RELEASE_VERSION\"/" README.ZH.md
+
+          git config user.name "github‑actions[bot]"
+          git config user.email "41898282+github‑actions[bot]@users.noreply.github.com"
+
+          git add README.md README.ZH.md
+          if git diff --cached --quiet; then
+            echo "No README changes detected, skipping commit."
+          else
+            git commit -m "chore: sync version to $RELEASE_VERSION in README files"
+            git push
+          fi
