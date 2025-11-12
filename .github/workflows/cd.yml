@@ -84,7 +84,10 @@ jobs:
 
       - uses: taiki-e/upload-rust-binary-action@v1.27.0
         with:
-          bin: board
+          package: schemaui-cli
+          bin: schemaui
+          features: full
+          profile: release
           target: ${{ matrix.target }}
           tar: all
           zip: windows
