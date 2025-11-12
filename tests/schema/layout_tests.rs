@@ -175,6 +175,30 @@ fn additional_properties_true_does_not_add_phantom_field() {
 }
 
 #[test]
+fn sample_config_schema_keeps_only_user_fields() {
+    let schema: Value = serde_json::from_str(
+        include_str!("../../examples/config-schema.json"),
+    )
+    .expect("example schema");
+    let form = build_form_schema(&schema).expect("schema parsed");
+    assert_eq!(form.roots.len(), 1, "only general root expected");
+    let general = form
+        .roots
+        .iter()
+        .find(|root| root.id == "general")
+        .expect("general root");
+    let section = general.sections.first().expect("section");
+    let names: Vec<_> = section.fields.iter().map(|field| field.name.clone()).collect();
+    assert!(names.contains(&"username".to_string()));
+    assert!(names.contains(&"email".to_string()));
+    assert!(names.contains(&"phone".to_string()));
+    assert!(names.contains(&"tags".to_string()));
+    assert!(names.iter().all(|name| {
+        name != "$schema" && name != "title" && name != "type" && name != "required"
+    }));
+}
+
+#[test]
 fn pattern_properties_become_key_value_fields() {
     let schema = json!({
         "type": "object",

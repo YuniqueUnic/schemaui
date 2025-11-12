@@ -1,0 +1,205 @@
+
+- Role: 软件开发工程师和项目设计重构专家
+- Background: 用户需要一个遵循严格核心行为准则的项目开发和管理流程，这些准则涵盖了从代码设计到任务执行、工具调用、输出沟通以及异常处理的各个方面。用户希望确保项目始终保持可构建状态，并且文档能够详细记录项目进展，方便后续开发者快速准确地接手项目。
+- Profile: 你是一位经验丰富的软件开发工程师，对代码设计原则、项目管理、工具使用和文档维护有着深刻的理解和实践经验。你擅长将复杂任务分解为可执行的步骤，并通过高效的工具调用和清晰的沟通确保项目顺利推进。
+- Skills: 你具备以下关键能力：
+  - 精通代码设计原则（如 KISS 和 SOLID）。
+  - 熟练使用任务管理和规划工具（如 TodoManager）。
+  - 熟悉多种开发工具（如 serena、web-search-prime、exa、tavily、desktop-commander 等）。
+  - 能够高效整合任务结果并清晰地向用户报告。
+  - 熟练掌握异常处理策略。
+- Goals: 
+  1. 确保项目始终遵循核心行为准则。
+  2. 保持项目可构建状态（`cargo check`）。
+  3. 更新项目进展文档，确保详细记录项目进展。
+  4. 使用 serena 激活项目，并合理调用其他 MCP 工具。
+- Constrains: 
+  - 严格遵循核心行为准则。
+  - 在任务执行过程中，必须按照规定的工具调用协议操作。
+  - 输出必须清晰、结构化，且明确指出方案的局限性。
+  - 遇到异常时，必须按照异常处理策略进行处理。
+- OutputFormat: 
+  - 使用中文进行回复。
+  - 结论先行，然后是详细说明。
+  - 引用外部信息时必须注明来源。
+  - 在结尾处明确指出方案的局限性或下一步建议。
+- Workflow:
+  1. 理解与规划：仔细阅读需求，调用 serena 激活项目并检索相关信息，使用规划工具分解任务。
+  2. 串行执行：按照子任务列表，依次调用合适的 MCP 工具执行任务。
+  3. 整合与报告：整合任务结果，形成最终解决方案，并附带《工具调用简报》。
+  4. 更新文档：确保项目进展文档详细记录项目进展。
+- Examples:
+  - 例子1：如果需要查询某个库的官方技术文档，首先调用 'web-search-prime' 搜索该库的官方文档链接，然后调用 'serena' 的 'read_memory' 检查是否已有相关记忆，最后整合搜索结果和记忆内容，形成清晰的报告。
+  - 例子2：如果需要执行本地文件操作，调用 'desktop-commander' 完成任务，并在报告中附带工具调用简报，说明调用原因、关键参数和结果概览。
+  - 例子3：如果遇到工具调用失败，按照异常处理策略缩小查询范围重试，或切换到备选方案，并在报告中明确标注不确定性。
+
+----
+
+当前存在的问题：
+1. field 的 UI 存在问题： description 未能显示出来。
+我希望的 field 的 TUI 界面设计如下： 
+----------------
+name *:                 <- 这里显示的是 field 的 name 和一些状态信息 (required, ·dirty, 等) (info_line)
+[ content ]             <- 这里显示的是 field 的 content (value_line) 【内容过多时， 应该正确的计算宽度，并且 wrap】(textwrap)
+     # inline              <- 这里显示的是 field 的 inline 信息， 比如一些复合类型，多选类型，在用户选中该 field 时，就会显示 inline 信息，展示当前选项有的更多信息。(如果数量很多，那么就展示部分，如果一般的话，那么就展示全部)
+type | description      <- 这里显示的是 field 的 type 和 description 等 (meta_line) 【内容过多时， 应该正确的计算宽度，并且 wrap】(textwrap)
+error_msg               <- 这里显示的是 validate 的错误信息 (msg_line) 【内容过多时， 应该正确的计算宽度，并且 wrap】(textwrap)
+----------------
+
+----------------
+name *:            
+[ content ]        
+type | description 
+error_msg          
+----------------
+
+而现在的 field 的 TUI 界面设计如下：
+----------------
+name *:                 <- 这里显示的是 field 的 name 和 require1 信息 (info_line)
+[ content ]             <- 这里显示的是 field 的 content (value_line) 
+  # inline              <- 这里显示的是 field 的 inline 信息， 比如一些复合类型，多选类型，在用户选中该 field 时，就会显示 inline 信息，展示当前选项有的更多信息。
+type | description      <- 这里显示的是 field 的 type 和一些状态信息(·dirty)等 (meta_line)
+error_msg               <- 这里显示的是 validate 的错误信息 (msg_line)
+----------------
+
+2. 目前的快捷键 shift + tab 不能工作， 存在问题：
+    tab 键能够正常工作， 依次的聚焦到下一个 field/child-sections/sections。
+    而 shift + tab 键不能工作， 存在问题： shift + tab 的功能正好和 tab 键的功能相反，依次聚焦到上一个 field/child-sections/sections。
+
+3. 当前的 TUI 设计也存在问题： 不够组件化。
+    /Users/unic/dev/projs/rs/schemaui/src/presentation 这里是整体的界面 layout 模块化设计。看起来还行，
+    /Users/unic/dev/projs/rs/schemaui/src/form 而这里的更细粒化的 form components， 拆分还不够。
+    我希望参考前端 shadcn(https://ui.shadcn.com/docs/components) 的这样的组件化设计。
+    将功能化的组件进行拆分和封装。
+    比如我们这个 schemaui 项目。 最重要的就是 form 模块，form 则是 field 中的 【content】 的核心渲染模块。
+    比如：
+    JSON Schema → TUI 映射
+
+    `schema::layout::build_form_schema`遍历完全解析的模式，并将每个子树映射为`FormSection`/`FieldSchema`：
+
+    | 模式功能                                                     | 结果控件                                              |  行为  |
+    | ------------------------------------------------------------ | ----------------------------------------------------- | ------ |
+    | `type: string`, `integer`, `number`                          | 带有数值保护的内联文本编辑器                          |        |
+    | `type: boolean`                                              | 切换/复选框                                           |        |
+    | `enum`                                                       | 弹出选择器（单选或多选用于数组枚举）                  |        |
+    | 数组                                                         | 内联列表摘要+每个项目的覆盖层编辑器                   |        |
+    | `patternProperties`, `propertyNames`, `additionalProperties` | 带有模式支持验证的键值编辑器                          |        |
+    | `$ref`, `definitions`                                        | 在布局前解析；被视为内联模式                          |        |
+    | `oneOf` / `anyOf`                                            | 变体选择器+覆盖层表单，将非活动变体排除在最终负载之外 |        | 
+
+    输入框就应该可以让用户能够输入， 并且 cursor hint 也应该正确的计算中文，英文的宽度，以及 “ ” 的宽度(unicode-width)。
+    对于 integer/number 类型的控件，应该支持 <-/-> 键直接改变数值。 <- 为-1， -> 为 +1。(这个快捷键应该是可以配置的。步长也应该是可以配置的)
+    对于 boolean，enum 类型，应该支持 <-/-> 键直接改变选项，依次遍历选项。(快捷键应该可以配置), 当然像这样的多选一的类型，也可以使用 Enter 打开一个 overlay， 然后使用 ↑/↓ 进行选择，然后 enter 进行提交。
+        - 如果是多选的话，也是使用 overlay， 弹出一个列表，然后用户使用 space 进行选择需要的多个选项，然后使用 enter 进行确定提交。
+    对于数组，则是采用内联列表摘要+覆盖层编辑器，从而用户能在覆盖层中编辑数组元素。（增加，删除，调整顺序，选择编辑项目）
+    然后就是每个这样的 component 也都应该具有 validator ，用于验证用户输入。并且 validate 函数应该返回错误信息，用于显示给用户。
+
+---    
+
+schemaui 的整体界面 TUI 设计:
+---------------------------------------------------------------------
+| [general] | dataPlane | website | docs | xxxx | xxxxxxxxxx | xxx<<|  <- root sections ([xx] 表示当前被选中的 section， 并且需要正确计算宽度， 当sections 过宽时，应该滚动显示)
+---------------------------------------------------------------------
+| [child section1] | child section2 | child section3 | child sect<< |  <-- child sections ( [xx] 显示当前被选中的 child section， 宽度应该正确计算， 当 sections 过宽时，应该滚动显示)
+---------------------------------------------------------------------       当然， child section 也可能还有其 child sections，所以需要递归处理。
+|  ----------------                                                 |   
+|  name *:                 -|                                       |
+|  [ content ]              |                                       |   root sections 是 json schema 的 $.object 类型中解析得到。也就是 json schema 中根节点中 nested 的第一级 object，
+|  type | description       | 这就应该算一个 field                  |   只要是在 root 中不能够被直接展示的基本类型，那么就应该算是 child section。
+|  error_msg               -|                                       |   child section 的 child section，应该和 root section 一样处理。
+|  ----------------                                                 |
+|  name *: ·dirty                                                   |   field 应该渲染至对应的 section(child section) 中
+|  [ content ]                                                      |
+|  type | description                                               |   用户可以使用 tab 键，将光标移动到下一个 field 中。也可以使用 shift + tab 键，将光标移动到上一个 field 中。
+|  error_msg                                                        |   当 child section 中的 fields 遍历完毕之后， 那么 tab 键应该跳转到下一个 child section/root section 中。
+|  ----------------                                                 |   当 child sections 遍历完毕之后，那么 tab 键应该跳转到下一个 root section 中。
+|                                                                   |   shift + tab 键功能和 tab 键功能正好相反。
+|                                                                   |   
+|                                                                   |   field -> fields -> child section -> child sections -> root section -> child section -> field
+|                                                                   |     |                            tab 循环遍历流程                                          |
+|                                                                   |     ----------------------------------------------------------------------------------------
+---------------------------------------------------------------------
+快捷键说明栏：                                                           <- action bar(用于动态展示当前界面/控件的快捷键)
+---------------------------------------------------------------------
+状态栏:                                                                  <- status bar(用于动态展示当前系统/界面/控件的状态)
+---------------------------------------------------------------------
+
+---
+
+pop up overlay 设计:
+
+--------------------------------------------------------------------------------------  <-这是 main page
+|         顶栏 (用于增加/删除，调整 entries 的顺序)                                  |
+|             v                                                v-这是 popup overlay  |  overlay 也应是包含一个顶栏 entries
+|          |===========|==================================================|          |  这个 entries 则是对应的是多个元素的意思
+|          | [entry 1] | entry 2 | entry 3 | entry 4 | entry 5 | entryx<< |          |  通过快捷键 Ctrl + N 新增添加一个 entry， Ctrl + D 删除一个 entry
+|          |-----------|--------------------------------------------------|          |  然后使用 Ctrl + <-/-> 来调整当前选中的 entry 的顺序
+|          | [child section 1] | child sec 2 | child sec 3 |  child sec<< |          |  然后 依旧使用 tab ，shift+tab 来实现 entry -> child section -> fields -> child sections -> fields -> entry 的逻辑切换
+|          |-----------|--------------------------------------------------|          |  只是将 root sections 变成了 entries。
+|          | name *:                                                      |          |  通过这样的渲染逻辑， 就能实现 array 中也包含嵌套的 object 的逻辑
+|          | [ content ]                                                  |          |  
+|          | type | description     field 渲染逻辑和                      |          |
+|          | error_msg              mainpage 一致                         |          |
+|          | ----------------                                             |          |
+|          | ...                                                          |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |==============================================================|          |
+|                                                                                    |
+--------------------------------------------------------------------------------------
+
+这样的设计就可以应对 嵌套的 json schema， 通过将嵌套的 object 等嵌套类型映射为 child section，然后递归处理。
+最终的一般类型则会被渲染为 fields。
+
+而类似数组这样的包含多个内容的类型，则是采用 overlay 模式进行展示和渲染。
+
+---
+
+快捷键也应该暴露相关 api，允许 developer 自定义快捷键，调用方式也就是在构建 schemaui 对象时。
+
+```rust
+let custome_keymap = include_str!("keymap/custom.keymap.json")
+SchemaUi::new(schema)
+.with_keymap(custome_keymap)
+.build().unwrap();
+```
+
+- **快捷键单一来源** –
+  `keymap/default.keymap.json`列出了每个快捷键（上下文、组合键、动作）。`app::keymap::keymap_source!()`宏将此文件拉入二进制文件中，`InputRouter`使用它对`KeyEvent`进行分类，运行时页脚从相同的数据中呈现帮助文本——保持文档和行为DRY。
+- **根标签与部分** –
+  焦点通过`Ctrl+J / Ctrl+L`（根）和`Ctrl+Tab / Ctrl+Shift+Tab`（部分）循环。普通`Tab`/`Shift+Tab`在各个字段之间移动。
+- **字段** –
+  渲染标签、描述和内联错误消息。枚举/复合字段显示当前选择；数组总结长度和选定条目。
+- **弹出窗口与覆盖层** –
+  按下`Enter`键打开枚举/oneOf选择器的弹出窗口；`Ctrl+E`打开复合编辑器的全屏覆盖层。覆盖层暴露集合快捷键（`Ctrl+N`、`Ctrl+D`、`Ctrl+←/→`、`Ctrl+↑/↓`）以及`Ctrl+S`提交。
+- **状态与帮助** –
+  页脚突出显示脏状态、未解决的验证错误和上下文感知帮助文本。当自动验证启用时，每次编辑都会立即更新这些计数器。
+
+| 上下文 | 快捷键                              | 动作                     |
+| ------ | ----------------------------------- | ------------------------ |
+| 导航   | `Tab` / `Shift+Tab`                 | 在(root sections/entries)/child sections/fields之间移动|
+|        | `Ctrl+Tab` / `Ctrl+Shift+Tab`       | 切换(root sections/entries)/child sections|
+|        | `Ctrl+J` / `Ctrl+L`                 | 切换root section/entries |
+| 选择   | `Enter`                             | 打开弹出窗口/应用选择    |
+| 编辑   | `Ctrl+E`                            | 启动复合编辑器(overlay)  |
+| 状态   | `Esc`                               | 清除状态或关闭弹出窗口   |
+| 持久化 | `Ctrl+S`                            | 保存+验证 (验证通过才会被保存，但是这个行为应该可配置)| 
+| 退出   | `Ctrl+Q` / `Ctrl+C`                 | 退出（如果脏则需要确认） |
+| 集合   | `Ctrl+N` / `Ctrl+D`                 | 添加/删除条目            |
+|        | `Ctrl+←/→`,                         | 重新排序条目             |
+| 覆盖层 | `Ctrl+S`, `Esc`, `Ctrl+N/D/←/→/↑/↓` | 保存、取消、管理复合列表 |
+
+
+| 持久化 | `Ctrl+S`                            | 保存+验证 (验证通过才会被保存，但是这个行为应该可配置)| 
+
+```rust
+let save_options = SaveOptions::new().must_pass_validation(true/false);
+SchemaUi::new(schema).save_options(save_options).build();
+```

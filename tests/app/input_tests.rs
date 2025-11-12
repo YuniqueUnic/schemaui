@@ -21,3 +21,10 @@ fn ctrl_tab_maps_to_section_steps() {
     assert!(matches!(next, KeyAction::SectionStep(1)));
     assert!(matches!(prev, KeyAction::SectionStep(-1)));
 }
+
+#[test]
+fn shift_tab_triggers_previous_field() {
+    let router = InputRouter::new();
+    let action = router.classify(&key(KeyCode::BackTab, KeyModifiers::SHIFT));
+    assert!(matches!(action, KeyAction::FieldStep(-1)));
+}
