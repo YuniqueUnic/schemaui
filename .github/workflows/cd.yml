@@ -37,7 +37,7 @@ jobs:
     name: ${{ matrix.target }}
     permissions:
       contents: write # to upload release assets
-    if: github.repository_owner == 'YuniqueUnic'
+    if: github.repository_owner == 'YuniqueUnic' && startsWith(github.event.release.name, 'schemaui-cli-v')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
