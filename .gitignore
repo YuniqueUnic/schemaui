@@ -1,5 +1,10 @@
 /target
 instructions.txt
+
+docs/
+!docs/**/cli_usage.*.md
+!docs/**/structure_design.*.md
+
 # General
 .DS_Store
 __MACOSX/

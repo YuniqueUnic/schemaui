@@ -154,7 +154,7 @@ pub(super) enum CompositeOverlayTarget {
 impl App {
     fn set_overlay_status_message(&mut self) {
         let help = self.overlay_help_text();
-        self.status.set_raw(&format!("Overlay: {help}"));
+        self.status.set_raw(format!("Overlay: {help}"));
     }
 
     fn overlay_help_text(&self) -> String {
