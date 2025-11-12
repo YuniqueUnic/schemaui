@@ -12,6 +12,6 @@ publish = true
 publish_timeout = "10m"
 
 semver_check = true
-release_commits = "^(release|feat)[(:]"
+release_commits = "^(release|feat|fix)[(:]"
 pr_branch_prefix = "release-plz-"
 pr_labels = ["release"]
