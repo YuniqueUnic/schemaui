@@ -1,9 +1,12 @@
 /target
 instructions.txt
 
+# 忽略整个 docs 目录
 docs/
-!docs/**/cli_usage.*.md
-!docs/**/structure_design.*.md
+!docs/**/cli_usage*.md
+!docs/**/structure_design*.md
+!docs/**/*demo.gif
+
 
 # General
 .DS_Store
