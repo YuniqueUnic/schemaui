@@ -1,4 +1,4 @@
-mod components;
+pub(crate) mod components;
 mod convert;
 mod state;
 

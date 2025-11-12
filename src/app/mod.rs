@@ -1,5 +1,5 @@
-mod input;
-mod keymap;
+pub(crate) mod input;
+pub(crate) mod keymap;
 mod options;
 mod popup;
 mod runtime;

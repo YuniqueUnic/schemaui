@@ -315,7 +315,7 @@ impl KeyValueState {
     }
 }
 
-fn summarize_value(value: &Value) -> String {
+pub(crate) fn summarize_value(value: &Value) -> String {
     match value {
         Value::Null => "null".to_string(),
         Value::Bool(flag) => flag.to_string(),
@@ -358,14 +358,4 @@ fn pointer_for_key(base: &str, key: &str) -> String {
     } else {
         format!("{base}/{}", encoded)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/form/key_value_tests.rs"
-    ));
 }

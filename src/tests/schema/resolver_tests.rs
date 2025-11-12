@@ -1,3 +1,4 @@
+use crate::schema::resolver::SchemaResolver;
 use schemars::schema::RootSchema;
 use serde_json::json;
 
@@ -31,12 +32,14 @@ fn resolves_definition_reference() {
         .resolve_schema(timeout_schema)
         .expect("resolution succeeds");
     assert!(resolved.object.is_some());
-    assert!(resolved
-        .object
-        .as_ref()
-        .unwrap()
-        .properties
-        .contains_key("value"));
+    assert!(
+        resolved
+            .object
+            .as_ref()
+            .unwrap()
+            .properties
+            .contains_key("value")
+    );
 }
 
 #[test]

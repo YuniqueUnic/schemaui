@@ -4,7 +4,7 @@ mod bool;
 mod composite;
 mod composite_list;
 mod enum_select;
-mod helpers;
+pub(crate) mod helpers;
 mod key_value;
 mod multi_select;
 mod scalar_array;

@@ -289,7 +289,11 @@ fn value_panel_lines(
     (lines, cursor_hint)
 }
 
-fn meta_lines(field: &FieldState, is_selected: bool, max_width: u16) -> Vec<Line<'static>> {
+pub(crate) fn meta_lines(
+    field: &FieldState,
+    is_selected: bool,
+    max_width: u16,
+) -> Vec<Line<'static>> {
     let mut parts = Vec::new();
     parts.push(format!("type: {}", field_type_label(&field.schema.kind)));
     if let Some(desc) = field
@@ -350,16 +354,6 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Composite(_) => "composite".to_string(),
         FieldKind::KeyValue(_) => "map".to_string(),
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/presentation/fields_tests.rs"
-    ));
 }
 
 fn composite_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {

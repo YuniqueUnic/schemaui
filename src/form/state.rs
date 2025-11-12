@@ -454,13 +454,3 @@ fn value_at_path<'a>(value: &'a Value, path: &[String]) -> Option<&'a Value> {
     }
     Some(current)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    include!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/tests/form/state_tests.rs"
-    ));
-}
