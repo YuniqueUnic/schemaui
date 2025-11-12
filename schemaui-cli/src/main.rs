@@ -1,4 +1,4 @@
-#![doc = include_str!("../../docs/en/cli_usage.md")]
+#![doc = include_str!("../cli_usage.md")]
 
 use std::fmt::Write as FmtWrite;
 use std::fs;
