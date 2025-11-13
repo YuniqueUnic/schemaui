@@ -7,7 +7,11 @@ use serde_json::{Map, Value, json};
 
 use crate::domain::{CompositeField, CompositeMode, parse_form_schema};
 
-use super::{error::FieldCoercionError, field::components::ComponentPalette, state::FormState};
+use super::{
+    error::FieldCoercionError,
+    field::components::{ComponentPalette, CompositePopupData},
+    state::FormState,
+};
 
 #[derive(Debug, Clone)]
 pub struct CompositeState {
@@ -111,6 +115,16 @@ impl CompositeListState {
         } else {
             Some(self.selected.min(self.entries.len() - 1))
         }
+    }
+
+    fn selected_entry(&self) -> Option<&CompositeListEntry> {
+        let idx = self.selected_index()?;
+        self.entries.get(idx)
+    }
+
+    fn selected_entry_mut(&mut self) -> Option<&mut CompositeListEntry> {
+        let idx = self.selected_index()?;
+        self.entries.get_mut(idx)
     }
 
     pub fn select(&mut self, delta: i32) -> bool {
@@ -262,6 +276,40 @@ impl CompositeListState {
             self.selected = 0;
         } else if self.selected >= self.entries.len() {
             self.selected = self.entries.len().saturating_sub(1);
+        }
+    }
+
+    pub fn popup(&self) -> Option<CompositePopupData> {
+        let entry = self.selected_entry()?;
+        let options = entry.state.option_titles();
+        if options.is_empty() {
+            return None;
+        }
+        let selected = entry
+            .state
+            .selected_index()
+            .unwrap_or(0)
+            .min(options.len().saturating_sub(1));
+        Some(CompositePopupData {
+            options,
+            selected,
+            multi: entry.state.is_multi(),
+            active: entry.state.active_flags(),
+        })
+    }
+
+    pub fn apply_selection(&mut self, selection: usize, flags: Option<Vec<bool>>) -> bool {
+        let Some(entry) = self.selected_entry_mut() else {
+            return false;
+        };
+        if entry.state.is_multi() {
+            if let Some(flags) = flags {
+                entry.state.apply_multi(&flags)
+            } else {
+                false
+            }
+        } else {
+            entry.state.apply_single(selection)
         }
     }
 }

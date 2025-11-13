@@ -58,7 +58,7 @@ fn seed_from_value_uses_enum_discriminator() {
         .expect("seed from value");
 
     assert_eq!(state.active_indices(), vec![1]);
-    assert_eq!(state.summary(), "Variant: Variant 2");
+    assert_eq!(state.summary(), "Variant: #2 Variant 2");
 }
 
 #[test]

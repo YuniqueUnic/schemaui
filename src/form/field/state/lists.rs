@@ -41,6 +41,16 @@ impl FieldState {
         )
     }
 
+    pub fn ensure_composite_list_popup_entry(&mut self) -> bool {
+        if !matches!(self.component.kind(), ComponentKind::CompositeList) {
+            return false;
+        }
+        if self.composite_list_selected_index().is_some() {
+            return false;
+        }
+        self.composite_list_add_entry()
+    }
+
     pub fn multi_states(&self) -> Option<&[bool]> {
         self.component.multi_state().map(|state| state.selected)
     }

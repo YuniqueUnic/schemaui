@@ -1,3 +1,5 @@
+#![allow(unused)] // TODO: maybe this blueprint should be total refactor
+
 use anyhow::Result;
 use serde_json::{Map, Value, json};
 

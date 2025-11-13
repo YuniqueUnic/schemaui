@@ -201,6 +201,7 @@ impl App {
     pub fn run(&mut self) -> Result<Value> {
         let mut terminal = TerminalGuard::new()?;
         while !self.should_quit {
+            terminal.autoresize()?;
             terminal.draw(|frame| self.draw(frame))?;
             if !event::poll(self.options.tick_rate)? {
                 continue;
@@ -325,6 +326,22 @@ impl App {
         if self.popup.is_some() {
             return true;
         }
+
+        match owner {
+            PopupOwner::Root => {
+                if let Some(field) = self.form_state.focused_field_mut() {
+                    field.ensure_composite_list_popup_entry();
+                }
+            }
+            PopupOwner::Composite => {
+                if let Some(editor) = self.active_overlay_mut()
+                    && let Some(field) = editor.form_state_mut().focused_field_mut()
+                {
+                    field.ensure_composite_list_popup_entry();
+                }
+            }
+        }
+
         let field_opt = match owner {
             PopupOwner::Root => self.form_state.focused_field(),
             PopupOwner::Composite => self

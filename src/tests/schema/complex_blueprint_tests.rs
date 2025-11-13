@@ -1,7 +1,8 @@
 use serde_json::Value;
 
 use crate::{
-    form::FormState,
+    domain::{CompositeMode, FieldKind},
+    form::{FormState, field::components::ComponentKind},
     schema::{
         blueprint::{build_ui_blueprint, form_schema_blueprint},
         layout::build_form_schema,
@@ -105,6 +106,55 @@ fn complex_schema_blueprint_exposes_anyof_variants() {
             .any(|root| !root.sections.is_empty()),
         "form state should include focusable sections"
     );
+}
+
+#[test]
+fn complex_schema_forms_expose_component_kinds() {
+    let schema = complex_schema();
+    let form = build_form_schema(&schema).expect("schema parsed");
+    let form_state = FormState::from_schema(&form);
+
+    let deep_items = form_state
+        .field_by_pointer("/e/e1/e2/e3/e4/deepItems")
+        .expect("deepItems pointer");
+    assert_eq!(
+        deep_items.component_kind(),
+        ComponentKind::CompositeList,
+        "deepItems should render as composite list"
+    );
+    match &deep_items.schema.kind {
+        FieldKind::Array(inner) => match inner.as_ref() {
+            FieldKind::Composite(meta) => {
+                assert_eq!(meta.mode, CompositeMode::AnyOf);
+                assert_eq!(meta.variants.len(), 3);
+            }
+            other => panic!("expected composite array entries, got {:?}", other),
+        },
+        other => panic!("expected array field kind, got {:?}", other),
+    }
+
+    let options = form_state
+        .field_by_pointer("/c/c1/c2/options")
+        .expect("options pointer");
+    assert_eq!(
+        options.component_kind(),
+        ComponentKind::Composite,
+        "options should render as composite field"
+    );
+    match &options.schema.kind {
+        FieldKind::Composite(meta) => {
+            assert_eq!(meta.mode, CompositeMode::AnyOf);
+            assert!(
+                meta.variants.iter().any(|variant| variant
+                    .schema
+                    .get("type")
+                    .and_then(Value::as_str)
+                    == Some("array")),
+                "options variants should describe array payloads"
+            );
+        }
+        other => panic!("expected composite field, got {:?}", other),
+    }
 }
 
 fn find_field<'a>(blueprint: &'a Value, name: &str) -> Option<&'a Value> {

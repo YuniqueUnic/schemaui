@@ -7,7 +7,7 @@ use crate::form::composite::{CompositeListEditorContext, CompositeListState};
 use crate::form::error::FieldCoercionError;
 
 use super::helpers::{EntryPanelState, OverlayContext, format_collection_value, list_hint_for};
-use super::{ComponentKind, FieldComponent, palette::ComponentPalette};
+use super::{ComponentKind, CompositePopupData, FieldComponent, palette::ComponentPalette};
 
 #[derive(Debug, Clone)]
 pub struct CompositeListComponent {
@@ -115,5 +115,13 @@ impl FieldComponent for CompositeListComponent {
         }
         context.instructions = Some(self.palette.collection.overlay_instructions.to_string());
         Some(context)
+    }
+
+    fn composite_popup(&self) -> Option<CompositePopupData> {
+        self.state.popup()
+    }
+
+    fn apply_composite_selection(&mut self, selection: usize, flags: Option<Vec<bool>>) -> bool {
+        self.state.apply_selection(selection, flags)
     }
 }
