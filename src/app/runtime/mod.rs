@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
+use ratatui::layout::Rect;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -206,7 +207,10 @@ impl App {
             }
             match event::read()? {
                 Event::Key(key) => self.handle_key(key)?,
-                Event::Resize(_, _) => {}
+                Event::Resize(width, height) => {
+                    terminal.resize(Rect::new(0, 0, width, height))?;
+                    continue;
+                }
                 Event::Mouse(_) => {}
                 Event::FocusGained | Event::FocusLost | Event::Paste(_) => {}
             }

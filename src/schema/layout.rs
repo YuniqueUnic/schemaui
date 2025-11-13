@@ -541,20 +541,21 @@ fn build_composite(
     let mut variants = Vec::new();
     for (index, variant) in schemas.iter().enumerate() {
         let resolved = resolver.resolve_schema(variant)?;
-        let is_object = is_object_schema(&resolved);
-        let mut schema_value = serde_json::to_value(Schema::Object(resolved.clone()))
+        let normalized = normalize_schema(resolver, &resolved)?;
+        let is_object = is_object_schema(&normalized);
+        let mut schema_value = schema_object_to_value(&normalized)
             .context("failed to serialize composite variant schema")?;
         if let Some(definitions) = resolver.definitions_snapshot()
             && let Value::Object(ref mut map) = schema_value
         {
             map.entry("definitions".to_string()).or_insert(definitions);
         }
-        let title = resolved
+        let title = normalized
             .metadata
             .as_ref()
             .and_then(|m| m.title.clone())
-            .unwrap_or_else(|| format!("Variant {}", index + 1));
-        let description = resolved
+            .unwrap_or_else(|| default_variant_title(index, &normalized));
+        let description = normalized
             .metadata
             .as_ref()
             .and_then(|m| m.description.clone());
@@ -568,6 +569,15 @@ fn build_composite(
     }
 
     Ok(Some(CompositeField { mode, variants }))
+}
+
+fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
+    let shape = describe_schema_shape(schema);
+    if shape.is_empty() {
+        format!("Variant {}", index + 1)
+    } else {
+        shape
+    }
 }
 
 fn resolve_array_items(
@@ -642,6 +652,79 @@ fn inline_object_composite(schema: &SchemaObject) -> Result<Option<CompositeFiel
         mode: CompositeMode::OneOf,
         variants: vec![variant],
     }))
+}
+
+fn describe_schema_shape(schema: &SchemaObject) -> String {
+    if let Some(instance) = instance_type(schema) {
+        match instance {
+            InstanceType::String => return "string".to_string(),
+            InstanceType::Integer => return "integer".to_string(),
+            InstanceType::Number => return "number".to_string(),
+            InstanceType::Boolean => return "boolean".to_string(),
+            InstanceType::Array => {
+                if let Some(array) = schema.array.as_ref()
+                    && let Some(item) = describe_array_items(array)
+                {
+                    return format!("{item}[]");
+                }
+                return "array".to_string();
+            }
+            InstanceType::Object => return describe_object_shape(schema),
+            InstanceType::Null => {}
+        }
+    }
+
+    if let Some(subschemas) = schema.subschemas.as_ref() {
+        if let Some(one_of) = subschemas.one_of.as_ref()
+            && !one_of.is_empty()
+        {
+            return "oneOf".to_string();
+        }
+        if let Some(any_of) = subschemas.any_of.as_ref()
+            && !any_of.is_empty()
+        {
+            return "anyOf".to_string();
+        }
+    }
+
+    if schema
+        .enum_values
+        .as_ref()
+        .is_some_and(|values| !values.is_empty())
+    {
+        return "enum".to_string();
+    }
+
+    String::new()
+}
+
+fn describe_object_shape(schema: &SchemaObject) -> String {
+    if let Some(object) = schema.object.as_ref()
+        && !object.properties.is_empty()
+    {
+        let mut props: Vec<String> = object.properties.keys().take(3).cloned().collect();
+        if object.properties.len() > 3 {
+            props.push("…".to_string());
+        }
+        return format!("object({})", props.join(", "));
+    }
+    "object".to_string()
+}
+
+fn describe_array_items(array: &ArrayValidation) -> Option<String> {
+    let items = array.items.as_ref()?;
+    match items {
+        SingleOrVec::Single(schema) => Some(describe_schema_from_single(schema.as_ref())),
+        SingleOrVec::Vec(list) => list.first().map(describe_schema_from_single),
+    }
+}
+
+fn describe_schema_from_single(schema: &Schema) -> String {
+    match schema {
+        Schema::Bool(true) => "any".to_string(),
+        Schema::Bool(false) => "never".to_string(),
+        Schema::Object(obj) => describe_schema_shape(obj),
+    }
 }
 
 fn required_set(object: &ObjectValidation) -> HashSet<String> {

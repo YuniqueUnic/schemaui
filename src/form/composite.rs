@@ -298,15 +298,17 @@ impl CompositeState {
             CompositeMode::OneOf => self
                 .variants
                 .iter()
-                .find(|variant| variant.active)
-                .map(|variant| format!("Variant: {}", variant.title))
+                .enumerate()
+                .find(|(_, variant)| variant.active)
+                .map(|(idx, variant)| format!("Variant: #{} {}", idx + 1, variant.title))
                 .unwrap_or_else(|| "Variant: <none>".to_string()),
             CompositeMode::AnyOf => {
                 let active = self
                     .variants
                     .iter()
-                    .filter(|variant| variant.active)
-                    .map(|variant| variant.title.clone())
+                    .enumerate()
+                    .filter(|(_, variant)| variant.active)
+                    .map(|(idx, variant)| format!("#{} {}", idx + 1, variant.title))
                     .collect::<Vec<_>>();
                 if active.is_empty() {
                     "Variants: []".to_string()
@@ -360,11 +362,17 @@ impl CompositeState {
 
     pub fn active_summaries(&self) -> Vec<CompositeVariantSummary> {
         let mut summaries = Vec::new();
-        for variant in self.variants.iter().filter(|variant| variant.active) {
+        for (idx, variant) in self.variants.iter().enumerate() {
+            if !variant.active {
+                continue;
+            }
             match variant.snapshot(self.pointer()) {
-                Ok(summary) => summaries.push(summary),
+                Ok(mut summary) => {
+                    summary.title = format!("#{} {}", idx + 1, summary.title);
+                    summaries.push(summary);
+                }
                 Err(err) => summaries.push(CompositeVariantSummary {
-                    title: variant.title.clone(),
+                    title: format!("#{} {}", idx + 1, variant.title.clone()),
                     description: variant.description.clone(),
                     lines: vec![format!("Error: {}", err.message)],
                 }),

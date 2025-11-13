@@ -460,7 +460,7 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
         } else {
             Style::default().fg(Color::Gray)
         };
-        spans.push(Span::styled(option.clone(), style));
+        spans.push(Span::styled(format!("#{} {}", idx + 1, option), style));
         if idx + 1 != view.options.len() {
             spans.push(Span::styled(
                 if view.multi { "  " } else { " | " },
@@ -480,27 +480,26 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
         let active_titles = view
             .options
             .iter()
-            .zip(view.active.iter())
-            .filter(|(_, flag)| **flag)
-            .map(|(title, _)| title.clone())
+            .enumerate()
+            .filter_map(|(idx, title)| {
+                view.active
+                    .get(idx)
+                    .copied()
+                    .filter(|flag| *flag)
+                    .map(|_| format!("#{} {}", idx + 1, title))
+            })
             .collect::<Vec<_>>();
-        let summary = if active_titles.is_empty() {
-            "    Active variants: <none>"
+        if active_titles.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                "    Active variants: <none>",
+                Style::default().fg(Color::Gray),
+            )]));
         } else {
-            "    Active variants: "
-        };
-        let mut summary_spans = vec![Span::styled(summary, Style::default().fg(Color::Gray))];
-        if !active_titles.is_empty() {
-            summary_spans.push(Span::styled(
-                active_titles.join(", "),
-                Style::default().fg(Color::White),
-            ));
+            lines.push(Line::from(vec![
+                Span::styled("    Active variants: ", Style::default().fg(Color::Gray)),
+                Span::styled(active_titles.join(", "), Style::default().fg(Color::White)),
+            ]));
         }
-        summary_spans.push(Span::styled(
-            "  + Add variant (Enter)",
-            Style::default().fg(Color::Yellow),
-        ));
-        lines.push(Line::from(summary_spans));
     }
 
     Some(lines)

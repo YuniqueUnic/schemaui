@@ -2,9 +2,9 @@
 
 - **Purpose**: `schemaui` is a Rust crate plus CLI that converts JSON Schema
   documents into interactive terminal user interfaces (TUIs). It parses schemas
-  (draft-07) into a navigable form tree, renders them with ratatui/crossterm,
-  and continuously validates user edits so the resulting JSON stays correct
-  before saving.
+  into a navigable form tree, renders them with ratatui/crossterm, and
+  continuously validates user edits so the resulting JSON stays correct before
+  saving.
 - **High-Level Architecture**: Input/output helpers live under `io::*`, schema
   parsing/refinement is in `schema::*` (loader/resolver/layout), form state +
   reducers are under `form::*`, runtime orchestration (keymaps, overlays,

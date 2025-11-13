@@ -1,3 +1,4 @@
+pub mod blueprint;
 pub mod layout;
 pub mod loader;
 pub mod metadata;
