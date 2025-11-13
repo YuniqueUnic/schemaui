@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 
 use crate::domain::{CompositeField, CompositeMode, parse_form_schema};
 
@@ -27,6 +27,7 @@ pub struct CompositeVariantState {
     active: bool,
     form: RefCell<Option<FormState>>,
     palette: Arc<ComponentPalette>,
+    shape: VariantShape,
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +52,14 @@ pub struct CompositeVariantSummary {
     pub title: String,
     pub description: Option<String>,
     pub lines: Vec<String>,
+}
+
+const WRAPPED_FIELD_NAME: &str = "__value";
+
+#[derive(Debug, Clone, Copy)]
+enum VariantShape {
+    Object,
+    Wrapped,
 }
 
 #[derive(Debug, Clone)]
@@ -256,6 +265,11 @@ impl CompositeState {
                 active: matches!(field.mode, CompositeMode::OneOf) && index == 0,
                 form: RefCell::new(None),
                 palette: Arc::clone(&palette),
+                shape: if variant.is_object {
+                    VariantShape::Object
+                } else {
+                    VariantShape::Wrapped
+                },
             });
         }
 
@@ -319,7 +333,9 @@ impl CompositeState {
             variant.active = idx == target;
             if variant.active {
                 let mut form = variant.borrow_form(&pointer)?;
-                form.seed_from_value(value);
+                let mut scratch = None;
+                let seed_value = variant.seed_payload(value, &mut scratch);
+                form.seed_from_value(seed_value);
             }
         }
         Ok(())
@@ -386,6 +402,19 @@ impl CompositeState {
         changed
     }
 
+    pub fn rotate_single(&mut self, delta: i32) -> bool {
+        if !matches!(self.mode, CompositeMode::OneOf) || self.variants.is_empty() {
+            return false;
+        }
+        let len = self.variants.len() as i32;
+        let current = self.selected_index().unwrap_or(0) as i32;
+        let next = (current + delta).rem_euclid(len);
+        if next == current && self.selected_index().is_some() {
+            return false;
+        }
+        self.apply_single(next as usize)
+    }
+
     pub fn take_editor_session(
         &self,
         pointer: &str,
@@ -410,7 +439,7 @@ impl CompositeState {
             title: variant.title.clone(),
             description: variant.description.clone(),
             form_state,
-            schema: variant.schema.clone(),
+            schema: variant.overlay_schema(),
         })
     }
 
@@ -443,7 +472,10 @@ impl CompositeState {
                 if let Some(variant) = self.variants.iter().find(|variant| variant.active) {
                     let form = variant.borrow_form(self.pointer())?;
                     match form.try_build_value() {
-                        Ok(value) => Ok(Some(value)),
+                        Ok(value) => {
+                            let actual = variant.unwrap_overlay_value(value, self.pointer())?;
+                            Ok(Some(actual))
+                        }
                         Err(mut err) => {
                             err.pointer = join_pointer(self.pointer(), &err.pointer);
                             Err(err)
@@ -463,7 +495,10 @@ impl CompositeState {
                 for variant in self.variants.iter().filter(|variant| variant.active) {
                     let form = variant.borrow_form(self.pointer())?;
                     match form.try_build_value() {
-                        Ok(value) => values.push(value),
+                        Ok(value) => {
+                            let actual = variant.unwrap_overlay_value(value, self.pointer())?;
+                            values.push(actual);
+                        }
                         Err(mut err) => {
                             err.pointer = join_pointer(self.pointer(), &err.pointer);
                             return Err(err);
@@ -488,12 +523,73 @@ impl CompositeState {
     }
 }
 
+fn wrap_non_object_schema(schema: &Value, title: &str, description: Option<&String>) -> Value {
+    let mut property = schema.clone();
+    if let Value::Object(ref mut map) = property {
+        map.entry("title".to_string())
+            .or_insert_with(|| Value::String(title.to_string()));
+        if let Some(desc) = description
+            && !map.contains_key("description")
+        {
+            map.insert("description".to_string(), Value::String(desc.clone()));
+        }
+    }
+    json!({
+        "type": "object",
+        "title": title,
+        "properties": {
+            WRAPPED_FIELD_NAME: property
+        },
+        "required": [WRAPPED_FIELD_NAME]
+    })
+}
+
 impl CompositeVariantState {
+    fn overlay_schema(&self) -> Value {
+        match self.shape {
+            VariantShape::Object => self.schema.clone(),
+            VariantShape::Wrapped => {
+                wrap_non_object_schema(&self.schema, &self.title, self.description.as_ref())
+            }
+        }
+    }
+
+    fn seed_payload<'a>(&self, value: &'a Value, scratch: &'a mut Option<Value>) -> &'a Value {
+        if matches!(self.shape, VariantShape::Wrapped) {
+            *scratch = Some(json!({ WRAPPED_FIELD_NAME: value }));
+            scratch.as_ref().unwrap()
+        } else {
+            value
+        }
+    }
+
+    fn unwrap_overlay_value(
+        &self,
+        value: Value,
+        pointer: &str,
+    ) -> Result<Value, FieldCoercionError> {
+        if !matches!(self.shape, VariantShape::Wrapped) {
+            return Ok(value);
+        }
+        let object = value.as_object().ok_or_else(|| FieldCoercionError {
+            pointer: pointer.to_string(),
+            message: "overlay payload missing object wrapper".to_string(),
+        })?;
+        object
+            .get(WRAPPED_FIELD_NAME)
+            .cloned()
+            .ok_or_else(|| FieldCoercionError {
+                pointer: pointer.to_string(),
+                message: "overlay payload missing wrapped value".to_string(),
+            })
+    }
+
     fn ensure_form_ready(&self, pointer: &str) -> Result<(), FieldCoercionError> {
         if self.form.borrow().is_some() {
             return Ok(());
         }
-        let schema = parse_form_schema(&self.schema).map_err(|err| FieldCoercionError {
+        let schema_value = self.overlay_schema();
+        let schema = parse_form_schema(&schema_value).map_err(|err| FieldCoercionError {
             pointer: pointer.to_string(),
             message: format!("failed to parse composite variant '{}': {err}", self.title),
         })?;

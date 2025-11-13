@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crossterm::event::KeyCode;
 use serde_json::Value;
 
 use crate::domain::{CompositeField, FieldSchema};
@@ -33,6 +34,14 @@ impl FieldComponent for CompositeComponent {
 
     fn display_value(&self, _schema: &FieldSchema) -> String {
         self.view.display_label(&self.state)
+    }
+
+    fn handle_key(&mut self, _schema: &FieldSchema, key: &crossterm::event::KeyEvent) -> bool {
+        match key.code {
+            KeyCode::Left => self.state.rotate_single(-1),
+            KeyCode::Right => self.state.rotate_single(1),
+            _ => false,
+        }
     }
 
     fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {

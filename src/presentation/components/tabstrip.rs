@@ -107,6 +107,16 @@ fn compute_visible_window(labels: &[TabLabel], selected: usize, available: usize
             right_overflow: selected + 1 < labels.len(),
         };
     }
+    let total_width: usize = labels.iter().map(|label| label.width).sum();
+    if total_width <= available {
+        return TabWindow {
+            start: 0,
+            end: labels.len(),
+            selected_offset: selected,
+            left_overflow: false,
+            right_overflow: false,
+        };
+    }
 
     let mut best: Option<(usize, usize, usize, TabWindow)> = None;
     for start in 0..=selected {
@@ -212,5 +222,23 @@ mod tests {
             "window should include selected and keep width constraints"
         );
         assert_eq!(window.selected_offset, 3 - window.start);
+    }
+
+    #[test]
+    fn window_spans_all_tabs_when_width_available() {
+        let labels = vec![
+            TabLabel::new("svc".into()),
+            TabLabel::new("db".into()),
+            TabLabel::new("metrics".into()),
+        ];
+        let total_width: usize = labels.iter().map(|label| label.width).sum();
+        let window = compute_visible_window(&labels, 1, total_width);
+        assert_eq!(window.start, 0);
+        assert_eq!(window.end, labels.len());
+        assert_eq!(window.selected_offset, 1);
+        assert!(
+            !window.left_overflow && !window.right_overflow,
+            "indicators should be hidden when tabs fit"
+        );
     }
 }

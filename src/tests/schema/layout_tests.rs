@@ -288,6 +288,42 @@ fn multi_level_refs_are_resolved() {
     assert_eq!(field.name, "value");
 }
 
+#[test]
+fn allof_properties_merge_into_object_section() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "settings": {
+                "type": "object",
+                "allOf": [
+                    {"properties": {"enabled": {"type": "boolean"}}},
+                    {"properties": {"threshold": {"type": "integer"}}}
+                ]
+            }
+        }
+    });
+    let form = build_form_schema(&schema).expect("schema parsed");
+    let settings_root = form
+        .roots
+        .iter()
+        .find(|root| root.id == "settings")
+        .expect("settings root");
+    let section = settings_root.sections.first().expect("settings section");
+    let names: Vec<_> = section
+        .fields
+        .iter()
+        .map(|field| field.name.as_str())
+        .collect();
+    assert!(
+        names.contains(&"enabled"),
+        "merged schema should expose 'enabled'"
+    );
+    assert!(
+        names.contains(&"threshold"),
+        "merged schema should expose 'threshold'"
+    );
+}
+
 fn find_field<'a>(
     form: &'a FormSchema,
     predicate: impl Fn(&FieldSchema) -> bool,

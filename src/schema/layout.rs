@@ -70,16 +70,18 @@ pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
     for (name, property_schema) in &object.properties {
         let path = vec![name.clone()];
         let resolved = resolver.resolve_schema(property_schema)?;
-        if should_descend(&resolved) {
+        let normalized = normalize_schema(&resolver, &resolved)?;
+        if should_descend(&normalized) {
             let entry = roots
                 .entry(name.clone())
-                .or_insert_with(|| RootBuilder::new(name, &resolved));
-            let section = build_section_tree(&resolver, &resolved, path, None, &mut order_counter)?;
+                .or_insert_with(|| RootBuilder::new(name, &normalized));
+            let section =
+                build_section_tree(&resolver, &normalized, path, None, &mut order_counter)?;
             entry.sections.push(section);
         } else {
             let field = build_field_schema(
                 &resolver,
-                &resolved,
+                &normalized,
                 name,
                 vec![name.clone()],
                 general_section_info(),
@@ -93,9 +95,10 @@ pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
     if let Some(additional) = object.additional_properties.as_ref()
         && let Some(resolved) = resolve_additional_properties(&resolver, additional)?
     {
+        let normalized = normalize_schema(&resolver, &resolved)?;
         let field = build_field_schema(
             &resolver,
-            &resolved,
+            &normalized,
             "additional",
             Vec::new(),
             general_section_info(),
@@ -156,6 +159,95 @@ pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
     })
 }
 
+fn normalize_schema(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<SchemaObject> {
+    if has_all_of(schema) {
+        merge_all_of_schema(resolver, schema)
+    } else {
+        Ok(schema.clone())
+    }
+}
+
+fn has_all_of(schema: &SchemaObject) -> bool {
+    schema
+        .subschemas
+        .as_ref()
+        .and_then(|subs| subs.all_of.as_ref())
+        .map(|items| !items.is_empty())
+        .unwrap_or(false)
+}
+
+fn merge_all_of_schema(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+) -> Result<SchemaObject> {
+    let Some(subs) = schema
+        .subschemas
+        .as_ref()
+        .and_then(|validation| validation.all_of.as_ref())
+        .filter(|items| !items.is_empty())
+    else {
+        return Ok(schema.clone());
+    };
+
+    let mut merged = schema.clone();
+    let mut object = merged
+        .object
+        .take()
+        .unwrap_or_else(|| Box::new(ObjectValidation::default()));
+    let mut contributed = false;
+
+    for part in subs {
+        let resolved = resolver.resolve_schema(part)?;
+        let normalized = normalize_schema(resolver, &resolved)?;
+        if let Some(source) = normalized.object.as_ref() {
+            merge_object_validation(&mut object, source);
+            contributed = true;
+        }
+    }
+
+    if !contributed {
+        return Ok(schema.clone());
+    }
+
+    merged.object = Some(object);
+    if let Some(mut validation) = merged.subschemas.take() {
+        validation.all_of = None;
+        merged.subschemas = Some(validation);
+    }
+    Ok(merged)
+}
+
+fn merge_object_validation(target: &mut ObjectValidation, source: &ObjectValidation) {
+    for (key, schema) in &source.properties {
+        target
+            .properties
+            .entry(key.clone())
+            .or_insert(schema.clone());
+    }
+    for (key, schema) in &source.pattern_properties {
+        target
+            .pattern_properties
+            .entry(key.clone())
+            .or_insert(schema.clone());
+    }
+    for required in &source.required {
+        target.required.insert(required.clone());
+    }
+    if target.additional_properties.is_none() {
+        target.additional_properties = source.additional_properties.clone();
+    }
+    if target.property_names.is_none() && source.property_names.is_some() {
+        target.property_names = source.property_names.clone();
+    }
+    if target.max_properties.is_none() {
+        target.max_properties = source.max_properties;
+    }
+    if target.min_properties.is_none() {
+        target.min_properties = source.min_properties;
+    }
+    // ObjectValidation does not track dependencies in this schema version.
+}
+
 fn build_section_tree(
     resolver: &SchemaResolver<'_>,
     schema: &SchemaObject,
@@ -181,14 +273,15 @@ fn build_section_tree(
         let mut next_path = path.clone();
         next_path.push(child_name.clone());
         let resolved = resolver.resolve_schema(child_schema)?;
-        if should_descend(&resolved) {
+        let normalized = normalize_schema(resolver, &resolved)?;
+        if should_descend(&normalized) {
             let child =
-                build_section_tree(resolver, &resolved, next_path, Some(&section_info), order)?;
+                build_section_tree(resolver, &normalized, next_path, Some(&section_info), order)?;
             children.push(child);
         } else {
             let field = build_field_schema(
                 resolver,
-                &resolved,
+                &normalized,
                 child_name,
                 next_path,
                 section_info.clone(),
@@ -202,13 +295,14 @@ fn build_section_tree(
     if let Some(additional) = object.additional_properties.as_ref()
         && let Some(resolved) = resolve_additional_properties(resolver, additional)?
     {
+        let normalized = normalize_schema(resolver, &resolved)?;
         let field_name = path
             .last()
             .cloned()
             .unwrap_or_else(|| "additional".to_string());
         let field = build_field_schema(
             resolver,
-            &resolved,
+            &normalized,
             &field_name,
             path.clone(),
             section_info.clone(),
@@ -237,7 +331,10 @@ fn resolve_additional_properties(
     match schema {
         Schema::Bool(false) => Ok(None),
         Schema::Bool(true) => Ok(None),
-        other => resolver.resolve_schema(other).map(Some),
+        other => {
+            let resolved = resolver.resolve_schema(other)?;
+            normalize_schema(resolver, &resolved).map(Some)
+        }
     }
 }
 
@@ -259,16 +356,20 @@ fn build_field_schema(
     section: SectionInfo,
     required: bool,
 ) -> Result<FieldSchema> {
-    let metadata = metadata_map(schema);
-    let kind = detect_kind(resolver, schema)
+    let normalized = normalize_schema(resolver, schema)?;
+    let metadata = metadata_map(&normalized);
+    let kind = detect_kind(resolver, &normalized)
         .with_context(|| format!("unsupported schema for field '{name}'"))?;
-    let title = schema
+    let title = normalized
         .metadata
         .as_ref()
         .and_then(|m| m.title.clone())
         .unwrap_or_else(|| prettify_label(name));
-    let default = schema.metadata.as_ref().and_then(|m| m.default.clone());
-    let description = schema.metadata.as_ref().and_then(|m| m.description.clone());
+    let default = normalized.metadata.as_ref().and_then(|m| m.default.clone());
+    let description = normalized
+        .metadata
+        .as_ref()
+        .and_then(|m| m.description.clone());
 
     Ok(FieldSchema {
         name: name.to_string(),
@@ -440,7 +541,7 @@ fn build_composite(
     let mut variants = Vec::new();
     for (index, variant) in schemas.iter().enumerate() {
         let resolved = resolver.resolve_schema(variant)?;
-        ensure_object_schema(&resolved)?;
+        let is_object = is_object_schema(&resolved);
         let mut schema_value = serde_json::to_value(Schema::Object(resolved.clone()))
             .context("failed to serialize composite variant schema")?;
         if let Some(definitions) = resolver.definitions_snapshot()
@@ -462,6 +563,7 @@ fn build_composite(
             title,
             description,
             schema: schema_value,
+            is_object,
         });
     }
 
@@ -477,9 +579,15 @@ fn resolve_array_items(
         .as_ref()
         .context("array schema must define items")?;
     match items {
-        SingleOrVec::Single(schema) => resolver.resolve_schema(schema),
+        SingleOrVec::Single(schema) => {
+            let resolved = resolver.resolve_schema(schema)?;
+            normalize_schema(resolver, &resolved)
+        }
         SingleOrVec::Vec(list) => match list.first() {
-            Some(first) => resolver.resolve_schema(first),
+            Some(first) => {
+                let resolved = resolver.resolve_schema(first)?;
+                normalize_schema(resolver, &resolved)
+            }
             None => bail!("tuple arrays without items are not supported"),
         },
     }
@@ -528,6 +636,7 @@ fn inline_object_composite(schema: &SchemaObject) -> Result<Option<CompositeFiel
         title,
         description,
         schema: schema_value,
+        is_object: true,
     };
     Ok(Some(CompositeField {
         mode: CompositeMode::OneOf,

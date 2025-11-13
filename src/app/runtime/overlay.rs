@@ -7,7 +7,7 @@ use jsonschema::{Validator, validator_for};
 use crate::form::field::components::helpers::OverlayContext;
 use crate::{
     app::keymap::KeymapContext,
-    domain::FieldKind,
+    domain::{CompositeMode, FieldKind},
     form::{
         ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand, FormEngine, FormState,
         KeyValueEditorSession, apply_command,
@@ -329,8 +329,18 @@ impl App {
         let component_context = field.overlay_context();
 
         match &field.schema.kind {
-            FieldKind::Composite(_) => {
-                let active = field.active_composite_variants();
+            FieldKind::Composite(template) => {
+                let schema = template.as_ref();
+                let mut active = field.active_composite_variants();
+                if active.is_empty()
+                    && matches!(schema.mode, CompositeMode::AnyOf)
+                    && !schema.variants.is_empty()
+                {
+                    let mut flags = vec![false; schema.variants.len()];
+                    flags[0] = true;
+                    field.apply_composite_selection(0, Some(flags));
+                    active = field.active_composite_variants();
+                }
                 let Some(&variant_index) = active.first() else {
                     self.status
                         .set_raw("Select a variant via Enter before editing (oneOf/anyOf)");
@@ -357,6 +367,13 @@ impl App {
             FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Composite(_)) => {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
+                if field.composite_list_selected_index().is_none()
+                    && !field.composite_list_add_entry()
+                {
+                    self.status
+                        .set_raw("Unable to auto-create the first entry; use Ctrl+N");
+                    return;
+                }
                 match field.open_composite_list_editor() {
                     Ok(context) => {
                         self.popup = None;
@@ -408,6 +425,13 @@ impl App {
             {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
+                if field.composite_list_selected_index().is_none()
+                    && !field.composite_list_add_entry()
+                {
+                    self.status
+                        .set_raw("Unable to auto-create the first entry; use Ctrl+N");
+                    return;
+                }
                 match field.open_scalar_array_editor() {
                     Ok(context) => {
                         self.popup = None;

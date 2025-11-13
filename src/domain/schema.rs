@@ -74,6 +74,7 @@ pub struct CompositeVariant {
     pub title: String,
     pub description: Option<String>,
     pub schema: Value,
+    pub is_object: bool,
 }
 
 #[derive(Debug, Clone)]
