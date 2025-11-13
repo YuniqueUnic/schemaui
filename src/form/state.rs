@@ -111,38 +111,48 @@ impl FormState {
     }
 
     pub fn focus_next_field(&mut self) {
-        self.normalize_focus();
-        let Some(section) = self.active_section() else {
-            return;
-        };
-        if section.fields.is_empty() {
-            return;
-        }
-        if self.field_index + 1 < section.fields.len() {
-            self.field_index += 1;
-        } else {
-            self.advance_section(1);
-            self.field_index = 0;
-            self.normalize_focus();
-        }
+        self.advance_focus_forward();
     }
 
     pub fn focus_prev_field(&mut self) {
+        self.advance_focus_backward();
+    }
+
+    pub fn advance_focus_forward(&mut self) {
         self.normalize_focus();
-        let Some(section) = self.active_section() else {
-            return;
-        };
-        if section.fields.is_empty() {
+        if self.roots.is_empty() {
             return;
         }
-        if self.field_index > 0 {
+        if let Some(section) = self.active_section()
+            && !section.fields.is_empty()
+            && self.field_index + 1 < section.fields.len()
+        {
+            self.field_index += 1;
+            return;
+        }
+        self.advance_section(1);
+        self.field_index = 0;
+        self.normalize_focus();
+    }
+
+    pub fn advance_focus_backward(&mut self) {
+        self.normalize_focus();
+        if self.roots.is_empty() {
+            return;
+        }
+        if let Some(section) = self.active_section()
+            && !section.fields.is_empty()
+            && self.field_index > 0
+        {
             self.field_index -= 1;
-        } else {
-            self.advance_section(-1);
-            self.normalize_focus();
-            if let Some(current) = self.active_section()
-                && !current.fields.is_empty()
-            {
+            return;
+        }
+        self.advance_section(-1);
+        self.normalize_focus();
+        if let Some(current) = self.active_section() {
+            if current.fields.is_empty() {
+                self.field_index = 0;
+            } else {
                 self.field_index = current.fields.len().saturating_sub(1);
             }
         }

@@ -4,6 +4,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use jsonschema::{Validator, validator_for};
 
+use crate::form::field::components::helpers::OverlayContext;
 use crate::{
     app::keymap::KeymapContext,
     domain::FieldKind,
@@ -44,6 +45,7 @@ pub(super) fn apply_selection_to_field(
     }
 }
 
+#[derive(Clone)]
 pub(super) enum OverlaySession {
     Composite(CompositeEditorSession),
     KeyValue(KeyValueEditorSession),
@@ -88,6 +90,28 @@ impl OverlaySession {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) enum OverlayHost {
+    RootForm,
+    Overlay { parent_level: usize },
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum CompositeOverlayTarget {
+    Field,
+    ListEntry { entry_index: usize },
+    KeyValueEntry { entry_index: usize },
+    ArrayEntry { entry_index: usize },
+}
+
+#[derive(Clone)]
+struct OverlayCommitPayload {
+    field_pointer: String,
+    host: OverlayHost,
+    target: CompositeOverlayTarget,
+    session: OverlaySession,
+}
+
 pub(super) struct CompositeEditorOverlay {
     pub(super) field_pointer: String,
     pub(super) field_label: String,
@@ -100,12 +124,16 @@ pub(super) struct CompositeEditorOverlay {
     pub(super) list_selected: Option<usize>,
     pub(super) instructions: String,
     pub(super) validator: Option<Arc<Validator>>,
+    pub(super) level: usize,
+    pub(super) host: OverlayHost,
 }
 
 impl CompositeEditorOverlay {
     pub(super) fn new(
         field_pointer: String,
         field_label: String,
+        level: usize,
+        host: OverlayHost,
         session: OverlaySession,
         instructions: String,
     ) -> Self {
@@ -123,7 +151,27 @@ impl CompositeEditorOverlay {
             list_selected: None,
             instructions,
             validator: None,
+            level,
+            host,
         }
+    }
+
+    fn build_commit_payload(&self) -> OverlayCommitPayload {
+        OverlayCommitPayload {
+            field_pointer: self.field_pointer.clone(),
+            host: self.host,
+            target: self.target.clone(),
+            session: self.session.clone(),
+        }
+    }
+
+    fn needs_list_panel(&self) -> bool {
+        matches!(
+            self.target,
+            CompositeOverlayTarget::ListEntry { .. }
+                | CompositeOverlayTarget::KeyValueEntry { .. }
+                | CompositeOverlayTarget::ArrayEntry { .. }
+        )
     }
 
     pub(super) fn form_state(&self) -> &FormState {
@@ -142,35 +190,113 @@ impl CompositeEditorOverlay {
     pub(super) fn dirty(&self) -> bool {
         self.session.is_dirty()
     }
-}
 
-pub(super) enum CompositeOverlayTarget {
-    Field,
-    ListEntry { entry_index: usize },
-    KeyValueEntry { entry_index: usize },
-    ArrayEntry { entry_index: usize },
+    pub(super) fn apply_component_context(&mut self, ctx: OverlayContext) {
+        if let Some(title) = ctx.title {
+            self.display_title = format!("Edit {} – {}", self.field_label, title);
+        }
+        if let Some(description) = ctx.description {
+            self.display_description = Some(description);
+        }
+        if let Some(panel) = ctx.entry_panel {
+            self.set_list_panel(panel.entries, panel.selected);
+        }
+        if let Some(extra) = ctx.instructions {
+            if self.instructions.trim().is_empty() {
+                self.instructions = extra;
+            } else {
+                self.instructions = format!("{} • {}", self.instructions, extra);
+            }
+        }
+    }
 }
 
 impl App {
-    fn set_overlay_status_message(&mut self) {
-        let help = self.overlay_help_text();
-        self.status.set_raw(format!("Overlay: {help}"));
+    pub(super) fn overlay_depth(&self) -> usize {
+        self.overlay_stack.len()
+    }
+
+    pub(super) fn active_overlay(&self) -> Option<&CompositeEditorOverlay> {
+        self.overlay_stack.last()
+    }
+
+    pub(super) fn active_overlay_mut(&mut self) -> Option<&mut CompositeEditorOverlay> {
+        self.overlay_stack.last_mut()
     }
 
     fn overlay_help_text(&self) -> String {
-        self.keymap_store
+        let base = self
+            .keymap_store
             .help_text(KeymapContext::Overlay)
-            .unwrap_or_else(|| "Ctrl+S save • Esc cancel".to_string())
+            .unwrap_or_else(|| "Ctrl+S save • Esc cancel".to_string());
+        if let Some(editor) = self.active_overlay() {
+            format!("L{} · {}", editor.level, base)
+        } else {
+            base
+        }
+    }
+
+    fn set_overlay_status_message(&mut self) {
+        if let Some(editor) = self.active_overlay() {
+            let help = self.overlay_help_text();
+            self.status
+                .set_raw(format!("Overlay {}: {}", editor.level, help));
+        }
+    }
+
+    fn host_form_state(&self, host: OverlayHost) -> &FormState {
+        match host {
+            OverlayHost::RootForm => &self.form_state,
+            OverlayHost::Overlay { parent_level } => {
+                let idx = parent_level.saturating_sub(1);
+                &self.overlay_stack[idx].session.form_state()
+            }
+        }
+    }
+
+    fn host_form_state_mut(&mut self, host: OverlayHost) -> &mut FormState {
+        match host {
+            OverlayHost::RootForm => &mut self.form_state,
+            OverlayHost::Overlay { parent_level } => {
+                let idx = parent_level.saturating_sub(1);
+                self.overlay_stack
+                    .get_mut(idx)
+                    .expect("overlay host should exist")
+                    .form_state_mut()
+            }
+        }
+    }
+
+    fn initialize_active_overlay(&mut self) {
+        self.set_overlay_status_message();
+        self.refresh_list_overlay_panel();
+        self.setup_overlay_validator();
+        self.run_overlay_validation();
     }
 
     pub(super) fn try_open_composite_editor(&mut self) {
-        if self.composite_editor.is_some() {
-            return;
-        }
-        let Some(field) = self.form_state.focused_field_mut() else {
+        let level = self.overlay_depth() + 1;
+        let host = if level == 1 {
+            OverlayHost::RootForm
+        } else {
+            OverlayHost::Overlay {
+                parent_level: level - 1,
+            }
+        };
+        let previous_depth = self.overlay_depth();
+
+        let field_result = if let Some(editor) = self.active_overlay_mut() {
+            editor.form_state_mut().focused_field_mut()
+        } else {
+            self.form_state.focused_field_mut()
+        };
+
+        let Some(field) = field_result else {
             self.status.set_raw("No field selected");
             return;
         };
+        let component_context = field.overlay_context();
+
         match &field.schema.kind {
             FieldKind::Composite(_) => {
                 let active = field.active_composite_variants();
@@ -184,14 +310,15 @@ impl App {
                 match field.open_composite_editor(variant_index) {
                     Ok(session) => {
                         self.popup = None;
-                        self.composite_editor = Some(CompositeEditorOverlay::new(
+                        self.overlay_stack.push(CompositeEditorOverlay::new(
                             pointer,
                             label,
+                            level,
+                            host,
                             OverlaySession::Composite(session),
                             self.overlay_help_text(),
                         ));
-                        self.set_overlay_status_message();
-                        self.setup_overlay_validator();
+                        self.initialize_active_overlay();
                     }
                     Err(err) => self.status.set_raw(&err.message),
                 }
@@ -199,31 +326,22 @@ impl App {
             FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Composite(_)) => {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
-                let (panel_entries, panel_selected) = field
-                    .composite_list_panel()
-                    .unwrap_or_else(|| (Vec::new(), 0));
                 match field.open_composite_list_editor() {
                     Ok(context) => {
                         self.popup = None;
                         let mut overlay = CompositeEditorOverlay::new(
                             pointer,
                             label,
+                            level,
+                            host,
                             OverlaySession::Composite(context.session),
                             self.overlay_help_text(),
                         );
                         overlay.target = CompositeOverlayTarget::ListEntry {
                             entry_index: context.entry_index,
                         };
-                        overlay.display_title =
-                            format!("Edit {} – {}", overlay.field_label, context.entry_label);
-                        overlay.display_description = Some(context.entry_label.clone());
-                        if !panel_entries.is_empty() {
-                            overlay.set_list_panel(panel_entries, panel_selected);
-                        }
-                        self.composite_editor = Some(overlay);
-                        self.set_overlay_status_message();
-                        self.refresh_list_overlay_panel();
-                        self.setup_overlay_validator();
+                        self.overlay_stack.push(overlay);
+                        self.initialize_active_overlay();
                     }
                     Err(err) => self.status.set_raw(&err.message),
                 }
@@ -231,31 +349,22 @@ impl App {
             FieldKind::KeyValue(_) => {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
-                let (panel_entries, panel_selected) = field
-                    .composite_list_panel()
-                    .unwrap_or_else(|| (Vec::new(), 0));
                 match field.open_key_value_editor() {
                     Ok(context) => {
                         self.popup = None;
                         let mut overlay = CompositeEditorOverlay::new(
                             pointer,
                             label,
+                            level,
+                            host,
                             OverlaySession::KeyValue(context.session),
                             self.overlay_help_text(),
                         );
                         overlay.target = CompositeOverlayTarget::KeyValueEntry {
                             entry_index: context.entry_index,
                         };
-                        overlay.display_title =
-                            format!("Edit {} – {}", overlay.field_label, context.entry_label);
-                        overlay.display_description = Some(context.entry_label.clone());
-                        if !panel_entries.is_empty() {
-                            overlay.set_list_panel(panel_entries, panel_selected);
-                        }
-                        self.composite_editor = Some(overlay);
-                        self.set_overlay_status_message();
-                        self.refresh_list_overlay_panel();
-                        self.setup_overlay_validator();
+                        self.overlay_stack.push(overlay);
+                        self.initialize_active_overlay();
                     }
                     Err(err) => self.status.set_raw(&err.message),
                 }
@@ -268,31 +377,22 @@ impl App {
             {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
-                let (panel_entries, panel_selected) = field
-                    .composite_list_panel()
-                    .unwrap_or_else(|| (Vec::new(), 0));
                 match field.open_scalar_array_editor() {
                     Ok(context) => {
                         self.popup = None;
                         let mut overlay = CompositeEditorOverlay::new(
                             pointer,
                             label,
+                            level,
+                            host,
                             OverlaySession::Array(context.session),
                             self.overlay_help_text(),
                         );
                         overlay.target = CompositeOverlayTarget::ArrayEntry {
                             entry_index: context.entry_index,
                         };
-                        overlay.display_title =
-                            format!("Edit {} – {}", overlay.field_label, context.entry_label);
-                        overlay.display_description = Some(context.entry_label.clone());
-                        if !panel_entries.is_empty() {
-                            overlay.set_list_panel(panel_entries, panel_selected);
-                        }
-                        self.composite_editor = Some(overlay);
-                        self.set_overlay_status_message();
-                        self.refresh_list_overlay_panel();
-                        self.setup_overlay_validator();
+                        self.overlay_stack.push(overlay);
+                        self.initialize_active_overlay();
                     }
                     Err(err) => self.status.set_raw(&err.message),
                 }
@@ -302,81 +402,108 @@ impl App {
                     .set_raw("Focus a composite or composite list field before editing");
             }
         }
+
+        if self.overlay_depth() > previous_depth {
+            if let Some(ctx) = component_context {
+                if let Some(editor) = self.active_overlay_mut() {
+                    editor.apply_component_context(ctx);
+                }
+            }
+        }
     }
 
-    pub(super) fn close_composite_editor(&mut self, commit: bool) {
-        let Some(editor) = self.composite_editor.take() else {
+    pub(super) fn close_active_overlay(&mut self, commit: bool) {
+        let Some(mut overlay) = self.overlay_stack.pop() else {
             return;
         };
-        let pointer = editor.field_pointer.clone();
-        let mut restored = false;
-        match editor.target {
-            CompositeOverlayTarget::Field => {
-                if let OverlaySession::Composite(session) = editor.session
-                    && let Some(field) = self.form_state.field_mut_by_pointer(&pointer)
-                {
-                    field.close_composite_editor(session, commit);
-                }
-            }
-            CompositeOverlayTarget::ListEntry { entry_index } => {
-                if let OverlaySession::Composite(session) = editor.session
-                    && let Some(field) = self.form_state.field_mut_by_pointer(&pointer)
-                {
-                    field.close_composite_list_editor(entry_index, session, commit);
-                }
-            }
-            CompositeOverlayTarget::KeyValueEntry { entry_index } => {
-                if let OverlaySession::KeyValue(ref session) = editor.session
-                    && commit
-                    && let Some(field) = self.form_state.field_mut_by_pointer(&pointer)
-                    && let Err(err) = field.close_key_value_editor(entry_index, session, true)
-                {
-                    self.status.set_raw(&err.message);
-                    self.composite_editor = Some(editor);
-                    self.popup = None;
-                    restored = true;
-                }
-            }
-            CompositeOverlayTarget::ArrayEntry { entry_index } => {
-                if let OverlaySession::Array(ref session) = editor.session
-                    && commit
-                    && let Some(field) = self.form_state.field_mut_by_pointer(&pointer)
-                    && let Err(err) = field.close_scalar_array_editor(entry_index, session, true)
-                {
-                    self.status.set_raw(&err.message);
-                    self.composite_editor = Some(editor);
-                    self.popup = None;
-                    restored = true;
-                }
-            }
-        }
-        if restored {
-            return;
-        }
         self.popup = None;
         if commit {
-            self.exit_armed = false;
-            self.status.value_updated();
-            if self.options.auto_validate {
-                self.run_validation(false);
+            match self.apply_overlay_commit(&overlay) {
+                Ok(()) => {
+                    overlay.form_state_mut().mark_clean();
+                    overlay.exit_armed = false;
+                    self.exit_armed = false;
+                    self.status.value_updated();
+                    if overlay.level == 1 && self.options.auto_validate {
+                        self.run_validation(false);
+                    } else {
+                        self.run_overlay_validation();
+                    }
+                }
+                Err(message) => {
+                    self.status.set_raw(&message);
+                    self.overlay_stack.push(overlay);
+                    return;
+                }
             }
         } else {
             self.status.ready();
+        }
+
+        if let Some(parent) = self.active_overlay_mut() {
+            parent.exit_armed = false;
+            self.set_overlay_status_message();
+            self.refresh_list_overlay_panel();
+            self.run_overlay_validation();
+        }
+    }
+
+    fn apply_overlay_commit(&mut self, overlay: &CompositeEditorOverlay) -> Result<(), String> {
+        let payload = overlay.build_commit_payload();
+        let host_state = self.host_form_state_mut(payload.host);
+        match payload.target {
+            CompositeOverlayTarget::Field => {
+                let OverlaySession::Composite(session) = payload.session else {
+                    return Err("Invalid overlay session".to_string());
+                };
+                let Some(field) = host_state.field_mut_by_pointer(&payload.field_pointer) else {
+                    return Err("Overlay target no longer exists".to_string());
+                };
+                field.close_composite_editor(session, true);
+                Ok(())
+            }
+            CompositeOverlayTarget::ListEntry { entry_index } => {
+                let OverlaySession::Composite(session) = payload.session else {
+                    return Err("Invalid overlay session".to_string());
+                };
+                let Some(field) = host_state.field_mut_by_pointer(&payload.field_pointer) else {
+                    return Err("Overlay target no longer exists".to_string());
+                };
+                field.close_composite_list_editor(entry_index, session, true);
+                Ok(())
+            }
+            CompositeOverlayTarget::KeyValueEntry { entry_index } => {
+                let OverlaySession::KeyValue(session) = payload.session else {
+                    return Err("Invalid overlay session".to_string());
+                };
+                let Some(field) = host_state.field_mut_by_pointer(&payload.field_pointer) else {
+                    return Err("Overlay target no longer exists".to_string());
+                };
+                field
+                    .close_key_value_editor(entry_index, &session, true)
+                    .map_err(|err| err.message)
+                    .map(|_| ())
+            }
+            CompositeOverlayTarget::ArrayEntry { entry_index } => {
+                let OverlaySession::Array(session) = payload.session else {
+                    return Err("Invalid overlay session".to_string());
+                };
+                let Some(field) = host_state.field_mut_by_pointer(&payload.field_pointer) else {
+                    return Err("Overlay target no longer exists".to_string());
+                };
+                field
+                    .close_scalar_array_editor(entry_index, &session, true)
+                    .map_err(|err| err.message)
+                    .map(|_| ())
+            }
         }
     }
 
     pub(super) fn handle_composite_editor_key(&mut self, key: KeyEvent) -> Result<()> {
         if key.code == KeyCode::Esc {
-            if let Some(editor) = self.composite_editor.as_mut()
-                && editor.dirty()
-                && !editor.exit_armed
-            {
-                editor.exit_armed = true;
-                self.status
-                    .set_raw("Overlay dirty. Press Esc again to discard changes.");
+            if !self.request_overlay_exit() {
                 return Ok(());
             }
-            self.close_composite_editor(false);
             return Ok(());
         }
 
@@ -386,7 +513,7 @@ impl App {
             .resolve(self.input_router.classify(&key));
         match dispatch {
             CommandDispatch::Form(command) => {
-                if let Some(editor) = self.composite_editor.as_mut() {
+                if let Some(editor) = self.active_overlay_mut() {
                     editor.exit_armed = false;
                     apply_command(editor.form_state_mut(), command.clone());
                     self.run_overlay_validation();
@@ -406,69 +533,78 @@ impl App {
         Ok(())
     }
 
-    fn handle_overlay_app_command(&mut self, command: AppCommand) -> Result<bool> {
-        match command {
-            AppCommand::Save | AppCommand::EditComposite => {
-                if let Some(editor) = self.composite_editor.as_mut() {
-                    editor.exit_armed = false;
-                }
-                self.close_composite_editor(true);
-                return Ok(true);
-            }
-            AppCommand::Quit => {
-                self.close_composite_editor(false);
-                return Ok(true);
-            }
-            AppCommand::TogglePopup => {
-                if self.try_open_popup(PopupOwner::Composite) {
-                    return Ok(true);
-                }
-            }
-            AppCommand::ResetStatus => {
-                self.status.ready();
-            }
-            AppCommand::ListAddEntry => {
-                if self.handle_list_add_entry() {
-                    return Ok(true);
-                }
-            }
-            AppCommand::ListRemoveEntry => {
-                if self.handle_list_remove_entry() {
-                    return Ok(true);
-                }
-            }
-            AppCommand::ListMove(delta) => {
-                if self.handle_list_move_entry(delta) {
-                    return Ok(true);
-                }
-            }
-            AppCommand::ListSelect(delta) => {
-                if self.handle_list_select_entry(delta) {
-                    return Ok(true);
-                }
+    pub(super) fn request_overlay_exit(&mut self) -> bool {
+        if let Some(editor) = self.active_overlay_mut() {
+            if editor.dirty() && !editor.exit_armed {
+                editor.exit_armed = true;
+                self.status
+                    .set_raw("Overlay dirty. Press Esc again to discard changes.");
+                return false;
             }
         }
-        Ok(false)
+        self.close_active_overlay(false);
+        true
+    }
+
+    pub(super) fn save_active_overlay(&mut self) -> bool {
+        let Some(mut overlay) = self.overlay_stack.pop() else {
+            return false;
+        };
+        match self.apply_overlay_commit(&overlay) {
+            Ok(()) => {
+                overlay.form_state_mut().mark_clean();
+                overlay.exit_armed = false;
+                self.status
+                    .set_raw(format!("Overlay {} saved.", overlay.level));
+                if overlay.level == 1 && self.options.auto_validate {
+                    self.run_validation(false);
+                } else {
+                    self.run_overlay_validation();
+                }
+                self.overlay_stack.push(overlay);
+                self.set_overlay_status_message();
+                self.refresh_list_overlay_panel();
+                true
+            }
+            Err(message) => {
+                self.status.set_raw(&message);
+                self.overlay_stack.push(overlay);
+                false
+            }
+        }
     }
 
     fn handle_overlay_field_input(&mut self, event: &KeyEvent) {
-        if let Some(editor) = self.composite_editor.as_mut() {
+        let Some(result) = ({
+            let editor = match self.active_overlay_mut() {
+                Some(editor) => editor,
+                None => return,
+            };
             editor.exit_armed = false;
-            let label = editor.field_label.clone();
+            let field_label = editor.field_label.clone();
             if let Some(field) = editor.form_state_mut().focused_field_mut()
                 && field.handle_key(event)
             {
-                self.status
-                    .editing(&format!("{} › {}", label, field.schema.display_label()));
-                if let Some(pointer) = Some(field.schema.pointer.clone()) {
-                    self.validate_overlay_field(pointer);
-                }
+                Some((
+                    field_label,
+                    field.schema.display_label(),
+                    field.schema.pointer.clone(),
+                ))
+            } else {
+                None
             }
-        }
+        }) else {
+            return;
+        };
+
+        let (parent_label, child_label, pointer) = result;
+        self.status
+            .editing(&format!("{parent_label} › {child_label}"));
+        self.validate_overlay_field(pointer);
     }
 
     fn validate_overlay_field(&mut self, pointer: String) {
-        let Some(editor) = self.composite_editor.as_mut() else {
+        let Some(editor) = self.active_overlay_mut() else {
             return;
         };
         let Some(validator) = editor.validator.clone() else {
@@ -494,7 +630,7 @@ impl App {
                 }
             }
             PopupOwner::Composite => {
-                if let Some(editor) = &mut self.composite_editor
+                if let Some(editor) = self.active_overlay_mut()
                     && let Some(field) = editor.form_state_mut().field_mut_by_pointer(pointer)
                 {
                     apply_selection_to_field(field, selection, multi);
@@ -505,7 +641,7 @@ impl App {
     }
 
     pub(super) fn setup_overlay_validator(&mut self) {
-        let Some(editor) = self.composite_editor.as_mut() else {
+        let Some(editor) = self.active_overlay_mut() else {
             return;
         };
         editor.validator = match &editor.session {
@@ -518,7 +654,7 @@ impl App {
 
     pub(super) fn run_overlay_validation(&mut self) {
         let pointer = {
-            let Some(editor) = self.composite_editor.as_mut() else {
+            let Some(editor) = self.active_overlay() else {
                 return;
             };
             editor
@@ -532,52 +668,117 @@ impl App {
     }
 
     pub(super) fn overlay_targets_pointer(&self, pointer: &str) -> bool {
-        self.composite_editor
-            .as_ref()
+        self.active_overlay()
             .map(|editor| editor.field_pointer == pointer)
             .unwrap_or(false)
     }
 
     pub(super) fn refresh_list_overlay_panel(&mut self) {
-        let Some(editor) = self.composite_editor.as_mut() else {
+        let Some(mut overlay) = self.overlay_stack.pop() else {
             return;
         };
-        if !matches!(
-            editor.target,
-            CompositeOverlayTarget::ListEntry { .. }
-                | CompositeOverlayTarget::KeyValueEntry { .. }
-                | CompositeOverlayTarget::ArrayEntry { .. }
-        ) {
+        if !overlay.needs_list_panel() {
+            self.overlay_stack.push(overlay);
             return;
         }
-        let pointer = editor.field_pointer.clone();
-        let (panel, label, idx) = match self.form_state.field_by_pointer(&pointer) {
-            Some(field) => (
-                field.composite_list_panel(),
-                field.composite_list_selected_label(),
-                field.composite_list_selected_index(),
-            ),
-            None => return,
+        let data = {
+            let host_state = self.host_form_state(overlay.host);
+            host_state
+                .field_by_pointer(&overlay.field_pointer)
+                .map(|field| {
+                    (
+                        field.composite_list_panel(),
+                        field.composite_list_selected_label(),
+                        field.composite_list_selected_index(),
+                    )
+                })
         };
-        if let Some((entries, selected)) = panel {
-            editor.set_list_panel(entries, selected);
-        }
-        if let Some(label) = label {
-            editor.display_title = format!("Edit {} – {}", editor.field_label, label);
-            editor.display_description = Some(label);
-        }
-        match (&mut editor.target, idx) {
-            (CompositeOverlayTarget::ListEntry { entry_index }, Some(idx)) => {
-                *entry_index = idx;
+        if let Some((panel, label, idx)) = data {
+            if let Some((entries, selected)) = panel {
+                overlay.set_list_panel(entries, selected);
             }
-            (CompositeOverlayTarget::KeyValueEntry { entry_index }, Some(idx)) => {
-                *entry_index = idx;
+            if let Some(label) = label {
+                overlay.display_title = format!("Edit {} – {}", overlay.field_label, label.clone());
+                overlay.display_description = Some(label);
             }
-            (CompositeOverlayTarget::ArrayEntry { entry_index }, Some(idx)) => {
-                *entry_index = idx;
+            if let Some(index) = idx {
+                match &mut overlay.target {
+                    CompositeOverlayTarget::ListEntry { entry_index }
+                    | CompositeOverlayTarget::KeyValueEntry { entry_index }
+                    | CompositeOverlayTarget::ArrayEntry { entry_index } => {
+                        *entry_index = index;
+                    }
+                    _ => {}
+                }
             }
-            _ => {}
         }
+        self.overlay_stack.push(overlay);
+    }
+
+    pub(super) fn handle_overlay_app_command(&mut self, command: AppCommand) -> Result<bool> {
+        match command {
+            AppCommand::Save => {
+                self.save_active_overlay();
+                return Ok(true);
+            }
+            AppCommand::Quit => {
+                self.request_overlay_exit();
+                return Ok(true);
+            }
+            AppCommand::EditComposite => {
+                self.try_open_composite_editor();
+                return Ok(true);
+            }
+            AppCommand::TogglePopup => {
+                if self.try_open_popup(PopupOwner::Composite) {
+                    return Ok(true);
+                }
+            }
+            AppCommand::ResetStatus => {
+                self.status.ready();
+                if let Some(editor) = self.active_overlay_mut() {
+                    editor.exit_armed = false;
+                }
+                return Ok(true);
+            }
+            AppCommand::ListAddEntry => {
+                if self.handle_list_add_entry() {
+                    return Ok(true);
+                }
+            }
+            AppCommand::ListRemoveEntry => {
+                if self.handle_list_remove_entry() {
+                    return Ok(true);
+                }
+            }
+            AppCommand::ListMove(delta) => {
+                if self.handle_list_move_entry(delta) {
+                    return Ok(true);
+                }
+            }
+            AppCommand::ListSelect(delta) => {
+                if self.handle_list_select_entry(delta) {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+}
+
+#[cfg(test)]
+impl App {
+    pub(crate) fn overlay_depth_for_test(&self) -> usize {
+        self.overlay_depth()
+    }
+
+    pub(crate) fn open_overlay_for_test(&mut self) {
+        self.try_open_composite_editor();
+    }
+
+    pub(crate) fn active_overlay_form_state_for_test(&mut self) -> Option<&mut FormState> {
+        self.active_overlay_mut()
+            .map(|overlay| overlay.form_state_mut())
     }
 }
 
@@ -629,10 +830,11 @@ mod tests {
         app.try_open_composite_editor();
         assert!(
             matches!(
-                app.composite_editor.as_ref().map(|overlay| &overlay.target),
+                app.active_overlay().map(|overlay| &overlay.target),
                 Some(CompositeOverlayTarget::ArrayEntry { .. })
             ),
             "scalar arrays should open overlay via Ctrl+E"
         );
+        assert_eq!(app.overlay_depth(), 1);
     }
 }

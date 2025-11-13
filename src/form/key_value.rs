@@ -21,7 +21,7 @@ struct KeyValueEntry {
     value: Value,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeyValueEditorSession {
     pub form_state: FormState,
     pub schema: Value,

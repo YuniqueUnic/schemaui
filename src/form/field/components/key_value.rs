@@ -4,7 +4,10 @@ use crate::domain::{FieldSchema, KeyValueField};
 use crate::form::error::FieldCoercionError;
 use crate::form::key_value::{KeyValueEditorContext, KeyValueEditorSession, KeyValueState};
 
-use super::helpers::{format_collection_value, list_hint_for};
+use super::helpers::{
+    COLLECTION_OVERLAY_HINT, EntryPanelState, OverlayContext, format_collection_value,
+    list_hint_for,
+};
 use super::{ComponentKind, FieldComponent};
 
 #[derive(Debug, Clone)]
@@ -86,5 +89,18 @@ impl FieldComponent for KeyValueComponent {
         session: &KeyValueEditorSession,
     ) -> Result<bool, FieldCoercionError> {
         self.state.apply_editor_session(entry_index, session)
+    }
+
+    fn overlay_context(&self, _schema: &FieldSchema) -> Option<OverlayContext> {
+        let mut context = OverlayContext::new();
+        if let Some(label) = self.state.selected_label() {
+            context.title = Some(label.clone());
+            context.description = Some(label);
+        }
+        if let Some((entries, selected)) = self.collection_panel() {
+            context.entry_panel = Some(EntryPanelState { entries, selected });
+        }
+        context.instructions = Some(COLLECTION_OVERLAY_HINT.to_string());
+        Some(context)
     }
 }

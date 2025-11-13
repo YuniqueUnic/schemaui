@@ -2,7 +2,7 @@ use super::App;
 
 impl App {
     pub(super) fn list_field_pointer(&self) -> Option<String> {
-        if let Some(editor) = &self.composite_editor
+        if let Some(editor) = self.active_overlay()
             && matches!(
                 editor.target,
                 super::overlay::CompositeOverlayTarget::ListEntry { .. }
@@ -27,7 +27,7 @@ impl App {
 
         let reopen = self.overlay_targets_pointer(&pointer);
         if reopen {
-            self.close_composite_editor(true);
+            self.close_active_overlay(true);
         }
 
         let selection_label = {
@@ -67,7 +67,7 @@ impl App {
 
         let reopen = self.overlay_targets_pointer(&pointer);
         if reopen {
-            self.close_composite_editor(true);
+            self.close_active_overlay(true);
         }
 
         let removed = {
@@ -109,7 +109,7 @@ impl App {
 
         let reopen = self.overlay_targets_pointer(&pointer);
         if reopen {
-            self.close_composite_editor(true);
+            self.close_active_overlay(true);
         }
 
         let moved_label = {
@@ -148,7 +148,7 @@ impl App {
 
         let reopen = self.overlay_targets_pointer(&pointer);
         if reopen {
-            self.close_composite_editor(true);
+            self.close_active_overlay(true);
         }
 
         let changed = {

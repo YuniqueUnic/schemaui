@@ -161,8 +161,9 @@ management and validation can map errors back precisely.
   current document via `FormState::try_build_value`, runs the validator, and
   feeds errors back into `FieldState` or the global status line.
 - Overlays (composite variants, key/value maps, list entries) spin up their own
-  validators built from the sub-schema currently being edited, so issues surface
-  before leaving the overlay.
+  validators built from the sub-schema currently being edited. Nested overlays
+  live on a stack, so each level validates in place before changes flow back to
+  the parent form.
 
 ```text
 ┌─────────────┐ parse schema ┌─────────────────┐ inflate state  ┌────────────┐
@@ -197,26 +198,27 @@ management and validation can map errors back precisely.
   Enum/composite fields show the current selection; arrays summarize length and
   selected entry.
 - **Popups & overlays** – pressing `Enter` opens a popup for enums/oneOf
-  selectors; `Ctrl+E` opens the full-screen overlay editor for composites,
+  selectors; `Ctrl+E` pushes a full-screen overlay editor for composites,
   key/value pairs, and array items. Overlays expose collection shortcuts
-  (`Ctrl+N`, `Ctrl+D`, `Ctrl+←/→`, `Ctrl+↑/↓`) plus `Ctrl+S` to commit.
+  (`Ctrl+N`, `Ctrl+D`, `Ctrl+←/→`, `Ctrl+↑/↓`), `Ctrl+S` saves the active level
+  without closing, and `Esc` / `Ctrl+Q` pops a single overlay.
 - **Status & help** – the footer highlights dirty state, outstanding validation
   errors, and context-aware help text. When auto-validate is enabled, each edit
   updates these counters immediately.
 
-| Context     | Shortcut                            | Action                                |
-| ----------- | ----------------------------------- | ------------------------------------- |
-| Navigation  | `Tab` / `Shift+Tab`                 | Move between fields                   |
-|             | `Ctrl+Tab` / `Ctrl+Shift+Tab`       | Switch sections                       |
-|             | `Ctrl+J` / `Ctrl+L`                 | Switch root tabs                      |
-| Selection   | `Enter`                             | Open popup / apply choice             |
-| Editing     | `Ctrl+E`                            | Launch composite editor               |
-| Status      | `Esc`                               | Clear status or close popup           |
-| Persistence | `Ctrl+S`                            | Save + validate                       |
-| Exit        | `Ctrl+Q` / `Ctrl+C`                 | Quit (requires confirmation if dirty) |
-| Collections | `Ctrl+N` / `Ctrl+D`                 | Add / remove entry                    |
-|             | `Ctrl+←/→`, `Ctrl+↑/↓`              | Select / reorder entries              |
-| Overlay     | `Ctrl+S`, `Esc`, `Ctrl+N/D/←/→/↑/↓` | Save, cancel, manage composite lists  |
+| Context     | Shortcut                                                                              | Action                                |
+| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------- |
+| Navigation  | `Tab` / `Shift+Tab`                                                                   | Move between fields                   |
+|             | `Ctrl+Tab` / `Ctrl+Shift+Tab`                                                         | Switch sections                       |
+|             | `Ctrl+J` / `Ctrl+L`                                                                   | Switch root tabs                      |
+| Selection   | `Enter`                                                                               | Open popup / apply choice             |
+| Editing     | `Ctrl+E`                                                                              | Launch composite editor               |
+| Status      | `Esc`                                                                                 | Clear status or close popup           |
+| Persistence | `Ctrl+S`                                                                              | Save + validate                       |
+| Exit        | `Ctrl+Q` / `Ctrl+C`                                                                   | Quit (requires confirmation if dirty) |
+| Collections | `Ctrl+N` / `Ctrl+D`                                                                   | Add / remove entry                    |
+|             | `Ctrl+←/→`, `Ctrl+↑/↓`                                                                | Select / reorder entries              |
+| Overlay     | `Ctrl+E` (open), `Ctrl+S` (save in place), `Esc` / `Ctrl+Q` (pop), `Ctrl+N/D/←/→/↑/↓` | Manage nested overlays & list entries |
 
 ### Keymap system
 

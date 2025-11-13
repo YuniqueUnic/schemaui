@@ -12,9 +12,9 @@ mod text;
 
 pub use array_buffer::ArrayBufferComponent;
 pub use base::{
-    ComponentKind, CompositePopupData, CompositeSelectorView, EnumStateRef, FieldComponent,
-    MultiSelectStateRef,
+    ComponentKind, CompositePopupData, CompositeSelectorView, EnumStateRef, MultiSelectStateRef,
 };
+pub(crate) use base::FieldComponent;
 pub use bool::BoolComponent;
 pub use composite::CompositeComponent;
 pub use composite_list::CompositeListComponent;

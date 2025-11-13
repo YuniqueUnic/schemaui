@@ -21,12 +21,12 @@ pub fn render_composite_overlay(
     let area = popup_rect(base, width, height);
     frame.render_widget(Clear, area);
 
+    let mut block_title = format!("Overlay {} – {}", overlay.level, overlay.title);
+    if overlay.dirty {
+        block_title.push_str("  • DIRTY");
+    }
     let block = Block::default()
-        .title(if overlay.dirty {
-            format!("{}  • DIRTY", overlay.title)
-        } else {
-            overlay.title.clone()
-        })
+        .title(block_title)
         .borders(Borders::ALL)
         .style(
             Style::default()

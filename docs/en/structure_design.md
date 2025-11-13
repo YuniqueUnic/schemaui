@@ -204,7 +204,10 @@ Form focus ──Ctrl+E──▶ try_open_composite_editor
         (InputRouter + KeyBindingMap reused inside overlay)
                           │
                           ▼
-                      save/quit ──▶ close_composite_editor(commit)
+                      Ctrl+S ──▶ save_active_overlay (stay open)
+                          │
+                          ▼
+                      Esc/Q ──▶ close_active_overlay(commit?)
 ```
 
 - Overlays spawn their own `FormState` and optional list panel metadata while
@@ -212,19 +215,23 @@ Form focus ──Ctrl+E──▶ try_open_composite_editor
   nested schema.
 - Help text is sourced through `keymap::help_text(KeymapContext::Overlay)` so
   footer messaging stays synchronized.
+- `App` now owns `overlay_stack: Vec<CompositeEditorOverlay>`; `Ctrl+E` pushes a
+  new level, `Esc` / `Ctrl+Q` pops only the top overlay, and `Ctrl+S` saves the
+  focused overlay without collapsing the stack. Titles include the overlay level
+  (e.g., “Overlay 2 – Edit service.routes”).
 
 ## 7. Shortcut Reference
 
-| Scope       | Shortcut                                   | Command                                             |
-| ----------- | ------------------------------------------ | --------------------------------------------------- |
-| Fields      | `Tab` / `Shift+Tab`, `Down` / `Up`         | Cycle within a section                              |
-| Sections    | `Ctrl+Tab` / `Ctrl+Shift+Tab`              | Jump between sections in the current root           |
-| Roots       | `Ctrl+J` / `Ctrl+L`                        | Jump between root tabs                              |
-| Popups      | `Enter` (open/apply), `Esc` (close/reset)  | Manage enums/composites                             |
-| Lists       | `Ctrl+N`, `Ctrl+D`, `Ctrl+←/→`, `Ctrl+↑/↓` | Add/delete/select/reorder entries                   |
-| Overlay     | `Ctrl+E`                                   | Launch editor for composites/key-value/list entries |
-| Persistence | `Ctrl+S`                                   | Save + validate                                     |
-| Exit        | `Ctrl+Q`, `Ctrl+C`                         | Arm quit / confirm quit                             |
+| Scope       | Shortcut                                                                       | Command                                     |
+| ----------- | ------------------------------------------------------------------------------ | ------------------------------------------- |
+| Fields      | `Tab` / `Shift+Tab`, `Down` / `Up`                                             | Cycle within a section                      |
+| Sections    | `Ctrl+Tab` / `Ctrl+Shift+Tab`                                                  | Jump between sections in the current root   |
+| Roots       | `Ctrl+J` / `Ctrl+L`                                                            | Jump between root tabs                      |
+| Popups      | `Enter` (open/apply), `Esc` (close/reset)                                      | Manage enums/composites                     |
+| Lists       | `Ctrl+N`, `Ctrl+D`, `Ctrl+←/→`, `Ctrl+↑/↓`                                     | Add/delete/select/reorder entries           |
+| Overlay     | `Ctrl+E` (open), `Ctrl+S` (save), `Esc` / `Ctrl+Q` (pop), collection shortcuts | Manage nested overlays & collection entries |
+| Persistence | `Ctrl+S`                                                                       | Save + validate main form                   |
+| Exit        | `Ctrl+Q`, `Ctrl+C`                                                             | Arm quit / confirm quit                     |
 
 Every shortcut runs through `InputRouter` so overlay and main views behave
 identically unless explicitly overridden.

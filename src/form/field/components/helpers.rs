@@ -51,3 +51,31 @@ pub(crate) fn list_hint_for(kind: ComponentKind) -> &'static str {
         _ => "",
     }
 }
+
+#[derive(Debug, Clone)]
+pub(crate) struct EntryPanelState {
+    pub entries: Vec<String>,
+    pub selected: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct OverlayContext {
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub instructions: Option<String>,
+    pub entry_panel: Option<EntryPanelState>,
+}
+
+impl OverlayContext {
+    pub fn new() -> Self {
+        Self {
+            title: None,
+            description: None,
+            instructions: None,
+            entry_panel: None,
+        }
+    }
+}
+
+pub(crate) const COLLECTION_OVERLAY_HINT: &str =
+    "Ctrl+N add • Ctrl+D remove • Ctrl+←/→ select • Ctrl+↑/↓ reorder";

@@ -1,6 +1,7 @@
 use crossterm::event::KeyEvent;
 use serde_json::Value;
 
+use super::helpers::OverlayContext;
 use crate::domain::FieldSchema;
 use crate::form::array::{ArrayEditorContext, ArrayEditorSession};
 use crate::form::composite::{CompositeEditorSession, CompositeListEditorContext};
@@ -20,7 +21,7 @@ pub enum ComponentKind {
     KeyValue,
 }
 
-pub trait FieldComponent: FieldComponentClone + std::fmt::Debug {
+pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
     fn kind(&self) -> ComponentKind;
     fn display_value(&self, schema: &FieldSchema) -> String;
     fn handle_key(&mut self, schema: &FieldSchema, key: &KeyEvent) -> bool {
@@ -162,9 +163,13 @@ pub trait FieldComponent: FieldComponentClone + std::fmt::Debug {
     ) -> Result<bool, FieldCoercionError> {
         Err(FieldCoercionError::unsupported("", "array editing"))
     }
+
+    fn overlay_context(&self, _schema: &FieldSchema) -> Option<OverlayContext> {
+        None
+    }
 }
 
-pub trait FieldComponentClone {
+pub(crate) trait FieldComponentClone {
     fn clone_box(&self) -> Box<dyn FieldComponent>;
 }
 

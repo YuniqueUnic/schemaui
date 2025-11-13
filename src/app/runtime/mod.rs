@@ -46,7 +46,7 @@ pub(crate) struct App {
     should_quit: bool,
     result: Option<Value>,
     popup: Option<AppPopup>,
-    composite_editor: Option<CompositeEditorOverlay>,
+    overlay_stack: Vec<CompositeEditorOverlay>,
     input_router: InputRouter,
     keymap_store: Arc<KeymapStore>,
 }
@@ -56,7 +56,7 @@ impl App {
         if !self.options.show_help {
             return None;
         }
-        let context = if self.composite_editor.is_some() {
+        let context = if self.overlay_depth() > 0 {
             KeymapContext::Overlay
         } else if let Some(field) = self.form_state.focused_field()
             && field.is_composite_list()
@@ -116,9 +116,17 @@ impl App {
         match command {
             AppCommand::Save => {
                 self.exit_armed = false;
-                self.on_save();
+                if self.overlay_depth() > 0 {
+                    let _ = self.save_active_overlay();
+                } else {
+                    self.on_save();
+                }
             }
             AppCommand::Quit => {
+                if self.overlay_depth() > 0 {
+                    self.request_overlay_exit();
+                    return true;
+                }
                 self.on_exit();
             }
             AppCommand::ResetStatus => {
@@ -183,7 +191,7 @@ impl App {
             should_quit: false,
             result: None,
             popup: None,
-            composite_editor: None,
+            overlay_stack: Vec::new(),
             input_router: InputRouter::new(keymap_store.clone()),
             keymap_store,
         }
@@ -213,41 +221,52 @@ impl App {
 
     fn draw(&mut self, frame: &mut ratatui::Frame<'_>) {
         let help = self.current_help_text();
-
-        let (focus_label, overlay_form_state, overlay_meta) = match self.composite_editor.as_mut() {
-            Some(editor) => {
-                let child = editor
-                    .form_state()
-                    .focused_field()
-                    .map(|field| field.schema.display_label())
-                    .unwrap_or_else(|| "<none>".to_string());
-                let label = format!("{} › {}", editor.field_label, child);
-                let dirty = editor.form_state().is_dirty();
-                let meta = presentation::CompositeOverlay {
-                    title: editor.display_title.clone(),
-                    description: editor.display_description.clone(),
-                    dirty,
-                    instructions: editor.instructions.clone(),
-                    list_entries: editor.list_entries.clone(),
-                    list_selected: editor.list_selected,
-                };
-                (Some(label), Some(editor.form_state_mut()), Some(meta))
-            }
-            None => (
-                self.form_state
-                    .focused_field()
-                    .map(|field| field.schema.display_label()),
-                None,
-                None,
-            ),
-        };
-
         let form_dirty = self.form_state.is_dirty();
+
+        if let Some(editor) = self.overlay_stack.last_mut() {
+            let child = editor
+                .form_state()
+                .focused_field()
+                .map(|field| field.schema.display_label())
+                .unwrap_or_else(|| "<none>".to_string());
+            let focus_label = Some(format!("{} › {}", editor.field_label, child));
+            let overlay_meta = presentation::CompositeOverlay {
+                title: editor.display_title.clone(),
+                description: editor.display_description.clone(),
+                dirty: editor.form_state().is_dirty(),
+                instructions: editor.instructions.clone(),
+                list_entries: editor.list_entries.clone(),
+                list_selected: editor.list_selected,
+                level: editor.level,
+            };
+            let overlay_form_state = editor.form_state_mut();
+            presentation::draw(
+                frame,
+                &mut self.form_state,
+                Some(overlay_form_state),
+                UiContext {
+                    status_message: self.status.message(),
+                    dirty: form_dirty,
+                    error_count: self.validation_errors,
+                    help: help.as_deref(),
+                    global_errors: &self.global_errors,
+                    focus_label,
+                    popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
+                    composite_overlay: Some(overlay_meta),
+                },
+            );
+            return;
+        }
+
+        let focus_label = self
+            .form_state
+            .focused_field()
+            .map(|field| field.schema.display_label());
 
         presentation::draw(
             frame,
             &mut self.form_state,
-            overlay_form_state,
+            None,
             UiContext {
                 status_message: self.status.message(),
                 dirty: form_dirty,
@@ -256,7 +275,7 @@ impl App {
                 global_errors: &self.global_errors,
                 focus_label,
                 popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
-                composite_overlay: overlay_meta,
+                composite_overlay: None,
             },
         );
     }
@@ -270,7 +289,7 @@ impl App {
             return Ok(());
         }
 
-        if self.composite_editor.is_some() {
+        if self.overlay_depth() > 0 {
             self.handle_composite_editor_key(key)?;
             return Ok(());
         }
@@ -305,8 +324,7 @@ impl App {
         let field_opt = match owner {
             PopupOwner::Root => self.form_state.focused_field(),
             PopupOwner::Composite => self
-                .composite_editor
-                .as_ref()
+                .active_overlay()
                 .and_then(|editor| editor.form_state().focused_field()),
         };
         let Some(field) = field_opt else {
@@ -422,5 +440,16 @@ mod tests {
         let mut app = app_with_single_field();
         app.on_exit();
         assert!(app.result.is_none(), "no save means no result");
+    }
+}
+
+#[cfg(test)]
+impl App {
+    pub(crate) fn form_state_mut_for_test(&mut self) -> &mut FormState {
+        &mut self.form_state
+    }
+
+    pub(crate) fn handle_key_for_test(&mut self, key: KeyEvent) -> Result<()> {
+        self.handle_key(key)
     }
 }

@@ -99,7 +99,7 @@
   },
   {
     "id": "app.save",
-    "description": "Save & validate",
+    "description": "Save & validate (overlays stay open)",
     "contexts": ["default", "overlay"],
     "action": { "kind": "save" },
     "combos": ["Ctrl+S"]
@@ -113,7 +113,7 @@
   },
   {
     "id": "status.reset",
-    "description": "Cancel / clear status (Esc twice discards overlays)",
+    "description": "Cancel / clear status (overlays: pop current level)",
     "contexts": ["default", "overlay"],
     "action": { "kind": "resetStatus" },
     "combos": ["Esc"]

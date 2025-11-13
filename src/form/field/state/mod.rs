@@ -5,7 +5,7 @@ mod value_ops;
 
 use crate::domain::FieldSchema;
 
-use super::components::{ComponentKind, FieldComponent};
+use super::components::{ComponentKind, FieldComponent, helpers::OverlayContext};
 
 #[derive(Debug, Clone)]
 pub struct FieldState {
@@ -18,5 +18,9 @@ pub struct FieldState {
 impl FieldState {
     pub fn component_kind(&self) -> ComponentKind {
         self.component.kind()
+    }
+
+    pub(crate) fn overlay_context(&self) -> Option<OverlayContext> {
+        self.component.overlay_context(&self.schema)
     }
 }

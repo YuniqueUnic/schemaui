@@ -4,7 +4,10 @@ use crate::domain::{FieldKind, FieldSchema};
 use crate::form::array::{ArrayEditorContext, ArrayEditorSession, ScalarArrayState};
 use crate::form::error::FieldCoercionError;
 
-use super::helpers::{format_collection_value, list_hint_for};
+use super::helpers::{
+    COLLECTION_OVERLAY_HINT, EntryPanelState, OverlayContext, format_collection_value,
+    list_hint_for,
+};
 use super::{ComponentKind, FieldComponent};
 
 #[derive(Debug, Clone)]
@@ -92,5 +95,18 @@ impl FieldComponent for ScalarArrayComponent {
         session: &ArrayEditorSession,
     ) -> Result<bool, FieldCoercionError> {
         self.state.apply_editor_session(entry_index, session)
+    }
+
+    fn overlay_context(&self, _schema: &FieldSchema) -> Option<OverlayContext> {
+        let mut context = OverlayContext::new();
+        if let Some(label) = self.state.selected_label() {
+            context.title = Some(label.clone());
+            context.description = Some(label);
+        }
+        if let Some((entries, selected)) = self.state.panel() {
+            context.entry_panel = Some(EntryPanelState { entries, selected });
+        }
+        context.instructions = Some(COLLECTION_OVERLAY_HINT.to_string());
+        Some(context)
     }
 }
