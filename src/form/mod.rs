@@ -11,6 +11,8 @@ mod state;
 pub use actions::FormCommand;
 pub use array::ArrayEditorSession;
 pub use composite::CompositeEditorSession;
+#[cfg(test)]
+pub(crate) use composite::CompositeState;
 pub use field::{CompositePopupData, FieldState};
 pub use key_value::KeyValueEditorSession;
 pub use reducers::{FormEngine, apply_command};

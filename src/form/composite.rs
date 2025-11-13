@@ -543,16 +543,33 @@ impl CompositeVariantState {
     }
 
     fn matches_value(&self, value: &Map<String, Value>) -> bool {
-        if let Some(props) = self.schema.get("properties").and_then(Value::as_object) {
-            for (key, schema) in props {
-                if let Some(expected) = schema.get("const")
-                    && value.get(key) != Some(expected)
-                {
+        let Some(props) = self.schema.get("properties").and_then(Value::as_object) else {
+            return true;
+        };
+
+        let mut inspected = false;
+
+        for (key, schema) in props {
+            if let Some(expected) = schema.get("const") {
+                inspected = true;
+                if value.get(key) != Some(expected) {
+                    return false;
+                }
+                continue;
+            }
+
+            if let Some(options) = schema.get("enum").and_then(Value::as_array) {
+                inspected = true;
+                let Some(actual) = value.get(key) else {
+                    return false;
+                };
+                if !options.iter().any(|candidate| candidate == actual) {
                     return false;
                 }
             }
         }
-        true
+
+        if inspected { true } else { true }
     }
 }
 
