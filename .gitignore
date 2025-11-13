@@ -2,6 +2,7 @@
 instructions.txt
 
 docs/**/*.md
+docs/**/*.txt
 docs/**/*.gif
 !docs/**/cli_usage*.md
 !docs/**/structure_design*.md

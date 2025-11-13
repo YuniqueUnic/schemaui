@@ -45,7 +45,7 @@ schemaui = "0.3.1"
 serde_json = "1"
 ```
 
-```rust
+```rust,ignore
 use schemaui::SchemaUI;
 use serde_json::json;
 
@@ -93,7 +93,7 @@ fn main() -> color_eyre::Result<()> {
 
 ## Architecture Snapshot
 
-```
+```text
 ┌─────────────┐   parse/merge    ┌───────────────┐   layout + typing   ┌─────────────┐
 │ io::input   ├─────────────────▶│ schema::*     ├────────────────────▶│ form::*     │
 └─────────────┘                  │ (loader /     │                     │ (state,     │
@@ -164,7 +164,7 @@ management and validation can map errors back precisely.
   validators built from the sub-schema currently being edited, so issues surface
   before leaving the overlay.
 
-```
+```text
 ┌─────────────┐ parse schema ┌─────────────────┐ inflate state  ┌────────────┐
 │ SchemaUI::run├────────────▶│ domain::parse   ├───────────────▶│ FormState  │
 └─────┬───────┘              │ (schema::layout)│                └─────┬──────┘
@@ -278,7 +278,7 @@ schemaui \
   -o ./config.toml ./config.json
 ```
 
-```
+```text
 ┌────────┐  clap args   ┌──────────────┐ read stdin/files ┌─────────────┐
 │  CLI   ├─────────────▶│ InputSource  ├─────────────────▶│ io::input   │
 └────┬───┘              └──────┬───────┘                  └────┬────────┘

@@ -5,7 +5,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
-use textwrap::wrap;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
@@ -84,7 +83,7 @@ pub fn render_fields(
                 .borders(Borders::ALL),
         )
         .highlight_style(Style::default())
-        .highlight_symbol("» ");
+        .highlight_symbol(HIGHLIGHT_SYMBOL);
 
     frame.render_stateful_widget(list, field_area, &mut list_state);
 
@@ -118,8 +117,8 @@ pub fn render_fields(
             );
             let cursor_y = inner_y.saturating_add(caret_line as u16);
             let cursor_x = inner_x
-                .saturating_add(2)
-                .saturating_add(HIGHLIGHT_WIDTH)
+                .saturating_add(cursor.prefix_width)
+                .saturating_add(highlight_symbol_width())
                 .saturating_add(cursor.value_width);
             frame.set_cursor_position((cursor_x, cursor_y));
         }
@@ -139,7 +138,14 @@ fn adjust_scroll_offset(section: &mut SectionState, selected: usize, height: u16
     }
 }
 
-const HIGHLIGHT_WIDTH: u16 = 2;
+const VALUE_BORDER_PREFIX: &str = "│ ";
+const VALUE_BORDER_SUFFIX: &str = " │";
+const HIGHLIGHT_SYMBOL: &str = "» ";
+const GUTTER_PADDING: u16 = 0;
+
+fn highlight_symbol_width() -> u16 {
+    UnicodeWidthStr::width(HIGHLIGHT_SYMBOL) as u16
+}
 
 struct FieldRender {
     lines: Vec<Line<'static>>,
@@ -149,6 +155,7 @@ struct FieldRender {
 struct CursorHint {
     line_in_field: usize,
     value_width: u16,
+    prefix_width: u16,
 }
 
 fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> FieldRender {
@@ -256,9 +263,9 @@ fn value_panel_lines(
                 width += 1;
             }
             lines.push(Line::from(vec![
-                Span::styled("│ ", border_style),
+                Span::styled(VALUE_BORDER_PREFIX, border_style),
                 Span::styled(content, value_style),
-                Span::styled(" │", border_style),
+                Span::styled(VALUE_BORDER_SUFFIX, border_style),
             ]));
         }
         lines.push(Line::from(Span::styled(
@@ -274,6 +281,7 @@ fn value_panel_lines(
         cursor_hint = Some(CursorHint {
             line_in_field: caret_line,
             value_width: caret_width as u16,
+            prefix_width: UnicodeWidthStr::width(VALUE_BORDER_PREFIX) as u16 + GUTTER_PADDING,
         });
     } else {
         for segment in wrapped_value {
@@ -317,9 +325,9 @@ pub(crate) fn meta_lines(
     };
 
     let width = max_width.max(4) as usize;
-    wrap(&content, width)
+    wrap_preserving_spaces(&content, width)
         .into_iter()
-        .map(|line| Line::from(Span::styled(format!("  {}", line.into_owned()), style)))
+        .map(|line| Line::from(Span::styled(format!("  {}", line), style)))
         .collect()
 }
 
@@ -330,9 +338,9 @@ fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>>
             "  Error:",
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )));
-        for line in wrap(message, max_width as usize) {
+        for line in wrap_preserving_spaces(message, max_width.max(4) as usize) {
             lines.push(Line::from(Span::styled(
-                format!("    {}", line.into_owned()),
+                format!("    {}", line),
                 Style::default().fg(Color::Red),
             )));
         }
