@@ -1,14 +1,14 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
 use crate::form::FormState;
 
 use super::super::view::CompositeOverlay;
-use super::{body::render_body, layout::popup_rect};
+use super::{body::render_body, layout::popup_rect, tabstrip::render_tab_strip};
 
 pub fn render_composite_overlay(
     frame: &mut Frame<'_>,
@@ -36,41 +36,46 @@ pub fn render_composite_overlay(
     frame.render_widget(block.clone(), area);
     let inner = block.inner(area);
 
-    let content_area = if let Some(entries) = &overlay.list_entries {
-        let columns = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(32), Constraint::Min(30)])
-            .split(inner);
-        render_list_sidebar(
-            frame,
-            columns[0],
-            entries,
-            overlay.list_selected.unwrap_or(0),
-        );
-        columns[1]
-    } else {
-        inner
-    };
+    let mut constraints = Vec::new();
+    if overlay.list_entries.is_some() {
+        constraints.push(Constraint::Length(3));
+    }
+    constraints.push(Constraint::Min(5));
+    constraints.push(Constraint::Length(2));
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(5), Constraint::Length(2)])
-        .split(content_area);
+        .constraints(constraints)
+        .split(inner);
 
+    let mut next = 0usize;
+    if let Some(entries) = &overlay.list_entries {
+        render_tab_strip(
+            frame,
+            layout[next],
+            entries,
+            overlay.list_selected.unwrap_or(0),
+            "Entries",
+        );
+        next += 1;
+    }
+
+    let body_area = layout[next];
     if let Some(description) = &overlay.description {
         let sub = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(4), Constraint::Min(1)])
-            .split(layout[0]);
+            .split(body_area);
         let desc = Paragraph::new(description.to_string())
             .wrap(Wrap { trim: true })
             .style(Style::default().fg(Color::Gray));
         frame.render_widget(desc, sub[0]);
         render_body(frame, sub[1], overlay_form, true);
     } else {
-        render_body(frame, layout[0], overlay_form, true);
+        render_body(frame, body_area, overlay_form, true);
     }
 
+    let footer_area = layout.last().copied().unwrap_or(body_area);
     let footer = Paragraph::new(overlay.instructions.clone())
         .wrap(Wrap { trim: true })
         .style(Style::default().fg(Color::Yellow))
@@ -79,29 +84,5 @@ pub fn render_composite_overlay(
                 .borders(Borders::TOP)
                 .title("Overlay Controls"),
         );
-    frame.render_widget(footer, layout[1]);
-}
-
-fn render_list_sidebar(frame: &mut Frame<'_>, area: Rect, entries: &[String], selected: usize) {
-    let items: Vec<ListItem<'_>> = if entries.is_empty() {
-        vec![ListItem::new("No entries")]
-    } else {
-        entries
-            .iter()
-            .map(|label| ListItem::new(label.clone()))
-            .collect()
-    };
-    let mut state = ListState::default();
-    if !entries.is_empty() {
-        state.select(Some(selected.min(entries.len().saturating_sub(1))));
-    }
-    let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Entries"))
-        .highlight_style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("» ");
-    frame.render_stateful_widget(list, area, &mut state);
+    frame.render_widget(footer, footer_area);
 }

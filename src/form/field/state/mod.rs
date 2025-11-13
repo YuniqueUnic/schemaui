@@ -16,6 +16,7 @@ pub struct FieldState {
 }
 
 impl FieldState {
+    #[allow(dead_code)]
     pub fn component_kind(&self) -> ComponentKind {
         self.component.kind()
     }
