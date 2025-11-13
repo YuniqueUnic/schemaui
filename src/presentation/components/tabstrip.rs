@@ -130,11 +130,7 @@ fn compute_visible_window(labels: &[TabLabel], selected: usize, available: usize
         let selected_offset = selected - start;
         let double_selected = selected_offset * 2;
         let double_center = visible_count.saturating_sub(1);
-        let center_distance = if double_selected > double_center {
-            double_selected - double_center
-        } else {
-            double_center - double_selected
-        };
+        let center_distance = double_selected.abs_diff(double_center);
         let window = TabWindow {
             start,
             end,

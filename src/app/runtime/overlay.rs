@@ -269,7 +269,7 @@ impl App {
             OverlayHost::RootForm => &self.form_state,
             OverlayHost::Overlay { parent_level } => {
                 let idx = parent_level.saturating_sub(1);
-                &self.overlay_stack[idx].session.form_state()
+                self.overlay_stack[idx].session.form_state()
             }
         }
     }
@@ -434,12 +434,11 @@ impl App {
             }
         }
 
-        if self.overlay_depth() > previous_depth {
-            if let Some(ctx) = component_context {
-                if let Some(editor) = self.active_overlay_mut() {
-                    editor.apply_component_context(ctx);
-                }
-            }
+        if self.overlay_depth() > previous_depth
+            && let Some(ctx) = component_context
+            && let Some(editor) = self.active_overlay_mut()
+        {
+            editor.apply_component_context(ctx);
         }
     }
 
@@ -773,13 +772,14 @@ impl App {
     }
 
     pub(super) fn request_overlay_exit(&mut self) -> bool {
-        if let Some(editor) = self.active_overlay_mut() {
-            if editor.dirty() && !editor.exit_armed {
-                editor.exit_armed = true;
-                self.status
-                    .set_raw("Overlay dirty. Press Esc again to discard changes.");
-                return false;
-            }
+        if let Some(editor) = self.active_overlay_mut()
+            && editor.dirty()
+            && !editor.exit_armed
+        {
+            editor.exit_armed = true;
+            self.status
+                .set_raw("Overlay dirty. Press Esc again to discard changes.");
+            return false;
         }
         self.close_active_overlay(false);
         true

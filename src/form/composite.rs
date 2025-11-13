@@ -586,7 +586,8 @@ impl CompositeVariantState {
             }
         }
 
-        if inspected { true } else { true }
+        // # true
+        inspected
     }
 }
 
