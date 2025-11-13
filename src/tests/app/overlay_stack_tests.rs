@@ -144,23 +144,29 @@ fn tab_cycles_entry_strip_inside_overlay() {
     }
     app.open_overlay_for_test();
     assert_eq!(app.overlay_depth_for_test(), 2);
-    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    {
+        let overlay_form = app
+            .active_overlay_form_state_for_test()
+            .expect("overlay form level2");
+        assert!(overlay_form.has_focusable_fields());
+    }
 
     app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
-        .expect("tab to entry strip");
-    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+        .expect("tab into fields");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
 
     app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
         .expect("tab back to fields");
-    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
-
-    app.handle_key_for_test(key(KeyCode::BackTab, KeyModifiers::SHIFT))
-        .expect("shift+tab to entry strip");
     assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
 
     app.handle_key_for_test(key(KeyCode::BackTab, KeyModifiers::SHIFT))
-        .expect("shift+tab back to last field");
+        .expect("shift+tab into fields");
     assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+
+    app.handle_key_for_test(key(KeyCode::BackTab, KeyModifiers::SHIFT))
+        .expect("shift+tab back to entry strip");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
 }
 
 #[test]
@@ -205,4 +211,28 @@ fn ctrl_arrows_manage_entries_without_closing_overlay() {
         .expect("ctrl+up reorder back");
     assert_eq!(app.overlay_depth_for_test(), 2);
     assert_eq!(app.overlay_selected_entry_for_test(), Some(0));
+}
+
+#[test]
+fn entry_focus_respects_arrow_keys() {
+    let mut app = build_nested_overlay_app();
+    activate_service_variant(&mut app);
+    app.open_overlay_for_test();
+    {
+        let overlay_form = app
+            .active_overlay_form_state_for_test()
+            .expect("overlay form level1");
+        focus_field(overlay_form, "/routes");
+    }
+    app.open_overlay_for_test();
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+
+    app.handle_key_for_test(key(KeyCode::Down, KeyModifiers::NONE))
+        .expect("down from entry focus jumps into fields");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+
+    app.handle_key_for_test(key(KeyCode::Up, KeyModifiers::NONE))
+        .expect("up from first field returns to entries");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
 }

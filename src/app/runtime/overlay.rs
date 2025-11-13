@@ -292,6 +292,17 @@ impl App {
         self.refresh_list_overlay_panel();
         self.setup_overlay_validator();
         self.run_overlay_validation();
+        self.reset_overlay_focus_mode();
+    }
+
+    fn reset_overlay_focus_mode(&mut self) {
+        if let Some(editor) = self.active_overlay_mut() {
+            if editor.can_focus_entries() {
+                editor.focus_entries();
+            } else {
+                editor.focus_form();
+            }
+        }
     }
 
     pub(super) fn try_open_composite_editor(&mut self) {
@@ -573,8 +584,8 @@ impl App {
             FormCommand::FocusNextField => {
                 if editor.focus == OverlayFocusMode::EntryTabs {
                     editor.exit_armed = false;
+                    editor.focus_form();
                     if editor.form_state().has_focusable_fields() {
-                        editor.focus_form();
                         editor.form_state_mut().focus_first_field();
                     }
                     return true;
@@ -590,8 +601,8 @@ impl App {
             FormCommand::FocusPrevField => {
                 if editor.focus == OverlayFocusMode::EntryTabs {
                     editor.exit_armed = false;
+                    editor.focus_form();
                     if editor.form_state().has_focusable_fields() {
-                        editor.focus_form();
                         editor.form_state_mut().focus_last_field();
                     }
                     return true;
