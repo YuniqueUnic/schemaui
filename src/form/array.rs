@@ -92,6 +92,17 @@ impl ScalarArrayState {
         changed
     }
 
+    pub fn set_selected(&mut self, index: usize) -> bool {
+        if self.entries.is_empty() {
+            return false;
+        }
+        let len = self.entries.len();
+        let bounded = index.min(len.saturating_sub(1));
+        let changed = bounded != self.selected;
+        self.selected = bounded;
+        changed
+    }
+
     pub fn add_entry(&mut self) -> bool {
         let value = default_value(&self.template.item_kind);
         self.entries.push(value);

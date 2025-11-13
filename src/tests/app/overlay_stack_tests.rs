@@ -145,6 +145,7 @@ fn tab_cycles_entry_strip_inside_overlay() {
     app.open_overlay_for_test();
     assert_eq!(app.overlay_depth_for_test(), 2);
     assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    assert_eq!(app.overlay_selected_entry_for_test(), Some(0));
     {
         let overlay_form = app
             .active_overlay_form_state_for_test()
@@ -155,18 +156,56 @@ fn tab_cycles_entry_strip_inside_overlay() {
     app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
         .expect("tab into fields");
     assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(0),
+        "entering fields keeps current entry"
+    );
 
     app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
         .expect("tab back to fields");
     assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(1),
+        "tab from last field advances to next entry"
+    );
+
+    app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
+        .expect("tab into next entry fields");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(1),
+        "entering fields keeps advanced entry selected"
+    );
+
+    app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
+        .expect("tab wraps selection back to entries");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(0),
+        "tab from final field wraps to first entry"
+    );
 
     app.handle_key_for_test(key(KeyCode::BackTab, KeyModifiers::SHIFT))
         .expect("shift+tab into fields");
     assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(0),
+        "shift+tab from entries enters current entry fields"
+    );
 
     app.handle_key_for_test(key(KeyCode::BackTab, KeyModifiers::SHIFT))
         .expect("shift+tab back to entry strip");
     assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(1),
+        "shift+tab from first field wraps to previous entry"
+    );
 }
 
 #[test]
@@ -235,4 +274,54 @@ fn entry_focus_respects_arrow_keys() {
     app.handle_key_for_test(key(KeyCode::Up, KeyModifiers::NONE))
         .expect("up from first field returns to entries");
     assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(1),
+        "up from first field should cycle to previous entry"
+    );
+}
+
+#[test]
+fn tab_cycle_still_works_after_adding_entry() {
+    let mut app = build_nested_overlay_app();
+    activate_service_variant(&mut app);
+    app.open_overlay_for_test();
+    {
+        let overlay_form = app
+            .active_overlay_form_state_for_test()
+            .expect("overlay form level1");
+        focus_field(overlay_form, "/routes");
+    }
+    app.open_overlay_for_test();
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    assert_eq!(app.overlay_selected_entry_for_test(), Some(0));
+
+    app.handle_key_for_test(key(KeyCode::Char('n'), KeyModifiers::CONTROL))
+        .expect("ctrl+n add entry");
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(2),
+        "new entry should become selected"
+    );
+
+    app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
+        .expect("tab into fields");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(2),
+        "entering fields keeps new entry selected"
+    );
+
+    app.handle_key_for_test(key(KeyCode::BackTab, KeyModifiers::SHIFT))
+        .expect("shift+tab back to entries");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(1),
+        "shift+tab from first field cycles to previous entry"
+    );
 }

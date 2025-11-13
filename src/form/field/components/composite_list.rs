@@ -65,6 +65,10 @@ impl FieldComponent for CompositeListComponent {
         self.state.select(delta)
     }
 
+    fn collection_set_selected(&mut self, index: usize) -> bool {
+        self.state.set_selected(index)
+    }
+
     fn collection_add(&mut self) -> bool {
         self.state.add_entry();
         true

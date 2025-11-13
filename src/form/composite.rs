@@ -103,6 +103,17 @@ impl CompositeListState {
         changed
     }
 
+    pub fn set_selected(&mut self, index: usize) -> bool {
+        if self.entries.is_empty() {
+            return false;
+        }
+        let len = self.entries.len();
+        let bounded = index.min(len.saturating_sub(1));
+        let changed = bounded != self.selected;
+        self.selected = bounded;
+        changed
+    }
+
     pub fn add_entry(&mut self) -> usize {
         let entry_pointer = format!("{}/entry_{}", self.pointer, self.counter);
         self.counter += 1;

@@ -567,56 +567,208 @@ impl App {
         Ok(())
     }
 
-    fn handle_overlay_focus_command(&mut self, command: &FormCommand) -> bool {
-        let Some(editor) = self.active_overlay_mut() else {
-            return false;
+    fn advance_overlay_entry(&mut self, delta: i32) -> bool {
+        let overlay_snapshot = {
+            let editor = match self.active_overlay() {
+                Some(editor) => editor,
+                None => return false,
+            };
+            if !editor.can_focus_entries() {
+                return false;
+            }
+            let entries_len = editor
+                .list_entries
+                .as_ref()
+                .map(|entries| entries.len())
+                .unwrap_or(0);
+            let selected = editor.list_selected.unwrap_or(0);
+            (
+                entries_len,
+                selected,
+                editor.field_pointer.clone(),
+                editor.host,
+            )
         };
+
+        let (entries_len, selected, field_pointer, host) = overlay_snapshot;
+        if entries_len == 0 {
+            return false;
+        }
+
+        let next_index = ((selected as i32 + delta).rem_euclid(entries_len as i32)) as usize;
+
+        if entries_len == 1 || next_index == selected {
+            if let Some(editor) = self.active_overlay_mut() {
+                editor.exit_armed = false;
+                editor.focus_entries();
+            }
+            return true;
+        }
+
+        let previous_depth = self.overlay_depth();
+        self.close_active_overlay(true);
+        if self.overlay_depth() != previous_depth.saturating_sub(1) {
+            return false;
+        }
+
+        let (changed, label) = {
+            let host_state = self.host_form_state_mut(host);
+            let Some(field) = host_state.field_mut_by_pointer(&field_pointer) else {
+                return false;
+            };
+            let changed = field.collection_set_selected(next_index);
+            let label = field.collection_selected_label();
+            (changed, label)
+        };
+
+        self.exit_armed = false;
+        self.status.value_updated();
+        if let Some(label) = label {
+            self.status.set_raw(format!("Selected entry {}", label));
+        } else if !changed {
+            self.status.ready();
+        }
+
+        let expected_depth = previous_depth;
+        self.try_open_composite_editor();
+        if self.overlay_depth() != expected_depth {
+            return false;
+        }
+
+        if let Some(editor) = self.active_overlay_mut() {
+            editor.exit_armed = false;
+            if editor.can_focus_entries() {
+                editor.focus_entries();
+            }
+        }
+
+        true
+    }
+
+    fn handle_overlay_focus_command(&mut self, command: &FormCommand) -> bool {
         if !matches!(
             command,
             FormCommand::FocusNextField | FormCommand::FocusPrevField
         ) {
             return false;
         }
-        if !editor.can_focus_entries() {
-            return false;
-        }
+
+        let snapshot = {
+            let editor = match self.active_overlay() {
+                Some(editor) => editor,
+                None => return false,
+            };
+            if !editor.can_focus_entries() {
+                return false;
+            }
+            let form_state = editor.form_state();
+            (
+                editor.focus,
+                form_state.has_focusable_fields(),
+                form_state.focus_is_first(),
+                form_state.focus_is_last(),
+                editor
+                    .list_entries
+                    .as_ref()
+                    .map(|entries| entries.len())
+                    .unwrap_or(0),
+            )
+        };
+
+        let (focus_mode, has_fields, focus_is_first, focus_is_last, entries_len) = snapshot;
+
         match command {
             FormCommand::FocusNextField => {
-                if editor.focus == OverlayFocusMode::EntryTabs {
-                    editor.exit_armed = false;
-                    editor.focus_form();
-                    if editor.form_state().has_focusable_fields() {
-                        editor.form_state_mut().focus_first_field();
+                if focus_mode == OverlayFocusMode::EntryTabs {
+                    if has_fields {
+                        if let Some(editor) = self.active_overlay_mut() {
+                            editor.exit_armed = false;
+                            editor.focus_form();
+                            if editor.form_state().has_focusable_fields() {
+                                editor.form_state_mut().focus_first_field();
+                            }
+                        }
+                        return true;
+                    }
+                    if entries_len > 0 && self.advance_overlay_entry(1) {
+                        return true;
+                    }
+                    if let Some(editor) = self.active_overlay_mut() {
+                        editor.exit_armed = false;
+                        editor.focus_entries();
                     }
                     return true;
                 }
-                if !editor.form_state().has_focusable_fields()
-                    || editor.form_state().focus_is_last()
-                {
-                    editor.exit_armed = false;
-                    editor.focus_entries();
+
+                if !has_fields {
+                    if entries_len > 0 && self.advance_overlay_entry(1) {
+                        return true;
+                    }
+                    if let Some(editor) = self.active_overlay_mut() {
+                        editor.exit_armed = false;
+                        editor.focus_entries();
+                    }
+                    return true;
+                }
+
+                if focus_is_last {
+                    if entries_len > 0 && self.advance_overlay_entry(1) {
+                        return true;
+                    }
+                    if let Some(editor) = self.active_overlay_mut() {
+                        editor.exit_armed = false;
+                        editor.focus_entries();
+                    }
                     return true;
                 }
             }
             FormCommand::FocusPrevField => {
-                if editor.focus == OverlayFocusMode::EntryTabs {
-                    editor.exit_armed = false;
-                    editor.focus_form();
-                    if editor.form_state().has_focusable_fields() {
-                        editor.form_state_mut().focus_last_field();
+                if focus_mode == OverlayFocusMode::EntryTabs {
+                    if has_fields {
+                        if let Some(editor) = self.active_overlay_mut() {
+                            editor.exit_armed = false;
+                            editor.focus_form();
+                            if editor.form_state().has_focusable_fields() {
+                                editor.form_state_mut().focus_last_field();
+                            }
+                        }
+                        return true;
+                    }
+                    if entries_len > 0 && self.advance_overlay_entry(-1) {
+                        return true;
+                    }
+                    if let Some(editor) = self.active_overlay_mut() {
+                        editor.exit_armed = false;
+                        editor.focus_entries();
                     }
                     return true;
                 }
-                if !editor.form_state().has_focusable_fields()
-                    || editor.form_state().focus_is_first()
-                {
-                    editor.exit_armed = false;
-                    editor.focus_entries();
+
+                if !has_fields {
+                    if entries_len > 0 && self.advance_overlay_entry(-1) {
+                        return true;
+                    }
+                    if let Some(editor) = self.active_overlay_mut() {
+                        editor.exit_armed = false;
+                        editor.focus_entries();
+                    }
+                    return true;
+                }
+
+                if focus_is_first {
+                    if entries_len > 0 && self.advance_overlay_entry(-1) {
+                        return true;
+                    }
+                    if let Some(editor) = self.active_overlay_mut() {
+                        editor.exit_armed = false;
+                        editor.focus_entries();
+                    }
                     return true;
                 }
             }
             _ => {}
         }
+
         false
     }
 

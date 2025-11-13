@@ -105,6 +105,10 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
         false
     }
 
+    fn collection_set_selected(&mut self, _index: usize) -> bool {
+        false
+    }
+
     fn collection_add(&mut self) -> bool {
         false
     }

@@ -66,6 +66,10 @@ impl FieldState {
         self.component.collection_selected_label()
     }
 
+    pub fn collection_selected_label(&self) -> Option<String> {
+        self.component.collection_selected_label()
+    }
+
     pub fn composite_list_panel(&self) -> Option<(Vec<String>, usize)> {
         self.component.collection_panel()
     }
@@ -99,6 +103,10 @@ impl FieldState {
         } else {
             false
         }
+    }
+
+    pub fn collection_set_selected(&mut self, index: usize) -> bool {
+        self.component.collection_set_selected(index)
     }
 
     pub fn open_composite_editor(
