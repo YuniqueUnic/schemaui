@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use serde_json::{Number, Value, json};
 
 use crate::domain::FieldKind;
 
 use super::{
-    error::FieldCoercionError, field::FieldState, section::SectionState, state::FormState,
+    error::FieldCoercionError, field::FieldState, field::components::ComponentPalette,
+    section::SectionState, state::FormState,
 };
 
 #[derive(Debug, Clone)]
@@ -12,6 +15,7 @@ pub struct ScalarArrayState {
     template: ScalarArrayTemplate,
     entries: Vec<Value>,
     selected: usize,
+    palette: Arc<ComponentPalette>,
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +37,7 @@ pub struct ArrayEditorSession {
 #[derive(Debug, Clone)]
 pub struct ArrayEditorContext {
     pub entry_index: usize,
+    #[allow(dead_code)]
     pub entry_label: String,
     pub session: ArrayEditorSession,
 }
@@ -44,6 +49,7 @@ impl ScalarArrayState {
         description: Option<String>,
         kind: &FieldKind,
         default: Option<&Value>,
+        palette: Arc<ComponentPalette>,
     ) -> Self {
         let entry_schema = json!({
             "type": "object",
@@ -62,6 +68,7 @@ impl ScalarArrayState {
             },
             entries: Vec::new(),
             selected: 0,
+            palette,
         };
         if let Some(Value::Array(items)) = default {
             state.seed_entries_from_array(items);
@@ -186,7 +193,7 @@ impl ScalarArrayState {
             .get(idx)
             .cloned()
             .unwrap_or_else(|| default_value(&self.template.item_kind));
-        let form_state = build_entry_form_state(&self.template, &value);
+        let form_state = build_entry_form_state(&self.template, &value, &self.palette);
         Ok(ArrayEditorContext {
             entry_index: idx,
             entry_label: format!("#{} {}", idx + 1, summarize_value(&value)),
@@ -226,9 +233,13 @@ impl ScalarArrayState {
     }
 }
 
-fn build_entry_form_state(template: &ScalarArrayTemplate, value: &Value) -> FormState {
+fn build_entry_form_state(
+    template: &ScalarArrayTemplate,
+    value: &Value,
+    palette: &Arc<ComponentPalette>,
+) -> FormState {
     let schema = FieldSchemaStub::new(template, value.clone());
-    let mut field_state = FieldState::from_schema(schema.into());
+    let mut field_state = FieldState::from_schema_with_palette(schema.into(), Arc::clone(palette));
     field_state.seed_value(value);
     let section = SectionState {
         id: "array_entry".to_string(),

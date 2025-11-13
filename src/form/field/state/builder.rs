@@ -1,14 +1,22 @@
+use std::sync::Arc;
+
 use crate::domain::{FieldKind, FieldSchema};
 
 use super::super::components::{
     ArrayBufferComponent, BoolComponent, CompositeComponent, CompositeListComponent, EnumComponent,
     FieldComponent, KeyValueComponent, MultiSelectComponent, ScalarArrayComponent, TextComponent,
+    palette::ComponentPalette,
 };
 use super::FieldState;
 
 impl FieldState {
+    #[allow(dead_code)]
     pub fn from_schema(schema: FieldSchema) -> Self {
-        let component = build_component(&schema);
+        Self::from_schema_with_palette(schema, Arc::new(ComponentPalette::default()))
+    }
+
+    pub fn from_schema_with_palette(schema: FieldSchema, palette: Arc<ComponentPalette>) -> Self {
+        let component = build_component(&schema, palette);
         Self {
             schema,
             component,
@@ -18,32 +26,49 @@ impl FieldState {
     }
 }
 
-fn build_component(schema: &FieldSchema) -> Box<dyn FieldComponent> {
+fn build_component(
+    schema: &FieldSchema,
+    palette: Arc<ComponentPalette>,
+) -> Box<dyn FieldComponent> {
     match &schema.kind {
         FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Json => {
-            Box::new(TextComponent::new(schema))
+            Box::new(TextComponent::new(schema, Arc::clone(&palette)))
         }
-        FieldKind::Boolean => Box::new(BoolComponent::new(schema)),
-        FieldKind::Enum(options) => Box::new(EnumComponent::new(options, schema)),
+        FieldKind::Boolean => Box::new(BoolComponent::new(schema, Arc::clone(&palette))),
+        FieldKind::Enum(options) => {
+            Box::new(EnumComponent::new(options, schema, Arc::clone(&palette)))
+        }
         FieldKind::Array(inner) => match inner.as_ref() {
-            FieldKind::Enum(options) => {
-                Box::new(MultiSelectComponent::new(options, schema.default.as_ref()))
-            }
+            FieldKind::Enum(options) => Box::new(MultiSelectComponent::new(
+                options,
+                schema.default.as_ref(),
+                Arc::clone(&palette),
+            )),
             FieldKind::Composite(meta) => Box::new(CompositeListComponent::new(
                 &schema.pointer,
                 meta,
                 schema.default.as_ref(),
+                Arc::clone(&palette),
             )),
             FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Boolean => {
-                Box::new(ScalarArrayComponent::new(schema, inner.as_ref()))
+                Box::new(ScalarArrayComponent::new(
+                    schema,
+                    inner.as_ref(),
+                    Arc::clone(&palette),
+                ))
             }
-            _ => Box::new(ArrayBufferComponent::new(schema)),
+            _ => Box::new(ArrayBufferComponent::new(schema, Arc::clone(&palette))),
         },
-        FieldKind::Composite(meta) => Box::new(CompositeComponent::new(&schema.pointer, meta)),
+        FieldKind::Composite(meta) => Box::new(CompositeComponent::new(
+            &schema.pointer,
+            meta,
+            Arc::clone(&palette),
+        )),
         FieldKind::KeyValue(template) => Box::new(KeyValueComponent::new(
             &schema.pointer,
             template,
             schema.default.as_ref(),
+            Arc::clone(&palette),
         )),
     }
 }

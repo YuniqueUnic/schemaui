@@ -1,22 +1,22 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::domain::{FieldKind, FieldSchema};
 use crate::form::array::{ArrayEditorContext, ArrayEditorSession, ScalarArrayState};
 use crate::form::error::FieldCoercionError;
 
-use super::helpers::{
-    COLLECTION_OVERLAY_HINT, EntryPanelState, OverlayContext, format_collection_value,
-    list_hint_for,
-};
-use super::{ComponentKind, FieldComponent};
+use super::helpers::{EntryPanelState, OverlayContext, format_collection_value, list_hint_for};
+use super::{ComponentKind, FieldComponent, palette::ComponentPalette};
 
 #[derive(Debug, Clone)]
 pub struct ScalarArrayComponent {
     state: ScalarArrayState,
+    palette: Arc<ComponentPalette>,
 }
 
 impl ScalarArrayComponent {
-    pub fn new(schema: &FieldSchema, inner: &FieldKind) -> Self {
+    pub fn new(schema: &FieldSchema, inner: &FieldKind, palette: Arc<ComponentPalette>) -> Self {
         Self {
             state: ScalarArrayState::new(
                 &schema.pointer,
@@ -24,7 +24,9 @@ impl ScalarArrayComponent {
                 schema.description.clone(),
                 inner,
                 schema.default.as_ref(),
+                Arc::clone(&palette),
             ),
+            palette,
         }
     }
 }
@@ -39,7 +41,7 @@ impl FieldComponent for ScalarArrayComponent {
             "Array",
             self.state.len(),
             self.state.selected_label(),
-            list_hint_for(ComponentKind::ScalarArray),
+            &list_hint_for(ComponentKind::ScalarArray, &self.palette),
         )
     }
 
@@ -110,7 +112,7 @@ impl FieldComponent for ScalarArrayComponent {
         if let Some((entries, selected)) = self.state.panel() {
             context.entry_panel = Some(EntryPanelState { entries, selected });
         }
-        context.instructions = Some(COLLECTION_OVERLAY_HINT.to_string());
+        context.instructions = Some(self.palette.collection.overlay_instructions.to_string());
         Some(context)
     }
 }

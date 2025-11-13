@@ -1,18 +1,25 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::domain::FieldSchema;
 use crate::form::error::FieldCoercionError;
 
-use super::{ComponentKind, FieldComponent, MultiSelectStateRef};
+use super::{ComponentKind, FieldComponent, MultiSelectStateRef, palette::ComponentPalette};
 
 #[derive(Debug, Clone)]
 pub struct MultiSelectComponent {
     options: Vec<String>,
     selected: Vec<bool>,
+    palette: Arc<ComponentPalette>,
 }
 
 impl MultiSelectComponent {
-    pub fn new(options: &[String], default: Option<&Value>) -> Self {
+    pub fn new(
+        options: &[String],
+        default: Option<&Value>,
+        palette: Arc<ComponentPalette>,
+    ) -> Self {
         let mut selected = vec![false; options.len()];
         if let Some(Value::Array(items)) = default {
             for item in items.iter().filter_map(Value::as_str) {
@@ -24,6 +31,7 @@ impl MultiSelectComponent {
         Self {
             options: options.to_vec(),
             selected,
+            palette,
         }
     }
 }
@@ -41,7 +49,7 @@ impl FieldComponent for MultiSelectComponent {
             .filter_map(|(option, flag)| if *flag { Some(option.clone()) } else { None })
             .collect::<Vec<_>>();
         if values.is_empty() {
-            "[]".to_string()
+            format!("[] {}", self.palette.collection.list_hint)
         } else {
             format!("[{}]", values.join(", "))
         }

@@ -1,9 +1,14 @@
+use std::sync::Arc;
+
 use serde_json::{Map, Value};
 
 use crate::domain::{FieldKind, FieldSchema, KeyValueField};
 
 use super::{
-    error::FieldCoercionError, field::FieldState, section::SectionState, state::FormState,
+    error::FieldCoercionError,
+    field::{FieldState, components::ComponentPalette},
+    section::SectionState,
+    state::FormState,
 };
 
 #[derive(Debug, Clone)]
@@ -13,6 +18,7 @@ pub struct KeyValueState {
     entries: Vec<KeyValueEntry>,
     selected: usize,
     counter: usize,
+    palette: Arc<ComponentPalette>,
 }
 
 #[derive(Debug, Clone)]
@@ -30,18 +36,25 @@ pub struct KeyValueEditorSession {
 #[derive(Debug)]
 pub struct KeyValueEditorContext {
     pub entry_index: usize,
+    #[allow(dead_code)]
     pub entry_label: String,
     pub session: KeyValueEditorSession,
 }
 
 impl KeyValueState {
-    pub fn new(pointer: &str, template: &KeyValueField, default: Option<&Value>) -> Self {
+    pub fn new(
+        pointer: &str,
+        template: &KeyValueField,
+        default: Option<&Value>,
+        palette: Arc<ComponentPalette>,
+    ) -> Self {
         let mut state = Self {
             pointer: pointer.to_string(),
             template: template.clone(),
             entries: Vec::new(),
             selected: 0,
             counter: 0,
+            palette,
         };
         if let Some(Value::Object(map)) = default {
             state.seed_entries_from_object(map);
@@ -271,8 +284,9 @@ impl KeyValueState {
             value_schema.default = self.template.value_default.clone();
         }
 
-        let key_field = FieldState::from_schema(key_schema);
-        let value_field = FieldState::from_schema(value_schema);
+        let key_field = FieldState::from_schema_with_palette(key_schema, Arc::clone(&self.palette));
+        let value_field =
+            FieldState::from_schema_with_palette(value_schema, Arc::clone(&self.palette));
         let section = SectionState {
             id: "key_value".to_string(),
             title: "Key/Value Entry".to_string(),

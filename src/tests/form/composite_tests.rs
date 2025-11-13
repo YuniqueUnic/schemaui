@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use serde_json::json;
 
 use crate::{
     domain::{CompositeField, CompositeMode, CompositeVariant},
     form::CompositeState,
+    form::field::components::ComponentPalette,
 };
 
 #[test]
@@ -41,7 +44,11 @@ fn seed_from_value_uses_enum_discriminator() {
         variants: vec![variant_one, variant_two],
     };
 
-    let mut state = CompositeState::new("/preferences", &field);
+    let mut state = CompositeState::new(
+        "/preferences",
+        &field,
+        Arc::new(ComponentPalette::default()),
+    );
     state
         .seed_from_value(&json!({
             "kind": "beta"

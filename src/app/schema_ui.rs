@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use jsonschema::validator_for;
 use serde_json::Value;
-use std::{sync::Arc, time::Duration};
+use std::{borrow::Cow, sync::Arc, time::Duration};
 
 use crate::{
     domain::parse_form_schema,
@@ -13,6 +13,7 @@ use crate::{
 };
 
 use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions, runtime::App};
+use crate::form::field::components::ComponentPalette;
 
 #[derive(Debug)]
 pub struct SchemaUI {
@@ -103,6 +104,78 @@ impl SchemaUI {
         self
     }
 
+    pub fn with_component_palette(mut self, palette: ComponentPalette) -> Self {
+        self.options = self.options.clone().with_component_palette(palette);
+        self
+    }
+
+    pub fn with_integer_step(mut self, step: i64) -> Self {
+        self.options = self.options.clone().with_integer_step(step);
+        self
+    }
+
+    pub fn with_integer_fast_step(mut self, step: i64) -> Self {
+        self.options = self.options.clone().with_integer_fast_step(step);
+        self
+    }
+
+    pub fn with_float_step(mut self, step: f64) -> Self {
+        self.options = self.options.clone().with_float_step(step);
+        self
+    }
+
+    pub fn with_float_fast_step(mut self, step: f64) -> Self {
+        self.options = self.options.clone().with_float_fast_step(step);
+        self
+    }
+
+    pub fn with_bool_labels(
+        mut self,
+        true_label: impl Into<Cow<'static, str>>,
+        false_label: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        self.options = self
+            .options
+            .clone()
+            .with_bool_labels(true_label, false_label);
+        self
+    }
+
+    pub fn with_bool_toggle_arrows(mut self, enabled: bool) -> Self {
+        self.options = self.options.clone().with_bool_toggle_arrows(enabled);
+        self
+    }
+
+    pub fn with_bool_toggle_space(mut self, enabled: bool) -> Self {
+        self.options = self.options.clone().with_bool_toggle_space(enabled);
+        self
+    }
+
+    pub fn with_enum_wrap(mut self, wrap: bool) -> Self {
+        self.options = self.options.clone().with_enum_wrap(wrap);
+        self
+    }
+
+    pub fn with_overlay_instructions(mut self, instructions: impl Into<Cow<'static, str>>) -> Self {
+        self.options = self.options.clone().with_overlay_instructions(instructions);
+        self
+    }
+
+    pub fn with_list_hint(mut self, hint: impl Into<Cow<'static, str>>) -> Self {
+        self.options = self.options.clone().with_list_hint(hint);
+        self
+    }
+
+    pub fn with_composite_single_hint(mut self, hint: impl Into<Cow<'static, str>>) -> Self {
+        self.options = self.options.clone().with_composite_single_hint(hint);
+        self
+    }
+
+    pub fn with_composite_multi_hint(mut self, hint: impl Into<Cow<'static, str>>) -> Self {
+        self.options = self.options.clone().with_composite_multi_hint(hint);
+        self
+    }
+
     pub fn run(self) -> Result<Value> {
         let SchemaUI {
             schema,
@@ -113,7 +186,8 @@ impl SchemaUI {
 
         let validator = validator_for(&schema).context("failed to compile JSON schema")?;
         let form_schema = parse_form_schema(&schema)?;
-        let form_state = FormState::from_schema(&form_schema);
+        let palette = options.component_palette();
+        let form_state = FormState::from_schema_with_palette(&form_schema, palette);
 
         let mut app = App::new(form_state, validator, options);
         let result = app.run()?;

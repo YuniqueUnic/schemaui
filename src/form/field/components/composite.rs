@@ -1,20 +1,27 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::domain::{CompositeField, FieldSchema};
 use crate::form::composite::CompositeState;
 use crate::form::error::FieldCoercionError;
 
-use super::{ComponentKind, CompositePopupData, CompositeSelectorView, FieldComponent};
+use super::{
+    ComponentKind, CompositePopupData, CompositeSelectorView, FieldComponent,
+    palette::ComponentPalette,
+};
 
 #[derive(Debug, Clone)]
 pub struct CompositeComponent {
     state: CompositeState,
+    view: CompositeViewAdapter,
 }
 
 impl CompositeComponent {
-    pub fn new(pointer: &str, template: &CompositeField) -> Self {
+    pub fn new(pointer: &str, template: &CompositeField, palette: Arc<ComponentPalette>) -> Self {
         Self {
-            state: CompositeState::new(pointer, template),
+            state: CompositeState::new(pointer, template, Arc::clone(&palette)),
+            view: CompositeViewAdapter { palette },
         }
     }
 }
@@ -25,13 +32,7 @@ impl FieldComponent for CompositeComponent {
     }
 
     fn display_value(&self, _schema: &FieldSchema) -> String {
-        let mut label = self.state.summary();
-        if self.state.is_multi() {
-            label.push_str(" (Enter to toggle)");
-        } else {
-            label.push_str(" (Enter to choose)");
-        }
-        label
+        self.view.display_label(&self.state)
     }
 
     fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {
@@ -45,43 +46,15 @@ impl FieldComponent for CompositeComponent {
     }
 
     fn composite_popup(&self) -> Option<CompositePopupData> {
-        let options = self.state.option_titles();
-        if options.is_empty() {
-            return None;
-        }
-        let active = self.state.active_flags();
-        let selected = self
-            .state
-            .selected_index()
-            .unwrap_or(0)
-            .min(options.len().saturating_sub(1));
-        Some(CompositePopupData {
-            options,
-            selected,
-            multi: self.state.is_multi(),
-            active,
-        })
+        self.view.popup(&self.state)
     }
 
     fn composite_selector(&self) -> Option<CompositeSelectorView> {
-        let options = self.state.option_titles();
-        if options.is_empty() {
-            return None;
-        }
-        Some(CompositeSelectorView {
-            multi: self.state.is_multi(),
-            options,
-            active: self.state.active_flags(),
-        })
+        self.view.selector(&self.state)
     }
 
     fn composite_summaries(&self) -> Option<Vec<crate::form::composite::CompositeVariantSummary>> {
-        let summaries = self.state.active_summaries();
-        if summaries.is_empty() {
-            None
-        } else {
-            Some(summaries)
-        }
+        self.view.summaries(&self.state)
     }
 
     fn active_composite_variants(&self) -> Vec<usize> {
@@ -110,5 +83,63 @@ impl FieldComponent for CompositeComponent {
 
     fn restore_composite_editor(&mut self, session: crate::form::CompositeEditorSession) {
         self.state.restore_editor_session(session);
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CompositeViewAdapter {
+    palette: Arc<ComponentPalette>,
+}
+
+impl CompositeViewAdapter {
+    fn display_label(&self, state: &CompositeState) -> String {
+        let mut label = state.summary();
+        if state.is_multi() {
+            label.push_str(self.palette.composite.multi_variant_hint.as_ref());
+        } else {
+            label.push_str(self.palette.composite.single_variant_hint.as_ref());
+        }
+        label
+    }
+
+    fn popup(&self, state: &CompositeState) -> Option<CompositePopupData> {
+        let options = state.option_titles();
+        if options.is_empty() {
+            return None;
+        }
+        let selected = state
+            .selected_index()
+            .unwrap_or(0)
+            .min(options.len().saturating_sub(1));
+        Some(CompositePopupData {
+            options,
+            selected,
+            multi: state.is_multi(),
+            active: state.active_flags(),
+        })
+    }
+
+    fn selector(&self, state: &CompositeState) -> Option<CompositeSelectorView> {
+        let options = state.option_titles();
+        if options.is_empty() {
+            return None;
+        }
+        Some(CompositeSelectorView {
+            multi: state.is_multi(),
+            options,
+            active: state.active_flags(),
+        })
+    }
+
+    fn summaries(
+        &self,
+        state: &CompositeState,
+    ) -> Option<Vec<crate::form::composite::CompositeVariantSummary>> {
+        let summaries = state.active_summaries();
+        if summaries.is_empty() {
+            None
+        } else {
+            Some(summaries)
+        }
     }
 }

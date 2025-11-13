@@ -1,24 +1,30 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::domain::{CompositeField, FieldSchema};
 use crate::form::composite::{CompositeListEditorContext, CompositeListState};
 use crate::form::error::FieldCoercionError;
 
-use super::helpers::{
-    COLLECTION_OVERLAY_HINT, EntryPanelState, OverlayContext, format_collection_value,
-    list_hint_for,
-};
-use super::{ComponentKind, FieldComponent};
+use super::helpers::{EntryPanelState, OverlayContext, format_collection_value, list_hint_for};
+use super::{ComponentKind, FieldComponent, palette::ComponentPalette};
 
 #[derive(Debug, Clone)]
 pub struct CompositeListComponent {
     state: CompositeListState,
+    palette: Arc<ComponentPalette>,
 }
 
 impl CompositeListComponent {
-    pub fn new(pointer: &str, template: &CompositeField, defaults: Option<&Value>) -> Self {
+    pub fn new(
+        pointer: &str,
+        template: &CompositeField,
+        defaults: Option<&Value>,
+        palette: Arc<ComponentPalette>,
+    ) -> Self {
         Self {
-            state: CompositeListState::new(pointer, template, defaults),
+            state: CompositeListState::new(pointer, template, defaults, Arc::clone(&palette)),
+            palette,
         }
     }
 }
@@ -33,7 +39,7 @@ impl FieldComponent for CompositeListComponent {
             "List",
             self.state.len(),
             self.state.selected_label(),
-            list_hint_for(ComponentKind::CompositeList),
+            &list_hint_for(ComponentKind::CompositeList, &self.palette),
         )
     }
 
@@ -107,7 +113,7 @@ impl FieldComponent for CompositeListComponent {
         if let Some((entries, selected)) = self.collection_panel() {
             context.entry_panel = Some(EntryPanelState { entries, selected });
         }
-        context.instructions = Some(COLLECTION_OVERLAY_HINT.to_string());
+        context.instructions = Some(self.palette.collection.overlay_instructions.to_string());
         Some(context)
     }
 }

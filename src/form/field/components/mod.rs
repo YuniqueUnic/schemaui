@@ -7,6 +7,7 @@ mod enum_select;
 pub(crate) mod helpers;
 mod key_value;
 mod multi_select;
+pub mod palette;
 mod scalar_array;
 mod text;
 
@@ -21,5 +22,9 @@ pub use composite_list::CompositeListComponent;
 pub use enum_select::EnumComponent;
 pub use key_value::KeyValueComponent;
 pub use multi_select::MultiSelectComponent;
+pub use palette::{
+    BoolTogglePresentation, CollectionHints, ComponentPalette, CompositeHints, EnumBehaviour,
+    NumericTuning,
+};
 pub use scalar_array::ScalarArrayComponent;
 pub use text::TextComponent;

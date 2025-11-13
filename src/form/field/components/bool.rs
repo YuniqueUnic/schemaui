@@ -1,22 +1,25 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::domain::FieldSchema;
 
-use super::{ComponentKind, FieldComponent};
+use super::{ComponentKind, FieldComponent, palette::ComponentPalette};
 
 #[derive(Debug, Clone)]
 pub struct BoolComponent {
     value: bool,
+    palette: Arc<ComponentPalette>,
 }
 
 impl BoolComponent {
-    pub fn new(schema: &FieldSchema) -> Self {
+    pub fn new(schema: &FieldSchema, palette: Arc<ComponentPalette>) -> Self {
         let value = schema
             .default
             .as_ref()
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
-        Self { value }
+        Self { value, palette }
     }
 }
 
@@ -26,14 +29,22 @@ impl FieldComponent for BoolComponent {
     }
 
     fn display_value(&self, _schema: &FieldSchema) -> String {
-        self.value.to_string()
+        if self.value {
+            self.palette.bools.true_label.to_string()
+        } else {
+            self.palette.bools.false_label.to_string()
+        }
     }
 
     fn handle_key(&mut self, _schema: &FieldSchema, key: &crossterm::event::KeyEvent) -> bool {
         match key.code {
-            crossterm::event::KeyCode::Char(' ')
-            | crossterm::event::KeyCode::Left
-            | crossterm::event::KeyCode::Right => {
+            crossterm::event::KeyCode::Char(' ') if self.palette.bools.toggle_with_space => {
+                self.value = !self.value;
+                true
+            }
+            crossterm::event::KeyCode::Left | crossterm::event::KeyCode::Right
+                if self.palette.bools.toggle_with_arrows =>
+            {
                 self.value = !self.value;
                 true
             }

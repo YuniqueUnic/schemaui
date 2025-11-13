@@ -1,14 +1,37 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::domain::FieldSchema;
+use crate::domain::{FieldKind, FieldSchema};
 
-use super::ComponentKind;
-use crate::form::field::convert::adjust_numeric_value;
+use super::{ComponentKind, palette::ComponentPalette};
+use crate::form::field::convert::{NumericStepValue, adjust_numeric_value};
 
-pub(crate) fn handle_text_edit(buffer: &mut String, schema: &FieldSchema, key: &KeyEvent) -> bool {
+pub(crate) fn handle_text_edit(
+    buffer: &mut String,
+    schema: &FieldSchema,
+    key: &KeyEvent,
+    palette: &ComponentPalette,
+) -> bool {
     match key.code {
-        KeyCode::Left => adjust_numeric_value(buffer, &schema.kind, -1),
-        KeyCode::Right => adjust_numeric_value(buffer, &schema.kind, 1),
+        KeyCode::Left | KeyCode::Right => {
+            let fast = key.modifiers.contains(KeyModifiers::SHIFT);
+            let sign = if matches!(key.code, KeyCode::Left) {
+                -1.0
+            } else {
+                1.0
+            };
+            let delta = match schema.kind {
+                FieldKind::Integer => {
+                    let step = palette.numeric.step_i64(fast) as f64 * sign;
+                    NumericStepValue::Integer(step.round() as i64)
+                }
+                FieldKind::Number => {
+                    let step = palette.numeric.step_f64(fast) * sign;
+                    NumericStepValue::Float(step)
+                }
+                _ => return false,
+            };
+            adjust_numeric_value(buffer, &schema.kind, delta)
+        }
         KeyCode::Char(ch) => {
             if key.modifiers.contains(KeyModifiers::CONTROL) {
                 return false;
@@ -42,13 +65,12 @@ pub(crate) fn format_collection_value(
     }
 }
 
-pub(crate) fn list_hint_for(kind: ComponentKind) -> &'static str {
+pub(crate) fn list_hint_for(kind: ComponentKind, palette: &ComponentPalette) -> String {
     match kind {
-        ComponentKind::CompositeList | ComponentKind::KeyValue => {
-            "(Ctrl+Left/Right select, Ctrl+E edit)"
+        ComponentKind::CompositeList | ComponentKind::KeyValue | ComponentKind::ScalarArray => {
+            palette.collection.list_hint.to_string()
         }
-        ComponentKind::ScalarArray => "(Ctrl+Left/Right select, Ctrl+E edit)",
-        _ => "",
+        _ => String::new(),
     }
 }
 
@@ -76,6 +98,3 @@ impl OverlayContext {
         }
     }
 }
-
-pub(crate) const COLLECTION_OVERLAY_HINT: &str =
-    "Ctrl+N add • Ctrl+D remove • Ctrl+←/→ select • Ctrl+↑/↓ reorder";

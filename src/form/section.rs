@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use crate::domain::FormSection;
 
-use super::field::FieldState;
+use super::field::{FieldState, components::ComponentPalette};
 
 #[derive(Debug, Clone)]
 pub struct SectionState {
@@ -16,12 +18,17 @@ pub struct SectionState {
 }
 
 impl SectionState {
-    pub fn collect(section: &FormSection, depth: usize, acc: &mut Vec<SectionState>) {
+    pub fn collect(
+        section: &FormSection,
+        depth: usize,
+        palette: &Arc<ComponentPalette>,
+        acc: &mut Vec<SectionState>,
+    ) {
         let fields = section
             .fields
             .iter()
             .cloned()
-            .map(FieldState::from_schema)
+            .map(|schema| FieldState::from_schema_with_palette(schema, Arc::clone(palette)))
             .collect();
         acc.push(SectionState {
             id: section.id.clone(),
@@ -33,7 +40,7 @@ impl SectionState {
             scroll_offset: 0,
         });
         for child in &section.children {
-            SectionState::collect(child, depth + 1, acc);
+            SectionState::collect(child, depth + 1, palette, acc);
         }
     }
 }

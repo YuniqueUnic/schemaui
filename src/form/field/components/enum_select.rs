@@ -1,18 +1,21 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::domain::FieldSchema;
 
-use super::{ComponentKind, EnumStateRef, FieldComponent};
+use super::{ComponentKind, EnumStateRef, FieldComponent, palette::ComponentPalette};
 use crate::form::field::convert::value_to_string;
 
 #[derive(Debug, Clone)]
 pub struct EnumComponent {
     options: Vec<String>,
     selected: usize,
+    palette: Arc<ComponentPalette>,
 }
 
 impl EnumComponent {
-    pub fn new(options: &[String], schema: &FieldSchema) -> Self {
+    pub fn new(options: &[String], schema: &FieldSchema, palette: Arc<ComponentPalette>) -> Self {
         let default_value = schema
             .default
             .as_ref()
@@ -26,6 +29,7 @@ impl EnumComponent {
         Self {
             options: options.to_vec(),
             selected,
+            palette,
         }
     }
 }
@@ -49,7 +53,9 @@ impl FieldComponent for EnumComponent {
                     return false;
                 }
                 if self.selected == 0 {
-                    self.selected = self.options.len().saturating_sub(1);
+                    if self.palette.enums.wrap_around {
+                        self.selected = self.options.len().saturating_sub(1);
+                    }
                 } else {
                     self.selected -= 1;
                 }
@@ -59,7 +65,13 @@ impl FieldComponent for EnumComponent {
                 if self.options.is_empty() {
                     return false;
                 }
-                self.selected = (self.selected + 1) % self.options.len();
+                if self.selected + 1 >= self.options.len() {
+                    if self.palette.enums.wrap_around {
+                        self.selected = 0;
+                    }
+                } else {
+                    self.selected += 1;
+                }
                 true
             }
             _ => false,

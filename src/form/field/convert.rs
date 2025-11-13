@@ -149,17 +149,38 @@ pub(super) fn array_value(
     Ok(Some(Value::Array(values)))
 }
 
-pub(super) fn adjust_numeric_value(buffer: &mut String, kind: &FieldKind, delta: i64) -> bool {
-    match kind {
-        FieldKind::Integer => {
+#[derive(Debug, Clone, Copy)]
+pub enum NumericStepValue {
+    Integer(i64),
+    Float(f64),
+}
+
+pub(super) fn adjust_numeric_value(
+    buffer: &mut String,
+    kind: &FieldKind,
+    delta: NumericStepValue,
+) -> bool {
+    match (kind, delta) {
+        (FieldKind::Integer, NumericStepValue::Integer(step)) => {
             let current = buffer.trim().parse::<i64>().unwrap_or(0);
-            let next = current.saturating_add(delta);
+            let next = current.saturating_add(step);
             *buffer = next.to_string();
             true
         }
-        FieldKind::Number => {
+        (FieldKind::Integer, NumericStepValue::Float(step)) => {
+            let current = buffer.trim().parse::<i64>().unwrap_or(0);
+            let next = current as f64 + step;
+            *buffer = next.round().to_string();
+            true
+        }
+        (FieldKind::Number, NumericStepValue::Integer(step)) => {
             let current = buffer.trim().parse::<f64>().unwrap_or(0.0);
-            *buffer = (current + delta as f64).to_string();
+            *buffer = (current + step as f64).to_string();
+            true
+        }
+        (FieldKind::Number, NumericStepValue::Float(step)) => {
+            let current = buffer.trim().parse::<f64>().unwrap_or(0.0);
+            *buffer = (current + step).to_string();
             true
         }
         _ => false,

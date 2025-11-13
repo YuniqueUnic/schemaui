@@ -1,8 +1,14 @@
+use std::sync::Arc;
+
 use serde_json::{Map, Value};
 
 use crate::domain::FormSchema;
 
-use super::{error::FieldCoercionError, field::FieldState, section::SectionState};
+use super::{
+    error::FieldCoercionError,
+    field::{FieldState, components::ComponentPalette},
+    section::SectionState,
+};
 
 #[derive(Debug, Clone)]
 pub struct RootSectionState {
@@ -23,7 +29,12 @@ pub struct FormState {
 }
 
 impl FormState {
+    #[allow(dead_code)]
     pub fn from_schema(schema: &FormSchema) -> Self {
+        Self::from_schema_with_palette(schema, Arc::new(ComponentPalette::default()))
+    }
+
+    pub fn from_schema_with_palette(schema: &FormSchema, palette: Arc<ComponentPalette>) -> Self {
         let mut roots = Vec::new();
         if schema.roots.is_empty() {
             roots.push(empty_root_state());
@@ -31,7 +42,7 @@ impl FormState {
             for root in &schema.roots {
                 let mut sections = Vec::new();
                 for section in &root.sections {
-                    SectionState::collect(section, 0, &mut sections);
+                    SectionState::collect(section, 0, &palette, &mut sections);
                 }
                 if sections.is_empty() {
                     sections.push(empty_section_state());

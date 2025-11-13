@@ -1,24 +1,30 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::domain::{FieldSchema, KeyValueField};
 use crate::form::error::FieldCoercionError;
 use crate::form::key_value::{KeyValueEditorContext, KeyValueEditorSession, KeyValueState};
 
-use super::helpers::{
-    COLLECTION_OVERLAY_HINT, EntryPanelState, OverlayContext, format_collection_value,
-    list_hint_for,
-};
-use super::{ComponentKind, FieldComponent};
+use super::helpers::{EntryPanelState, OverlayContext, format_collection_value, list_hint_for};
+use super::{ComponentKind, FieldComponent, palette::ComponentPalette};
 
 #[derive(Debug, Clone)]
 pub struct KeyValueComponent {
     state: KeyValueState,
+    palette: Arc<ComponentPalette>,
 }
 
 impl KeyValueComponent {
-    pub fn new(pointer: &str, template: &KeyValueField, default: Option<&Value>) -> Self {
+    pub fn new(
+        pointer: &str,
+        template: &KeyValueField,
+        default: Option<&Value>,
+        palette: Arc<ComponentPalette>,
+    ) -> Self {
         Self {
-            state: KeyValueState::new(pointer, template, default),
+            state: KeyValueState::new(pointer, template, default, Arc::clone(&palette)),
+            palette,
         }
     }
 }
@@ -33,7 +39,7 @@ impl FieldComponent for KeyValueComponent {
             "Map",
             self.state.len(),
             self.state.selected_label(),
-            list_hint_for(ComponentKind::KeyValue),
+            &list_hint_for(ComponentKind::KeyValue, &self.palette),
         )
     }
 
@@ -104,7 +110,7 @@ impl FieldComponent for KeyValueComponent {
         if let Some((entries, selected)) = self.collection_panel() {
             context.entry_panel = Some(EntryPanelState { entries, selected });
         }
-        context.instructions = Some(COLLECTION_OVERLAY_HINT.to_string());
+        context.instructions = Some(self.palette.collection.overlay_instructions.to_string());
         Some(context)
     }
 }

@@ -1,25 +1,28 @@
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use crate::domain::{FieldKind, FieldSchema};
 use crate::form::error::FieldCoercionError;
 
 use super::helpers::handle_text_edit;
-use super::{ComponentKind, FieldComponent};
+use super::{ComponentKind, FieldComponent, palette::ComponentPalette};
 use crate::form::field::convert::{integer_value, number_value, string_value, value_to_string};
 
 #[derive(Debug, Clone)]
 pub struct TextComponent {
     buffer: String,
+    palette: Arc<ComponentPalette>,
 }
 
 impl TextComponent {
-    pub fn new(schema: &FieldSchema) -> Self {
+    pub fn new(schema: &FieldSchema, palette: Arc<ComponentPalette>) -> Self {
         let buffer = schema
             .default
             .as_ref()
             .map(value_to_string)
             .unwrap_or_default();
-        Self { buffer }
+        Self { buffer, palette }
     }
 }
 
@@ -33,7 +36,7 @@ impl FieldComponent for TextComponent {
     }
 
     fn handle_key(&mut self, schema: &FieldSchema, key: &crossterm::event::KeyEvent) -> bool {
-        handle_text_edit(&mut self.buffer, schema, key)
+        handle_text_edit(&mut self.buffer, schema, key, &self.palette)
     }
 
     fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {

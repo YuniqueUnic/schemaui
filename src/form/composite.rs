@@ -1,10 +1,13 @@
-use std::cell::{RefCell, RefMut};
+use std::{
+    cell::{RefCell, RefMut},
+    sync::Arc,
+};
 
 use serde_json::{Map, Value};
 
 use crate::domain::{CompositeField, CompositeMode, parse_form_schema};
 
-use super::{error::FieldCoercionError, state::FormState};
+use super::{error::FieldCoercionError, field::components::ComponentPalette, state::FormState};
 
 #[derive(Debug, Clone)]
 pub struct CompositeState {
@@ -23,6 +26,7 @@ pub struct CompositeVariantState {
     schema: Value,
     active: bool,
     form: RefCell<Option<FormState>>,
+    palette: Arc<ComponentPalette>,
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +41,7 @@ pub struct CompositeEditorSession {
 #[derive(Debug, Clone)]
 pub struct CompositeListEditorContext {
     pub entry_index: usize,
+    #[allow(dead_code)]
     pub entry_label: String,
     pub session: CompositeEditorSession,
 }
@@ -55,6 +60,7 @@ pub struct CompositeListState {
     entries: Vec<CompositeListEntry>,
     selected: usize,
     counter: usize,
+    palette: Arc<ComponentPalette>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,13 +70,19 @@ struct CompositeListEntry {
 }
 
 impl CompositeListState {
-    pub fn new(pointer: &str, template: &CompositeField, defaults: Option<&Value>) -> Self {
+    pub fn new(
+        pointer: &str,
+        template: &CompositeField,
+        defaults: Option<&Value>,
+        palette: Arc<ComponentPalette>,
+    ) -> Self {
         let mut state = Self {
             pointer: pointer.to_string(),
             template: template.clone(),
             entries: Vec::new(),
             selected: 0,
             counter: 0,
+            palette: Arc::clone(&palette),
         };
 
         if let Some(Value::Array(items)) = defaults {
@@ -117,7 +129,7 @@ impl CompositeListState {
     pub fn add_entry(&mut self) -> usize {
         let entry_pointer = format!("{}/entry_{}", self.pointer, self.counter);
         self.counter += 1;
-        let state = CompositeState::new(&entry_pointer, &self.template);
+        let state = CompositeState::new(&entry_pointer, &self.template, Arc::clone(&self.palette));
         self.entries.push(CompositeListEntry {
             pointer: entry_pointer,
             state,
@@ -218,7 +230,8 @@ impl CompositeListState {
         self.entries.clear();
         for (index, item) in items.iter().enumerate() {
             let pointer = format!("{}/entry_{}", self.pointer, index);
-            let mut state = CompositeState::new(&pointer, &self.template);
+            let mut state =
+                CompositeState::new(&pointer, &self.template, Arc::clone(&self.palette));
             let _ = state.seed_from_value(item);
             self.entries.push(CompositeListEntry { pointer, state });
         }
@@ -232,7 +245,7 @@ impl CompositeListState {
 }
 
 impl CompositeState {
-    pub fn new(pointer: &str, field: &CompositeField) -> Self {
+    pub fn new(pointer: &str, field: &CompositeField, palette: Arc<ComponentPalette>) -> Self {
         let mut variants = Vec::with_capacity(field.variants.len());
         for (index, variant) in field.variants.iter().enumerate() {
             variants.push(CompositeVariantState {
@@ -242,6 +255,7 @@ impl CompositeState {
                 schema: variant.schema.clone(),
                 active: matches!(field.mode, CompositeMode::OneOf) && index == 0,
                 form: RefCell::new(None),
+                palette: Arc::clone(&palette),
             });
         }
 
@@ -483,7 +497,10 @@ impl CompositeVariantState {
             pointer: pointer.to_string(),
             message: format!("failed to parse composite variant '{}': {err}", self.title),
         })?;
-        *self.form.borrow_mut() = Some(FormState::from_schema(&schema));
+        *self.form.borrow_mut() = Some(FormState::from_schema_with_palette(
+            &schema,
+            Arc::clone(&self.palette),
+        ));
         Ok(())
     }
 
