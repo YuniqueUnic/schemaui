@@ -24,10 +24,10 @@ pub fn render_body(
         return;
     }
 
-    let show_root_tabs = !form_state.roots.is_empty();
+    let show_root_tabs = form_state.roots.len() > 1;
     let show_section_tabs = form_state
         .active_root()
-        .map(|root| !root.sections.is_empty())
+        .map(|root| root.sections.len() > 1)
         .unwrap_or(false);
 
     let mut constraints = Vec::new();

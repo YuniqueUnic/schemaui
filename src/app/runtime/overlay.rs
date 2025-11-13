@@ -104,6 +104,12 @@ pub(super) enum CompositeOverlayTarget {
     ArrayEntry { entry_index: usize },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum OverlayFocusMode {
+    FormFields,
+    EntryTabs,
+}
+
 #[derive(Clone)]
 struct OverlayCommitPayload {
     field_pointer: String,
@@ -126,6 +132,7 @@ pub(super) struct CompositeEditorOverlay {
     pub(super) validator: Option<Arc<Validator>>,
     pub(super) level: usize,
     pub(super) host: OverlayHost,
+    pub(super) focus: OverlayFocusMode,
 }
 
 impl CompositeEditorOverlay {
@@ -153,6 +160,7 @@ impl CompositeEditorOverlay {
             validator: None,
             level,
             host,
+            focus: OverlayFocusMode::FormFields,
         }
     }
 
@@ -189,6 +197,18 @@ impl CompositeEditorOverlay {
 
     pub(super) fn dirty(&self) -> bool {
         self.session.is_dirty()
+    }
+
+    pub(super) fn can_focus_entries(&self) -> bool {
+        self.list_entries.is_some()
+    }
+
+    pub(super) fn focus_entries(&mut self) {
+        self.focus = OverlayFocusMode::EntryTabs;
+    }
+
+    pub(super) fn focus_form(&mut self) {
+        self.focus = OverlayFocusMode::FormFields;
     }
 
     pub(super) fn apply_component_context(&mut self, ctx: OverlayContext) {
@@ -244,7 +264,7 @@ impl App {
         }
     }
 
-    fn host_form_state(&self, host: OverlayHost) -> &FormState {
+    pub(super) fn host_form_state(&self, host: OverlayHost) -> &FormState {
         match host {
             OverlayHost::RootForm => &self.form_state,
             OverlayHost::Overlay { parent_level } => {
@@ -254,7 +274,7 @@ impl App {
         }
     }
 
-    fn host_form_state_mut(&mut self, host: OverlayHost) -> &mut FormState {
+    pub(super) fn host_form_state_mut(&mut self, host: OverlayHost) -> &mut FormState {
         match host {
             OverlayHost::RootForm => &mut self.form_state,
             OverlayHost::Overlay { parent_level } => {
@@ -513,6 +533,9 @@ impl App {
             .resolve(self.input_router.classify(&key));
         match dispatch {
             CommandDispatch::Form(command) => {
+                if self.handle_overlay_focus_command(&command) {
+                    return Ok(());
+                }
                 if let Some(editor) = self.active_overlay_mut() {
                     editor.exit_armed = false;
                     apply_command(editor.form_state_mut(), command.clone());
@@ -531,6 +554,59 @@ impl App {
         }
 
         Ok(())
+    }
+
+    fn handle_overlay_focus_command(&mut self, command: &FormCommand) -> bool {
+        let Some(editor) = self.active_overlay_mut() else {
+            return false;
+        };
+        if !matches!(
+            command,
+            FormCommand::FocusNextField | FormCommand::FocusPrevField
+        ) {
+            return false;
+        }
+        if !editor.can_focus_entries() {
+            return false;
+        }
+        match command {
+            FormCommand::FocusNextField => {
+                if editor.focus == OverlayFocusMode::EntryTabs {
+                    editor.exit_armed = false;
+                    if editor.form_state().has_focusable_fields() {
+                        editor.focus_form();
+                        editor.form_state_mut().focus_first_field();
+                    }
+                    return true;
+                }
+                if !editor.form_state().has_focusable_fields()
+                    || editor.form_state().focus_is_last()
+                {
+                    editor.exit_armed = false;
+                    editor.focus_entries();
+                    return true;
+                }
+            }
+            FormCommand::FocusPrevField => {
+                if editor.focus == OverlayFocusMode::EntryTabs {
+                    editor.exit_armed = false;
+                    if editor.form_state().has_focusable_fields() {
+                        editor.focus_form();
+                        editor.form_state_mut().focus_last_field();
+                    }
+                    return true;
+                }
+                if !editor.form_state().has_focusable_fields()
+                    || editor.form_state().focus_is_first()
+                {
+                    editor.exit_armed = false;
+                    editor.focus_entries();
+                    return true;
+                }
+            }
+            _ => {}
+        }
+        false
     }
 
     pub(super) fn request_overlay_exit(&mut self) -> bool {
@@ -667,12 +743,6 @@ impl App {
         }
     }
 
-    pub(super) fn overlay_targets_pointer(&self, pointer: &str) -> bool {
-        self.active_overlay()
-            .map(|editor| editor.field_pointer == pointer)
-            .unwrap_or(false)
-    }
-
     pub(super) fn refresh_list_overlay_panel(&mut self) {
         let Some(mut overlay) = self.overlay_stack.pop() else {
             return;
@@ -779,6 +849,16 @@ impl App {
     pub(crate) fn active_overlay_form_state_for_test(&mut self) -> Option<&mut FormState> {
         self.active_overlay_mut()
             .map(|overlay| overlay.form_state_mut())
+    }
+
+    pub(crate) fn overlay_entry_focus_for_test(&self) -> Option<bool> {
+        self.active_overlay()
+            .map(|overlay| overlay.focus == OverlayFocusMode::EntryTabs)
+    }
+
+    pub(crate) fn overlay_selected_entry_for_test(&self) -> Option<usize> {
+        self.active_overlay()
+            .and_then(|overlay| overlay.list_selected)
     }
 }
 

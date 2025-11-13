@@ -20,7 +20,8 @@ fn build_nested_overlay_app() -> App {
                             "routes": {
                                 "type": "array",
                                 "default": [
-                                    {"path": "/"}
+                                    {"path": "/"},
+                                    {"path": "/status"}
                                 ],
                                 "items": {
                                     "type": "object",
@@ -128,4 +129,80 @@ fn esc_pops_only_top_overlay() {
     app.handle_key_for_test(key(KeyCode::Esc, KeyModifiers::NONE))
         .expect("close overlay1");
     assert_eq!(app.overlay_depth_for_test(), 0);
+}
+
+#[test]
+fn tab_cycles_entry_strip_inside_overlay() {
+    let mut app = build_nested_overlay_app();
+    activate_service_variant(&mut app);
+    app.open_overlay_for_test();
+    {
+        let overlay_form = app
+            .active_overlay_form_state_for_test()
+            .expect("overlay form level1");
+        focus_field(overlay_form, "/routes");
+    }
+    app.open_overlay_for_test();
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+
+    app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
+        .expect("tab to entry strip");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+
+    app.handle_key_for_test(key(KeyCode::Tab, KeyModifiers::NONE))
+        .expect("tab back to fields");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+
+    app.handle_key_for_test(key(KeyCode::BackTab, KeyModifiers::SHIFT))
+        .expect("shift+tab to entry strip");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(true));
+
+    app.handle_key_for_test(key(KeyCode::BackTab, KeyModifiers::SHIFT))
+        .expect("shift+tab back to last field");
+    assert_eq!(app.overlay_entry_focus_for_test(), Some(false));
+}
+
+#[test]
+fn ctrl_arrows_manage_entries_without_closing_overlay() {
+    let mut app = build_nested_overlay_app();
+    activate_service_variant(&mut app);
+    app.open_overlay_for_test();
+    {
+        let overlay_form = app
+            .active_overlay_form_state_for_test()
+            .expect("overlay form level1");
+        focus_field(overlay_form, "/routes");
+    }
+    app.open_overlay_for_test();
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(app.overlay_selected_entry_for_test(), Some(0));
+
+    app.handle_key_for_test(key(KeyCode::Right, KeyModifiers::CONTROL))
+        .expect("ctrl+right");
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(app.overlay_selected_entry_for_test(), Some(1));
+
+    app.handle_key_for_test(key(KeyCode::Left, KeyModifiers::CONTROL))
+        .expect("ctrl+left");
+    assert_eq!(app.overlay_selected_entry_for_test(), Some(0));
+
+    app.handle_key_for_test(key(KeyCode::Left, KeyModifiers::CONTROL))
+        .expect("ctrl+left boundary");
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(app.overlay_selected_entry_for_test(), Some(0));
+
+    app.handle_key_for_test(key(KeyCode::Down, KeyModifiers::CONTROL))
+        .expect("ctrl+down reorder");
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(1),
+        "entry should move to index 1 after reorder"
+    );
+
+    app.handle_key_for_test(key(KeyCode::Up, KeyModifiers::CONTROL))
+        .expect("ctrl+up reorder back");
+    assert_eq!(app.overlay_depth_for_test(), 2);
+    assert_eq!(app.overlay_selected_entry_for_test(), Some(0));
 }

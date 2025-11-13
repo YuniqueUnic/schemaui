@@ -118,6 +118,50 @@ impl FormState {
         self.advance_focus_backward();
     }
 
+    pub fn has_focusable_fields(&self) -> bool {
+        !self.focus_positions().is_empty()
+    }
+
+    pub fn focus_is_first(&self) -> bool {
+        let positions = self.focus_positions();
+        if positions.is_empty() {
+            return false;
+        }
+        match (self.current_focus_position(), positions.first()) {
+            (Some(current), Some(first)) => current == *first,
+            _ => false,
+        }
+    }
+
+    pub fn focus_is_last(&self) -> bool {
+        let positions = self.focus_positions();
+        if positions.is_empty() {
+            return false;
+        }
+        match (self.current_focus_position(), positions.last()) {
+            (Some(current), Some(last)) => current == *last,
+            _ => false,
+        }
+    }
+
+    pub fn focus_first_field(&mut self) {
+        if let Some((root_idx, section_idx, field_idx)) = self.focus_positions().first().copied() {
+            self.root_index = root_idx;
+            self.section_index = section_idx;
+            self.field_index = field_idx;
+            self.normalize_focus();
+        }
+    }
+
+    pub fn focus_last_field(&mut self) {
+        if let Some((root_idx, section_idx, field_idx)) = self.focus_positions().last().copied() {
+            self.root_index = root_idx;
+            self.section_index = section_idx;
+            self.field_index = field_idx;
+            self.normalize_focus();
+        }
+    }
+
     pub fn advance_focus_forward(&mut self) {
         self.normalize_focus();
         if self.roots.is_empty() {
@@ -356,6 +400,32 @@ impl FormState {
         self.roots
             .iter_mut()
             .flat_map(|root| root.sections.iter_mut())
+    }
+
+    fn current_focus_position(&self) -> Option<(usize, usize, usize)> {
+        let root = self.roots.get(self.root_index)?;
+        let section = root.sections.get(self.section_index)?;
+        if section.fields.is_empty() {
+            return None;
+        }
+        let field_len = section.fields.len();
+        Some((
+            self.root_index,
+            self.section_index,
+            self.field_index.min(field_len.saturating_sub(1)),
+        ))
+    }
+
+    fn focus_positions(&self) -> Vec<(usize, usize, usize)> {
+        let mut positions = Vec::new();
+        for (root_idx, root) in self.roots.iter().enumerate() {
+            for (section_idx, section) in root.sections.iter().enumerate() {
+                for (field_idx, _field) in section.fields.iter().enumerate() {
+                    positions.push((root_idx, section_idx, field_idx));
+                }
+            }
+        }
+        positions
     }
 
     fn section_positions(&self) -> Vec<(usize, usize)> {

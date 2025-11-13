@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schema/basic-all-types.json",
+  "title": "Example Schema with All Types",
+  "type": "object",
+  "required": ["id", "name", "profile", "settings"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "User's full name"
+    },
+    "age": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 150
+    },
+    "email": {
+      "type": ["string", "null"],
+      "format": "email"
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "profile": {
+      "type": "object",
+      "required": ["address", "contacts"],
+      "properties": {
+        "nickname": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+$"
+        },
+        "address": {
+          "type": "object",
+          "properties": {
+            "country": { "type": "string" },
+            "city": { "type": "string" },
+            "zipCode": { "type": "string", "pattern": "^[0-9]{5}$" }
+          },
+          "required": ["country", "city"]
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contact"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark", "system"]
+        },
+        "notifications": {
+          "type": "object",
+          "properties": {
+            "email": { "type": "boolean" },
+            "sms": { "type": "boolean" },
+            "push": { "type": "boolean" }
+          }
+        },
+        "preferences": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/booleanPref" },
+              { "$ref": "#/$defs/rangePref" }
+            ]
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "contact": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["email", "phone"] },
+        "value": { "type": "string" }
+      },
+      "required": ["type", "value"]
+    },
+    "booleanPref": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "boolean" }
+      },
+      "required": ["key", "value"]
+    },
+    "rangePref": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      },
+      "required": ["key", "min", "max"]
+    }
+  }
+}
