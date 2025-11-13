@@ -49,14 +49,9 @@ serde_json = "1"
 serde_yaml = { version = "0.9", optional = true }
 toml = { version = "0.9", optional = true }
 
-
 [[example]]
-name = "jsonattr"
-path = "examples/jsonattr.rs"
-
-[[example]]
-name = "schemars"
-path = "examples/schemars.rs"
+name = "demo"
+path = "examples/demo.rs"
 
 
 [profile.release]

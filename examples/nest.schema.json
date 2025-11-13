@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schema/complex-nested-schema.json",
+  "title": "Complex Nested Example Schema",
+  "type": "object",
+  "description": "保持多层嵌套和数组结构，移除条件选择器",
+  "properties": {
+    "a": {
+      "type": "object",
+      "description": "简单基础类型集合",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "age": { "type": "integer", "minimum": 0 },
+        "isActive": { "type": "boolean", "default": true },
+        "score": { "type": "number", "minimum": 0, "maximum": 100 },
+        "email": { "type": "string", "format": "email" },
+        "notes": { "type": ["string", "null"] }
+      },
+      "required": ["name"]
+    },
+
+    "b": {
+      "type": "object",
+      "description": "数组与二层嵌套结构",
+      "properties": {
+        "b1": {
+          "type": "array",
+          "description": "对象数组，包含标签和属性嵌套",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "tags": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "uniqueItems": true,
+                "minItems": 0
+              },
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "key": { "type": "string", "minLength": 1 },
+                  "values": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "required": ["key"]
+              }
+            },
+            "required": ["id"]
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["b1"]
+    },
+
+    "c": {
+      "type": "object",
+      "description": "三层深度嵌套结构 (c.c1.c2)",
+      "properties": {
+        "c1": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "c2": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "mode": { "enum": ["auto", "manual", "off"] },
+                "thresholds": {
+                  "type": "array",
+                  "items": { "type": "number", "minimum": 0, "maximum": 100 },
+                  "minItems": 3,
+                  "maxItems": 5,
+                  "uniqueItems": true
+                },
+                "details": {
+                  "type": "object",
+                  "properties": {
+                    "info": { "type": "string", "minLength": 1 },
+                    "timestamp": { "type": "string", "format": "date-time" }
+                  },
+                  "required": ["info"]
+                }
+              },
+              "required": ["enabled", "mode"]
+            }
+          },
+          "required": ["c2"]
+        }
+      },
+      "required": ["c1"]
+    },
+
+    "d": {
+      "type": "object",
+      "description": "四层深度嵌套结构 (d.d1.d2.d3)",
+      "properties": {
+        "d1": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "d2": {
+              "type": "object",
+              "properties": {
+                "meta": {
+                  "type": "object",
+                  "properties": {
+                    "createdBy": { "type": "string", "minLength": 1 },
+                    "createdAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": ["createdBy", "createdAt"]
+                },
+                "d3": {
+                  "type": "object",
+                  "description": "最深层配置对象",
+                  "properties": {
+                    "config": {
+                      "type": "object",
+                      "properties": {
+                        "name": { "type": "string", "minLength": 1 },
+                        "retryCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10,
+                          "default": 3
+                        },
+                        "timeout": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 300
+                        },
+                        "advanced": {
+                          "type": "object",
+                          "description": "替代oneOf的明确类型字段",
+                          "properties": {
+                            "stringValue": { "type": "string" },
+                            "integerValue": { "type": "integer" },
+                            "booleanValue": { "type": "boolean" },
+                            "targets": {
+                              "type": "array",
+                              "items": { "$ref": "#/$defs/target" },
+                              "minItems": 1,
+                              "uniqueItems": true
+                            }
+                          }
+                        }
+                      },
+                      "required": ["name"]
+                    }
+                  },
+                  "required": ["config"]
+                }
+              },
+              "required": ["meta", "d3"]
+            }
+          },
+          "required": ["id", "d2"]
+        }
+      },
+      "required": ["d1"]
+    }
+  },
+  "required": ["a", "b", "c", "d"],
+
+  "$defs": {
+    "target": {
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "priority": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "active": { "type": "boolean", "default": true }
+      },
+      "required": ["url"]
+    }
+  }
+}

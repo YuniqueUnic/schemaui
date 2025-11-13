@@ -1,0 +1,408 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schema/complex-v5-schema.json",
+    "title": "Ultra Complex JSON Schema (5-level nested)",
+    "type": "object",
+    "description": "A deeply nested schema that demonstrates advanced JSON Schema features (refs, allOf, anyOf, oneOf).",
+    "properties": {
+        "a": {
+            "type": "object",
+            "description": "Simple root object with primitives",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "inactive",
+                        "pending"
+                    ]
+                },
+                "age": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "rating": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 5
+                },
+                "email": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "format": "email"
+                },
+                "flags": {
+                    "type": "array",
+                    "items": {
+                        "type": "boolean"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                }
+            },
+            "required": [
+                "name",
+                "status"
+            ]
+        },
+        "b": {
+            "type": "object",
+            "description": "Array of objects with oneOf type variation",
+            "properties": {
+                "b1": {
+                    "type": "array",
+                    "items": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/$defs/simpleItem"
+                            },
+                            {
+                                "$ref": "#/$defs/numericItem"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "c": {
+            "type": "object",
+            "description": "3-level nested (c.c1.c2) with allOf / anyOf usage",
+            "properties": {
+                "c1": {
+                    "type": "object",
+                    "properties": {
+                        "description": {
+                            "type": "string"
+                        },
+                        "c2": {
+                            "type": "object",
+                            "properties": {
+                                "mode": {
+                                    "type": "string",
+                                    "enum": [
+                                        "auto",
+                                        "manual"
+                                    ]
+                                },
+                                "settings": {
+                                    "type": "object",
+                                    "allOf": [
+                                        {
+                                            "properties": {
+                                                "enabled": {
+                                                    "type": "boolean"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "properties": {
+                                                "threshold": {
+                                                    "type": "integer",
+                                                    "minimum": 1,
+                                                    "maximum": 10
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                "options": {
+                                    "anyOf": [
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "mode"
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "d": {
+            "type": "object",
+            "description": "4-level nested (d.d1.d2.d3) with allOf composition",
+            "properties": {
+                "d1": {
+                    "type": "object",
+                    "properties": {
+                        "uuid": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "d2": {
+                            "type": "object",
+                            "properties": {
+                                "metadata": {
+                                    "$ref": "#/$defs/metadata"
+                                },
+                                "d3": {
+                                    "allOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "config": {
+                                                    "$ref": "#/$defs/configBase"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "overrides": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "debug": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "level": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "low",
+                                                                "medium",
+                                                                "high"
+                                                            ]
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "metadata",
+                                "d3"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "uuid",
+                        "d2"
+                    ]
+                }
+            }
+        },
+        "e": {
+            "type": "object",
+            "description": "5-level nested structure (e.e1.e2.e3.e4)",
+            "properties": {
+                "e1": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string"
+                        },
+                        "e2": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "e3": {
+                                    "type": "object",
+                                    "properties": {
+                                        "info": {
+                                            "type": "string"
+                                        },
+                                        "e4": {
+                                            "type": "object",
+                                            "properties": {
+                                                "summary": {
+                                                    "type": "string",
+                                                    "pattern": "^[A-Za-z0-9_ ]+$"
+                                                },
+                                                "deepItems": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "anyOf": [
+                                                            {
+                                                                "$ref": "#/$defs/target"
+                                                            },
+                                                            {
+                                                                "type": "string"
+                                                            },
+                                                            {
+                                                                "type": "integer"
+                                                            }
+                                                        ]
+                                                    },
+                                                    "minItems": 2
+                                                },
+                                                "logic": {
+                                                    "oneOf": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "type": {
+                                                                    "const": "fixed"
+                                                                },
+                                                                "value": {
+                                                                    "type": "number"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "type",
+                                                                "value"
+                                                            ]
+                                                        },
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "type": {
+                                                                    "const": "dynamic"
+                                                                },
+                                                                "expression": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "type",
+                                                                "expression"
+                                                            ]
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "required": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+    ],
+    "$defs": {
+        "simpleItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "id"
+            ]
+        },
+        "numericItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "values": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                }
+            },
+            "required": [
+                "id"
+            ]
+        },
+        "metadata": {
+            "type": "object",
+            "properties": {
+                "createdBy": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "labels": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "uniqueItems": true
+                }
+            }
+        },
+        "configBase": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "key"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "name"
+            ]
+        },
+        "target": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "format": "uri"
+                },
+                "priority": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                },
+                "active": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "url"
+            ]
+        }
+    }
+}

@@ -1,9 +1,6 @@
-use schemaui::SchemaUI;
 use serde_json::json;
 
-type ExampleResult<T> = Result<T, Box<dyn std::error::Error>>;
-
-fn main() -> ExampleResult<()> {
+fn main() -> anyhow::Result<()> {
     let schema = json!({
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "Service Config",
@@ -41,11 +38,21 @@ fn main() -> ExampleResult<()> {
                 "type": "boolean",
                 "description": "Expose service publicly",
                 "default": false
+            },
+            "tags": {
+                "type": "array",
+                "description": "Service tags",
+                "items": { "type": "string" }
             }
         }
     });
 
-    SchemaUI::new(schema).with_title("SchemaUI Example").run()?;
+    let options = schemaui::UiOptions::default();
+    let result = schemaui::SchemaUI::new(schema)
+        .with_options(options)
+        .run()?;
 
+    let json = serde_json::to_string_pretty(&result)?;
+    println!("{}", json);
     Ok(())
 }
