@@ -138,7 +138,9 @@ impl CompositeListState {
     pub fn add_entry(&mut self) -> usize {
         let entry_pointer = format!("{}/entry_{}", self.pointer, self.counter);
         self.counter += 1;
-        let state = CompositeState::new(&entry_pointer, &self.template, Arc::clone(&self.palette));
+        let mut state =
+            CompositeState::new(&entry_pointer, &self.template, Arc::clone(&self.palette));
+        state.ensure_editable_variant();
         self.entries.push(CompositeListEntry {
             pointer: entry_pointer,
             state,
@@ -195,6 +197,16 @@ impl CompositeListState {
             pointer: self.pointer.clone(),
             message: "no entry selected".to_string(),
         })?;
+        {
+            let entry = self
+                .entries
+                .get_mut(idx)
+                .ok_or_else(|| FieldCoercionError {
+                    pointer: self.pointer.clone(),
+                    message: "invalid entry selection".to_string(),
+                })?;
+            entry.state.ensure_editable_variant();
+        }
         let entry = self.entries.get(idx).ok_or_else(|| FieldCoercionError {
             pointer: self.pointer.clone(),
             message: "invalid entry selection".to_string(),
@@ -242,6 +254,7 @@ impl CompositeListState {
             let mut state =
                 CompositeState::new(&pointer, &self.template, Arc::clone(&self.palette));
             let _ = state.seed_from_value(item);
+            state.ensure_editable_variant();
             self.entries.push(CompositeListEntry { pointer, state });
         }
         self.counter = self.entries.len();
@@ -413,6 +426,24 @@ impl CompositeState {
             return false;
         }
         self.apply_single(next as usize)
+    }
+
+    pub fn ensure_editable_variant(&mut self) {
+        if self.variants.is_empty() {
+            return;
+        }
+        if self.active_indices().is_empty() {
+            match self.mode {
+                CompositeMode::OneOf => {
+                    let _ = self.apply_single(0);
+                }
+                CompositeMode::AnyOf => {
+                    if let Some(first) = self.variants.first_mut() {
+                        first.active = true;
+                    }
+                }
+            }
+        }
     }
 
     pub fn take_editor_session(

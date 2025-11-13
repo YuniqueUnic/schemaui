@@ -1,0 +1,94 @@
+我希望的 field 的 TUI 界面设计如下：
+----------------
+name *:                 <- 这里显示的是 field 的 name 和一些状态信息 (required, ·dirty, 等) (info_line)
+[ content ]             <- 这里显示的是 field 的 content (value_line) 【内容过多时，应该正确的计算宽度，并且 wrap】(textwrap)
+type | description      <- 这里显示的是 field 的 type 和 description 等 (meta_line) 【内容过多时，应该正确的计算宽度，并且 wrap】(textwrap)
+     # inline              <- 这里显示的是 field 的 inline 信息，比如一些复合类型，多选类型，在用户选中该 field 时，就会显示 inline 信息，展示当前选项有的更多信息。(如果数量很多，那么就展示部分，如果一般的话，那么就展示全部)
+error_msg               <- 这里显示的是 validate 的错误信息 (msg_line) 【内容过多时，应该正确的计算宽度，并且 wrap】(textwrap)
+----------------
+
+schemaui 的整体界面 TUI 设计：
+---------------------------------------------------------------------
+| [general] | dataPlane | website | docs | xxxx | xxxxxxxxxx | xxx<<|  <- root sections ([xx] 表示当前被选中的 section，并且需要正确计算宽度，当 sections 过宽时，应该滚动显示)
+---------------------------------------------------------------------
+| [child section1] | child section2 | child section3 | child sect<< |  <-- child sections ( [xx] 显示当前被选中的 child section，宽度应该正确计算，当 sections 过宽时，应该滚动显示)
+---------------------------------------------------------------------       当然，child section 也可能还有其 child sections，所以需要递归处理。
+|  ----------------                                                 |
+|  name *:                 -|                                       |
+|  [ content ]              |                                       |   root sections 是 json schema 的 $.object 类型中解析得到。也就是 json schema 中根节点中 nested 的第一级 object，
+|  type | description       | 这就应该算一个 field                  |   只要是在 root 中不能够被直接展示的基本类型，那么就应该算是 child section。
+|  error_msg               -|                                       |   child section 的 child section，应该和 root section 一样处理。
+|  ----------------                                                 |
+|  name *: ·dirty                                                   |   field 应该渲染至对应的 section(child section) 中
+|  [ content ]                                                      |
+|  type | description                                               |   用户可以使用 tab 键，将光标移动到下一个 field 中。也可以使用 shift + tab 键，将光标移动到上一个 field 中。
+|  error_msg                                                        |   当 child section 中的 fields 遍历完毕之后，那么 tab 键应该跳转到下一个 child section/root section 中。
+|  ----------------                                                 |   当 child sections 遍历完毕之后，那么 tab 键应该跳转到下一个 root section 中。
+|                                                                   |   shift + tab 键功能和 tab 键功能正好相反。
+|                                                                   |
+|                                                                   |   field -> fields -> child section -> child sections -> root section -> child section -> field
+|                                                                   |     |                            tab 循环遍历流程                                          |
+|                                                                   |     ----------------------------------------------------------------------------------------
+---------------------------------------------------------------------
+快捷键说明栏：                                                           <- action bar(用于动态展示当前界面/控件的快捷键)
+---------------------------------------------------------------------
+状态栏：                                                                 <- status bar(用于动态展示当前系统/界面/控件的状态)
+---------------------------------------------------------------------
+
+---
+
+pop up overlay 设计：
+
+--------------------------------------------------------------------------------------  <-这是 main page
+|         顶栏 (用于增加/删除，调整 entries 的顺序)                                  |
+|             v                                                v-这是 popup overlay  |  overlay 也应是包含一个顶栏 entries
+|          |===========|==================================================|          |  这个 entries 则是对应的是多个元素的意思
+|          | [entry 1] | entry 2 | entry 3 | entry 4 | entry 5 | entryx<< |          |  通过快捷键 Ctrl + N 新增添加一个 entry，Ctrl + D 删除一个 entry
+|          |-----------|--------------------------------------------------|          |  然后使用 Ctrl + <-/-> 来调整当前选中的 entry 的顺序
+|          | [child section 1] | child sec 2 | child sec 3 |  child sec<< |          |  然后 依旧使用 tab，shift+tab 来实现 entry -> child section -> fields -> child sections -> fields -> entry 的逻辑切换
+|          |-----------|--------------------------------------------------|          |  只是将 root sections 变成了 entries。
+|          | name *:                                                      |          |  通过这样的渲染逻辑，就能实现 array 中也包含嵌套的 object 的逻辑
+|          | [ content ]                                                  |          |
+|          | type | description     field 渲染逻辑和                      |          |
+|          | error_msg              mainpage 一致                         |          |
+|          | ----------------                                             |          |
+|          | ...                                                          |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |                                                              |          |
+|          |==============================================================|          |
+|                                                                                    |
+--------------------------------------------------------------------------------------
+
+这样的设计就可以应对 嵌套的 json schema，通过将嵌套的 object 等嵌套类型映射为 child section，然后递归处理。
+最终的一般类型则会被渲染为 fields。
+
+而类似数组这样的包含多个内容的类型，则是采用 overlay 模式进行展示和渲染。
+
+- oneOf 的 tui 展示逻辑应该是类似 enum, 支持用户在 field 阶段使用 <-/-> 切换要选择的 one. 然后再使用 ctrl+E 进入 overlay1 编辑模式。
+- anyof 的 tui 展示逻辑应该是让用户使用 ctrl+E 进入 overlay1 模式，然后 entry 的 第一个 field 显示为 oneof,
+  让用户使用 <-/-> 选择 anyof 的 one. 然后用户确认了之后，就可以再使用 ctrl+E 进入 overlay2 编辑模式。
+  然后用户回到 overlay1, 可以使用 ctrl+N 添加一个 entry2, 然后再对 entry2 的 field 进行 oneof 的选择，然后使用 ctrl+E 进入 overlay2 编辑模式。
+  因为 anyof 的实际是一个 数组[],对吧。
+- allof 那就很简单了，就是让用户 ctrl+E 进入 overlay1 模式，然后再以此的对对应的 field 进行解析，展示。
+
+
+很多类型都已经提取为呢 component, 做成呢组件化的设计。为什么现在还是不能递归的解析 json schema, 然后根据
+对应的 json type 来递归渲染对应的 ui 组件呢？??
+
+我理解的是，json schema 的类型只有那么几种。并且我们也处理了 allof. oneof. anyof. 以及各个的数组状态。
+1. 那么在遇到 普通类型时，可以直接渲染 ui 的类型时，则是按照 field 进行渲染。
+2. 遇到了数组类型，那么就需要一个 overlay 来实现数组操作。
+3, 如果遇到 composite(allof/oneof/anyof) 类型，则也需要一个 overlay 来实现 composite 操作。
+    - 并且 allof 可以看作是一个嵌套的 json 类型。
+    - oneof 则先是一个单选的 enum, 用户选择之后，就是一个 json 类型了。
+    - anyof 则是一个多选的 enum, 用户选择之后，就是一个 json 类型了。
+4. 遇到多选，那么采用多选的控件，让用户多选之后，就时一个 json, 然后再使用 overlay 来处理就好了。
+
+所以上面说的 4 条规则，就已经完成了 json schema 各个情况的映射，完成了递归的解析和映射..

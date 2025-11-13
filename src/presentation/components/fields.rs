@@ -157,15 +157,15 @@ struct CursorHint {
 fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> FieldRender {
     let mut lines = Vec::new();
     lines.push(info_line(field, is_selected));
-
-    if is_selected && let Some(selector_lines) = composite_selector_lines(field) {
-        lines.extend(selector_lines);
-    }
-
     let (value_panel, cursor_hint) = value_panel_lines(field, is_selected, max_width);
     lines.extend(value_panel);
+    lines.extend(meta_lines(field, is_selected, max_width));
 
     if is_selected {
+        if let Some(selector_lines) = composite_selector_lines(field) {
+            lines.extend(selector_lines);
+        }
+
         if let Some(summary) = composite_summary_lines(field) {
             lines.extend(summary);
         }
@@ -174,8 +174,6 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
             lines.extend(summary);
         }
     }
-
-    lines.extend(meta_lines(field, is_selected, max_width));
 
     if let Some(error) = error_lines(field, max_width) {
         lines.extend(error);
