@@ -107,7 +107,6 @@ pub fn render_fields(
         );
         if caret_line <= max_visible {
             let inner_y = field_area.y.saturating_add(2);
-            let inner_x = field_area.x.saturating_add(1);
             #[cfg(feature = "debug")]
             println!(
                 "[cursor-debug-xy] inner_y={} caret_line={} cursor_y={}",
@@ -116,10 +115,7 @@ pub fn render_fields(
                 inner_y + caret_line as u16
             );
             let cursor_y = inner_y.saturating_add(caret_line as u16);
-            let cursor_x = inner_x
-                .saturating_add(cursor.prefix_width)
-                .saturating_add(highlight_symbol_width())
-                .saturating_add(cursor.value_width);
+            let cursor_x = field_area.x.saturating_add(cursor.column_offset);
             frame.set_cursor_position((cursor_x, cursor_y));
         }
     }
@@ -142,6 +138,7 @@ const VALUE_BORDER_PREFIX: &str = "│ ";
 const VALUE_BORDER_SUFFIX: &str = " │";
 const HIGHLIGHT_SYMBOL: &str = "» ";
 const GUTTER_PADDING: u16 = 0;
+const LIST_BORDER_OFFSET: u16 = 1;
 
 fn highlight_symbol_width() -> u16 {
     UnicodeWidthStr::width(HIGHLIGHT_SYMBOL) as u16
@@ -154,8 +151,7 @@ struct FieldRender {
 
 struct CursorHint {
     line_in_field: usize,
-    value_width: u16,
-    prefix_width: u16,
+    column_offset: u16,
 }
 
 fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> FieldRender {
@@ -278,10 +274,15 @@ fn value_panel_lines(
         if caret_width > inner_width {
             caret_width = inner_width;
         }
+        let prefix_width = UnicodeWidthStr::width(VALUE_BORDER_PREFIX) as u16 + GUTTER_PADDING;
+        let highlight_width = highlight_symbol_width();
+        let column_offset = LIST_BORDER_OFFSET
+            .saturating_add(highlight_width)
+            .saturating_add(prefix_width)
+            .saturating_add(caret_width as u16);
         cursor_hint = Some(CursorHint {
             line_in_field: caret_line,
-            value_width: caret_width as u16,
-            prefix_width: UnicodeWidthStr::width(VALUE_BORDER_PREFIX) as u16 + GUTTER_PADDING,
+            column_offset,
         });
     } else {
         for segment in wrapped_value {
@@ -324,11 +325,7 @@ pub(crate) fn meta_lines(
         Style::default().fg(Color::DarkGray)
     };
 
-    let width = max_width.max(4) as usize;
-    wrap_preserving_spaces(&content, width)
-        .into_iter()
-        .map(|line| Line::from(Span::styled(format!("  {}", line), style)))
-        .collect()
+    wrap_with_prefix(&content, "  ", max_width, style, style)
 }
 
 fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>> {
@@ -338,12 +335,14 @@ fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>>
             "  Error:",
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )));
-        for line in wrap_preserving_spaces(message, max_width.max(4) as usize) {
-            lines.push(Line::from(Span::styled(
-                format!("    {}", line),
-                Style::default().fg(Color::Red),
-            )));
-        }
+        let error_style = Style::default().fg(Color::Red);
+        lines.extend(wrap_with_prefix(
+            message,
+            "    ",
+            max_width,
+            error_style,
+            error_style,
+        ));
         lines
     })
 }
@@ -535,4 +534,71 @@ fn wrap_preserving_spaces(text: &str, width: usize) -> Vec<String> {
         lines.push(String::new());
     }
     lines
+}
+
+fn wrap_with_prefix(
+    text: &str,
+    prefix: &str,
+    max_width: u16,
+    prefix_style: Style,
+    content_style: Style,
+) -> Vec<Line<'static>> {
+    let prefix_width = UnicodeWidthStr::width(prefix) as u16;
+    let available = max_width.saturating_sub(prefix_width).max(1) as usize;
+    wrap_preserving_spaces(text, available)
+        .into_iter()
+        .map(|segment| {
+            Line::from(vec![
+                Span::styled(prefix.to_string(), prefix_style),
+                Span::styled(segment, content_style),
+            ])
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{FieldKind, FieldSchema};
+    use crate::form::FieldState;
+    use serde_json::Value;
+
+    fn field_with_value(value: &str) -> FieldState {
+        FieldState::from_schema(FieldSchema {
+            name: "unicode".into(),
+            path: vec!["unicode".into()],
+            pointer: "/unicode".into(),
+            title: "Unicode".into(),
+            description: None,
+            section_id: "sec".into(),
+            kind: FieldKind::String,
+            required: false,
+            default: Some(Value::String(value.to_string())),
+            metadata: Default::default(),
+        })
+    }
+
+    #[test]
+    fn wrap_preserving_spaces_keeps_wide_characters() {
+        let wrapped = wrap_preserving_spaces("宽度🙂", 4);
+        assert_eq!(wrapped, vec!["宽度".to_string(), "🙂".to_string()]);
+    }
+
+    #[test]
+    fn cursor_hint_includes_border_and_highlight_width() {
+        let field = field_with_value("汉字");
+        let render = build_field_render(&field, true, 10);
+        let hint = render
+            .cursor_hint
+            .expect("cursor hint present for selected field");
+        let highlight = highlight_symbol_width();
+        let prefix = UnicodeWidthStr::width(VALUE_BORDER_PREFIX) as u16 + GUTTER_PADDING;
+        let value_width = UnicodeWidthStr::width("汉字") as u16;
+        let expected = LIST_BORDER_OFFSET + highlight + prefix + value_width;
+        assert_eq!(hint.column_offset, expected);
+        assert!(
+            hint.line_in_field > 0,
+            "cursor line should point to value content"
+        );
+    }
 }

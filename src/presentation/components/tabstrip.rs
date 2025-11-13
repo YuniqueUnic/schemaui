@@ -2,7 +2,7 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, Tabs},
 };
 use unicode_width::UnicodeWidthStr;
@@ -25,25 +25,33 @@ pub(crate) fn render_tab_strip(
     let clamped_selected = selected.min(total.saturating_sub(1));
     let available = area.width.saturating_sub(2) as usize; // borders consume 2 columns
     let window = compute_visible_window(&labels, clamped_selected, available);
+
+    let indicator_style = Style::default().fg(Color::DarkGray);
     let mut visible = Vec::new();
-    for (idx, label) in labels[window.start..window.end].iter().enumerate() {
-        let absolute_index = window.start + idx;
-        let mut rendered = if absolute_index == clamped_selected {
-            format!("[{}]", label.text)
+    for (offset, label) in labels[window.start..window.end].iter().enumerate() {
+        let absolute_index = window.start + offset;
+        let mut spans = Vec::new();
+
+        if window.left_overflow && absolute_index == window.start {
+            spans.push(Span::styled(format!("{LEFT_CHEVRON} "), indicator_style));
         } else {
-            format!(" {} ", label.text)
-        };
-        if absolute_index == window.start && window.left_overflow {
-            rendered = format!("≫ {}", rendered.trim_start());
+            spans.push(Span::raw(" ".to_string()));
         }
-        if absolute_index == window.end - 1 && window.right_overflow {
-            rendered = format!("{} ≪", rendered.trim_end());
+
+        spans.push(Span::raw(label.text.clone()));
+
+        if window.right_overflow && absolute_index == window.end.saturating_sub(1) {
+            spans.push(Span::styled(format!(" {RIGHT_CHEVRON}"), indicator_style));
+        } else {
+            spans.push(Span::raw(" ".to_string()));
         }
-        visible.push(Line::from(rendered));
+
+        visible.push(Line::from(spans));
     }
+
     let tabs = Tabs::new(visible)
         .block(Block::default().title(label).borders(Borders::ALL))
-        .select(clamped_selected.saturating_sub(window.start))
+        .select(window.selected_offset)
         .style(Style::default().fg(Color::Gray))
         .highlight_style(
             Style::default()
@@ -67,11 +75,14 @@ impl TabLabel {
 }
 
 const TAB_EXTRA_PADDING: usize = 2;
+const LEFT_CHEVRON: &str = "≪";
+const RIGHT_CHEVRON: &str = "≫";
 
 #[derive(Debug, Clone, Copy)]
 struct TabWindow {
     start: usize,
     end: usize,
+    selected_offset: usize,
     left_overflow: bool,
     right_overflow: bool,
 }
@@ -81,65 +92,80 @@ fn compute_visible_window(labels: &[TabLabel], selected: usize, available: usize
         return TabWindow {
             start: 0,
             end: 0,
+            selected_offset: 0,
             left_overflow: false,
             right_overflow: false,
         };
     }
+    let selected = selected.min(labels.len() - 1);
     if available == 0 {
         return TabWindow {
             start: selected,
             end: selected + 1,
+            selected_offset: 0,
             left_overflow: selected > 0,
             right_overflow: selected + 1 < labels.len(),
         };
     }
-    let mut start = 0usize;
-    let mut end = 0usize;
-    let mut total_width = 0usize;
-    while end < labels.len() {
-        let next = labels[end].width;
-        if end > start && total_width + next > available {
-            break;
-        }
-        total_width += next;
-        end += 1;
-    }
-    if end == 0 {
-        end = 1;
-    }
-    while selected >= end {
-        total_width = total_width.saturating_sub(labels[start].width);
-        start += 1;
+
+    let mut best: Option<(usize, usize, usize, TabWindow)> = None;
+    for start in 0..=selected {
+        let mut end = start;
+        let mut width = 0usize;
         while end < labels.len() {
-            let next = labels[end].width;
-            if total_width + next > available {
+            let label_width = labels[end].width;
+            if end > start && width + label_width > available {
                 break;
             }
-            total_width += next;
+            width += label_width;
             end += 1;
         }
-        if end - start == 0 {
+        if end == start {
             end = start + 1;
-            break;
         }
-    }
-    while selected < start {
-        start = start.saturating_sub(1);
-        total_width += labels[start].width;
-        while total_width > available && end > start + 1 {
-            end -= 1;
-            total_width = total_width.saturating_sub(labels[end].width);
+        if !(start <= selected && selected < end) {
+            continue;
         }
+        let visible_count = end - start;
+        let selected_offset = selected - start;
+        let double_selected = selected_offset * 2;
+        let double_center = visible_count.saturating_sub(1);
+        let center_distance = if double_selected > double_center {
+            double_selected - double_center
+        } else {
+            double_center - double_selected
+        };
+        let window = TabWindow {
+            start,
+            end,
+            selected_offset,
+            left_overflow: start > 0,
+            right_overflow: end < labels.len(),
+        };
+        best = Some(match best {
+            None => (center_distance, visible_count, start, window),
+            Some((best_dist, best_count, best_start, best_window)) => {
+                if center_distance < best_dist
+                    || (center_distance == best_dist && visible_count > best_count)
+                    || (center_distance == best_dist
+                        && visible_count == best_count
+                        && start < best_start)
+                {
+                    (center_distance, visible_count, start, window)
+                } else {
+                    (best_dist, best_count, best_start, best_window)
+                }
+            }
+        });
     }
-    if end <= start {
-        end = start + 1;
-    }
-    TabWindow {
-        start,
-        end,
-        left_overflow: start > 0,
-        right_overflow: end < labels.len(),
-    }
+
+    best.map(|(_, _, _, window)| window).unwrap_or(TabWindow {
+        start: selected,
+        end: selected + 1,
+        selected_offset: 0,
+        left_overflow: selected > 0,
+        right_overflow: selected + 1 < labels.len(),
+    })
 }
 
 #[cfg(test)]
@@ -158,6 +184,7 @@ mod tests {
         assert!(window.start <= 2 && window.end > 2);
         assert!(window.left_overflow);
         assert!(window.end <= labels.len());
+        assert_eq!(window.selected_offset, 2 - window.start);
     }
 
     #[test]
@@ -167,5 +194,27 @@ mod tests {
         assert_eq!(window.start, 1);
         assert_eq!(window.end, 2);
         assert!(window.left_overflow);
+        assert_eq!(window.selected_offset, 0);
+    }
+
+    #[test]
+    fn window_prefers_center_when_space_allows() {
+        let labels = vec![
+            TabLabel::new("alpha".into()),
+            TabLabel::new("beta".into()),
+            TabLabel::new("gamma".into()),
+            TabLabel::new("delta".into()),
+            TabLabel::new("epsilon".into()),
+        ];
+        let window = compute_visible_window(&labels, 3, 16);
+        assert_eq!(
+            window.start, 2,
+            "window should scroll just enough to keep selection visible"
+        );
+        assert_eq!(
+            window.end, 4,
+            "window should include selected and keep width constraints"
+        );
+        assert_eq!(window.selected_offset, 3 - window.start);
     }
 }
