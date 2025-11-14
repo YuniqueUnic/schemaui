@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use crate::{
-    domain::{CompositeMode, FieldKind},
+    domain::{CompositeMode, FieldKind, FormSchema, FormSection},
     form::{FormState, field::components::ComponentKind},
     schema::{
         blueprint::{build_ui_blueprint, form_schema_blueprint},
@@ -109,6 +109,20 @@ fn complex_schema_blueprint_exposes_anyof_variants() {
 }
 
 #[test]
+fn complex_blueprint_preserves_field_order() {
+    let schema = complex_schema();
+    let form = build_form_schema(&schema).expect("schema parsed");
+    let blueprint = form_schema_blueprint(&form);
+
+    let form_order = collect_form_field_names(&form);
+    let blueprint_order = collect_blueprint_field_names(&blueprint);
+    assert_eq!(
+        blueprint_order, form_order,
+        "blueprint should preserve the original form field ordering"
+    );
+}
+
+#[test]
 fn complex_schema_forms_expose_component_kinds() {
     let schema = complex_schema();
     let form = build_form_schema(&schema).expect("schema parsed");
@@ -184,4 +198,52 @@ fn find_field_in_sections<'a>(sections: &'a Value, name: &str) -> Option<&'a Val
         }
     }
     None
+}
+
+fn collect_form_field_names(form: &FormSchema) -> Vec<String> {
+    let mut names = Vec::new();
+    for root in &form.roots {
+        for section in &root.sections {
+            collect_section_field_names(section, &mut names);
+        }
+    }
+    names
+}
+
+fn collect_section_field_names(section: &FormSection, out: &mut Vec<String>) {
+    for field in &section.fields {
+        out.push(field.name.clone());
+    }
+    for child in &section.children {
+        collect_section_field_names(child, out);
+    }
+}
+
+fn collect_blueprint_field_names(blueprint: &Value) -> Vec<String> {
+    let mut names = Vec::new();
+    if let Some(roots) = blueprint.get("roots").and_then(Value::as_array) {
+        for root in roots {
+            if let Some(sections) = root.get("sections") {
+                collect_blueprint_field_names_in_sections(sections, &mut names);
+            }
+        }
+    }
+    names
+}
+
+fn collect_blueprint_field_names_in_sections(sections: &Value, out: &mut Vec<String>) {
+    if let Some(items) = sections.as_array() {
+        for section in items {
+            if let Some(fields) = section.get("fields").and_then(Value::as_array) {
+                for field in fields {
+                    if let Some(name) = field.get("name").and_then(Value::as_str) {
+                        out.push(name.to_string());
+                    }
+                }
+            }
+            if let Some(children) = section.get("children") {
+                collect_blueprint_field_names_in_sections(children, out);
+            }
+        }
+    }
 }

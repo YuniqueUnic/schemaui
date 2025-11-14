@@ -50,12 +50,13 @@ pub fn render_composite_overlay(
 
     let mut next = 0usize;
     if let Some(entries) = &overlay.list_entries {
+        let label = overlay.entry_label.as_deref().unwrap_or("Entries");
         render_tab_strip(
             frame,
             layout[next],
             entries,
             overlay.list_selected.unwrap_or(0),
-            "Entries",
+            label,
         );
         next += 1;
     }

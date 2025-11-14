@@ -63,6 +63,10 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
         None
     }
 
+    fn composite_entry_selector(&self) -> Option<CompositeSelectorView> {
+        None
+    }
+
     fn composite_summaries(&self) -> Option<Vec<crate::form::composite::CompositeVariantSummary>> {
         None
     }

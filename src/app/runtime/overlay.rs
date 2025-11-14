@@ -4,7 +4,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use jsonschema::{Validator, validator_for};
 
-use crate::form::field::components::helpers::OverlayContext;
+use crate::form::field::components::{CompositeSelectorView, helpers::OverlayContext};
 use crate::{
     app::keymap::KeymapContext,
     domain::{CompositeMode, FieldKind},
@@ -17,19 +17,39 @@ use crate::{
 use super::super::input::{AppCommand, CommandDispatch};
 use super::{App, PopupOwner};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EntryTabsKind {
+    Entries,
+    Variants,
+}
+
 #[derive(Debug, Clone)]
 struct EntryTabsStore {
     entries: Vec<String>,
+    ids: Vec<usize>,
     selected: usize,
+    kind: EntryTabsKind,
 }
 
 impl EntryTabsStore {
     fn new(entries: Vec<String>, selected: usize) -> Self {
+        let ids = (0..entries.len()).collect();
+        Self::with_kind(entries, ids, selected, EntryTabsKind::Entries)
+    }
+
+    fn with_kind(
+        entries: Vec<String>,
+        ids: Vec<usize>,
+        selected_id: usize,
+        kind: EntryTabsKind,
+    ) -> Self {
         let mut store = Self {
             entries,
+            ids,
             selected: 0,
+            kind,
         };
-        store.select(selected);
+        store.select_by_id(selected_id);
         store
     }
 
@@ -49,6 +69,14 @@ impl EntryTabsStore {
         self.selected
     }
 
+    fn selected_id(&self) -> Option<usize> {
+        self.ids.get(self.selected).copied()
+    }
+
+    fn kind(&self) -> EntryTabsKind {
+        self.kind
+    }
+
     fn select(&mut self, index: usize) {
         if self.entries.is_empty() {
             self.selected = 0;
@@ -58,8 +86,25 @@ impl EntryTabsStore {
     }
 
     fn set_entries(&mut self, entries: Vec<String>, selected: usize) {
+        self.ids = (0..entries.len()).collect();
         self.entries = entries;
+        self.kind = EntryTabsKind::Entries;
         self.select(selected);
+    }
+
+    fn set_entries_with_ids(&mut self, entries: Vec<String>, ids: Vec<usize>, selected_id: usize) {
+        self.entries = entries;
+        self.ids = ids;
+        self.kind = EntryTabsKind::Variants;
+        self.select_by_id(selected_id);
+    }
+
+    fn select_by_id(&mut self, id: usize) {
+        if let Some(pos) = self.ids.iter().position(|candidate| *candidate == id) {
+            self.select(pos);
+        } else {
+            self.select(0);
+        }
     }
 
     #[allow(dead_code)]
@@ -86,6 +131,7 @@ struct OverlayStore {
     display_description: Option<String>,
     instructions: String,
     entry_tabs: Option<EntryTabsStore>,
+    entry_label: Option<String>,
     focus: OverlayFocusMode,
 }
 
@@ -197,7 +243,31 @@ impl OverlayState {
     }
 
     fn session(&self) -> &OverlaySession {
+        if matches!(self.session, OverlaySession::Detached) {
+            panic!("overlay session detached")
+        }
         &self.session
+    }
+
+    fn take_composite_session(&mut self) -> Option<CompositeEditorSession> {
+        match std::mem::replace(&mut self.session, OverlaySession::Detached) {
+            OverlaySession::Composite(session) => Some(session),
+            other => {
+                self.session = other;
+                None
+            }
+        }
+    }
+
+    fn replace_composite_session(&mut self, session: CompositeEditorSession) {
+        self.session = OverlaySession::Composite(session);
+    }
+
+    fn current_variant_index(&self) -> Option<usize> {
+        match &self.session {
+            OverlaySession::Composite(session) => Some(session.variant_index),
+            _ => None,
+        }
     }
 
     fn field_pointer(&self) -> &str {
@@ -265,6 +335,7 @@ impl OverlayStore {
             display_description,
             instructions,
             entry_tabs: None,
+            entry_label: None,
             focus: OverlayFocusMode::FormFields,
         }
     }
@@ -279,6 +350,10 @@ impl OverlayStore {
 
     fn entry_tabs_entries(&self) -> Option<&[String]> {
         self.entry_tabs.as_ref().map(|tabs| tabs.entries())
+    }
+
+    fn entry_tabs_label(&self) -> Option<&String> {
+        self.entry_label.as_ref()
     }
 
     fn entry_tabs_snapshot(&self) -> Option<(usize, usize)> {
@@ -306,11 +381,39 @@ impl OverlayStore {
         self.focus
     }
 
-    fn set_entry_tabs(&mut self, entries: Vec<String>, selected: usize) {
+    fn set_entry_tabs(&mut self, label: impl Into<String>, entries: Vec<String>, selected: usize) {
         if let Some(store) = self.entry_tabs.as_mut() {
             store.set_entries(entries, selected);
         } else {
             self.entry_tabs = Some(EntryTabsStore::new(entries, selected));
+        }
+        self.entry_label = Some(label.into());
+    }
+
+    fn set_variant_tabs(
+        &mut self,
+        label: impl Into<String>,
+        entries: Vec<String>,
+        ids: Vec<usize>,
+        selected_id: usize,
+    ) {
+        let label = label.into();
+        if let Some(store) = self.entry_tabs.as_mut() {
+            store.set_entries_with_ids(entries, ids, selected_id);
+        } else {
+            self.entry_tabs = Some(EntryTabsStore::with_kind(
+                entries,
+                ids,
+                selected_id,
+                EntryTabsKind::Variants,
+            ));
+        }
+        self.entry_label = Some(label);
+    }
+
+    fn select_entry_by_id(&mut self, selected_id: usize) {
+        if let Some(store) = self.entry_tabs.as_mut() {
+            store.select_by_id(selected_id);
         }
     }
 
@@ -338,7 +441,7 @@ impl OverlayStore {
             self.display_description = Some(description);
         }
         if let Some(panel) = ctx.entry_panel {
-            self.set_entry_tabs(panel.entries, panel.selected);
+            self.set_entry_tabs("Entries", panel.entries, panel.selected);
         }
         if let Some(extra) = ctx.instructions {
             self.append_instructions(extra);
@@ -391,6 +494,7 @@ pub(super) enum OverlaySession {
     Composite(CompositeEditorSession),
     KeyValue(KeyValueEditorSession),
     Array(ArrayEditorSession),
+    Detached,
 }
 
 impl OverlaySession {
@@ -399,6 +503,7 @@ impl OverlaySession {
             OverlaySession::Composite(session) => &session.form_state,
             OverlaySession::KeyValue(session) => &session.form_state,
             OverlaySession::Array(session) => &session.form_state,
+            OverlaySession::Detached => panic!("overlay session detached"),
         }
     }
 
@@ -407,6 +512,7 @@ impl OverlaySession {
             OverlaySession::Composite(session) => &mut session.form_state,
             OverlaySession::KeyValue(session) => &mut session.form_state,
             OverlaySession::Array(session) => &mut session.form_state,
+            OverlaySession::Detached => panic!("overlay session detached"),
         }
     }
 
@@ -419,6 +525,7 @@ impl OverlaySession {
             OverlaySession::Composite(session) => &session.title,
             OverlaySession::KeyValue(_) => "Entry",
             OverlaySession::Array(session) => &session.title,
+            OverlaySession::Detached => panic!("overlay session detached"),
         }
     }
 
@@ -427,6 +534,7 @@ impl OverlaySession {
             OverlaySession::Composite(session) => session.description.clone(),
             OverlaySession::KeyValue(_) => None,
             OverlaySession::Array(session) => session.description.clone(),
+            OverlaySession::Detached => None,
         }
     }
 }
@@ -464,6 +572,11 @@ enum FocusOutcome {
     PassThrough,
 }
 
+enum EntryAdvance {
+    Collection { selected: usize },
+    Variant { variant_index: usize },
+}
+
 pub(super) struct CompositeEditorOverlay {
     state: OverlayState,
     store: OverlayStore,
@@ -495,7 +608,7 @@ impl CompositeEditorOverlay {
             CompositeOverlayTarget::ListEntry { .. }
                 | CompositeOverlayTarget::KeyValueEntry { .. }
                 | CompositeOverlayTarget::ArrayEntry { .. }
-        )
+        ) && !matches!(self.session(), OverlaySession::Composite(_))
     }
 
     pub(super) fn form_state(&self) -> &FormState {
@@ -564,12 +677,24 @@ impl CompositeEditorOverlay {
         self.store.entry_tabs_entries()
     }
 
+    pub(super) fn entry_tabs_label(&self) -> Option<&str> {
+        self.store.entry_tabs_label().map(|label| label.as_str())
+    }
+
     fn entry_tabs_snapshot(&self) -> Option<(usize, usize)> {
         self.store.entry_tabs_snapshot()
     }
 
     fn set_entry_tabs(&mut self, entries: Vec<String>, selected: usize) {
-        self.store.set_entry_tabs(entries, selected);
+        self.store.set_entry_tabs("Entries", entries, selected);
+    }
+
+    fn set_variant_tabs(&mut self, entries: Vec<String>, ids: Vec<usize>, selected: usize) {
+        self.store
+            .set_variant_tabs("Variants", entries, ids, selected);
+        self.store.append_instructions(
+            "Ctrl+←/→ switches variants; Tab focuses variant tabs".to_string(),
+        );
     }
 
     pub(super) fn instructions(&self) -> &str {
@@ -636,12 +761,35 @@ impl CompositeEditorOverlay {
         self.state.session()
     }
 
-    fn advance_entry_tab(&mut self, delta: i32) -> bool {
-        self.store
-            .entry_tabs
-            .as_mut()
-            .map(|tabs| tabs.advance(delta))
-            .unwrap_or(false)
+    fn current_variant_index(&self) -> Option<usize> {
+        self.state.current_variant_index()
+    }
+
+    fn take_composite_session(&mut self) -> Option<CompositeEditorSession> {
+        self.state.take_composite_session()
+    }
+
+    fn replace_composite_session(&mut self, session: CompositeEditorSession) {
+        self.state.replace_composite_session(session);
+    }
+
+    fn sync_variant_selection(&mut self, variant_index: usize) {
+        self.store.select_entry_by_id(variant_index);
+    }
+
+    fn advance_entry_tab(&mut self, delta: i32) -> Option<EntryAdvance> {
+        let store = self.store.entry_tabs.as_mut()?;
+        if !store.advance(delta) {
+            return None;
+        }
+        match store.kind() {
+            EntryTabsKind::Entries => Some(EntryAdvance::Collection {
+                selected: store.selected(),
+            }),
+            EntryTabsKind::Variants => store
+                .selected_id()
+                .map(|variant_index| EntryAdvance::Variant { variant_index }),
+        }
     }
 
     fn session_kind(&self) -> &'static str {
@@ -649,6 +797,7 @@ impl CompositeEditorOverlay {
             OverlaySession::Composite(_) => "composite",
             OverlaySession::KeyValue(_) => "keyvalue",
             OverlaySession::Array(_) => "array",
+            OverlaySession::Detached => "detached",
         }
     }
 
@@ -815,6 +964,7 @@ impl App {
     }
 
     pub(super) fn try_open_composite_editor(&mut self) {
+        let overlay_help_text = self.overlay_help_text().to_string();
         let level = self.overlay_depth() + 1;
         let host = if level == 1 {
             OverlayHost::RootForm
@@ -859,15 +1009,23 @@ impl App {
                 let label = field.schema.display_label();
                 match field.open_composite_editor(variant_index) {
                     Ok(session) => {
-                        self.popup = None;
-                        self.overlay_stack.push(CompositeEditorOverlay::new(
+                        let mut overlay = CompositeEditorOverlay::new(
                             pointer,
                             label,
                             level,
                             host,
                             OverlaySession::Composite(session),
-                            self.overlay_help_text(),
-                        ));
+                            overlay_help_text.clone(),
+                        );
+                        if let Some((labels, indices)) =
+                            Self::variant_tab_entries_for_field(field, overlay.target())
+                        {
+                            let selected = overlay.current_variant_index().unwrap_or(0);
+                            overlay.set_variant_tabs(labels, indices, selected);
+                        }
+                        let _ = field;
+                        self.popup = None;
+                        self.overlay_stack.push(overlay);
                         self.initialize_active_overlay();
                     }
                     Err(err) => self.status.set_raw(&err.message),
@@ -885,18 +1043,25 @@ impl App {
                 }
                 match field.open_composite_list_editor() {
                     Ok(context) => {
-                        self.popup = None;
                         let mut overlay = CompositeEditorOverlay::new(
                             pointer,
                             label,
                             level,
                             host,
                             OverlaySession::Composite(context.session),
-                            self.overlay_help_text(),
+                            overlay_help_text.clone(),
                         );
                         overlay.set_target(CompositeOverlayTarget::ListEntry {
                             entry_index: context.entry_index,
                         });
+                        if let Some((labels, indices)) =
+                            Self::variant_tab_entries_for_field(field, overlay.target())
+                        {
+                            let selected = overlay.current_variant_index().unwrap_or(0);
+                            overlay.set_variant_tabs(labels, indices, selected);
+                        }
+                        let _ = field;
+                        self.popup = None;
                         self.overlay_stack.push(overlay);
                         self.initialize_active_overlay();
                     }
@@ -1057,7 +1222,7 @@ impl App {
     }
 
     fn advance_overlay_entry(&mut self, delta: i32) -> bool {
-        let snapshot = {
+        let (action, field_pointer, host) = {
             let editor = match self.active_overlay_mut() {
                 Some(editor) => editor,
                 None => return false,
@@ -1068,59 +1233,171 @@ impl App {
             if editor.entry_tabs_snapshot().is_none() {
                 return false;
             }
-            if !editor.advance_entry_tab(delta) {
+            let pointer = editor.field_pointer().to_string();
+            let host = editor.host();
+            let Some(next) = editor.advance_entry_tab(delta) else {
                 editor.set_exit_armed(false);
                 if !editor.focus_entries() {
                     editor.focus_form_first();
                 }
                 return true;
-            }
-            let pointer = editor.field_pointer().to_string();
-            let host = editor.host();
-            let selected = editor.entry_tabs_selected().unwrap_or(0);
-            (pointer, host, selected)
-        };
-
-        let (field_pointer, host, next_index) = snapshot;
-
-        let previous_depth = self.overlay_depth();
-        self.close_active_overlay(true);
-        if self.overlay_depth() != previous_depth.saturating_sub(1) {
-            return false;
-        }
-
-        let (changed, label) = {
-            let host_state = self.host_form_state_mut(host);
-            let Some(field) = host_state.field_mut_by_pointer(&field_pointer) else {
-                return false;
             };
-            let changed = field.collection_set_selected(next_index);
-            let label = field.collection_selected_label();
-            (changed, label)
+            (next, pointer, host)
         };
 
-        self.exit_armed = false;
-        self.status.value_updated();
-        if let Some(label) = label {
-            self.status.set_raw(format!("Selected entry {}", label));
-        } else if !changed {
-            self.status.ready();
-        }
+        match action {
+            EntryAdvance::Variant { variant_index } => self.switch_overlay_variant(variant_index),
+            EntryAdvance::Collection {
+                selected: next_index,
+            } => {
+                let previous_depth = self.overlay_depth();
+                self.close_active_overlay(true);
+                if self.overlay_depth() != previous_depth.saturating_sub(1) {
+                    return false;
+                }
 
-        let expected_depth = previous_depth;
-        self.try_open_composite_editor();
-        if self.overlay_depth() != expected_depth {
-            return false;
+                let (changed, label) = {
+                    let host_state = self.host_form_state_mut(host);
+                    let Some(field) = host_state.field_mut_by_pointer(&field_pointer) else {
+                        return false;
+                    };
+                    let changed = field.collection_set_selected(next_index);
+                    let label = field.collection_selected_label();
+                    (changed, label)
+                };
+
+                self.exit_armed = false;
+                self.status.value_updated();
+                if let Some(label) = label {
+                    self.status.set_raw(format!("Selected entry {}", label));
+                } else if !changed {
+                    self.status.ready();
+                }
+
+                let expected_depth = previous_depth;
+                self.try_open_composite_editor();
+                if self.overlay_depth() != expected_depth {
+                    return false;
+                }
+
+                if let Some(editor) = self.active_overlay_mut() {
+                    editor.set_exit_armed(false);
+                    if !editor.focus_entries() {
+                        editor.focus_form_first();
+                    }
+                }
+
+                true
+            }
         }
+    }
+
+    fn switch_overlay_variant(&mut self, variant_index: usize) -> bool {
+        let (field_pointer, host) = {
+            let editor = match self.active_overlay() {
+                Some(editor) => editor,
+                None => return false,
+            };
+            match editor.session() {
+                OverlaySession::Composite(_) => {}
+                _ => return false,
+            }
+            let current = editor.current_variant_index().unwrap_or(variant_index);
+            if current == variant_index {
+                return true;
+            }
+            (editor.field_pointer().to_string(), editor.host())
+        };
+
+        let old_session = {
+            let editor = match self.active_overlay_mut() {
+                Some(editor) => editor,
+                None => return false,
+            };
+            match editor.take_composite_session() {
+                Some(session) => session,
+                None => return false,
+            }
+        };
+
+        let host_state = self.host_form_state_mut(host);
+        let Some(field) = host_state.field_mut_by_pointer(&field_pointer) else {
+            if let Some(editor) = self.active_overlay_mut() {
+                editor.replace_composite_session(old_session);
+            }
+            return false;
+        };
+
+        let old_index = old_session.variant_index;
+        field.close_composite_editor(old_session, false);
+
+        let new_session = match field.open_composite_editor(variant_index) {
+            Ok(session) => session,
+            Err(err) => {
+                if let Ok(restored) = field.open_composite_editor(old_index) {
+                    if let Some(editor) = self.active_overlay_mut() {
+                        editor.replace_composite_session(restored);
+                        editor.sync_variant_selection(old_index);
+                    }
+                }
+                self.status.set_raw(&err.message);
+                return false;
+            }
+        };
 
         if let Some(editor) = self.active_overlay_mut() {
+            editor.replace_composite_session(new_session);
+            editor.sync_variant_selection(variant_index);
             editor.set_exit_armed(false);
             if !editor.focus_entries() {
                 editor.focus_form_first();
             }
         }
 
+        self.exit_armed = false;
+        self.status
+            .set_raw(format!("Switched to variant #{}", variant_index + 1));
+        self.setup_overlay_validator();
+        self.run_overlay_validation();
         true
+    }
+
+    fn variant_tab_entries_for_field(
+        field: &FieldState,
+        target: &CompositeOverlayTarget,
+    ) -> Option<(Vec<String>, Vec<usize>)> {
+        match (target, &field.schema.kind) {
+            (CompositeOverlayTarget::Field, FieldKind::Composite(meta))
+                if matches!(meta.mode, CompositeMode::AnyOf) =>
+            {
+                let view = field.composite_selector_view()?;
+                Self::variant_entries_from_view(&view)
+            }
+            (CompositeOverlayTarget::ListEntry { .. }, FieldKind::Array(inner)) if matches!(inner.as_ref(), FieldKind::Composite(meta) if matches!(meta.mode, CompositeMode::AnyOf)) =>
+            {
+                let view = field.composite_entry_selector_view()?;
+                Self::variant_entries_from_view(&view)
+            }
+            _ => None,
+        }
+    }
+
+    fn variant_entries_from_view(
+        view: &CompositeSelectorView,
+    ) -> Option<(Vec<String>, Vec<usize>)> {
+        let mut labels = Vec::new();
+        let mut indices = Vec::new();
+        for (idx, option) in view.options.iter().enumerate() {
+            if view.active.get(idx).copied().unwrap_or(false) {
+                labels.push(format!("#{} {}", idx + 1, option));
+                indices.push(idx);
+            }
+        }
+        if labels.is_empty() {
+            None
+        } else {
+            Some((labels, indices))
+        }
     }
 
     fn handle_overlay_focus_command(&mut self, command: &FormCommand) -> bool {
@@ -1284,6 +1561,7 @@ impl App {
                     validator_for(&session.schema).ok().map(Arc::new)
                 }
                 OverlaySession::Array(session) => validator_for(&session.schema).ok().map(Arc::new),
+                OverlaySession::Detached => return,
             }
         };
         if let Some(valid) = &validator {

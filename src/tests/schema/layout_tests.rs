@@ -4,6 +4,21 @@ use crate::{
 };
 use serde_json::{Value, json};
 
+fn find_field_by_pointer<'a>(
+    sections: &'a [FormSection],
+    pointer: &str,
+) -> Option<&'a FieldSchema> {
+    for section in sections {
+        if let Some(field) = section.fields.iter().find(|field| field.pointer == pointer) {
+            return Some(field);
+        }
+        if let Some(found) = find_field_by_pointer(&section.children, pointer) {
+            return Some(found);
+        }
+    }
+    None
+}
+
 #[test]
 fn builds_nested_sections_and_general_root() {
     let schema = json!({
@@ -286,6 +301,39 @@ fn multi_level_refs_are_resolved() {
     })
     .expect("requestTimeout value field");
     assert_eq!(field.name, "value");
+}
+
+#[test]
+fn anyof_variant_titles_reflect_shape() {
+    let schema: Value = serde_json::from_str(include_str!("../../../examples/complex.schema.json"))
+        .expect("complex schema");
+    let form = build_form_schema(&schema).expect("schema parsed");
+    let pointer = "/c/c1/c2/options";
+    let field = form
+        .roots
+        .iter()
+        .find_map(|root| find_field_by_pointer(&root.sections, pointer))
+        .expect("options field");
+    match &field.kind {
+        FieldKind::Composite(meta) => {
+            let titles: Vec<_> = meta
+                .variants
+                .iter()
+                .map(|variant| variant.title.as_str())
+                .collect();
+            assert!(
+                titles.iter().any(|title| *title == "string[]"),
+                "variant titles: {:?}",
+                titles
+            );
+            assert!(
+                titles.iter().any(|title| *title == "integer[]"),
+                "variant titles: {:?}",
+                titles
+            );
+        }
+        other => panic!("expected composite field, got {:?}", other),
+    }
 }
 
 #[test]

@@ -244,6 +244,7 @@ impl App {
                 instructions: editor.instructions().to_string(),
                 list_entries: editor.entry_tabs_entries().map(|entries| entries.to_vec()),
                 list_selected: editor.entry_tabs_selected(),
+                entry_label: editor.entry_tabs_label().map(|label| label.to_string()),
                 level: editor.level(),
             };
             let overlay_form_state = editor.form_state_mut();

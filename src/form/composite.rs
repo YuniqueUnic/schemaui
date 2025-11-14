@@ -9,7 +9,7 @@ use crate::domain::{CompositeField, CompositeMode, parse_form_schema};
 
 use super::{
     error::FieldCoercionError,
-    field::components::{ComponentPalette, CompositePopupData},
+    field::components::{ComponentPalette, CompositePopupData, CompositeSelectorView},
     state::FormState,
 };
 
@@ -202,6 +202,15 @@ impl CompositeListState {
             .enumerate()
             .map(|(idx, entry)| format!("#{} {}", idx + 1, entry.state.summary()))
             .collect()
+    }
+
+    pub fn selected_entry_selector(&self) -> Option<CompositeSelectorView> {
+        let entry = self.selected_entry()?;
+        Some(CompositeSelectorView {
+            multi: entry.state.is_multi(),
+            options: entry.state.option_titles(),
+            active: entry.state.active_flags(),
+        })
     }
 
     pub fn open_selected_editor(

@@ -75,8 +75,8 @@ impl TabLabel {
 }
 
 const TAB_EXTRA_PADDING: usize = 2;
-const LEFT_CHEVRON: &str = "≪";
-const RIGHT_CHEVRON: &str = "≫";
+const LEFT_CHEVRON: &str = "<<";
+const RIGHT_CHEVRON: &str = ">>";
 
 #[derive(Debug, Clone, Copy)]
 struct TabWindow {
@@ -117,76 +117,51 @@ fn compute_visible_window(labels: &[TabLabel], selected: usize, available: usize
             right_overflow: false,
         };
     }
-
-    let mut best: Option<(usize, usize, usize, usize, TabWindow)> = None;
-    for start in 0..=selected {
-        let mut end = start;
-        let mut width = 0usize;
-        while end < labels.len() {
-            let label_width = labels[end].width;
-            if end > start && width + label_width > available {
-                // accept partial overlap by including one extra tab so users see the truncation
-                if width == 0 {
-                    width = label_width;
-                    end += 1;
-                }
-                break;
-            }
-            width += label_width;
-            end += 1;
-        }
-        if end == start {
-            end = start + 1;
-        }
-        if width < available && end < labels.len() {
-            width += labels[end].width;
-            end += 1;
-        }
-        if !(start <= selected && selected < end) {
-            continue;
-        }
-        let visible_count = end - start;
-        let selected_offset = selected - start;
-        let double_selected = selected_offset * 2;
-        let double_center = visible_count.saturating_sub(1);
-        let center_distance = double_selected.abs_diff(double_center);
-        let clipped = width > available;
-        let window = TabWindow {
-            start,
-            end,
-            selected_offset,
-            left_overflow: start > 0,
-            right_overflow: clipped || end < labels.len(),
-        };
-        best = Some(match best {
-            None => (visible_count, center_distance, width, start, window),
-            Some((best_count, best_dist, best_width, best_start, best_window)) => {
-                if visible_count > best_count
-                    || (visible_count == best_count && center_distance < best_dist)
-                    || (visible_count == best_count
-                        && center_distance == best_dist
-                        && width > best_width)
-                    || (visible_count == best_count
-                        && center_distance == best_dist
-                        && width == best_width
-                        && start < best_start)
-                {
-                    (visible_count, center_distance, width, start, window)
-                } else {
-                    (best_count, best_dist, best_width, best_start, best_window)
-                }
-            }
-        });
-    }
-
-    best.map(|(_, _, _, _, window)| window)
-        .unwrap_or(TabWindow {
+    let selected_width = labels[selected].width;
+    if selected_width > available {
+        return TabWindow {
             start: selected,
             end: selected + 1,
             selected_offset: 0,
             left_overflow: selected > 0,
-            right_overflow: selected + 1 < labels.len(),
-        })
+            right_overflow: true,
+        };
+    }
+
+    let mut start = selected;
+    let mut end = selected + 1;
+    let mut width = selected_width;
+
+    loop {
+        let mut expanded = false;
+        if start > 0 {
+            let extra = labels[start - 1].width;
+            if width + extra <= available {
+                start -= 1;
+                width += extra;
+                expanded = true;
+            }
+        }
+        if end < labels.len() {
+            let extra = labels[end].width;
+            if width + extra <= available {
+                width += extra;
+                end += 1;
+                expanded = true;
+            }
+        }
+        if !expanded {
+            break;
+        }
+    }
+
+    TabWindow {
+        start,
+        end,
+        selected_offset: selected - start,
+        left_overflow: start > 0,
+        right_overflow: end < labels.len(),
+    }
 }
 
 #[cfg(test)]
@@ -222,27 +197,6 @@ mod tests {
     }
 
     #[test]
-    fn window_prefers_center_when_space_allows() {
-        let labels = vec![
-            TabLabel::new("alpha".into()),
-            TabLabel::new("beta".into()),
-            TabLabel::new("gamma".into()),
-            TabLabel::new("delta".into()),
-            TabLabel::new("epsilon".into()),
-        ];
-        let window = compute_visible_window(&labels, 3, 16);
-        assert_eq!(
-            window.start, 2,
-            "window should scroll just enough to keep selection visible"
-        );
-        assert_eq!(
-            window.end, 5,
-            "window should include as many trailing tabs as possible"
-        );
-        assert_eq!(window.selected_offset, 3 - window.start);
-    }
-
-    #[test]
     fn window_spans_all_tabs_when_width_available() {
         let labels = vec![
             TabLabel::new("svc".into()),
@@ -261,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn window_prefers_showing_partial_next_tab() {
+    fn window_scrolls_when_selection_moves_past_visible_range() {
         let labels = vec![
             TabLabel::new("alpha".into()),
             TabLabel::new("beta".into()),
@@ -269,25 +223,55 @@ mod tests {
             TabLabel::new("delta".into()),
             TabLabel::new("epsilon".into()),
         ];
-        // Force available width to hold roughly 4 labels so the 5th should appear truncated
-        let width = labels
-            .iter()
-            .take(4)
-            .map(|label| label.width)
-            .sum::<usize>()
-            - 1;
-        let window = compute_visible_window(&labels, 3, width);
-        assert_eq!(
-            window.start, 1,
-            "should keep as many leading tabs as possible"
+        let available = labels.iter().take(3).map(|label| label.width).sum();
+        let window = compute_visible_window(&labels, 4, available);
+        assert!(
+            window.start > 0,
+            "window should scroll once the selection moves beyond the initial range"
         );
+    }
+
+    #[test]
+    fn window_avoids_unneeded_scroll_when_space_is_sufficient() {
+        let labels = vec![
+            TabLabel::new("root section1".into()),
+            TabLabel::new("root section2".into()),
+            TabLabel::new("root section3".into()),
+            TabLabel::new("root section4".into()),
+            TabLabel::new("root section5".into()),
+        ];
+        let available = labels.iter().take(4).map(|label| label.width).sum();
+        let window = compute_visible_window(&labels, 3, available);
+        assert_eq!(window.start, 0, "first tab should stay visible");
         assert_eq!(
-            window.end, 5,
-            "window should still expose final tab even if clipped"
+            window.end, 4,
+            "window should fill the available width with fully rendered tabs"
         );
         assert!(
             window.right_overflow,
-            "overflow indicator should be visible"
+            "overflow indicator should remain for the hidden tab"
         );
+        assert!(
+            !window.left_overflow,
+            "no left indicator expected when the first tab is visible"
+        );
+    }
+
+    #[test]
+    fn window_expands_after_resize() {
+        let labels = vec![
+            TabLabel::new("alpha".into()),
+            TabLabel::new("beta".into()),
+            TabLabel::new("gamma".into()),
+            TabLabel::new("delta".into()),
+        ];
+        let narrow = labels.iter().take(2).map(|label| label.width).sum();
+        let wide = labels.iter().take(3).map(|label| label.width).sum();
+        let narrow_window = compute_visible_window(&labels, 2, narrow);
+        assert_eq!(narrow_window.start, 1);
+        assert_eq!(narrow_window.end, 3);
+        let wide_window = compute_visible_window(&labels, 2, wide);
+        assert_eq!(wide_window.start, 0, "resize should reveal the first tab");
+        assert_eq!(wide_window.end, 3, "wider windows include more tabs");
     }
 }

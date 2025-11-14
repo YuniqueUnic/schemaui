@@ -14,6 +14,10 @@ impl FieldState {
         self.component.composite_selector()
     }
 
+    pub fn composite_entry_selector_view(&self) -> Option<CompositeSelectorView> {
+        self.component.composite_entry_selector()
+    }
+
     pub fn composite_variant_summaries(&self) -> Option<Vec<CompositeVariantSummary>> {
         self.component.composite_summaries()
     }
