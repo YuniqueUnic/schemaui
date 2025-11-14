@@ -240,8 +240,8 @@ impl App {
                 description: editor.display_description.clone(),
                 dirty: editor.form_state().is_dirty(),
                 instructions: editor.instructions.clone(),
-                list_entries: editor.list_entries.clone(),
-                list_selected: editor.list_selected,
+                list_entries: editor.entry_tabs_entries().map(|entries| entries.to_vec()),
+                list_selected: editor.entry_tabs_selected(),
                 level: editor.level,
             };
             let overlay_form_state = editor.form_state_mut();

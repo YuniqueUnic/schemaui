@@ -2,6 +2,9 @@
 //! Each visual区域（root tabs、section tabs、field list）拥有自己的 store，
 //! 以便 presentation 层像 React + Zustand 那样组合/订阅状态。
 
+pub mod view;
+pub use view::{FieldsView, RootTabsView, SectionTabsView};
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RootTabsStore {
     current: usize,
@@ -39,7 +42,6 @@ impl RootTabsStore {
         }
     }
 
-    #[allow(dead_code)]
     pub fn advance(&mut self, delta: i32, len: usize) -> bool {
         if len == 0 {
             self.current = 0;
@@ -106,6 +108,7 @@ pub struct FieldListStore {
     current: usize,
 }
 
+#[allow(dead_code)]
 impl FieldListStore {
     pub fn current(&self) -> usize {
         self.current

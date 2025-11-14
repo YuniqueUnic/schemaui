@@ -9,7 +9,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
     domain::FieldKind,
-    form::{FieldState, FormState, SectionState},
+    form::{FieldState, FormState, SectionState, ui::FieldsView},
 };
 
 pub fn render_fields(
@@ -18,12 +18,16 @@ pub fn render_fields(
     form_state: &mut FormState,
     enable_cursor: bool,
 ) {
-    let Some((section, selected_index)) = form_state.active_section_mut() else {
+    let Some(fields_view) = form_state.fields_view() else {
         let placeholder =
             Paragraph::new("No section selected").block(Block::default().borders(Borders::ALL));
         frame.render_widget(placeholder, area);
         return;
     };
+    let FieldsView {
+        section,
+        selected: selected_index,
+    } = fields_view;
 
     let mut field_area = area;
     if let Some(description) = &section.description {

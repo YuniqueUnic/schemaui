@@ -24,10 +24,15 @@ pub fn render_body(
         return;
     }
 
-    let show_root_tabs = form_state.roots.len() > 1;
-    let show_section_tabs = form_state
-        .active_root()
-        .map(|root| root.sections.len() > 1)
+    let root_tabs_view = form_state.root_tabs_view();
+    let show_root_tabs = root_tabs_view
+        .as_ref()
+        .map(|view| view.titles.len() > 1)
+        .unwrap_or(false);
+    let section_tabs_view = form_state.section_tabs_view();
+    let show_section_tabs = section_tabs_view
+        .as_ref()
+        .map(|view| view.titles.len() > 1)
         .unwrap_or(false);
 
     let mut constraints = Vec::new();
@@ -46,11 +51,15 @@ pub fn render_body(
 
     let mut index = 0;
     if show_root_tabs {
-        render_root_tabs(frame, chunks[index], form_state);
+        if let Some(view) = root_tabs_view.as_ref() {
+            render_root_tabs(frame, chunks[index], view);
+        }
         index += 1;
     }
     if show_section_tabs {
-        render_section_tabs(frame, chunks[index], form_state);
+        if let Some(view) = section_tabs_view.as_ref() {
+            render_section_tabs(frame, chunks[index], view);
+        }
         index += 1;
     }
     render_fields(frame, chunks[index], form_state, enable_cursor);

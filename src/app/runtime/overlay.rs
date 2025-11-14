@@ -17,6 +17,67 @@ use crate::{
 use super::super::input::{AppCommand, CommandDispatch};
 use super::{App, PopupOwner};
 
+#[derive(Debug, Clone)]
+struct EntryTabsStore {
+    entries: Vec<String>,
+    selected: usize,
+}
+
+impl EntryTabsStore {
+    fn new(entries: Vec<String>, selected: usize) -> Self {
+        let mut store = Self {
+            entries,
+            selected: 0,
+        };
+        store.select(selected);
+        store
+    }
+
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    fn entries(&self) -> &[String] {
+        &self.entries
+    }
+
+    fn selected(&self) -> usize {
+        self.selected
+    }
+
+    fn select(&mut self, index: usize) {
+        if self.entries.is_empty() {
+            self.selected = 0;
+        } else {
+            self.selected = index.min(self.entries.len().saturating_sub(1));
+        }
+    }
+
+    fn set_entries(&mut self, entries: Vec<String>, selected: usize) {
+        self.entries = entries;
+        self.select(selected);
+    }
+
+    #[allow(dead_code)]
+    fn advance(&mut self, delta: i32) -> bool {
+        if self.entries.is_empty() {
+            return false;
+        }
+        let len = self.entries.len() as i32;
+        let next = (self.selected as i32 + delta).clamp(0, len - 1) as usize;
+        if next == self.selected {
+            false
+        } else {
+            self.selected = next;
+            true
+        }
+    }
+}
+
 pub(super) fn apply_selection_to_field(
     field: &mut FieldState,
     selection: usize,
@@ -126,8 +187,7 @@ pub(super) struct CompositeEditorOverlay {
     pub(super) session: OverlaySession,
     pub(super) target: CompositeOverlayTarget,
     pub(super) exit_armed: bool,
-    pub(super) list_entries: Option<Vec<String>>,
-    pub(super) list_selected: Option<usize>,
+    entry_tabs: Option<EntryTabsStore>,
     pub(super) instructions: String,
     pub(super) validator: Option<Arc<Validator>>,
     pub(super) level: usize,
@@ -154,8 +214,7 @@ impl CompositeEditorOverlay {
             session,
             target: CompositeOverlayTarget::Field,
             exit_armed: false,
-            list_entries: None,
-            list_selected: None,
+            entry_tabs: None,
             instructions,
             validator: None,
             level,
@@ -190,9 +249,12 @@ impl CompositeEditorOverlay {
         self.session.form_state_mut()
     }
 
-    pub(super) fn set_list_panel(&mut self, entries: Vec<String>, selected: usize) {
-        self.list_entries = Some(entries);
-        self.list_selected = Some(selected);
+    pub(super) fn set_entry_tabs(&mut self, entries: Vec<String>, selected: usize) {
+        if let Some(store) = self.entry_tabs.as_mut() {
+            store.set_entries(entries, selected);
+        } else {
+            self.entry_tabs = Some(EntryTabsStore::new(entries, selected));
+        }
     }
 
     pub(super) fn dirty(&self) -> bool {
@@ -200,7 +262,10 @@ impl CompositeEditorOverlay {
     }
 
     pub(super) fn can_focus_entries(&self) -> bool {
-        self.list_entries.is_some()
+        self.entry_tabs
+            .as_ref()
+            .map(|tabs| !tabs.is_empty())
+            .unwrap_or(false)
     }
 
     pub(super) fn focus_entries(&mut self) {
@@ -219,7 +284,7 @@ impl CompositeEditorOverlay {
             self.display_description = Some(description);
         }
         if let Some(panel) = ctx.entry_panel {
-            self.set_list_panel(panel.entries, panel.selected);
+            self.set_entry_tabs(panel.entries, panel.selected);
         }
         if let Some(extra) = ctx.instructions {
             if self.instructions.trim().is_empty() {
@@ -228,6 +293,24 @@ impl CompositeEditorOverlay {
                 self.instructions = format!("{} • {}", self.instructions, extra);
             }
         }
+    }
+
+    fn entry_tabs_len(&self) -> usize {
+        self.entry_tabs.as_ref().map(|tabs| tabs.len()).unwrap_or(0)
+    }
+
+    pub(super) fn entry_tabs_selected(&self) -> Option<usize> {
+        self.entry_tabs.as_ref().map(|tabs| tabs.selected())
+    }
+
+    pub(super) fn entry_tabs_entries(&self) -> Option<&[String]> {
+        self.entry_tabs.as_ref().map(|tabs| tabs.entries())
+    }
+
+    fn entry_tabs_snapshot(&self) -> Option<(usize, usize)> {
+        self.entry_tabs
+            .as_ref()
+            .map(|tabs| (tabs.len(), tabs.selected()))
     }
 }
 
@@ -599,12 +682,9 @@ impl App {
             if !editor.can_focus_entries() {
                 return false;
             }
-            let entries_len = editor
-                .list_entries
-                .as_ref()
-                .map(|entries| entries.len())
-                .unwrap_or(0);
-            let selected = editor.list_selected.unwrap_or(0);
+            let Some((entries_len, selected)) = editor.entry_tabs_snapshot() else {
+                return false;
+            };
             (
                 entries_len,
                 selected,
@@ -690,11 +770,7 @@ impl App {
                 form_state.has_focusable_fields(),
                 form_state.focus_is_first(),
                 form_state.focus_is_last(),
-                editor
-                    .list_entries
-                    .as_ref()
-                    .map(|entries| entries.len())
-                    .unwrap_or(0),
+                editor.entry_tabs_len(),
             )
         };
 
@@ -952,7 +1028,7 @@ impl App {
         };
         if let Some((panel, label, idx)) = data {
             if let Some((entries, selected)) = panel {
-                overlay.set_list_panel(entries, selected);
+                overlay.set_entry_tabs(entries, selected);
             }
             if let Some(label) = label {
                 overlay.display_title = format!("Edit {} – {}", overlay.field_label, label.clone());
@@ -1045,7 +1121,7 @@ impl App {
 
     pub(crate) fn overlay_selected_entry_for_test(&self) -> Option<usize> {
         self.active_overlay()
-            .and_then(|overlay| overlay.list_selected)
+            .and_then(|overlay| overlay.entry_tabs_selected())
     }
 }
 
