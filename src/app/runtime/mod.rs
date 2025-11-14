@@ -3,7 +3,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
 use ratatui::layout::Rect;
 use serde_json::Value;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     form::{FormCommand, FormEngine, FormState},
@@ -48,6 +48,7 @@ pub(crate) struct App {
     result: Option<Value>,
     popup: Option<AppPopup>,
     overlay_stack: Vec<CompositeEditorOverlay>,
+    overlay_validator_cache: HashMap<String, Arc<Validator>>,
     input_router: InputRouter,
     keymap_store: Arc<KeymapStore>,
 }
@@ -193,6 +194,7 @@ impl App {
             result: None,
             popup: None,
             overlay_stack: Vec::new(),
+            overlay_validator_cache: HashMap::new(),
             input_router: InputRouter::new(keymap_store.clone()),
             keymap_store,
         }

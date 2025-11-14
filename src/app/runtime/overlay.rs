@@ -451,6 +451,19 @@ pub(super) enum OverlayFocusMode {
     EntryTabs,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FocusDirection {
+    Forward,
+    Backward,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FocusOutcome {
+    Consumed,
+    RequestEntryDelta(i32),
+    PassThrough,
+}
+
 pub(super) struct CompositeEditorOverlay {
     state: OverlayState,
     store: OverlayStore,
@@ -501,12 +514,37 @@ impl CompositeEditorOverlay {
         self.store.can_focus_entries()
     }
 
-    pub(super) fn focus_entries(&mut self) {
-        self.store.focus_entries();
+    pub(super) fn focus_entries(&mut self) -> bool {
+        if self.store.can_focus_entries() {
+            self.store.focus_entries();
+            true
+        } else {
+            false
+        }
     }
 
-    pub(super) fn focus_form(&mut self) {
+    pub(super) fn focus_form_default(&mut self) -> bool {
+        if !self.form_state().has_focusable_fields() {
+            return false;
+        }
         self.store.focus_form();
+        true
+    }
+
+    pub(super) fn focus_form_first(&mut self) -> bool {
+        if !self.focus_form_default() {
+            return false;
+        }
+        self.form_state_mut().focus_first_field();
+        true
+    }
+
+    pub(super) fn focus_form_last(&mut self) -> bool {
+        if !self.focus_form_default() {
+            return false;
+        }
+        self.form_state_mut().focus_last_field();
+        true
     }
 
     pub(super) fn apply_component_context(&mut self, ctx: OverlayContext) {
@@ -605,6 +643,103 @@ impl CompositeEditorOverlay {
             .map(|tabs| tabs.advance(delta))
             .unwrap_or(false)
     }
+
+    fn session_kind(&self) -> &'static str {
+        match self.session() {
+            OverlaySession::Composite(_) => "composite",
+            OverlaySession::KeyValue(_) => "keyvalue",
+            OverlaySession::Array(_) => "array",
+        }
+    }
+
+    fn validator_cache_key(&self) -> String {
+        let target = match self.target() {
+            CompositeOverlayTarget::Field => "field",
+            CompositeOverlayTarget::ListEntry { .. } => "list",
+            CompositeOverlayTarget::KeyValueEntry { .. } => "keyvalue-entry",
+            CompositeOverlayTarget::ArrayEntry { .. } => "array-entry",
+        };
+        format!(
+            "{}::{}::{}",
+            self.field_pointer(),
+            self.session_kind(),
+            target
+        )
+    }
+
+    fn advance_focus(&mut self, direction: FocusDirection) -> FocusOutcome {
+        let has_fields = self.form_state().has_focusable_fields();
+        let entries_len = self.entry_tabs_len();
+        let focus_mode = self.focus_mode();
+        match direction {
+            FocusDirection::Forward => {
+                if focus_mode == OverlayFocusMode::EntryTabs {
+                    if has_fields && self.focus_form_first() {
+                        return FocusOutcome::Consumed;
+                    }
+                    if entries_len > 0 {
+                        return FocusOutcome::RequestEntryDelta(1);
+                    }
+                    if self.focus_entries() {
+                        return FocusOutcome::Consumed;
+                    }
+                    return FocusOutcome::Consumed;
+                }
+                if !has_fields {
+                    if entries_len > 0 {
+                        return FocusOutcome::RequestEntryDelta(1);
+                    }
+                    if self.focus_entries() {
+                        return FocusOutcome::Consumed;
+                    }
+                    return FocusOutcome::Consumed;
+                }
+                if self.form_state().focus_is_last() {
+                    if entries_len > 0 {
+                        return FocusOutcome::RequestEntryDelta(1);
+                    }
+                    if self.focus_entries() {
+                        return FocusOutcome::Consumed;
+                    }
+                    return FocusOutcome::Consumed;
+                }
+                FocusOutcome::PassThrough
+            }
+            FocusDirection::Backward => {
+                if focus_mode == OverlayFocusMode::EntryTabs {
+                    if has_fields && self.focus_form_last() {
+                        return FocusOutcome::Consumed;
+                    }
+                    if entries_len > 0 {
+                        return FocusOutcome::RequestEntryDelta(-1);
+                    }
+                    if self.focus_entries() {
+                        return FocusOutcome::Consumed;
+                    }
+                    return FocusOutcome::Consumed;
+                }
+                if !has_fields {
+                    if entries_len > 0 {
+                        return FocusOutcome::RequestEntryDelta(-1);
+                    }
+                    if self.focus_entries() {
+                        return FocusOutcome::Consumed;
+                    }
+                    return FocusOutcome::Consumed;
+                }
+                if self.form_state().focus_is_first() {
+                    if entries_len > 0 {
+                        return FocusOutcome::RequestEntryDelta(-1);
+                    }
+                    if self.focus_entries() {
+                        return FocusOutcome::Consumed;
+                    }
+                    return FocusOutcome::Consumed;
+                }
+                FocusOutcome::PassThrough
+            }
+        }
+    }
 }
 
 impl App {
@@ -673,10 +808,8 @@ impl App {
 
     fn reset_overlay_focus_mode(&mut self) {
         if let Some(editor) = self.active_overlay_mut() {
-            if editor.can_focus_entries() {
-                editor.focus_entries();
-            } else {
-                editor.focus_form();
+            if !editor.focus_entries() {
+                editor.focus_form_first();
             }
         }
     }
@@ -846,6 +979,8 @@ impl App {
         let Some(mut overlay) = self.overlay_stack.pop() else {
             return;
         };
+        self.overlay_validator_cache
+            .remove(&overlay.validator_cache_key());
         self.popup = None;
         if commit {
             match self.apply_overlay_commit(&overlay) {
@@ -935,7 +1070,9 @@ impl App {
             }
             if !editor.advance_entry_tab(delta) {
                 editor.set_exit_armed(false);
-                editor.focus_entries();
+                if !editor.focus_entries() {
+                    editor.focus_form_first();
+                }
                 return true;
             }
             let pointer = editor.field_pointer().to_string();
@@ -978,8 +1115,8 @@ impl App {
 
         if let Some(editor) = self.active_overlay_mut() {
             editor.set_exit_armed(false);
-            if editor.can_focus_entries() {
-                editor.focus_entries();
+            if !editor.focus_entries() {
+                editor.focus_form_first();
             }
         }
 
@@ -993,120 +1130,24 @@ impl App {
         ) {
             return false;
         }
-
-        let snapshot = {
-            let editor = match self.active_overlay() {
+        let direction = match command {
+            FormCommand::FocusNextField => FocusDirection::Forward,
+            FormCommand::FocusPrevField => FocusDirection::Backward,
+            _ => return false,
+        };
+        let outcome = {
+            let editor = match self.active_overlay_mut() {
                 Some(editor) => editor,
                 None => return false,
             };
-            if !editor.can_focus_entries() {
-                return false;
-            }
-            let form_state = editor.form_state();
-            (
-                editor.focus_mode(),
-                form_state.has_focusable_fields(),
-                form_state.focus_is_first(),
-                form_state.focus_is_last(),
-                editor.entry_tabs_len(),
-            )
+            editor.set_exit_armed(false);
+            editor.advance_focus(direction)
         };
-
-        let (focus_mode, has_fields, focus_is_first, focus_is_last, entries_len) = snapshot;
-
-        match command {
-            FormCommand::FocusNextField => {
-                if focus_mode == OverlayFocusMode::EntryTabs {
-                    if has_fields {
-                        if let Some(editor) = self.active_overlay_mut() {
-                            editor.set_exit_armed(false);
-                            editor.focus_form();
-                            if editor.form_state().has_focusable_fields() {
-                                editor.form_state_mut().focus_first_field();
-                            }
-                        }
-                        return true;
-                    }
-                    if entries_len > 0 && self.advance_overlay_entry(1) {
-                        return true;
-                    }
-                    if let Some(editor) = self.active_overlay_mut() {
-                        editor.set_exit_armed(false);
-                        editor.focus_entries();
-                    }
-                    return true;
-                }
-
-                if !has_fields {
-                    if entries_len > 0 && self.advance_overlay_entry(1) {
-                        return true;
-                    }
-                    if let Some(editor) = self.active_overlay_mut() {
-                        editor.set_exit_armed(false);
-                        editor.focus_entries();
-                    }
-                    return true;
-                }
-
-                if focus_is_last {
-                    if entries_len > 0 && self.advance_overlay_entry(1) {
-                        return true;
-                    }
-                    if let Some(editor) = self.active_overlay_mut() {
-                        editor.set_exit_armed(false);
-                        editor.focus_entries();
-                    }
-                    return true;
-                }
-            }
-            FormCommand::FocusPrevField => {
-                if focus_mode == OverlayFocusMode::EntryTabs {
-                    if has_fields {
-                        if let Some(editor) = self.active_overlay_mut() {
-                            editor.set_exit_armed(false);
-                            editor.focus_form();
-                            if editor.form_state().has_focusable_fields() {
-                                editor.form_state_mut().focus_last_field();
-                            }
-                        }
-                        return true;
-                    }
-                    if entries_len > 0 && self.advance_overlay_entry(-1) {
-                        return true;
-                    }
-                    if let Some(editor) = self.active_overlay_mut() {
-                        editor.set_exit_armed(false);
-                        editor.focus_entries();
-                    }
-                    return true;
-                }
-
-                if !has_fields {
-                    if entries_len > 0 && self.advance_overlay_entry(-1) {
-                        return true;
-                    }
-                    if let Some(editor) = self.active_overlay_mut() {
-                        editor.set_exit_armed(false);
-                        editor.focus_entries();
-                    }
-                    return true;
-                }
-
-                if focus_is_first {
-                    if entries_len > 0 && self.advance_overlay_entry(-1) {
-                        return true;
-                    }
-                    if let Some(editor) = self.active_overlay_mut() {
-                        editor.set_exit_armed(false);
-                        editor.focus_entries();
-                    }
-                    return true;
-                }
-            }
-            _ => {}
+        match outcome {
+            FocusOutcome::Consumed => true,
+            FocusOutcome::RequestEntryDelta(delta) => self.advance_overlay_entry(delta),
+            FocusOutcome::PassThrough => false,
         }
-
-        false
     }
 
     pub(super) fn request_overlay_exit(&mut self) -> bool {
@@ -1218,15 +1259,40 @@ impl App {
     }
 
     pub(super) fn setup_overlay_validator(&mut self) {
-        let Some(editor) = self.active_overlay_mut() else {
+        let Some(cache_key) = self
+            .active_overlay()
+            .map(|editor| editor.validator_cache_key())
+        else {
             return;
         };
-        let validator = match editor.session() {
-            OverlaySession::Composite(session) => validator_for(&session.schema).ok().map(Arc::new),
-            OverlaySession::KeyValue(session) => validator_for(&session.schema).ok().map(Arc::new),
-            OverlaySession::Array(session) => validator_for(&session.schema).ok().map(Arc::new),
+        if let Some(cached) = self.overlay_validator_cache.get(&cache_key).cloned() {
+            if let Some(editor) = self.active_overlay_mut() {
+                editor.set_validator(Some(cached));
+            }
+            self.run_overlay_validation();
+            return;
+        }
+        let validator = {
+            let Some(editor) = self.active_overlay() else {
+                return;
+            };
+            match editor.session() {
+                OverlaySession::Composite(session) => {
+                    validator_for(&session.schema).ok().map(Arc::new)
+                }
+                OverlaySession::KeyValue(session) => {
+                    validator_for(&session.schema).ok().map(Arc::new)
+                }
+                OverlaySession::Array(session) => validator_for(&session.schema).ok().map(Arc::new),
+            }
         };
-        editor.set_validator(validator);
+        if let Some(valid) = &validator {
+            self.overlay_validator_cache
+                .insert(cache_key, valid.clone());
+        }
+        if let Some(editor) = self.active_overlay_mut() {
+            editor.set_validator(validator);
+        }
         self.run_overlay_validation();
     }
 
