@@ -8,10 +8,7 @@ use crate::form::error::FieldCoercionError;
 
 use super::helpers::{EntryPanelState, OverlayContext, format_collection_value, list_hint_for};
 use super::{
-    ComponentKind,
-    CompositePopupData,
-    CompositeSelectorView,
-    FieldComponent,
+    ComponentKind, CompositePopupData, CompositeSelectorView, FieldComponent,
     palette::ComponentPalette,
 };
 

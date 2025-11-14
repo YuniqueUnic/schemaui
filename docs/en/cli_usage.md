@@ -162,5 +162,36 @@ CLI and host applications automatically reflect build-time capabilities.
 - Combine `-o -` with file outputs to tee the result into CI logs while still
   writing to disk.
 
+## 11. Web Mode
+
+When built with the `web` feature (enabled by default), `schemaui-cli` exposes a
+`web` subcommand that proxies the library's browser UI helpers:
+
+```bash
+schemaui web \
+  --schema ./schema.json \
+  --config ./defaults.json \
+  --host 127.0.0.1 --port 0 \
+  -o -
+```
+
+The command reuses the same schema/config pipeline as the TUI flow, then calls
+`schemaui::web::session::bind_session` to embed the static assets and APIs from
+the crate. The terminal prints the bound address (port `0` selects a random free
+port). Hit **Save** to persist edits without leaving, or **Save & Exit** to shut
+down the temporary server and emit the resulting JSON through the configured
+outputs.
+
+Flags specific to the subcommand:
+
+| Flag            | Description                                 |
+| --------------- | ------------------------------------------- |
+| `--host <IP>`   | Bind address for the temporary HTTP server. |
+| `--port <PORT>` | Bind port (`0` requests an ephemeral port). |
+
+All other arguments (`--schema`, `--config`, `--output`, etc.) behave exactly
+like the TUI mode—either inlined or file-backed specs, multiple destinations,
+and the same diagnostics.
+
 With these patterns you can script `schemaui` confidently in CI/CD pipelines or
 developer tooling.

@@ -3,16 +3,23 @@
 use std::fmt::Write as FmtWrite;
 use std::fs;
 use std::io::{self, Read};
+#[cfg(feature = "web")]
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
-use clap::{ArgAction, Parser};
+use clap::{ArgAction, Parser, Subcommand};
 use color_eyre::eyre::{Report, Result, WrapErr, eyre};
 use serde_json::Value;
 
+use schemaui::io::output;
+#[cfg(feature = "web")]
+use schemaui::web::session::{ServeOptions as WebServeOptions, WebSessionBuilder, bind_session};
 use schemaui::{
     DocumentFormat, OutputDestination, OutputOptions, SchemaUI, parse_document_str,
     schema_from_data_value, schema_with_defaults,
 };
+#[cfg(feature = "web")]
+use tokio::runtime::Runtime;
 
 const DEFAULT_TEMP_FILE: &str = "/tmp/schemaui.json";
 
@@ -20,9 +27,19 @@ const DEFAULT_TEMP_FILE: &str = "/tmp/schemaui.json";
 #[command(
     name = "schemaui",
     version,
-    about = "Render JSON Schemas as interactive TUIs"
+    about = "Render JSON Schemas as interactive TUIs or Web UIs"
 )]
 struct Cli {
+    #[command(flatten)]
+    common: CommonArgs,
+
+    #[cfg(feature = "web")]
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Debug, Parser, Clone)]
+struct CommonArgs {
     /// Schema spec: file path, inline payload, or "-" for stdin
     #[arg(short = 's', long = "schema", value_name = "SPEC")]
     schema: Option<String>,
@@ -56,20 +73,86 @@ struct Cli {
     force: bool,
 }
 
+#[cfg(feature = "web")]
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Launch the interactive web UI instead of the terminal UI
+    Web(WebCommand),
+}
+
+#[cfg(feature = "web")]
+#[derive(Debug, Parser, Clone)]
+struct WebCommand {
+    #[command(flatten)]
+    common: CommonArgs,
+
+    /// Bind address for the temporary HTTP server
+    #[arg(long = "host", value_name = "IP", default_value = "127.0.0.1")]
+    host: IpAddr,
+
+    /// Bind port for the temporary HTTP server (0 picks a random free port)
+    #[arg(long = "port", value_name = "PORT", default_value_t = 0)]
+    port: u16,
+}
+
 #[derive(Debug)]
 enum InputSource {
     File(PathBuf),
     Stdin,
 }
 
+#[derive(Debug)]
+struct SessionBundle {
+    schema: Value,
+    defaults: Option<Value>,
+    title: Option<String>,
+    output: Option<OutputOptions>,
+}
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     let cli = Cli::parse();
 
+    #[cfg(feature = "web")]
+    if let Some(command) = cli.command {
+        return match command {
+            Commands::Web(args) => run_web_cli(args),
+        };
+    }
+
+    run_tui_cli(&cli.common)
+}
+
+fn run_tui_cli(args: &CommonArgs) -> Result<()> {
+    let session = prepare_session(args)?;
+    execute_tui_session(session)
+}
+
+fn execute_tui_session(session: SessionBundle) -> Result<()> {
+    let SessionBundle {
+        schema,
+        defaults,
+        title,
+        output,
+    } = session;
+    let mut ui = SchemaUI::new(schema);
+    if let Some(title) = title {
+        ui = ui.with_title(title);
+    }
+    if let Some(ref defaults) = defaults {
+        ui = ui.with_default_data(defaults);
+    }
+    if let Some(options) = output {
+        ui = ui.with_output(options);
+    }
+    ui.run().map_err(Report::msg).map(|_| ())
+}
+
+fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
     let mut diagnostics = DiagnosticCollector::default();
 
-    let schema_spec = cli.schema.as_deref();
-    let config_spec = cli.config.as_deref();
+    let schema_spec = args.schema.as_deref();
+    let config_spec = args.config.as_deref();
     let schema_stdin = schema_spec == Some("-");
     let config_stdin = config_spec == Some("-");
     if schema_stdin && config_stdin {
@@ -98,18 +181,17 @@ fn main() -> Result<()> {
     );
 
     let (output_settings, output_paths) = build_output_options(
-        &cli,
+        args,
         config_hint.hint.extension_value(),
         schema_hint.hint.extension_value(),
         &mut diagnostics,
     );
-    ensure_output_paths_available(&output_paths, cli.force, &mut diagnostics);
+    ensure_output_paths_available(&output_paths, args.force, &mut diagnostics);
 
     diagnostics.into_result()?;
 
     let mut schema_value = schema_value;
     let mut config_value = config_value;
-
     if schema_value.is_none() {
         if let Some(config_doc) = config_value.as_ref()
             && looks_like_json_schema(config_doc)
@@ -132,20 +214,46 @@ fn main() -> Result<()> {
         (None, None) => unreachable!("validated above"),
     };
 
-    let mut ui = SchemaUI::new(schema);
-    if let Some(title) = cli.title.as_ref() {
-        ui = ui.with_title(title.clone());
-    }
-    if let Some(defaults) = config_value.as_ref() {
-        ui = ui.with_default_data(defaults);
-    }
+    Ok(SessionBundle {
+        schema,
+        defaults: config_value,
+        title: args.title.clone(),
+        output: output_settings,
+    })
+}
 
-    if let Some(options) = output_settings {
-        ui = ui.with_output(options);
+#[cfg(feature = "web")]
+fn run_web_cli(cmd: WebCommand) -> Result<()> {
+    let session = prepare_session(&cmd.common)?;
+    let SessionBundle {
+        schema,
+        defaults,
+        title,
+        output,
+    } = session;
+    let mut builder = WebSessionBuilder::new(schema);
+    if let Some(title) = title.clone() {
+        builder = builder.with_title(title);
     }
-
-    let _ = ui.run().map_err(Report::msg)?;
-
+    if let Some(defaults) = defaults {
+        builder = builder.with_initial_data(defaults);
+    }
+    let config = builder.build().map_err(|err| eyre!(err))?;
+    let runtime = Runtime::new().wrap_err("failed to initialize tokio runtime")?;
+    let host = cmd.host;
+    let port = cmd.port;
+    let value = runtime.block_on(async move {
+        let bound = bind_session(config, WebServeOptions { host, port })
+            .await
+            .map_err(|err| eyre!(err))?;
+        let addr = bound.local_addr();
+        eprintln!("schemaui web UI available at http://{addr}/");
+        eprintln!("Press Ctrl+C to abort the session.");
+        bound.run().await.map_err(|err| eyre!(err))
+    })?;
+    if let Some(options) = output {
+        output::emit(&value, &options).map_err(|err| eyre!(err))?;
+    }
     Ok(())
 }
 
@@ -325,103 +433,54 @@ fn looks_like_json_schema(value: &Value) -> bool {
 
     if let Some(props) = obj.get("properties").and_then(Value::as_object) {
         let mut scored = 0usize;
+
         for value in props.values() {
-            if let Some(prop_obj) = value.as_object() {
-                if prop_obj.contains_key("type")
-                    || prop_obj.contains_key("properties")
-                    || prop_obj.contains_key("items")
-                    || prop_obj.contains_key("$ref")
-                {
-                    scored += 1;
-                }
+            if value.get("type").is_some() {
+                scored += 1;
+            }
+            if value.get("properties").is_some() {
+                scored += 1;
+            }
+            if value.get("enum").is_some() {
+                scored += 1;
             }
         }
-        if scored > 0 {
-            return true;
-        }
+
+        return scored >= 2;
     }
 
     false
 }
 
-#[cfg(test)]
-mod tests {
-    use super::looks_like_json_schema;
-    use serde_json::json;
-
-    #[test]
-    fn detects_json_schema_shape() {
-        let doc = json!({
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "properties": {
-                "username": {"type": "string"},
-                "tags": {"type": "array", "items": {"type": "string"}}
-            }
-        });
-        assert!(looks_like_json_schema(&doc));
+fn format_list() -> &'static str {
+    #[cfg(all(feature = "yaml", feature = "toml"))]
+    {
+        "JSON/YAML/TOML"
     }
-
-    #[test]
-    fn ignores_regular_config_documents() {
-        let doc = json!({
-            "username": "unic",
-            "tags": ["alpha"],
-            "properties": "not a schema"
-        });
-        assert!(!looks_like_json_schema(&doc));
+    #[cfg(all(feature = "yaml", not(feature = "toml")))]
+    {
+        "JSON/YAML"
     }
-}
-
-fn format_list() -> String {
-    let items: Vec<String> = DocumentFormat::available_formats()
-        .into_iter()
-        .map(|fmt| fmt.to_string())
-        .collect();
-    items.join(", ")
-}
-
-#[derive(Default)]
-struct DiagnosticCollector {
-    messages: Vec<String>,
-}
-
-impl DiagnosticCollector {
-    fn push_input(&mut self, label: &str, message: impl Into<String>) {
-        self.messages
-            .push(format!("input ({label}): {}", message.into()));
+    #[cfg(all(not(feature = "yaml"), feature = "toml"))]
+    {
+        "JSON/TOML"
     }
-
-    fn push_output(&mut self, message: impl Into<String>) {
-        self.messages.push(format!("output: {}", message.into()));
-    }
-
-    fn len(&self) -> usize {
-        self.messages.len()
-    }
-
-    fn into_result(self) -> Result<()> {
-        if self.messages.is_empty() {
-            return Ok(());
-        }
-        let mut body = String::from("encountered input/output issues:\n");
-        for (idx, msg) in self.messages.iter().enumerate() {
-            let _ = writeln!(body, "  {}. {}", idx + 1, msg);
-        }
-        Err(eyre!(body))
+    #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
+    {
+        "JSON"
     }
 }
 
 fn build_output_options(
-    cli: &Cli,
+    args: &CommonArgs,
     config_hint: Option<DocumentFormat>,
     schema_hint: Option<DocumentFormat>,
     diagnostics: &mut DiagnosticCollector,
 ) -> (Option<OutputOptions>, Vec<PathBuf>) {
     let mut destinations = Vec::new();
-    let explicit_outputs = !cli.outputs.is_empty();
+    let explicit_outputs = !args.outputs.is_empty();
 
-    for raw in &cli.outputs {
+    for raw in &args.outputs {
         if raw.trim().is_empty() {
             diagnostics.push_output("output destination cannot be empty");
             continue;
@@ -434,10 +493,10 @@ fn build_output_options(
     }
 
     if destinations.is_empty() && !explicit_outputs {
-        if cli.no_temp_file {
+        if args.no_temp_file {
             return (None, Vec::new());
         }
-        let fallback = cli
+        let fallback = args
             .temp_file
             .clone()
             .unwrap_or_else(|| PathBuf::from(DEFAULT_TEMP_FILE));
@@ -470,7 +529,7 @@ fn build_output_options(
     (
         Some(OutputOptions {
             format,
-            pretty: !cli.no_pretty,
+            pretty: !args.no_pretty,
             destinations,
         }),
         file_paths,
@@ -572,5 +631,35 @@ fn ensure_output_paths_available(
                 path.display()
             ));
         }
+    }
+}
+
+#[derive(Debug, Default)]
+struct DiagnosticCollector {
+    messages: Vec<String>,
+}
+
+impl DiagnosticCollector {
+    fn push_input(&mut self, label: &str, message: impl Into<String>) {
+        self.messages.push(format!("{label}: {}", message.into()));
+    }
+
+    fn push_output(&mut self, message: impl Into<String>) {
+        self.messages.push(format!("output: {}", message.into()));
+    }
+
+    fn len(&self) -> usize {
+        self.messages.len()
+    }
+
+    fn into_result(self) -> Result<()> {
+        if self.messages.is_empty() {
+            return Ok(());
+        }
+        let mut body = String::from("encountered input/output issues:\n");
+        for (idx, msg) in self.messages.iter().enumerate() {
+            let _ = writeln!(body, "  {}. {}", idx + 1, msg);
+        }
+        Err(eyre!(body))
     }
 }

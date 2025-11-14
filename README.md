@@ -36,6 +36,9 @@ see the full list of issues before saving.
 - **Batteries-included CLI** – `schemaui-cli` offers the same pipeline as the
   library, including multi-destination output, stdin/inline specs, and
   aggregated diagnostics.
+- **Embedded Web UI** – enabling the `web` feature bundles a browser UI and
+  exposes helpers under `schemaui::web::session` so host applications can serve
+  the experience without reimplementing the stack.
 
 ## Quick Start
 
@@ -133,6 +136,47 @@ code change to its architectural responsibility.
   destinations are supported; conflicts are caught before emission.
 - `SchemaUI::with_output` wires these options into the runtime so the final
   `serde_json::Value` can be written automatically after the session ends.
+
+## Web UI Mode
+
+The optional `web` feature bundles the files under `web/dist/` directly into the
+crate and exposes high-level helpers for hosting the browser UI. Basic usage:
+
+```rust,no_run
+use schemaui::web::session::{
+    ServeOptions,
+    WebSessionBuilder,
+    bind_session,
+};
+
+# async fn run() -> anyhow::Result<()> {
+let schema = serde_json::json!({
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "host": {"type": "string", "default": "127.0.0.1"},
+        "port": {"type": "integer", "default": 8080}
+    },
+    "required": ["host", "port"]
+});
+
+let config = WebSessionBuilder::new(schema)
+    .with_title("Service Config")
+    .build()?;
+let session = bind_session(config, ServeOptions::default()).await?;
+println!("visit http://{}/", session.local_addr());
+let value = session.run().await?;
+println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
+# Ok(())
+# }
+```
+
+The helper spawns an Axum router that exposes `/api/session`, `/api/save`, and
+`/api/exit` alongside the embedded static assets. Library users can either call
+`bind_session`/`serve_session` for a turnkey flow or reuse
+`session_router/WebSessionBuilder` to integrate the UI into an existing HTTP
+stack. The official CLI (`schemaui-cli web …`) is merely a thin wrapper around
+these APIs.
 
 ## JSON Schema → TUI Mapping
 

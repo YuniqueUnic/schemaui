@@ -7,6 +7,8 @@ mod form;
 pub mod io;
 mod presentation;
 mod schema;
+#[cfg(feature = "web")]
+pub mod web;
 
 #[cfg(test)]
 pub(crate) mod tests;

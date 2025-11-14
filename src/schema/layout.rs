@@ -573,10 +573,10 @@ fn build_composite(
 
 fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
     let mut shape = describe_schema_shape(schema);
-    if shape.is_empty() {
-        if let Some(reference) = schema.reference.as_ref() {
-            shape = reference.trim_start_matches("#/$defs/").to_string();
-        }
+    if shape.is_empty()
+        && let Some(reference) = schema.reference.as_ref()
+    {
+        shape = reference.trim_start_matches("#/$defs/").to_string();
     }
     if shape.is_empty() {
         format!("Variant {}", index + 1)

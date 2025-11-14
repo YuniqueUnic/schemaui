@@ -19,13 +19,15 @@ schemaui = { path = "..", version = "0.3" }
 serde_json = "1"
 color-eyre = "0.6"
 clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 
 [features]
-default = ["full"]
+default = ["full", "web"]
 full = ["json", "yaml", "toml"]
 json = ["schemaui/json"]
 yaml = ["schemaui/yaml"]
 toml = ["schemaui/toml"]
+web = ["schemaui/web", "dep:tokio"]
 
 [dev-dependencies]
 assert_cmd = "2"

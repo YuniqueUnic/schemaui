@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- *(web)* bundle the browser UI assets via `include_dir!` and expose
+  `schemaui::web::session` (builder, router, server helpers) directly from the
+  library when the `web` feature is enabled.
+- *(cli)* introduce the `web` subcommand that delegates to the new library API
+  instead of hand-rolling the HTTP server, enabling easy customization for
+  embedders.
+- *(docs)* document the browser workflow in `README.md`, `schemaui-cli/cli_usage.md`,
+  and `web/README.md`.
+
 ## [0.3.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.3.0...schemaui-v0.3.1) - 2025-11-12
 
 ### Fixed

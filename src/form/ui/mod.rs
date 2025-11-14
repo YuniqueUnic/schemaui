@@ -1,5 +1,5 @@
 //! UI-focused stores that encapsulate navigational state for the form tree.
-//! Each visual区域（root tabs、section tabs、field list）拥有自己的 store，
+//! Each visual 区域（root tabs、section tabs、field list）拥有自己的 store，
 //! 以便 presentation 层像 React + Zustand 那样组合/订阅状态。
 
 pub mod view;

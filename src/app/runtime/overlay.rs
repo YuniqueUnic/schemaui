@@ -956,10 +956,10 @@ impl App {
     }
 
     fn reset_overlay_focus_mode(&mut self) {
-        if let Some(editor) = self.active_overlay_mut() {
-            if !editor.focus_entries() {
-                editor.focus_form_first();
-            }
+        if let Some(editor) = self.active_overlay_mut()
+            && !editor.focus_entries()
+        {
+            editor.focus_form_first();
         }
     }
 
@@ -1334,11 +1334,11 @@ impl App {
         let new_session = match field.open_composite_editor(variant_index) {
             Ok(session) => session,
             Err(err) => {
-                if let Ok(restored) = field.open_composite_editor(old_index) {
-                    if let Some(editor) = self.active_overlay_mut() {
-                        editor.replace_composite_session(restored);
-                        editor.sync_variant_selection(old_index);
-                    }
+                if let Ok(restored) = field.open_composite_editor(old_index)
+                    && let Some(editor) = self.active_overlay_mut()
+                {
+                    editor.replace_composite_session(restored);
+                    editor.sync_variant_selection(old_index);
                 }
                 self.status.set_raw(&err.message);
                 return false;

@@ -18,7 +18,7 @@ readme = "README.md"
 default = ["tui", "json"]
 full = ["all_formats", "tui", "web"]
 tui = []
-web = []
+web = ["dep:include_dir", "dep:axum", "dep:tokio"]
 
 all_formats = ["json", "yaml", "toml"]
 json = []
@@ -43,6 +43,9 @@ percent-encoding = "2"
 unicode-width = "=0.2.0"
 textwrap = "0.16"
 regex = "1"
+include_dir = { version = "0.7", optional = true }
+axum = { version = "0.7", features = ["macros", "json"], optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net"], optional = true }
 
 # For serialization formats
 serde_json = "1"
