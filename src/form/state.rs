@@ -8,6 +8,7 @@ use super::{
     error::FieldCoercionError,
     field::{FieldState, components::ComponentPalette},
     section::SectionState,
+    ui::UiStores,
 };
 
 #[derive(Debug, Clone)]
@@ -23,9 +24,7 @@ pub struct RootSectionState {
 #[derive(Debug, Clone)]
 pub struct FormState {
     pub roots: Vec<RootSectionState>,
-    pub root_index: usize,
-    pub section_index: usize,
-    pub field_index: usize,
+    ui: UiStores,
 }
 
 impl FormState {
@@ -57,9 +56,7 @@ impl FormState {
         }
         let mut state = Self {
             roots,
-            root_index: 0,
-            section_index: 0,
-            field_index: 0,
+            ui: UiStores::new(),
         };
         state.normalize_focus();
         state
@@ -78,12 +75,68 @@ impl FormState {
                 description: root_description,
                 sections,
             }],
-            root_index: 0,
-            section_index: 0,
-            field_index: 0,
+            ui: UiStores::new(),
         };
         state.normalize_focus();
         state
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_roots_for_test(roots: Vec<RootSectionState>) -> Self {
+        let mut state = Self {
+            roots,
+            ui: UiStores::new(),
+        };
+        state.normalize_focus();
+        state
+    }
+
+    pub fn root_index(&self) -> usize {
+        self.ui.root.current()
+    }
+
+    pub fn section_index(&self) -> usize {
+        self.ui.sections.current()
+    }
+
+    pub fn field_index(&self) -> usize {
+        self.ui.fields.current()
+    }
+
+    pub fn set_root_index(&mut self, index: usize) -> bool {
+        let changed = self.ui.root.set(index, self.roots.len());
+        if changed {
+            self.ui.sections.reset();
+            self.ui.fields.reset();
+            self.normalize_focus();
+        }
+        changed
+    }
+
+    pub fn set_section_index(&mut self, index: usize) -> bool {
+        let len = self
+            .roots
+            .get(self.root_index())
+            .map(|root| root.sections.len())
+            .unwrap_or(0);
+        let changed = self.ui.sections.set(index, len);
+        if changed {
+            self.ui.fields.reset();
+            self.normalize_focus();
+        }
+        changed
+    }
+
+    pub fn set_field_index(&mut self, index: usize) -> bool {
+        let len = self
+            .active_section()
+            .map(|section| section.fields.len())
+            .unwrap_or(0);
+        let changed = self.ui.fields.set(index, len);
+        if changed {
+            self.normalize_focus();
+        }
+        changed
     }
 
     pub fn is_empty(&self) -> bool {
@@ -95,19 +148,22 @@ impl FormState {
     }
 
     pub fn active_root(&self) -> Option<&RootSectionState> {
-        self.roots.get(self.root_index)
+        self.roots.get(self.root_index())
     }
 
     pub fn active_section(&self) -> Option<&SectionState> {
         self.active_root()
-            .and_then(|root| root.sections.get(self.section_index))
+            .and_then(|root| root.sections.get(self.section_index()))
     }
 
     pub fn active_section_mut(&mut self) -> Option<(&mut SectionState, usize)> {
         self.normalize_focus();
-        let root = self.roots.get_mut(self.root_index)?;
-        let section = root.sections.get_mut(self.section_index)?;
-        let index = self.field_index.min(section.fields.len().saturating_sub(1));
+        let root_index = self.root_index();
+        let section_index = self.section_index();
+        let field_index = self.field_index();
+        let root = self.roots.get_mut(root_index)?;
+        let section = root.sections.get_mut(section_index)?;
+        let index = field_index.min(section.fields.len().saturating_sub(1));
         Some((section, index))
     }
 
@@ -118,7 +174,7 @@ impl FormState {
 
     pub fn focused_field(&self) -> Option<&FieldState> {
         self.active_section()
-            .and_then(|section| section.fields.get(self.field_index))
+            .and_then(|section| section.fields.get(self.field_index()))
     }
 
     pub fn focus_next_field(&mut self) {
@@ -157,19 +213,17 @@ impl FormState {
 
     pub fn focus_first_field(&mut self) {
         if let Some((root_idx, section_idx, field_idx)) = self.focus_positions().first().copied() {
-            self.root_index = root_idx;
-            self.section_index = section_idx;
-            self.field_index = field_idx;
-            self.normalize_focus();
+            self.set_root_index(root_idx);
+            self.set_section_index(section_idx);
+            self.set_field_index(field_idx);
         }
     }
 
     pub fn focus_last_field(&mut self) {
         if let Some((root_idx, section_idx, field_idx)) = self.focus_positions().last().copied() {
-            self.root_index = root_idx;
-            self.section_index = section_idx;
-            self.field_index = field_idx;
-            self.normalize_focus();
+            self.set_root_index(root_idx);
+            self.set_section_index(section_idx);
+            self.set_field_index(field_idx);
         }
     }
 
@@ -178,15 +232,15 @@ impl FormState {
         if self.roots.is_empty() {
             return;
         }
-        if let Some(section) = self.active_section()
-            && !section.fields.is_empty()
-            && self.field_index + 1 < section.fields.len()
-        {
-            self.field_index += 1;
-            return;
+        if let Some(section) = self.active_section() {
+            let len = section.fields.len();
+            if len > 0 && self.field_index() + 1 < len {
+                self.ui.fields.set(self.field_index() + 1, len);
+                return;
+            }
         }
         self.advance_section(1);
-        self.field_index = 0;
+        self.ui.fields.reset();
         self.normalize_focus();
     }
 
@@ -195,21 +249,24 @@ impl FormState {
         if self.roots.is_empty() {
             return;
         }
-        if let Some(section) = self.active_section()
-            && !section.fields.is_empty()
-            && self.field_index > 0
-        {
-            self.field_index -= 1;
-            return;
+        if let Some(section) = self.active_section() {
+            let len = section.fields.len();
+            if len > 0 && self.field_index() > 0 {
+                self.ui.fields.set(self.field_index() - 1, len);
+                return;
+            }
         }
         self.advance_section(-1);
         self.normalize_focus();
         if let Some(current) = self.active_section() {
-            if current.fields.is_empty() {
-                self.field_index = 0;
+            let len = current.fields.len();
+            if len == 0 {
+                self.ui.fields.reset();
             } else {
-                self.field_index = current.fields.len().saturating_sub(1);
+                self.ui.fields.set(len.saturating_sub(1), len);
             }
+        } else {
+            self.ui.fields.reset();
         }
     }
 
@@ -223,14 +280,10 @@ impl FormState {
         if self.roots.is_empty() {
             return;
         }
-        let len = self.roots.len() as i32;
-        let mut next = self.root_index as i32 + delta;
-        if len > 0 {
-            next = ((next % len) + len) % len;
+        if self.ui.root.advance(delta, self.roots.len()) {
+            self.ui.sections.reset();
+            self.ui.fields.reset();
         }
-        self.root_index = next as usize;
-        self.section_index = 0;
-        self.field_index = 0;
         self.normalize_focus();
     }
 
@@ -340,67 +393,76 @@ impl FormState {
         }
         let current_idx = positions
             .iter()
-            .position(|&(root, section)| root == self.root_index && section == self.section_index)
+            .position(|&(root, section)| {
+                root == self.root_index() && section == self.section_index()
+            })
             .unwrap_or(0);
         let len = positions.len() as i32;
         let mut next = current_idx as i32 + delta;
         next = ((next % len) + len) % len;
         let (root_index, section_index) = positions[next as usize];
-        self.root_index = root_index;
-        self.section_index = section_index;
-        self.field_index = 0;
+        self.set_root_index(root_index);
+        self.set_section_index(section_index);
+        self.ui.fields.reset();
     }
 
     fn normalize_focus(&mut self) {
         if self.roots.is_empty() {
             return;
         }
-        if self.root_index >= self.roots.len() {
-            self.root_index = 0;
-        }
-        if self.roots[self.root_index].sections.is_empty() {
+        self.ui.root.clamp(self.roots.len());
+        if self
+            .roots
+            .get(self.root_index())
+            .map(|root| root.sections.is_empty())
+            .unwrap_or(true)
+        {
             if let Some((idx, _)) = self
                 .roots
                 .iter()
                 .enumerate()
                 .find(|(_, root)| !root.sections.is_empty())
             {
-                self.root_index = idx;
+                self.ui.root.set(idx, self.roots.len());
             } else {
-                self.section_index = 0;
-                self.field_index = 0;
+                self.ui.sections.reset();
+                self.ui.fields.reset();
                 return;
             }
         }
-        let section_len = self.roots[self.root_index].sections.len();
+        let section_len = self
+            .roots
+            .get(self.root_index())
+            .map(|root| root.sections.len())
+            .unwrap_or(0);
         if section_len == 0 {
-            self.section_index = 0;
-            self.field_index = 0;
+            self.ui.sections.reset();
+            self.ui.fields.reset();
             return;
         }
-        if self.section_index >= section_len {
-            self.section_index = section_len - 1;
-        }
+        self.ui.sections.clamp(section_len);
 
-        if !self.section_has_fields(self.root_index, self.section_index) {
-            if let Some(index) = self.first_focusable_section_in_root(self.root_index) {
-                self.section_index = index;
+        if !self.section_has_fields(self.root_index(), self.section_index()) {
+            if let Some(index) = self.first_focusable_section_in_root(self.root_index()) {
+                self.ui.sections.set(index, section_len);
             } else if let Some((root_idx, section_idx)) =
                 self.focusable_section_positions().first().copied()
             {
-                self.root_index = root_idx;
-                self.section_index = section_idx;
+                self.ui.root.set(root_idx, self.roots.len());
+                let new_len = self
+                    .roots
+                    .get(root_idx)
+                    .map(|root| root.sections.len())
+                    .unwrap_or(0);
+                self.ui.sections.set(section_idx, new_len);
             }
         }
 
-        let field_len = self.roots[self.root_index].sections[self.section_index]
-            .fields
-            .len();
-        if field_len == 0 {
-            self.field_index = 0;
-        } else if self.field_index >= field_len {
-            self.field_index = field_len - 1;
-        }
+        let field_len = self
+            .active_section()
+            .map(|section| section.fields.len())
+            .unwrap_or(0);
+        self.ui.fields.clamp(field_len);
     }
 
     fn iter_sections(&self) -> impl Iterator<Item = &SectionState> {
@@ -414,16 +476,18 @@ impl FormState {
     }
 
     fn current_focus_position(&self) -> Option<(usize, usize, usize)> {
-        let root = self.roots.get(self.root_index)?;
-        let section = root.sections.get(self.section_index)?;
+        let root_idx = self.root_index();
+        let section_idx = self.section_index();
+        let root = self.roots.get(root_idx)?;
+        let section = root.sections.get(section_idx)?;
         if section.fields.is_empty() {
             return None;
         }
         let field_len = section.fields.len();
         Some((
-            self.root_index,
-            self.section_index,
-            self.field_index.min(field_len.saturating_sub(1)),
+            root_idx,
+            section_idx,
+            self.field_index().min(field_len.saturating_sub(1)),
         ))
     }
 

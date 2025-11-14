@@ -67,12 +67,7 @@ fn sample_form_state() -> FormState {
         sections: vec![section("site_main", "Site", 0, site_fields)],
     };
 
-    FormState {
-        roots: vec![root_general, root_site],
-        root_index: 0,
-        section_index: 0,
-        field_index: 0,
-    }
+    FormState::from_roots_for_test(vec![root_general, root_site])
 }
 
 fn focused_pointer(form: &FormState) -> String {
@@ -106,9 +101,9 @@ fn tab_cycles_sections_and_roots() {
 #[test]
 fn shift_tab_moves_backward_through_hierarchy() {
     let mut form = sample_form_state();
-    form.field_index = 0;
-    form.section_index = 0;
-    form.root_index = 0;
+    form.set_root_index(0);
+    form.set_section_index(0);
+    form.set_field_index(0);
 
     // jump near the end
     form.focus_prev_field(); // should wrap to site/enabled

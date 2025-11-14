@@ -14,7 +14,13 @@ pub fn render_root_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormStat
         .iter()
         .map(|root| root.title.clone())
         .collect();
-    render_tab_strip(frame, area, &titles, form_state.root_index, "Root Sections");
+    render_tab_strip(
+        frame,
+        area,
+        &titles,
+        form_state.root_index(),
+        "Root Sections",
+    );
 }
 
 pub fn render_section_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormState) {
@@ -39,7 +45,7 @@ pub fn render_section_tabs(frame: &mut Frame<'_>, area: Rect, form_state: &FormS
         frame,
         area,
         &titles,
-        form_state.section_index,
+        form_state.section_index(),
         &format!("{} Sections", root.title),
     );
 }

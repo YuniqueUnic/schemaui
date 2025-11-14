@@ -7,6 +7,7 @@ pub(crate) mod key_value;
 pub mod reducers;
 mod section;
 mod state;
+pub mod ui;
 
 pub use actions::FormCommand;
 pub use array::ArrayEditorSession;

@@ -57,9 +57,9 @@ fn focus_field(state: &mut FormState, pointer: &str) {
             if let Some(field_idx) = section.fields.iter().position(|field| {
                 field.schema.pointer == pointer || field.schema.pointer.ends_with(pointer)
             }) {
-                state.root_index = root_idx;
-                state.section_index = section_idx;
-                state.field_index = field_idx;
+                state.set_root_index(root_idx);
+                state.set_section_index(section_idx);
+                state.set_field_index(field_idx);
                 return;
             }
         }
