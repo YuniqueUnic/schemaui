@@ -235,7 +235,8 @@ impl FormState {
         if let Some(section) = self.active_section() {
             let len = section.fields.len();
             if len > 0 && self.field_index() + 1 < len {
-                self.ui.fields.set(self.field_index() + 1, len);
+                self.ui.fields.advance(1, len);
+                self.normalize_focus();
                 return;
             }
         }
@@ -252,7 +253,8 @@ impl FormState {
         if let Some(section) = self.active_section() {
             let len = section.fields.len();
             if len > 0 && self.field_index() > 0 {
-                self.ui.fields.set(self.field_index() - 1, len);
+                self.ui.fields.advance(-1, len);
+                self.normalize_focus();
                 return;
             }
         }

@@ -68,13 +68,293 @@ impl EntryTabsStore {
             return false;
         }
         let len = self.entries.len() as i32;
-        let next = (self.selected as i32 + delta).clamp(0, len - 1) as usize;
+        let mut next = self.selected as i32 + delta;
+        next = ((next % len) + len) % len;
+        let next = next as usize;
         if next == self.selected {
             false
         } else {
             self.selected = next;
             true
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct OverlayStore {
+    display_title: String,
+    display_description: Option<String>,
+    instructions: String,
+    entry_tabs: Option<EntryTabsStore>,
+    focus: OverlayFocusMode,
+}
+
+#[derive(Clone)]
+struct OverlayResult {
+    field_pointer: String,
+    host: OverlayHost,
+    target: CompositeOverlayTarget,
+    session: OverlaySession,
+}
+
+impl OverlayResult {
+    fn host(&self) -> OverlayHost {
+        self.host
+    }
+
+    fn apply(self, host_state: &mut FormState) -> Result<(), String> {
+        match self.target {
+            CompositeOverlayTarget::Field => {
+                let OverlaySession::Composite(session) = self.session else {
+                    return Err("Invalid overlay session".to_string());
+                };
+                let Some(field) = host_state.field_mut_by_pointer(&self.field_pointer) else {
+                    return Err("Overlay target no longer exists".to_string());
+                };
+                field.close_composite_editor(session, true);
+                Ok(())
+            }
+            CompositeOverlayTarget::ListEntry { entry_index } => {
+                let OverlaySession::Composite(session) = self.session else {
+                    return Err("Invalid overlay session".to_string());
+                };
+                let Some(field) = host_state.field_mut_by_pointer(&self.field_pointer) else {
+                    return Err("Overlay target no longer exists".to_string());
+                };
+                field.close_composite_list_editor(entry_index, session, true);
+                Ok(())
+            }
+            CompositeOverlayTarget::KeyValueEntry { entry_index } => {
+                let OverlaySession::KeyValue(session) = self.session else {
+                    return Err("Invalid overlay session".to_string());
+                };
+                let Some(field) = host_state.field_mut_by_pointer(&self.field_pointer) else {
+                    return Err("Overlay target no longer exists".to_string());
+                };
+                field
+                    .close_key_value_editor(entry_index, &session, true)
+                    .map_err(|err| err.message)
+                    .map(|_| ())
+            }
+            CompositeOverlayTarget::ArrayEntry { entry_index } => {
+                let OverlaySession::Array(session) = self.session else {
+                    return Err("Invalid overlay session".to_string());
+                };
+                let Some(field) = host_state.field_mut_by_pointer(&self.field_pointer) else {
+                    return Err("Overlay target no longer exists".to_string());
+                };
+                field
+                    .close_scalar_array_editor(entry_index, &session, true)
+                    .map_err(|err| err.message)
+                    .map(|_| ())
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+struct OverlayState {
+    field_pointer: String,
+    field_label: String,
+    host: OverlayHost,
+    level: usize,
+    target: CompositeOverlayTarget,
+    session: OverlaySession,
+    exit_armed: bool,
+    validator: Option<Arc<Validator>>,
+}
+
+impl OverlayState {
+    fn new(
+        field_pointer: String,
+        field_label: String,
+        host: OverlayHost,
+        level: usize,
+        session: OverlaySession,
+    ) -> Self {
+        Self {
+            field_pointer,
+            field_label,
+            host,
+            level,
+            target: CompositeOverlayTarget::Field,
+            session,
+            exit_armed: false,
+            validator: None,
+        }
+    }
+
+    fn dirty(&self) -> bool {
+        self.session.is_dirty()
+    }
+
+    fn form_state(&self) -> &FormState {
+        self.session.form_state()
+    }
+
+    fn form_state_mut(&mut self) -> &mut FormState {
+        self.session.form_state_mut()
+    }
+
+    fn session(&self) -> &OverlaySession {
+        &self.session
+    }
+
+    fn field_pointer(&self) -> &str {
+        &self.field_pointer
+    }
+
+    fn field_label(&self) -> &str {
+        &self.field_label
+    }
+
+    fn level(&self) -> usize {
+        self.level
+    }
+
+    fn host(&self) -> OverlayHost {
+        self.host
+    }
+
+    fn target(&self) -> &CompositeOverlayTarget {
+        &self.target
+    }
+
+    fn target_mut(&mut self) -> &mut CompositeOverlayTarget {
+        &mut self.target
+    }
+
+    fn set_target(&mut self, target: CompositeOverlayTarget) {
+        self.target = target;
+    }
+
+    fn exit_armed(&self) -> bool {
+        self.exit_armed
+    }
+
+    fn set_exit_armed(&mut self, armed: bool) {
+        self.exit_armed = armed;
+    }
+
+    fn set_validator(&mut self, validator: Option<Arc<Validator>>) {
+        self.validator = validator;
+    }
+
+    fn validator_clone(&self) -> Option<Arc<Validator>> {
+        self.validator.clone()
+    }
+
+    fn build_result(&self) -> OverlayResult {
+        OverlayResult {
+            field_pointer: self.field_pointer.clone(),
+            host: self.host,
+            target: self.target.clone(),
+            session: self.session.clone(),
+        }
+    }
+}
+
+impl OverlayStore {
+    fn new(
+        display_title: String,
+        display_description: Option<String>,
+        instructions: String,
+    ) -> Self {
+        Self {
+            display_title,
+            display_description,
+            instructions,
+            entry_tabs: None,
+            focus: OverlayFocusMode::FormFields,
+        }
+    }
+
+    fn entry_tabs_len(&self) -> usize {
+        self.entry_tabs.as_ref().map(|tabs| tabs.len()).unwrap_or(0)
+    }
+
+    fn entry_tabs_selected(&self) -> Option<usize> {
+        self.entry_tabs.as_ref().map(|tabs| tabs.selected())
+    }
+
+    fn entry_tabs_entries(&self) -> Option<&[String]> {
+        self.entry_tabs.as_ref().map(|tabs| tabs.entries())
+    }
+
+    fn entry_tabs_snapshot(&self) -> Option<(usize, usize)> {
+        self.entry_tabs
+            .as_ref()
+            .map(|tabs| (tabs.len(), tabs.selected()))
+    }
+
+    fn can_focus_entries(&self) -> bool {
+        self.entry_tabs
+            .as_ref()
+            .map(|tabs| !tabs.is_empty())
+            .unwrap_or(false)
+    }
+
+    fn focus_entries(&mut self) {
+        self.focus = OverlayFocusMode::EntryTabs;
+    }
+
+    fn focus_form(&mut self) {
+        self.focus = OverlayFocusMode::FormFields;
+    }
+
+    fn focus(&self) -> OverlayFocusMode {
+        self.focus
+    }
+
+    fn set_entry_tabs(&mut self, entries: Vec<String>, selected: usize) {
+        if let Some(store) = self.entry_tabs.as_mut() {
+            store.set_entries(entries, selected);
+        } else {
+            self.entry_tabs = Some(EntryTabsStore::new(entries, selected));
+        }
+    }
+
+    fn update_title(&mut self, field_label: &str, title: &str) {
+        self.display_title = format!("Edit {} – {}", field_label, title);
+    }
+
+    fn set_description(&mut self, description: Option<String>) {
+        self.display_description = description;
+    }
+
+    fn append_instructions(&mut self, extra: String) {
+        if self.instructions.trim().is_empty() {
+            self.instructions = extra;
+        } else {
+            self.instructions = format!("{} • {}", self.instructions, extra);
+        }
+    }
+
+    fn apply_component_context(&mut self, field_label: &str, ctx: OverlayContext) {
+        if let Some(title) = ctx.title {
+            self.update_title(field_label, &title);
+        }
+        if let Some(description) = ctx.description {
+            self.display_description = Some(description);
+        }
+        if let Some(panel) = ctx.entry_panel {
+            self.set_entry_tabs(panel.entries, panel.selected);
+        }
+        if let Some(extra) = ctx.instructions {
+            self.append_instructions(extra);
+        }
+    }
+
+    fn title(&self) -> &str {
+        &self.display_title
+    }
+
+    fn description(&self) -> Option<&String> {
+        self.display_description.as_ref()
+    }
+
+    fn instructions(&self) -> &str {
+        &self.instructions
     }
 }
 
@@ -171,28 +451,9 @@ pub(super) enum OverlayFocusMode {
     EntryTabs,
 }
 
-#[derive(Clone)]
-struct OverlayCommitPayload {
-    field_pointer: String,
-    host: OverlayHost,
-    target: CompositeOverlayTarget,
-    session: OverlaySession,
-}
-
 pub(super) struct CompositeEditorOverlay {
-    pub(super) field_pointer: String,
-    pub(super) field_label: String,
-    pub(super) display_title: String,
-    pub(super) display_description: Option<String>,
-    pub(super) session: OverlaySession,
-    pub(super) target: CompositeOverlayTarget,
-    pub(super) exit_armed: bool,
-    entry_tabs: Option<EntryTabsStore>,
-    pub(super) instructions: String,
-    pub(super) validator: Option<Arc<Validator>>,
-    pub(super) level: usize,
-    pub(super) host: OverlayHost,
-    pub(super) focus: OverlayFocusMode,
+    state: OverlayState,
+    store: OverlayStore,
 }
 
 impl CompositeEditorOverlay {
@@ -206,35 +467,18 @@ impl CompositeEditorOverlay {
     ) -> Self {
         let display_title = format!("Edit {} – {}", field_label, session.title());
         let display_description = session.description();
-        Self {
-            field_pointer,
-            field_label,
-            display_title,
-            display_description,
-            session,
-            target: CompositeOverlayTarget::Field,
-            exit_armed: false,
-            entry_tabs: None,
-            instructions,
-            validator: None,
-            level,
-            host,
-            focus: OverlayFocusMode::FormFields,
-        }
+        let store = OverlayStore::new(display_title, display_description, instructions);
+        let state = OverlayState::new(field_pointer, field_label, host, level, session);
+        Self { state, store }
     }
 
-    fn build_commit_payload(&self) -> OverlayCommitPayload {
-        OverlayCommitPayload {
-            field_pointer: self.field_pointer.clone(),
-            host: self.host,
-            target: self.target.clone(),
-            session: self.session.clone(),
-        }
+    fn build_commit_payload(&self) -> OverlayResult {
+        self.state.build_result()
     }
 
     fn needs_list_panel(&self) -> bool {
         matches!(
-            self.target,
+            self.state.target(),
             CompositeOverlayTarget::ListEntry { .. }
                 | CompositeOverlayTarget::KeyValueEntry { .. }
                 | CompositeOverlayTarget::ArrayEntry { .. }
@@ -242,75 +486,124 @@ impl CompositeEditorOverlay {
     }
 
     pub(super) fn form_state(&self) -> &FormState {
-        self.session.form_state()
+        self.state.form_state()
     }
 
     pub(super) fn form_state_mut(&mut self) -> &mut FormState {
-        self.session.form_state_mut()
-    }
-
-    pub(super) fn set_entry_tabs(&mut self, entries: Vec<String>, selected: usize) {
-        if let Some(store) = self.entry_tabs.as_mut() {
-            store.set_entries(entries, selected);
-        } else {
-            self.entry_tabs = Some(EntryTabsStore::new(entries, selected));
-        }
+        self.state.form_state_mut()
     }
 
     pub(super) fn dirty(&self) -> bool {
-        self.session.is_dirty()
+        self.state.dirty()
     }
 
     pub(super) fn can_focus_entries(&self) -> bool {
-        self.entry_tabs
-            .as_ref()
-            .map(|tabs| !tabs.is_empty())
-            .unwrap_or(false)
+        self.store.can_focus_entries()
     }
 
     pub(super) fn focus_entries(&mut self) {
-        self.focus = OverlayFocusMode::EntryTabs;
+        self.store.focus_entries();
     }
 
     pub(super) fn focus_form(&mut self) {
-        self.focus = OverlayFocusMode::FormFields;
+        self.store.focus_form();
     }
 
     pub(super) fn apply_component_context(&mut self, ctx: OverlayContext) {
-        if let Some(title) = ctx.title {
-            self.display_title = format!("Edit {} – {}", self.field_label, title);
-        }
-        if let Some(description) = ctx.description {
-            self.display_description = Some(description);
-        }
-        if let Some(panel) = ctx.entry_panel {
-            self.set_entry_tabs(panel.entries, panel.selected);
-        }
-        if let Some(extra) = ctx.instructions {
-            if self.instructions.trim().is_empty() {
-                self.instructions = extra;
-            } else {
-                self.instructions = format!("{} • {}", self.instructions, extra);
-            }
-        }
+        let field_label = self.field_label().to_string();
+        self.store.apply_component_context(&field_label, ctx);
     }
 
     fn entry_tabs_len(&self) -> usize {
-        self.entry_tabs.as_ref().map(|tabs| tabs.len()).unwrap_or(0)
+        self.store.entry_tabs_len()
     }
 
     pub(super) fn entry_tabs_selected(&self) -> Option<usize> {
-        self.entry_tabs.as_ref().map(|tabs| tabs.selected())
+        self.store.entry_tabs_selected()
     }
 
     pub(super) fn entry_tabs_entries(&self) -> Option<&[String]> {
-        self.entry_tabs.as_ref().map(|tabs| tabs.entries())
+        self.store.entry_tabs_entries()
     }
 
     fn entry_tabs_snapshot(&self) -> Option<(usize, usize)> {
-        self.entry_tabs
-            .as_ref()
-            .map(|tabs| (tabs.len(), tabs.selected()))
+        self.store.entry_tabs_snapshot()
+    }
+
+    fn set_entry_tabs(&mut self, entries: Vec<String>, selected: usize) {
+        self.store.set_entry_tabs(entries, selected);
+    }
+
+    pub(super) fn instructions(&self) -> &str {
+        self.store.instructions()
+    }
+
+    pub(super) fn title(&self) -> &str {
+        self.store.title()
+    }
+
+    pub(super) fn description(&self) -> Option<&String> {
+        self.store.description()
+    }
+
+    fn focus_mode(&self) -> OverlayFocusMode {
+        self.store.focus()
+    }
+
+    pub(super) fn field_label(&self) -> &str {
+        self.state.field_label()
+    }
+
+    pub(super) fn level(&self) -> usize {
+        self.state.level()
+    }
+
+    pub(super) fn host(&self) -> OverlayHost {
+        self.state.host()
+    }
+
+    pub(super) fn field_pointer(&self) -> &str {
+        self.state.field_pointer()
+    }
+
+    pub(super) fn target(&self) -> &CompositeOverlayTarget {
+        self.state.target()
+    }
+
+    fn target_mut(&mut self) -> &mut CompositeOverlayTarget {
+        self.state.target_mut()
+    }
+
+    pub(super) fn set_target(&mut self, target: CompositeOverlayTarget) {
+        self.state.set_target(target);
+    }
+
+    fn exit_armed(&self) -> bool {
+        self.state.exit_armed()
+    }
+
+    fn set_exit_armed(&mut self, armed: bool) {
+        self.state.set_exit_armed(armed);
+    }
+
+    fn validator_clone(&self) -> Option<Arc<Validator>> {
+        self.state.validator_clone()
+    }
+
+    fn set_validator(&mut self, validator: Option<Arc<Validator>>) {
+        self.state.set_validator(validator);
+    }
+
+    fn session(&self) -> &OverlaySession {
+        self.state.session()
+    }
+
+    fn advance_entry_tab(&mut self, delta: i32) -> bool {
+        self.store
+            .entry_tabs
+            .as_mut()
+            .map(|tabs| tabs.advance(delta))
+            .unwrap_or(false)
     }
 }
 
@@ -333,7 +626,7 @@ impl App {
             .help_text(KeymapContext::Overlay)
             .unwrap_or_else(|| "Ctrl+S save • Esc cancel".to_string());
         if let Some(editor) = self.active_overlay() {
-            format!("L{} · {}", editor.level, base)
+            format!("L{} · {}", editor.level(), base)
         } else {
             base
         }
@@ -343,7 +636,7 @@ impl App {
         if let Some(editor) = self.active_overlay() {
             let help = self.overlay_help_text();
             self.status
-                .set_raw(format!("Overlay {}: {}", editor.level, help));
+                .set_raw(format!("Overlay {}: {}", editor.level(), help));
         }
     }
 
@@ -352,7 +645,7 @@ impl App {
             OverlayHost::RootForm => &self.form_state,
             OverlayHost::Overlay { parent_level } => {
                 let idx = parent_level.saturating_sub(1);
-                self.overlay_stack[idx].session.form_state()
+                self.overlay_stack[idx].form_state()
             }
         }
     }
@@ -468,9 +761,9 @@ impl App {
                             OverlaySession::Composite(context.session),
                             self.overlay_help_text(),
                         );
-                        overlay.target = CompositeOverlayTarget::ListEntry {
+                        overlay.set_target(CompositeOverlayTarget::ListEntry {
                             entry_index: context.entry_index,
-                        };
+                        });
                         self.overlay_stack.push(overlay);
                         self.initialize_active_overlay();
                     }
@@ -491,9 +784,9 @@ impl App {
                             OverlaySession::KeyValue(context.session),
                             self.overlay_help_text(),
                         );
-                        overlay.target = CompositeOverlayTarget::KeyValueEntry {
+                        overlay.set_target(CompositeOverlayTarget::KeyValueEntry {
                             entry_index: context.entry_index,
-                        };
+                        });
                         self.overlay_stack.push(overlay);
                         self.initialize_active_overlay();
                     }
@@ -526,9 +819,9 @@ impl App {
                             OverlaySession::Array(context.session),
                             self.overlay_help_text(),
                         );
-                        overlay.target = CompositeOverlayTarget::ArrayEntry {
+                        overlay.set_target(CompositeOverlayTarget::ArrayEntry {
                             entry_index: context.entry_index,
-                        };
+                        });
                         self.overlay_stack.push(overlay);
                         self.initialize_active_overlay();
                     }
@@ -558,10 +851,10 @@ impl App {
             match self.apply_overlay_commit(&overlay) {
                 Ok(()) => {
                     overlay.form_state_mut().mark_clean();
-                    overlay.exit_armed = false;
+                    overlay.set_exit_armed(false);
                     self.exit_armed = false;
                     self.status.value_updated();
-                    if overlay.level == 1 && self.options.auto_validate {
+                    if overlay.level() == 1 && self.options.auto_validate {
                         self.run_validation(false);
                     } else {
                         self.run_overlay_validation();
@@ -578,7 +871,7 @@ impl App {
         }
 
         if let Some(parent) = self.active_overlay_mut() {
-            parent.exit_armed = false;
+            parent.set_exit_armed(false);
             self.set_overlay_status_message();
             self.refresh_list_overlay_panel();
             self.run_overlay_validation();
@@ -587,53 +880,8 @@ impl App {
 
     fn apply_overlay_commit(&mut self, overlay: &CompositeEditorOverlay) -> Result<(), String> {
         let payload = overlay.build_commit_payload();
-        let host_state = self.host_form_state_mut(payload.host);
-        match payload.target {
-            CompositeOverlayTarget::Field => {
-                let OverlaySession::Composite(session) = payload.session else {
-                    return Err("Invalid overlay session".to_string());
-                };
-                let Some(field) = host_state.field_mut_by_pointer(&payload.field_pointer) else {
-                    return Err("Overlay target no longer exists".to_string());
-                };
-                field.close_composite_editor(session, true);
-                Ok(())
-            }
-            CompositeOverlayTarget::ListEntry { entry_index } => {
-                let OverlaySession::Composite(session) = payload.session else {
-                    return Err("Invalid overlay session".to_string());
-                };
-                let Some(field) = host_state.field_mut_by_pointer(&payload.field_pointer) else {
-                    return Err("Overlay target no longer exists".to_string());
-                };
-                field.close_composite_list_editor(entry_index, session, true);
-                Ok(())
-            }
-            CompositeOverlayTarget::KeyValueEntry { entry_index } => {
-                let OverlaySession::KeyValue(session) = payload.session else {
-                    return Err("Invalid overlay session".to_string());
-                };
-                let Some(field) = host_state.field_mut_by_pointer(&payload.field_pointer) else {
-                    return Err("Overlay target no longer exists".to_string());
-                };
-                field
-                    .close_key_value_editor(entry_index, &session, true)
-                    .map_err(|err| err.message)
-                    .map(|_| ())
-            }
-            CompositeOverlayTarget::ArrayEntry { entry_index } => {
-                let OverlaySession::Array(session) = payload.session else {
-                    return Err("Invalid overlay session".to_string());
-                };
-                let Some(field) = host_state.field_mut_by_pointer(&payload.field_pointer) else {
-                    return Err("Overlay target no longer exists".to_string());
-                };
-                field
-                    .close_scalar_array_editor(entry_index, &session, true)
-                    .map_err(|err| err.message)
-                    .map(|_| ())
-            }
-        }
+        let host_state = self.host_form_state_mut(payload.host());
+        payload.apply(host_state)
     }
 
     pub(super) fn handle_composite_editor_key(&mut self, key: KeyEvent) -> Result<()> {
@@ -654,7 +902,7 @@ impl App {
                     return Ok(());
                 }
                 if let Some(editor) = self.active_overlay_mut() {
-                    editor.exit_armed = false;
+                    editor.set_exit_armed(false);
                     apply_command(editor.form_state_mut(), command.clone());
                     self.run_overlay_validation();
                 }
@@ -674,39 +922,29 @@ impl App {
     }
 
     fn advance_overlay_entry(&mut self, delta: i32) -> bool {
-        let overlay_snapshot = {
-            let editor = match self.active_overlay() {
+        let snapshot = {
+            let editor = match self.active_overlay_mut() {
                 Some(editor) => editor,
                 None => return false,
             };
             if !editor.can_focus_entries() {
                 return false;
             }
-            let Some((entries_len, selected)) = editor.entry_tabs_snapshot() else {
+            if editor.entry_tabs_snapshot().is_none() {
                 return false;
-            };
-            (
-                entries_len,
-                selected,
-                editor.field_pointer.clone(),
-                editor.host,
-            )
+            }
+            if !editor.advance_entry_tab(delta) {
+                editor.set_exit_armed(false);
+                editor.focus_entries();
+                return true;
+            }
+            let pointer = editor.field_pointer().to_string();
+            let host = editor.host();
+            let selected = editor.entry_tabs_selected().unwrap_or(0);
+            (pointer, host, selected)
         };
 
-        let (entries_len, selected, field_pointer, host) = overlay_snapshot;
-        if entries_len == 0 {
-            return false;
-        }
-
-        let next_index = ((selected as i32 + delta).rem_euclid(entries_len as i32)) as usize;
-
-        if entries_len == 1 || next_index == selected {
-            if let Some(editor) = self.active_overlay_mut() {
-                editor.exit_armed = false;
-                editor.focus_entries();
-            }
-            return true;
-        }
+        let (field_pointer, host, next_index) = snapshot;
 
         let previous_depth = self.overlay_depth();
         self.close_active_overlay(true);
@@ -739,7 +977,7 @@ impl App {
         }
 
         if let Some(editor) = self.active_overlay_mut() {
-            editor.exit_armed = false;
+            editor.set_exit_armed(false);
             if editor.can_focus_entries() {
                 editor.focus_entries();
             }
@@ -766,7 +1004,7 @@ impl App {
             }
             let form_state = editor.form_state();
             (
-                editor.focus,
+                editor.focus_mode(),
                 form_state.has_focusable_fields(),
                 form_state.focus_is_first(),
                 form_state.focus_is_last(),
@@ -781,7 +1019,7 @@ impl App {
                 if focus_mode == OverlayFocusMode::EntryTabs {
                     if has_fields {
                         if let Some(editor) = self.active_overlay_mut() {
-                            editor.exit_armed = false;
+                            editor.set_exit_armed(false);
                             editor.focus_form();
                             if editor.form_state().has_focusable_fields() {
                                 editor.form_state_mut().focus_first_field();
@@ -793,7 +1031,7 @@ impl App {
                         return true;
                     }
                     if let Some(editor) = self.active_overlay_mut() {
-                        editor.exit_armed = false;
+                        editor.set_exit_armed(false);
                         editor.focus_entries();
                     }
                     return true;
@@ -804,7 +1042,7 @@ impl App {
                         return true;
                     }
                     if let Some(editor) = self.active_overlay_mut() {
-                        editor.exit_armed = false;
+                        editor.set_exit_armed(false);
                         editor.focus_entries();
                     }
                     return true;
@@ -815,7 +1053,7 @@ impl App {
                         return true;
                     }
                     if let Some(editor) = self.active_overlay_mut() {
-                        editor.exit_armed = false;
+                        editor.set_exit_armed(false);
                         editor.focus_entries();
                     }
                     return true;
@@ -825,7 +1063,7 @@ impl App {
                 if focus_mode == OverlayFocusMode::EntryTabs {
                     if has_fields {
                         if let Some(editor) = self.active_overlay_mut() {
-                            editor.exit_armed = false;
+                            editor.set_exit_armed(false);
                             editor.focus_form();
                             if editor.form_state().has_focusable_fields() {
                                 editor.form_state_mut().focus_last_field();
@@ -837,7 +1075,7 @@ impl App {
                         return true;
                     }
                     if let Some(editor) = self.active_overlay_mut() {
-                        editor.exit_armed = false;
+                        editor.set_exit_armed(false);
                         editor.focus_entries();
                     }
                     return true;
@@ -848,7 +1086,7 @@ impl App {
                         return true;
                     }
                     if let Some(editor) = self.active_overlay_mut() {
-                        editor.exit_armed = false;
+                        editor.set_exit_armed(false);
                         editor.focus_entries();
                     }
                     return true;
@@ -859,7 +1097,7 @@ impl App {
                         return true;
                     }
                     if let Some(editor) = self.active_overlay_mut() {
-                        editor.exit_armed = false;
+                        editor.set_exit_armed(false);
                         editor.focus_entries();
                     }
                     return true;
@@ -874,9 +1112,9 @@ impl App {
     pub(super) fn request_overlay_exit(&mut self) -> bool {
         if let Some(editor) = self.active_overlay_mut()
             && editor.dirty()
-            && !editor.exit_armed
+            && !editor.exit_armed()
         {
-            editor.exit_armed = true;
+            editor.set_exit_armed(true);
             self.status
                 .set_raw("Overlay dirty. Press Esc again to discard changes.");
             return false;
@@ -892,10 +1130,10 @@ impl App {
         match self.apply_overlay_commit(&overlay) {
             Ok(()) => {
                 overlay.form_state_mut().mark_clean();
-                overlay.exit_armed = false;
+                overlay.set_exit_armed(false);
                 self.status
-                    .set_raw(format!("Overlay {} saved.", overlay.level));
-                if overlay.level == 1 && self.options.auto_validate {
+                    .set_raw(format!("Overlay {} saved.", overlay.level()));
+                if overlay.level() == 1 && self.options.auto_validate {
                     self.run_validation(false);
                 } else {
                     self.run_overlay_validation();
@@ -919,8 +1157,8 @@ impl App {
                 Some(editor) => editor,
                 None => return,
             };
-            editor.exit_armed = false;
-            let field_label = editor.field_label.clone();
+            editor.set_exit_armed(false);
+            let field_label = editor.field_label().to_string();
             if let Some(field) = editor.form_state_mut().focused_field_mut()
                 && field.handle_key(event)
             {
@@ -946,7 +1184,7 @@ impl App {
         let Some(editor) = self.active_overlay_mut() else {
             return;
         };
-        let Some(validator) = editor.validator.clone() else {
+        let Some(validator) = editor.validator_clone() else {
             return;
         };
         let mut engine = FormEngine::new(editor.form_state_mut(), &validator);
@@ -983,11 +1221,12 @@ impl App {
         let Some(editor) = self.active_overlay_mut() else {
             return;
         };
-        editor.validator = match &editor.session {
+        let validator = match editor.session() {
             OverlaySession::Composite(session) => validator_for(&session.schema).ok().map(Arc::new),
             OverlaySession::KeyValue(session) => validator_for(&session.schema).ok().map(Arc::new),
             OverlaySession::Array(session) => validator_for(&session.schema).ok().map(Arc::new),
         };
+        editor.set_validator(validator);
         self.run_overlay_validation();
     }
 
@@ -1015,9 +1254,9 @@ impl App {
             return;
         }
         let data = {
-            let host_state = self.host_form_state(overlay.host);
+            let host_state = self.host_form_state(overlay.host());
             host_state
-                .field_by_pointer(&overlay.field_pointer)
+                .field_by_pointer(overlay.field_pointer())
                 .map(|field| {
                     (
                         field.composite_list_panel(),
@@ -1031,11 +1270,12 @@ impl App {
                 overlay.set_entry_tabs(entries, selected);
             }
             if let Some(label) = label {
-                overlay.display_title = format!("Edit {} – {}", overlay.field_label, label.clone());
-                overlay.display_description = Some(label);
+                let field_label = overlay.field_label().to_string();
+                overlay.store.update_title(&field_label, &label);
+                overlay.store.set_description(Some(label));
             }
             if let Some(index) = idx {
-                match &mut overlay.target {
+                match overlay.target_mut() {
                     CompositeOverlayTarget::ListEntry { entry_index }
                     | CompositeOverlayTarget::KeyValueEntry { entry_index }
                     | CompositeOverlayTarget::ArrayEntry { entry_index } => {
@@ -1070,7 +1310,7 @@ impl App {
             AppCommand::ResetStatus => {
                 self.status.ready();
                 if let Some(editor) = self.active_overlay_mut() {
-                    editor.exit_armed = false;
+                    editor.set_exit_armed(false);
                 }
                 return Ok(true);
             }
@@ -1116,7 +1356,7 @@ impl App {
 
     pub(crate) fn overlay_entry_focus_for_test(&self) -> Option<bool> {
         self.active_overlay()
-            .map(|overlay| overlay.focus == OverlayFocusMode::EntryTabs)
+            .map(|overlay| overlay.focus_mode() == OverlayFocusMode::EntryTabs)
     }
 
     pub(crate) fn overlay_selected_entry_for_test(&self) -> Option<usize> {
@@ -1173,7 +1413,7 @@ mod tests {
         app.try_open_composite_editor();
         assert!(
             matches!(
-                app.active_overlay().map(|overlay| &overlay.target),
+                app.active_overlay().map(|overlay| overlay.target()),
                 Some(CompositeOverlayTarget::ArrayEntry { .. })
             ),
             "scalar arrays should open overlay via Ctrl+E"

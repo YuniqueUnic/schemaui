@@ -5,13 +5,13 @@ impl App {
     pub(super) fn list_field_pointer(&self) -> Option<String> {
         if let Some(editor) = self.active_overlay()
             && matches!(
-                editor.target,
+                editor.target(),
                 super::overlay::CompositeOverlayTarget::ListEntry { .. }
                     | super::overlay::CompositeOverlayTarget::KeyValueEntry { .. }
                     | super::overlay::CompositeOverlayTarget::ArrayEntry { .. }
             )
         {
-            return Some(editor.field_pointer.clone());
+            return Some(editor.field_pointer().to_string());
         }
         self.form_state
             .focused_field()
@@ -28,8 +28,8 @@ impl App {
 
         let overlay_host = self
             .active_overlay()
-            .filter(|editor| editor.field_pointer == pointer)
-            .map(|editor| editor.host);
+            .filter(|editor| editor.field_pointer() == pointer)
+            .map(|editor| editor.host());
         let targeted_overlay = overlay_host.is_some();
         if targeted_overlay && !self.save_active_overlay() {
             return false;
@@ -74,8 +74,8 @@ impl App {
 
         let overlay_host = self
             .active_overlay()
-            .filter(|editor| editor.field_pointer == pointer)
-            .map(|editor| editor.host);
+            .filter(|editor| editor.field_pointer() == pointer)
+            .map(|editor| editor.host());
         let targeted_overlay = overlay_host.is_some();
         if targeted_overlay && !self.save_active_overlay() {
             return false;
@@ -121,8 +121,8 @@ impl App {
 
         let overlay_host = self
             .active_overlay()
-            .filter(|editor| editor.field_pointer == pointer)
-            .map(|editor| editor.host);
+            .filter(|editor| editor.field_pointer() == pointer)
+            .map(|editor| editor.host());
         if overlay_host.is_some() && !self.save_active_overlay() {
             return false;
         }
@@ -160,8 +160,8 @@ impl App {
 
         let overlay_host = self
             .active_overlay()
-            .filter(|editor| editor.field_pointer == pointer)
-            .map(|editor| editor.host);
+            .filter(|editor| editor.field_pointer() == pointer)
+            .map(|editor| editor.host());
         let targeted_overlay = overlay_host.is_some();
         if targeted_overlay && !self.save_active_overlay() {
             return false;

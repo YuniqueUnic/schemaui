@@ -234,15 +234,15 @@ impl App {
                 .focused_field()
                 .map(|field| field.schema.display_label())
                 .unwrap_or_else(|| "<none>".to_string());
-            let focus_label = Some(format!("{} › {}", editor.field_label, child));
+            let focus_label = Some(format!("{} › {}", editor.field_label(), child));
             let overlay_meta = presentation::CompositeOverlay {
-                title: editor.display_title.clone(),
-                description: editor.display_description.clone(),
+                title: editor.title().to_string(),
+                description: editor.description().cloned(),
                 dirty: editor.form_state().is_dirty(),
-                instructions: editor.instructions.clone(),
+                instructions: editor.instructions().to_string(),
                 list_entries: editor.entry_tabs_entries().map(|entries| entries.to_vec()),
                 list_selected: editor.entry_tabs_selected(),
-                level: editor.level,
+                level: editor.level(),
             };
             let overlay_form_state = editor.form_state_mut();
             presentation::draw(
