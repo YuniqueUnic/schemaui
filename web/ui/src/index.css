@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+body {
+  @apply font-sans bg-slate-950 text-slate-100 min-h-screen overflow-hidden;
+}
+
+#root {
+  @apply min-h-screen;
+}
