@@ -5,6 +5,7 @@
 **目标**：为 schemaui 项目添加完全离线的 Web 界面功能
 
 **核心特性**：
+
 - ✅ 完全离线（单 HTML 文件，无 CDN 依赖）
 - ✅ 现代极简设计
 - ✅ 三栏布局（树状导航 + 编辑器 + 预览）
@@ -20,6 +21,7 @@
 ### Week 1: 基础设施
 
 **Day 1-2: 项目初始化**
+
 ```bash
 # 1. 创建前端项目
 cd schemaui
@@ -40,6 +42,7 @@ mkdir -p src/components src/utils src/hooks
 ```
 
 **Day 3-4: 核心组件开发**
+
 - [ ] App.jsx - 主应用容器
 - [ ] TreeNavigator.jsx - 树状导航组件
 - [ ] FieldEditor.jsx - 字段编辑器
@@ -47,6 +50,7 @@ mkdir -p src/components src/utils src/hooks
 - [ ] SyntaxHighlight.jsx - 语法高亮组件
 
 **Day 5-7: 功能实现**
+
 - [ ] Schema 解析和树构建
 - [ ] 表单状态管理
 - [ ] 实时验证（防抖）
@@ -56,6 +60,7 @@ mkdir -p src/components src/utils src/hooks
 ### Week 2: UI 优化和完善
 
 **Day 8-10: 样式和交互**
+
 - [ ] 实现毛玻璃效果
 - [ ] 添加微交互动画
 - [ ] 优化响应式布局
@@ -63,18 +68,21 @@ mkdir -p src/components src/utils src/hooks
 - [ ] 改进可访问性
 
 **Day 11-12: 离线功能验证**
+
 - [ ] 配置 vite-plugin-singlefile
 - [ ] 确保所有资源内联
 - [ ] 断网测试
 - [ ] 性能优化
 
 **Day 13-14: 测试和修复**
+
 - [ ] 单元测试（可选）
 - [ ] 集成测试
 - [ ] 跨浏览器测试
 - [ ] Bug 修复
 
 ### 交付物
+
 - ✅ 完整的 React 应用
 - ✅ 单个 HTML 文件（dist/index.html）
 - ✅ 完全离线可用
@@ -87,6 +95,7 @@ mkdir -p src/components src/utils src/hooks
 ### Week 3: 后端开发
 
 **Day 15-16: Web 模块基础**
+
 ```bash
 # 1. 添加依赖到 Cargo.toml
 # 2. 创建 web 模块结构
@@ -95,6 +104,7 @@ touch src/web/mod.rs src/web/server.rs src/web/assets.rs src/web/api.rs
 ```
 
 **必需的 Rust 依赖：**
+
 ```toml
 [dependencies]
 # 现有依赖...
@@ -116,6 +126,7 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 ```
 
 **Day 17-18: 实现 Web 服务器**
+
 - [ ] 创建 WebServer 结构
 - [ ] 实现资源嵌入（rust-embed）
 - [ ] 实现 HTTP 路由
@@ -127,18 +138,21 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
   - `POST /api/exit` - 退出服务器
 
 **Day 19-20: CLI 集成**
+
 - [ ] 更新 schemaui-cli
 - [ ] 添加 `web` 子命令
 - [ ] 实现命令行参数
 - [ ] 实现输出处理
 
 **Day 21: 测试**
+
 - [ ] 端到端测试
 - [ ] 性能测试
 - [ ] 内存泄漏检查
 - [ ] 错误处理测试
 
 ### 交付物
+
 - ✅ Web 功能完全集成到 schemaui 库
 - ✅ CLI 命令 `schemaui-cli web` 可用
 - ✅ 所有测试通过
@@ -150,6 +164,7 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 ### 测试清单
 
 **功能测试**
+
 - [ ] Schema 解析正确
 - [ ] 树状导航工作
 - [ ] 字段编辑正确
@@ -159,23 +174,27 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 - [ ] 退出并输出 JSON
 
 **离线测试**
+
 - [ ] 断网后应用正常工作
 - [ ] 无控制台错误
 - [ ] 所有资源加载
 - [ ] 语法高亮正常
 
 **性能测试**
+
 - [ ] 大型 Schema（1000+ 字段）
 - [ ] 深度嵌套（10+ 层）
 - [ ] 实时验证性能
 - [ ] 内存使用合理
 
 **浏览器兼容性**
+
 - [ ] Chrome/Edge 最新版
 - [ ] Firefox 最新版
 - [ ] Safari 最新版
 
 **用户体验**
+
 - [ ] 输入不失去焦点
 - [ ] 滚动流畅
 - [ ] 动画流畅（60fps）
@@ -184,18 +203,21 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 ### 优化项
 
 **性能优化**
+
 1. 虚拟滚动（大型树）
 2. Web Worker 验证
 3. 增量验证
 4. 缓存 Schema 编译结果
 
 **体积优化**
+
 1. Tree shaking
 2. 代码拆分（可选）
 3. 图片压缩
 4. 移除未使用的 Tailwind 类
 
 **用户体验优化**
+
 1. 加载指示器
 2. 操作反馈
 3. 键盘快捷键
@@ -208,23 +230,27 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 ### 文档需求
 
 **README.md 更新**
+
 - [ ] Web 功能介绍
 - [ ] 安装说明
 - [ ] 使用示例
 - [ ] 截图/GIF 演示
 
 **API 文档**
+
 - [ ] Web 模块 API
 - [ ] CLI 命令文档
 - [ ] 配置选项
 
 **用户指南**
+
 - [ ] 快速开始
 - [ ] 常见问题
 - [ ] 故障排除
 - [ ] 最佳实践
 
 **开发者指南**
+
 - [ ] 架构设计
 - [ ] 贡献指南
 - [ ] 测试指南
@@ -233,6 +259,7 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 ### 发布准备
 
 **Version 0.4.0**
+
 - [ ] 更新 CHANGELOG.md
 - [ ] 更新版本号
 - [ ] 创建 Git tag
@@ -301,6 +328,7 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 ## 🎯 成功指标
 
 ### 技术指标
+
 - ✅ 构建大小 < 1MB（单 HTML 文件）
 - ✅ 首次加载 < 2 秒
 - ✅ 交互响应 < 100ms
@@ -308,12 +336,14 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 - ✅ 无外部依赖
 
 ### 用户体验指标
+
 - ✅ 界面直观易用
 - ✅ 学习曲线低
 - ✅ 操作流畅无卡顿
 - ✅ 错误提示清晰
 
 ### 社区指标
+
 - ✅ GitHub Stars 增长
 - ✅ 正面反馈
 - ✅ 低 Bug 率
@@ -326,6 +356,7 @@ web = ["axum", "tokio", "tower-http", "rust-embed", "open"]
 ### 常见问题
 
 **1. 构建失败**
+
 ```bash
 # 清理并重新构建
 rm -rf node_modules dist
@@ -334,6 +365,7 @@ npm run build
 ```
 
 **2. 资源未内联**
+
 ```bash
 # 检查 Vite 配置
 # 确保 vite-plugin-singlefile 已正确配置
@@ -341,6 +373,7 @@ npm run build
 ```
 
 **3. 输入失去焦点**
+
 ```javascript
 // 确保使用 useRef
 const inputRef = useRef(null);
@@ -348,11 +381,12 @@ const inputRef = useRef(null);
 // 使用防抖的验证
 const debouncedValidate = useMemo(
   () => debounce(validate, 300),
-  []
+  [],
 );
 ```
 
 **4. Rust 编译错误**
+
 ```bash
 # 确保正确的 feature flags
 cargo build --features web
@@ -364,14 +398,16 @@ cargo tree
 ### 调试技巧
 
 **前端调试**
+
 ```javascript
 // 添加调试日志
-console.log('Schema:', schema);
-console.log('Form Data:', formData);
-console.log('Validation Errors:', errors);
+console.log("Schema:", schema);
+console.log("Form Data:", formData);
+console.log("Validation Errors:", errors);
 ```
 
 **后端调试**
+
 ```rust
 // 添加调试日志
 dbg!(&schema);
@@ -380,6 +416,7 @@ eprintln!("Validation result: {:?}", result);
 ```
 
 **性能分析**
+
 ```javascript
 // React DevTools Profiler
 // Chrome Performance tab
@@ -390,13 +427,13 @@ eprintln!("Validation result: {:?}", result);
 
 ## 📅 时间线总结
 
-| Phase | 任务 | 时间 | 负责人 |
-|-------|------|------|--------|
-| 1 | 前端开发 | 1-2 周 | 前端开发者 |
-| 2 | Rust 集成 | 1 周 | Rust 开发者 |
-| 3 | 测试优化 | 3-5 天 | QA + 开发者 |
-| 4 | 文档发布 | 2-3 天 | 技术写作者 |
-| **总计** | **完整实现** | **3-4 周** | |
+| Phase    | 任务         | 时间       | 负责人      |
+| -------- | ------------ | ---------- | ----------- |
+| 1        | 前端开发     | 1-2 周     | 前端开发者  |
+| 2        | Rust 集成    | 1 周       | Rust 开发者 |
+| 3        | 测试优化     | 3-5 天     | QA + 开发者 |
+| 4        | 文档发布     | 2-3 天     | 技术写作者  |
+| **总计** | **完整实现** | **3-4 周** |             |
 
 ---
 
@@ -430,13 +467,15 @@ eprintln!("Validation result: {:?}", result);
 ## 📞 获取帮助
 
 **技术支持**
+
 - GitHub Issues: `https://github.com/yuniqueunic/schemaui/issues`
 - Discussions: `https://github.com/yuniqueunic/schemaui/discussions`
 
 **参考资源**
-- Vite 文档: https://vitejs.dev/
-- Axum 文档: https://docs.rs/axum/
-- React 文档: https://react.dev/
+
+- Vite 文档：https://vitejs.dev/
+- Axum 文档：https://docs.rs/axum/
+- React 文档：https://react.dev/
 - Tailwind CSS: https://tailwindcss.com/
 
 ---

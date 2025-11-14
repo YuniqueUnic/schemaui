@@ -1,8 +1,7 @@
-#![cfg(feature = "web")]
-
 use std::{
     future::IntoFuture,
     net::{IpAddr, SocketAddr},
+    path::PathBuf,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -29,7 +28,7 @@ use tokio::{
 use crate::io::{DocumentFormat, input::schema_with_defaults};
 
 use super::{
-    assets,
+    assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider},
     blueprint::{WebBlueprint, blueprint_from_schema},
 };
 
@@ -37,6 +36,7 @@ pub struct WebSessionBuilder {
     schema: Value,
     defaults: Option<Value>,
     title: Option<String>,
+    asset_provider: Arc<dyn WebAssetProvider>,
 }
 
 impl WebSessionBuilder {
@@ -45,6 +45,8 @@ impl WebSessionBuilder {
             schema,
             defaults: None,
             title: None,
+            #[allow(clippy::default_constructed_unit_structs)]
+            asset_provider: Arc::new(EmbeddedAssets::default()),
         }
     }
 
@@ -55,6 +57,16 @@ impl WebSessionBuilder {
 
     pub fn with_initial_data(mut self, data: Value) -> Self {
         self.defaults = Some(data);
+        self
+    }
+
+    pub fn with_asset_provider(mut self, provider: Arc<dyn WebAssetProvider>) -> Self {
+        self.asset_provider = provider;
+        self
+    }
+
+    pub fn with_filesystem_assets<P: Into<PathBuf>>(mut self, root: P) -> Self {
+        self.asset_provider = Arc::new(FilesystemAssets::new(root));
         self
     }
 
@@ -70,6 +82,7 @@ impl WebSessionBuilder {
             blueprint,
             data,
             schema,
+            asset_provider: self.asset_provider,
         })
     }
 }
@@ -80,6 +93,7 @@ pub struct WebSessionConfig {
     pub blueprint: WebBlueprint,
     pub data: Value,
     pub schema: Value,
+    pub asset_provider: Arc<dyn WebAssetProvider>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -160,6 +174,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
         blueprint,
         data,
         schema,
+        asset_provider,
     } = config;
     let validator = Arc::new(validator_for(&schema).context("failed to compile JSON schema")?);
     let (result_tx, result_rx) = oneshot::channel();
@@ -175,6 +190,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
             shutdown: Mutex::new(Some(shutdown_tx)),
         }),
         finished: Arc::new(AtomicBool::new(false)),
+        asset_provider,
     };
 
     let router = Router::new()
@@ -223,6 +239,7 @@ struct SharedState {
     validator: Arc<Validator>,
     finish_line: Arc<FinishLine>,
     finished: Arc<AtomicBool>,
+    asset_provider: Arc<dyn WebAssetProvider>,
 }
 
 struct FinishLine {
@@ -406,13 +423,14 @@ fn encode_value(
     }
 }
 
-async fn static_assets(State(_state): State<SharedState>, uri: OriginalUri) -> impl IntoResponse {
-    if let Some(asset) = assets::asset(uri.path()) {
+async fn static_assets(State(state): State<SharedState>, uri: OriginalUri) -> impl IntoResponse {
+    if let Some(asset) = state.asset_provider.load(uri.path()) {
+        let body = Body::from(asset.contents.into_owned());
         Response::builder()
             .status(StatusCode::OK)
             .header(header::CACHE_CONTROL, "no-store")
             .header(header::CONTENT_TYPE, asset.mime)
-            .body(Body::from(asset.contents))
+            .body(body)
             .unwrap_or_else(|_| {
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)

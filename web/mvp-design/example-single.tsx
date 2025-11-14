@@ -257,7 +257,7 @@ const FieldEditor = ({ field, value, onChange, error }) => {
               type="checkbox"
               checked={!!value}
               onChange={(e) => onChange(e.target.checked)}
-              className="w-5 h-5 rounded bg-slate-800 border-slate-600 text-cyan-500 
+              className="w-5 h-5 rounded bg-slate-800 border-slate-600 text-cyan-500
                          focus:ring-2 focus:ring-cyan-500/50 cursor-pointer"
             />
             <span className="text-slate-300">
@@ -594,7 +594,7 @@ const SchemaUIWeb = () => {
           <button
             onClick={handleSave}
             disabled={validationErrors.length > 0}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600
                      disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed
                      text-white rounded-lg transition-colors shadow-lg shadow-cyan-500/20"
           >
@@ -604,7 +604,7 @@ const SchemaUIWeb = () => {
 
           <button
             onClick={handleExit}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600
                      text-slate-200 rounded-lg transition-colors"
           >
             <X size={18} />

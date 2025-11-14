@@ -1,6 +1,7 @@
 # SchemaUI Web 完整实现指南 🚀
 
 ## 📋 目录
+
 1. [架构概览](#架构概览)
 2. [完全离线实现方案](#完全离线实现方案)
 3. [解决现有问题](#解决现有问题)
@@ -15,6 +16,7 @@
 ### 技术栈选择
 
 **前端（完全离线）**
+
 - React 18 - UI 框架
 - Vite - 构建工具（支持单文件输出）
 - Tailwind CSS - 样式系统（内联到 HTML）
@@ -22,6 +24,7 @@
 - 无 CDN 依赖
 
 **后端（Rust）**
+
 - axum - Web 框架
 - tokio - 异步运行时
 - jsonschema - Schema 验证
@@ -50,9 +53,9 @@
 
 ```javascript
 // web-ui/vite.config.js
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { viteSingleFile } from 'vite-plugin-singlefile';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { viteSingleFile } from "vite-plugin-singlefile";
 
 export default defineConfig({
   plugins: [
@@ -63,7 +66,7 @@ export default defineConfig({
     }),
   ],
   build: {
-    target: 'esnext',
+    target: "esnext",
     assetsInlineLimit: 100000000, // 内联所有资源
     cssCodeSplit: false,
     rollupOptions: {
@@ -80,6 +83,7 @@ export default defineConfig({
 两种方案：
 
 **方案 A：使用轻量级库（推荐）**
+
 ```javascript
 // 自实现的极简语法高亮（已在 React 组件中实现）
 // 优点：完全可控，无依赖，体积小
@@ -87,6 +91,7 @@ export default defineConfig({
 ```
 
 **方案 B：内联 Prism.js**
+
 ```html
 <!-- 在构建时将 Prism.js 核心 + 语言包内联 -->
 <script>
@@ -140,23 +145,23 @@ const FieldEditor = ({ field, value, onChange }) => {
 // ✅ 正确做法：使用 useRef 保持引用稳定
 const FieldEditor = ({ field, value, onChange, error }) => {
   const inputRef = useRef(null);
-  
+
   // 使用防抖避免过于频繁的验证
   const debouncedOnChange = useMemo(
     () => debounce(onChange, 300),
-    [onChange]
+    [onChange],
   );
-  
+
   return (
-    <input 
+    <input
       ref={inputRef}
-      value={value} 
+      value={value}
       onChange={(e) => {
         // 立即更新显示
         inputRef.current.value = e.target.value;
         // 延迟验证
         debouncedOnChange(e.target.value);
-      }} 
+      }}
     />
   );
 };
@@ -174,13 +179,13 @@ useEffect(() => {
     const result = await validateData(formData);
     setValidationErrors(result.errors);
   }, 300); // 300ms 防抖
-  
+
   return () => clearTimeout(timer);
 }, [formData]);
 
 // onChange 只更新数据，不触发验证
 const handleChange = (field, value) => {
-  setFormData(prev => ({ ...prev, [field]: value }));
+  setFormData((prev) => ({ ...prev, [field]: value }));
 };
 ```
 
@@ -220,38 +225,41 @@ button {
 
 ```jsx
 // ✅ 正确的单页布局（已实现）
-<div className="h-screen flex flex-col"> {/* 占满视口 */}
+<div className="h-screen flex flex-col">
+  {/* 占满视口 */}
   {/* 顶栏：固定高度 */}
   <header className="h-14 flex-shrink-0">
     ...
   </header>
-  
+
   {/* 主内容：flex-1 占据剩余空间 */}
-  <main className="flex-1 flex overflow-hidden"> {/* overflow-hidden 关键！ */}
+  <main className="flex-1 flex overflow-hidden">
+    {/* overflow-hidden 关键！ */}
     {/* 左侧导航：独立滚动 */}
     <aside className="w-72 overflow-y-auto">
       ...
     </aside>
-    
+
     {/* 中间编辑器：独立滚动 */}
     <section className="flex-1 overflow-y-auto">
       ...
     </section>
-    
+
     {/* 右侧预览：独立滚动 */}
     <aside className="w-96 overflow-y-auto">
       ...
     </aside>
   </main>
-  
+
   {/* 状态栏（可选）：固定在底部 */}
   <footer className="h-8 flex-shrink-0">
     ...
   </footer>
-</div>
+</div>;
 ```
 
 **关键点**：
+
 - 使用 `h-screen` 确保容器占满视口
 - 使用 `overflow-hidden` 在主容器上阻止页面滚动
 - 每个子区域独立使用 `overflow-y-auto` 实现内部滚动
@@ -267,21 +275,36 @@ const SyntaxHighlight = ({ code, language }) => {
       .replace(/("[\w\d_-]+")\s*:/g, '<span class="text-cyan-400">$1</span>:')
       .replace(/:\s*(".*?")/g, ': <span class="text-green-400">$1</span>')
       .replace(/:\s*(\d+\.?\d*)/g, ': <span class="text-orange-400">$1</span>')
-      .replace(/:\s*(true|false|null)/g, ': <span class="text-purple-400">$1</span>');
+      .replace(
+        /:\s*(true|false|null)/g,
+        ': <span class="text-purple-400">$1</span>',
+      );
   };
 
   const highlightTOML = (text) => {
     return text
       // 高亮 section headers [section]
-      .replace(/^\[.*\]/gm, match => `<span class="text-purple-400">${match}</span>`)
+      .replace(
+        /^\[.*\]/gm,
+        (match) => `<span class="text-purple-400">${match}</span>`,
+      )
       // 高亮 keys
       .replace(/^(\w+)\s*=/gm, '<span class="text-cyan-400">$1</span> =')
       // 高亮 string values
-      .replace(/=\s*".*?"/g, match => `= <span class="text-green-400">${match.slice(2)}</span>`)
+      .replace(
+        /=\s*".*?"/g,
+        (match) => `= <span class="text-green-400">${match.slice(2)}</span>`,
+      )
       // 高亮 numbers
-      .replace(/=\s*\d+\.?\d*/g, match => `= <span class="text-orange-400">${match.slice(2)}</span>`)
+      .replace(
+        /=\s*\d+\.?\d*/g,
+        (match) => `= <span class="text-orange-400">${match.slice(2)}</span>`,
+      )
       // 高亮 booleans
-      .replace(/=\s*(true|false)/g, match => `= <span class="text-purple-400">${match.slice(2)}</span>`);
+      .replace(
+        /=\s*(true|false)/g,
+        (match) => `= <span class="text-purple-400">${match.slice(2)}</span>`,
+      );
   };
 
   const highlightYAML = (text) => {
@@ -289,12 +312,15 @@ const SyntaxHighlight = ({ code, language }) => {
       .replace(/^(\s*[\w\d_-]+):/gm, '<span class="text-cyan-400">$1</span>:')
       .replace(/:\s*(".*?")/g, ': <span class="text-green-400">$1</span>')
       .replace(/:\s*(\d+\.?\d*)/g, ': <span class="text-orange-400">$1</span>')
-      .replace(/:\s*(true|false|null)/g, ': <span class="text-purple-400">$1</span>');
+      .replace(
+        /:\s*(true|false|null)/g,
+        ': <span class="text-purple-400">$1</span>',
+      );
   };
 
   return (
     <pre className="text-sm leading-relaxed overflow-auto h-full p-4">
-      <code dangerouslySetInnerHTML={{ 
+      <code dangerouslySetInnerHTML={{
         __html: language === 'json' ? highlightJSON(code)
               : language === 'yaml' ? highlightYAML(code)
               : language === 'toml' ? highlightTOML(code)
@@ -307,28 +333,28 @@ const SyntaxHighlight = ({ code, language }) => {
 // 格式转换
 const formatOutput = (data, format) => {
   switch (format) {
-    case 'json':
+    case "json":
       return JSON.stringify(data, null, 2);
-    
-    case 'yaml':
+
+    case "yaml":
       // 简化的 YAML 输出
       const toYAML = (obj, indent = 0) => {
-        const spaces = '  '.repeat(indent);
+        const spaces = "  ".repeat(indent);
         return Object.entries(obj).map(([k, v]) => {
-          if (typeof v === 'object' && v !== null) {
+          if (typeof v === "object" && v !== null) {
             return `${spaces}${k}:\n${toYAML(v, indent + 1)}`;
           }
           return `${spaces}${k}: ${JSON.stringify(v)}`;
-        }).join('\n');
+        }).join("\n");
       };
       return toYAML(data);
-    
-    case 'toml':
+
+    case "toml":
       // 简化的 TOML 输出
-      const toTOML = (obj, section = '') => {
+      const toTOML = (obj, section = "") => {
         let result = [];
         for (const [k, v] of Object.entries(obj)) {
-          if (typeof v === 'object' && v !== null) {
+          if (typeof v === "object" && v !== null) {
             const newSection = section ? `${section}.${k}` : k;
             result.push(`\n[${newSection}]`);
             result.push(toTOML(v, newSection));
@@ -336,7 +362,7 @@ const formatOutput = (data, format) => {
             result.push(`${k} = ${JSON.stringify(v)}`);
           }
         }
-        return result.join('\n');
+        return result.join("\n");
       };
       return toTOML(data);
   }
@@ -349,13 +375,13 @@ const formatOutput = (data, format) => {
 
 ```javascript
 // 递归树节点组件
-const TreeNode = ({ 
-  node, 
-  level = 0, 
-  selectedPath, 
-  onSelect, 
-  expandedNodes, 
-  onToggle 
+const TreeNode = ({
+  node,
+  level = 0,
+  selectedPath,
+  onSelect,
+  expandedNodes,
+  onToggle,
 }) => {
   const isExpanded = expandedNodes.has(node.path);
   const isSelected = selectedPath === node.path;
@@ -368,24 +394,26 @@ const TreeNode = ({
         className={`
           flex items-center gap-2 py-2 px-3 cursor-pointer
           hover:bg-slate-700/50 rounded-lg transition-all
-          ${isSelected ? 'bg-cyan-500/20 border-l-2 border-cyan-400' : ''}
+          ${isSelected ? "bg-cyan-500/20 border-l-2 border-cyan-400" : ""}
         `}
         style={{ paddingLeft: `${level * 16 + 12}px` }}
         onClick={() => onSelect(node.path)}
       >
         {/* 展开/折叠按钮 */}
         {hasChildren && (
-          <button onClick={(e) => {
-            e.stopPropagation();
-            onToggle(node.path);
-          }}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(node.path);
+            }}
+          >
             {isExpanded ? <ChevronDown /> : <ChevronRight />}
           </button>
         )}
-        
+
         {/* 节点标题 */}
         <span>{node.title}</span>
-        
+
         {/* 必填标记 */}
         {node.required && <span className="text-red-400">*</span>}
       </div>
@@ -393,7 +421,7 @@ const TreeNode = ({
       {/* 子节点（递归） */}
       {isExpanded && hasChildren && (
         <div>
-          {node.children.map(child => (
+          {node.children.map((child) => (
             <TreeNode
               key={child.path}
               node={child}
@@ -411,9 +439,9 @@ const TreeNode = ({
 };
 
 // 从 Schema 构建树结构
-const buildTreeFromSchema = (schema, path = '') => {
+const buildTreeFromSchema = (schema, path = "") => {
   if (!schema.properties) return [];
-  
+
   return Object.entries(schema.properties).map(([key, prop]) => {
     const nodePath = path ? `${path}/${key}` : `/${key}`;
     return {
@@ -421,9 +449,9 @@ const buildTreeFromSchema = (schema, path = '') => {
       title: prop.title || key,
       type: prop.type,
       required: schema.required?.includes(key),
-      children: prop.type === 'object' && prop.properties
+      children: prop.type === "object" && prop.properties
         ? buildTreeFromSchema(prop, nodePath)
-        : []
+        : [],
     };
   });
 };
@@ -616,32 +644,32 @@ cargo build --release --features web
 const colors = {
   // 背景层次
   bg: {
-    primary: '#0f172a',      // slate-900
-    secondary: '#1e293b',    // slate-800
-    tertiary: '#334155',     // slate-700
+    primary: "#0f172a", // slate-900
+    secondary: "#1e293b", // slate-800
+    tertiary: "#334155", // slate-700
   },
-  
+
   // 强调色
   accent: {
-    primary: '#0ea5e9',      // cyan-500
-    hover: '#06b6d4',        // cyan-600
-    light: '#22d3ee',        // cyan-400
+    primary: "#0ea5e9", // cyan-500
+    hover: "#06b6d4", // cyan-600
+    light: "#22d3ee", // cyan-400
   },
-  
+
   // 语义色
   semantic: {
-    error: '#ef4444',        // red-500
-    warning: '#f59e0b',      // amber-500
-    success: '#10b981',      // green-500
-    info: '#3b82f6',         // blue-500
+    error: "#ef4444", // red-500
+    warning: "#f59e0b", // amber-500
+    success: "#10b981", // green-500
+    info: "#3b82f6", // blue-500
   },
-  
+
   // 文本
   text: {
-    primary: '#f1f5f9',      // slate-100
-    secondary: '#cbd5e1',    // slate-300
-    tertiary: '#94a3b8',     // slate-400
-    disabled: '#64748b',     // slate-500
+    primary: "#f1f5f9", // slate-100
+    secondary: "#cbd5e1", // slate-300
+    tertiary: "#94a3b8", // slate-400
+    disabled: "#64748b", // slate-500
   },
 };
 ```
@@ -650,12 +678,12 @@ const colors = {
 
 ```javascript
 const spacing = {
-  xs: '4px',
-  sm: '8px',
-  md: '16px',
-  lg: '24px',
-  xl: '32px',
-  '2xl': '48px',
+  xs: "4px",
+  sm: "8px",
+  md: "16px",
+  lg: "24px",
+  xl: "32px",
+  "2xl": "48px",
 };
 ```
 
@@ -663,10 +691,10 @@ const spacing = {
 
 ```javascript
 const borderRadius = {
-  sm: '6px',
-  md: '8px',
-  lg: '12px',
-  xl: '16px',
+  sm: "6px",
+  md: "8px",
+  lg: "12px",
+  xl: "16px",
 };
 ```
 

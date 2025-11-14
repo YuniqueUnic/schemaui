@@ -1,22 +1,70 @@
+use std::{
+    borrow::Cow,
+    fs,
+    path::{Path, PathBuf},
+};
+
 use include_dir::{Dir, include_dir};
 
 pub static DIST: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/web/dist");
 
 #[derive(Debug, Clone)]
-pub struct EmbeddedAsset {
+pub struct AssetResponse {
     pub path: String,
     pub mime: &'static str,
-    pub contents: &'static [u8],
+    pub contents: Cow<'static, [u8]>,
 }
 
-pub fn asset(path: &str) -> Option<EmbeddedAsset> {
-    let normalized = normalize_path(path);
-    let file = DIST.get_file(normalized)?;
-    Some(EmbeddedAsset {
-        path: normalized.to_string(),
-        mime: mime_from_path(normalized),
-        contents: file.contents(),
-    })
+pub trait WebAssetProvider: Send + Sync + std::fmt::Debug + 'static {
+    fn load(&self, path: &str) -> Option<AssetResponse>;
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct EmbeddedAssets;
+
+impl WebAssetProvider for EmbeddedAssets {
+    fn load(&self, path: &str) -> Option<AssetResponse> {
+        let normalized = normalize_path(path);
+        let file = DIST.get_file(normalized)?;
+        Some(AssetResponse {
+            path: normalized.to_string(),
+            mime: mime_from_path(normalized),
+            contents: Cow::Borrowed(file.contents()),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FilesystemAssets {
+    root: PathBuf,
+}
+
+impl FilesystemAssets {
+    pub fn new<P: Into<PathBuf>>(root: P) -> Self {
+        Self { root: root.into() }
+    }
+
+    pub fn root(&self) -> &Path {
+        self.root.as_path()
+    }
+}
+
+impl WebAssetProvider for FilesystemAssets {
+    fn load(&self, path: &str) -> Option<AssetResponse> {
+        let normalized = normalize_path(path);
+        let joined = self.root.join(normalized);
+        let contents = fs::read(joined).ok()?;
+        Some(AssetResponse {
+            path: normalized.to_string(),
+            mime: mime_from_path(normalized),
+            contents: Cow::Owned(contents),
+        })
+    }
+}
+
+pub fn embedded_asset(path: &str) -> Option<AssetResponse> {
+    #[allow(clippy::default_constructed_unit_structs)]
+    EmbeddedAssets::default().load(path)
 }
 
 fn normalize_path(raw: &str) -> &str {
@@ -44,8 +92,16 @@ mod tests {
 
     #[test]
     fn loads_index_html() {
-        let asset = asset("/").expect("index.html embedded");
+        let assets = EmbeddedAssets::default();
+        let asset = assets.load("/").expect("index.html embedded");
         assert_eq!(asset.mime, "text/html; charset=utf-8");
         assert!(asset.contents.starts_with(b"<!doctype html>"));
+    }
+
+    #[test]
+    fn normalizes_root_path() {
+        let assets = EmbeddedAssets::default();
+        let asset = assets.load("").expect("falls back to index");
+        assert_eq!(asset.path, "index.html");
     }
 }
