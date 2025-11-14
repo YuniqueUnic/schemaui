@@ -1,3 +1,5 @@
+#![cfg(feature = "web")]
+
 use std::{
     future::IntoFuture,
     net::{IpAddr, SocketAddr},
@@ -16,12 +18,15 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use jsonschema::{Validator, validator_for};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use tokio::{
     net::TcpListener,
     sync::{Mutex, oneshot},
 };
+
+use crate::io::{DocumentFormat, input::schema_with_defaults};
 
 use super::{
     assets,
@@ -53,13 +58,18 @@ impl WebSessionBuilder {
         self
     }
 
-    pub fn build(self) -> Result<WebSessionConfig> {
-        let blueprint = blueprint_from_schema(&self.schema)?;
-        let data = self.defaults.unwrap_or_else(|| Value::Object(Map::new()));
+    pub fn build(mut self) -> Result<WebSessionConfig> {
+        let data = self
+            .defaults
+            .take()
+            .unwrap_or_else(|| Value::Object(Map::new()));
+        let schema = schema_with_defaults(&self.schema, &data);
+        let blueprint = blueprint_from_schema(&schema)?;
         Ok(WebSessionConfig {
             title: self.title,
             blueprint,
             data,
+            schema,
         })
     }
 }
@@ -69,6 +79,7 @@ pub struct WebSessionConfig {
     pub title: Option<String>,
     pub blueprint: WebBlueprint,
     pub data: Value,
+    pub schema: Value,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -118,14 +129,13 @@ impl BoundSession {
             }
         };
 
-        // ensure the server future drains once the client exits
         let _ = server.await;
         Ok(value)
     }
 }
 
 pub async fn bind_session(config: WebSessionConfig, options: ServeOptions) -> Result<BoundSession> {
-    let (router, handles) = session_router(config);
+    let (router, handles) = session_router(config)?;
     let listener = TcpListener::bind(SocketAddr::new(options.host, options.port))
         .await
         .context("failed to bind web listener")?;
@@ -144,18 +154,22 @@ pub async fn serve_session(config: WebSessionConfig, options: ServeOptions) -> R
     bind_session(config, options).await?.run().await
 }
 
-pub fn session_router(config: WebSessionConfig) -> (Router, SessionHandles) {
+pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandles)> {
     let WebSessionConfig {
         title,
         blueprint,
         data,
+        schema,
     } = config;
+    let validator = Arc::new(validator_for(&schema).context("failed to compile JSON schema")?);
     let (result_tx, result_rx) = oneshot::channel();
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let shared = SharedState {
         title,
         blueprint: Arc::new(blueprint),
         data: Arc::new(Mutex::new(data)),
+        formats: DocumentFormat::available_formats(),
+        validator,
         finish_line: Arc::new(FinishLine {
             result: Mutex::new(Some(result_tx)),
             shutdown: Mutex::new(Some(shutdown_tx)),
@@ -167,16 +181,18 @@ pub fn session_router(config: WebSessionConfig) -> (Router, SessionHandles) {
         .route("/api/session", get(get_session))
         .route("/api/save", post(post_save))
         .route("/api/exit", post(post_exit))
+        .route("/api/validate", post(post_validate))
+        .route("/api/preview", post(post_preview))
         .fallback(static_assets)
         .with_state(shared);
 
-    (
+    Ok((
         router,
         SessionHandles {
             result_rx: Some(result_rx),
             shutdown_rx: Some(shutdown_rx),
         },
-    )
+    ))
 }
 
 pub struct SessionHandles {
@@ -196,13 +212,6 @@ impl SessionHandles {
             .expect("shutdown receiver already consumed");
         (result, shutdown)
     }
-
-    pub async fn wait(self) -> Result<Value> {
-        let (result, _) = self.into_parts();
-        result
-            .await
-            .map_err(|_| anyhow!("web session closed before emitting a value"))
-    }
 }
 
 #[derive(Clone)]
@@ -210,6 +219,8 @@ struct SharedState {
     title: Option<String>,
     blueprint: Arc<WebBlueprint>,
     data: Arc<Mutex<Value>>,
+    formats: Vec<DocumentFormat>,
+    validator: Arc<Validator>,
     finish_line: Arc<FinishLine>,
     finished: Arc<AtomicBool>,
 }
@@ -235,6 +246,7 @@ struct SessionResponse {
     title: Option<String>,
     blueprint: WebBlueprint,
     data: Value,
+    formats: Vec<String>,
 }
 
 async fn get_session(State(state): State<SharedState>) -> impl IntoResponse {
@@ -242,6 +254,7 @@ async fn get_session(State(state): State<SharedState>) -> impl IntoResponse {
         title: state.title.clone(),
         blueprint: (*state.blueprint).clone(),
         data: state.data.lock().await.clone(),
+        formats: state.formats.iter().map(|f| f.to_string()).collect(),
     };
     Json(payload)
 }
@@ -294,6 +307,103 @@ async fn post_exit(
     };
     state.finish_line.complete(final_value).await;
     (StatusCode::OK, Json(json!({"status": "closing"})))
+}
+
+#[derive(Deserialize)]
+struct ValidateRequest {
+    data: Value,
+}
+
+#[derive(Serialize)]
+struct ValidationResponse {
+    ok: bool,
+    errors: Vec<FieldError>,
+}
+
+#[derive(Serialize)]
+struct FieldError {
+    pointer: String,
+    message: String,
+}
+
+async fn post_validate(
+    State(state): State<SharedState>,
+    Json(req): Json<ValidateRequest>,
+) -> impl IntoResponse {
+    let mut errors = Vec::new();
+    for error in state.validator.iter_errors(&req.data) {
+        errors.push(FieldError {
+            pointer: error.instance_path.to_string(),
+            message: error.to_string(),
+        });
+    }
+    Json(ValidationResponse {
+        ok: errors.is_empty(),
+        errors,
+    })
+}
+
+#[derive(Deserialize)]
+struct PreviewRequest {
+    data: Value,
+    format: String,
+    #[serde(default = "default_true")]
+    pretty: bool,
+}
+
+#[derive(Serialize)]
+struct PreviewResponse {
+    payload: String,
+}
+
+async fn post_preview(
+    State(state): State<SharedState>,
+    Json(req): Json<PreviewRequest>,
+) -> Result<Json<PreviewResponse>, (StatusCode, Json<Value>)> {
+    render_payload(&req.data, &req.format, req.pretty, &state.formats)
+        .map(|payload| Json(PreviewResponse { payload }))
+        .map_err(|err| (StatusCode::BAD_REQUEST, Json(json!({"error": err}))))
+}
+
+fn render_payload(
+    data: &Value,
+    format_keyword: &str,
+    pretty: bool,
+    allowed: &[DocumentFormat],
+) -> Result<String, String> {
+    let format = DocumentFormat::from_keyword(format_keyword)?;
+    if !allowed.contains(&format) {
+        return Err(format!("format '{format}' is disabled for this build"));
+    }
+    encode_value(data, format, pretty).map_err(|err| err.to_string())
+}
+
+fn encode_value(
+    value: &Value,
+    format: DocumentFormat,
+    pretty: bool,
+) -> Result<String, anyhow::Error> {
+    match format {
+        DocumentFormat::Json => {
+            if pretty {
+                Ok(serde_json::to_string_pretty(value)?)
+            } else {
+                Ok(serde_json::to_string(value)?)
+            }
+        }
+        #[cfg(feature = "yaml")]
+        DocumentFormat::Yaml => Ok(serde_yaml::to_string(value)?),
+        #[cfg(feature = "toml")]
+        DocumentFormat::Toml => {
+            if pretty {
+                Ok(toml::to_string_pretty(value)?)
+            } else {
+                Ok(toml::to_string(value)?)
+            }
+        }
+        #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
+        _ => Err(anyhow!("unsupported format")),
+    }
 }
 
 async fn static_assets(State(_state): State<SharedState>, uri: OriginalUri) -> impl IntoResponse {
