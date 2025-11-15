@@ -8,6 +8,7 @@ interface AppHeaderProps {
   description?: string | null;
   dirty: boolean;
   saving: boolean;
+  exiting?: boolean;
   onSave(): void;
   onExit(): void;
 }
@@ -17,6 +18,7 @@ export const AppHeader = memo(function AppHeader({
   description,
   dirty,
   saving,
+  exiting = false,
   onSave,
   onExit,
 }: AppHeaderProps) {
@@ -79,11 +81,11 @@ export const AppHeader = memo(function AppHeader({
         <button
           type="button"
           onClick={onExit}
-          disabled={saving}
+          disabled={saving || exiting}
           className="inline-flex items-center gap-2 px-4 py-1 text-sm rounded-full border border-rose-400 text-rose-600 transition hover:bg-rose-500/10 dark:border-rose-500/50 dark:text-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Power className="h-4 w-4" />
-          Exit
+          {exiting ? "Exiting…" : "Exit"}
         </button>
       </div>
     </header>

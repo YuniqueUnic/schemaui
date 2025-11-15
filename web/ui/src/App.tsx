@@ -5,6 +5,7 @@ import { TreePanel } from "./components/TreePanel";
 import { EditorPane } from "./components/EditorPane";
 import { PreviewPane } from "./components/PreviewPane";
 import { StatusBar } from "./components/StatusBar";
+import { ExitGuardDialog } from "./components/ExitGuardDialog";
 import { useResizableColumns } from "./hooks/useResizableColumns";
 import { applyBlueprintDefaults } from "./utils/defaults";
 import {
@@ -21,7 +22,7 @@ import {
   renderPreview,
   validateData,
 } from "./api";
-import type { JsonValue, WebBlueprint } from "./types";
+import type { JsonValue, ValidationResponse, WebBlueprint } from "./types";
 import { deepClone, setPointerValue } from "./utils/jsonPointer";
 import { useTheme } from "./theme";
 import "./index.css";
@@ -56,6 +57,9 @@ export default function App() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [previewPending, setPreviewPending] = useState(false);
+  const [exitPromptOpen, setExitPromptOpen] = useState(false);
+  const [exitPending, setExitPending] = useState(false);
+  const [exitCheckPending, setExitCheckPending] = useState(false);
   const validationSequence = useRef(0);
   const previewSequence = useRef(0);
 
@@ -156,12 +160,17 @@ export default function App() {
   );
 
   const errorCount = validationErrors.size;
+  const exitErrors = useMemo(
+    () => Array.from(validationErrors.entries()),
+    [validationErrors],
+  );
   const shortcuts = useMemo(
     () => [
       { combo: `${modifierKey}+S`, label: "Save" },
     ],
     [modifierKey],
   );
+  const exiting = exitPending || exitCheckPending;
 
   const handleFieldChange = useCallback(
     (pointer: string, value: JsonValue) => {
@@ -188,22 +197,30 @@ export default function App() {
     });
   }, []);
 
+  const applyValidationResult = useCallback(
+    (result: ValidationResponse) => {
+      const next = new Map<string, string>();
+      result.errors.forEach((error) => {
+        next.set(error.pointer || "/", error.message);
+      });
+      setValidationErrors(next);
+      setStatus(result.ok ? "Validation passed" : "Validation failed");
+      return result;
+    },
+    [],
+  );
+
   const runValidation = useCallback(
-    async (draft: JsonValue) => {
+    async (draft: JsonValue): Promise<ValidationResponse | undefined> => {
       const seq = validationSequence.current + 1;
       validationSequence.current = seq;
       setValidating(true);
       try {
         const result = await validateData(draft);
-        if (seq !== validationSequence.current) {
-          return;
+        if (seq === validationSequence.current) {
+          applyValidationResult(result);
         }
-        const next = new Map<string, string>();
-        result.errors.forEach((error) => {
-          next.set(error.pointer || "/", error.message);
-        });
-        setValidationErrors(next);
-        setStatus(result.ok ? "Validation passed" : "Validation failed");
+        return result;
       } catch (error) {
         console.error(error);
         if (seq === validationSequence.current) {
@@ -216,7 +233,7 @@ export default function App() {
         }
       }
     },
-    [],
+    [applyValidationResult],
   );
 
   const updatePreview = useCallback(
@@ -281,15 +298,51 @@ export default function App() {
     }
   }, [data, saving]);
 
+  const finalizeExit = useCallback(
+    async (commit: boolean) => {
+      if (exitPending) {
+        return;
+      }
+      setExitPending(true);
+      try {
+        await exitSession(data, commit);
+        setToast({
+          message: commit
+            ? "Session closed with the latest changes."
+            : "Session closed using the last saved configuration.",
+          kind: "success",
+        });
+        setStatus("Session closed");
+        setExitPromptOpen(false);
+      } catch (error) {
+        console.error(error);
+        setToast({ message: "Exit failed", kind: "error" });
+      } finally {
+        setExitPending(false);
+      }
+    },
+    [data, exitPending],
+  );
+
   const handleExit = useCallback(async () => {
-    try {
-      await exitSession(data, false);
-      setToast({ message: "Session closed without saving.", kind: "success" });
-    } catch (error) {
-      console.error(error);
-      setToast({ message: "Exit failed", kind: "error" });
+    if (exitCheckPending || exitPending) {
+      return;
     }
-  }, [data]);
+    setExitCheckPending(true);
+    try {
+      const result = await runValidation(data);
+      if (!result) {
+        return;
+      }
+      if (result.errors.length > 0) {
+        setExitPromptOpen(true);
+        return;
+      }
+      await finalizeExit(true);
+    } finally {
+      setExitCheckPending(false);
+    }
+  }, [data, exitCheckPending, exitPending, finalizeExit, runValidation]);
 
   useEffect(() => {
     if (!toast) return;
@@ -311,6 +364,7 @@ export default function App() {
         description={blueprint?.description}
         dirty={dirty}
         saving={saving}
+        exiting={exiting}
         onSave={handleSave}
         onExit={handleExit}
       />
@@ -372,6 +426,16 @@ export default function App() {
         lastSaved={lastSaved}
         shortcuts={shortcuts}
       />
+      {exitPromptOpen
+        ? (
+          <ExitGuardDialog
+            errors={exitErrors}
+            forcing={exitPending}
+            onCancel={() => setExitPromptOpen(false)}
+            onForceExit={() => finalizeExit(false)}
+          />
+        )
+        : null}
       {toast
         ? (
           <div

@@ -263,13 +263,7 @@ function PrimitiveArrayEditor({
   };
 
   const addItem = () => {
-    const defaults: Record<string, JsonValue> = {
-      string: "",
-      number: 0,
-      integer: 0,
-      boolean: false,
-    };
-    const placeholder = defaults[itemKind] ?? null;
+    const placeholder = defaultArrayValue(itemKind);
     onChange(pointer, [...value, placeholder]);
   };
 
@@ -326,6 +320,18 @@ function PrimitiveArrayEditor({
       </button>
     </div>
   );
+}
+
+function defaultArrayValue(kind?: string): JsonValue {
+  switch (kind) {
+    case "number":
+    case "integer":
+      return 0;
+    case "boolean":
+      return false;
+    default:
+      return "";
+  }
 }
 
 function describeFieldKind(kind: WebField["kind"]): string {
