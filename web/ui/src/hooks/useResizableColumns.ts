@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 
 export interface ColumnSizes {
   nav: number;
@@ -20,7 +21,7 @@ export function useResizableColumns(initial: ColumnSizes) {
     width: 0,
   });
 
-  const startDrag = useCallback((event: React.PointerEvent, target: DragTarget) => {
+  const startDrag = useCallback((event: ReactPointerEvent, target: DragTarget) => {
     dragTarget.current = target;
     dragOrigin.current = {
       startX: event.clientX,

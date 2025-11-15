@@ -1,83 +1,59 @@
-# React + TypeScript + Vite
+# SchemaUI Web Workspace
 
-This template provides a minimal setup to get React working in Vite with HMR and
-some ESLint rules.
+This package hosts the offline React single-page application that ships with the
+`schemaui` crate. The UI is bundled into a single `index.html` file (via
+`vite-plugin-singlefile`) and embedded into the Rust binary through
+`include_dir`, so no CDN access is required at runtime.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react)
-  uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in
-  [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc)
-  uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev
-& build performances. To add it, see
-[this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the
-configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+```bash
+cd web/ui
+npm install          # once
+npm run dev          # launches Vite on http://127.0.0.1:5173
 ```
 
-You can also install
-[eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x)
-and
-[eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom)
-for React-specific lint rules:
+The layout mirrors the TUI: fixed header/footer, draggable tree/editor/preview
+panes, syntax-highlighted previews, realtime JSON Schema validation, and a theme
+toggle.
 
-```js
-// eslint.config.js
-import reactX from "eslint-plugin-react-x";
-import reactDom from "eslint-plugin-react-dom";
+## Production build
 
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs["recommended-typescript"],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+```bash
+npm run build
 ```
+
+This runs `tsc -b` followed by `vite build`, emitting `../dist/index.html`.
+Cargo’s `build.rs` automatically triggers `npm run build` unless
+`SCHEMAUI_WEB_SKIP_BUILD=1`. Set `SCHEMAUI_WEB_FORCE_BUILD=1` to rebuild
+unconditionally.
+
+## Type-safe data contracts
+
+The server layer derives TypeScript bindings via
+[`ts-rs`](https://crates.io/crates/ts-rs). Generated files live in
+`web/types/*.ts` and are addressable inside the SPA (and in third-party
+frontends) through the alias `@schemaui/types/*`. Run
+
+```bash
+cargo test -p schemaui --lib --features web
+```
+
+whenever you modify the Rust data structures to refresh those bindings.
+
+The helper module `src/types.ts` re-exports the generated interfaces while
+replacing `serde_json::Value` with the richer `JsonValue` union the UI expects.
+
+## Custom frontends
+
+Consumers embedding `schemaui` in their own products can ship a fully custom
+bundle by:
+
+1. Implementing a frontend that talks to the documented HTTP endpoints
+   (`/api/session`, `/api/validate`, `/api/preview`, etc.). Import the generated
+   definitions from `web/types` to stay in sync with the server.
+2. Pointing the library at their assets via
+   `WebSessionBuilder::with_asset_provider` or `with_filesystem_assets`.
+
+The CLI wrapper (`cargo run -p schemaui-cli -- web ...`) automatically falls
+back to the embedded bundle if no override is provided.

@@ -1,6 +1,11 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+
+const thisDir = path.dirname(fileURLToPath(import.meta.url));
+const workspaceRoot = path.resolve(thisDir, '..');
 
 export default defineConfig({
   plugins: [
@@ -10,6 +15,16 @@ export default defineConfig({
       useRecommendedBuildConfig: true,
     }),
   ],
+  resolve: {
+    alias: {
+      '@schemaui/types': path.resolve(workspaceRoot, 'types'),
+    },
+  },
+  server: {
+    fs: {
+      allow: [workspaceRoot],
+    },
+  },
   build: {
     target: 'esnext',
     assetsInlineLimit: 100_000_000,

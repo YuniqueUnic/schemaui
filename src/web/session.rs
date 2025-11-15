@@ -24,6 +24,7 @@ use tokio::{
     net::TcpListener,
     sync::{Mutex, oneshot},
 };
+use ts_rs::TS;
 
 use crate::io::{DocumentFormat, input::schema_with_defaults};
 
@@ -258,12 +259,14 @@ impl FinishLine {
     }
 }
 
-#[derive(Serialize)]
-struct SessionResponse {
-    title: Option<String>,
-    blueprint: WebBlueprint,
-    data: Value,
-    formats: Vec<String>,
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
+pub(crate) struct SessionResponse {
+    pub title: Option<String>,
+    pub blueprint: WebBlueprint,
+    #[ts(type = "Record<string, unknown>")]
+    pub data: Value,
+    pub formats: Vec<String>,
 }
 
 async fn get_session(State(state): State<SharedState>) -> impl IntoResponse {
@@ -276,9 +279,11 @@ async fn get_session(State(state): State<SharedState>) -> impl IntoResponse {
     Json(payload)
 }
 
-#[derive(Deserialize)]
-struct SaveRequest {
-    data: Value,
+#[derive(Deserialize, TS)]
+#[ts(export, export_to = "web/types/")]
+pub(crate) struct SaveRequest {
+    #[ts(type = "Record<string, unknown>")]
+    pub data: Value,
 }
 
 async fn post_save(
@@ -295,11 +300,13 @@ async fn post_save(
     (StatusCode::OK, Json(json!({"status": "saved"})))
 }
 
-#[derive(Deserialize)]
-struct ExitRequest {
-    data: Value,
+#[derive(Deserialize, TS)]
+#[ts(export, export_to = "web/types/")]
+pub(crate) struct ExitRequest {
+    #[ts(type = "Record<string, unknown>")]
+    pub data: Value,
     #[serde(default = "default_true")]
-    commit: bool,
+    pub commit: bool,
 }
 
 fn default_true() -> bool {
@@ -326,21 +333,25 @@ async fn post_exit(
     (StatusCode::OK, Json(json!({"status": "closing"})))
 }
 
-#[derive(Deserialize)]
-struct ValidateRequest {
-    data: Value,
+#[derive(Deserialize, TS)]
+#[ts(export, export_to = "web/types/")]
+pub(crate) struct ValidateRequest {
+    #[ts(type = "Record<string, unknown>")]
+    pub data: Value,
 }
 
-#[derive(Serialize)]
-struct ValidationResponse {
-    ok: bool,
-    errors: Vec<FieldError>,
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
+pub(crate) struct ValidationResponse {
+    pub ok: bool,
+    pub errors: Vec<FieldError>,
 }
 
-#[derive(Serialize)]
-struct FieldError {
-    pointer: String,
-    message: String,
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
+pub(crate) struct FieldError {
+    pub pointer: String,
+    pub message: String,
 }
 
 async fn post_validate(
@@ -360,17 +371,20 @@ async fn post_validate(
     })
 }
 
-#[derive(Deserialize)]
-struct PreviewRequest {
-    data: Value,
-    format: String,
+#[derive(Deserialize, TS)]
+#[ts(export, export_to = "web/types/")]
+pub(crate) struct PreviewRequest {
+    #[ts(type = "Record<string, unknown>")]
+    pub data: Value,
+    pub format: String,
     #[serde(default = "default_true")]
-    pretty: bool,
+    pub pretty: bool,
 }
 
-#[derive(Serialize)]
-struct PreviewResponse {
-    payload: String,
+#[derive(Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
+pub(crate) struct PreviewResponse {
+    pub payload: String,
 }
 
 async fn post_preview(

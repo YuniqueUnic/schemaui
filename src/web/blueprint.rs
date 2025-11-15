@@ -1,19 +1,22 @@
 use anyhow::Result;
 use serde::Serialize;
 use serde_json::Value;
+use ts_rs::TS;
 
 use crate::domain::{
     CompositeMode, FieldKind, FieldSchema, FormSchema, FormSection, RootSection, parse_form_schema,
 };
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
 pub struct WebBlueprint {
     pub title: Option<String>,
     pub description: Option<String>,
     pub roots: Vec<WebRoot>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
 pub struct WebRoot {
     pub id: String,
     pub title: String,
@@ -21,7 +24,8 @@ pub struct WebRoot {
     pub sections: Vec<WebSection>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
 pub struct WebSection {
     pub id: String,
     pub title: String,
@@ -30,7 +34,8 @@ pub struct WebSection {
     pub sections: Vec<WebSection>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
 pub struct WebField {
     pub name: String,
     pub label: String,
@@ -38,11 +43,13 @@ pub struct WebField {
     pub description: Option<String>,
     pub required: bool,
     pub kind: WebFieldKind,
+    #[ts(type = "Record<string, unknown> | null")]
     pub default_value: Option<Value>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export, export_to = "web/types/")]
 pub enum WebFieldKind {
     String,
     Integer,
@@ -68,18 +75,21 @@ pub enum WebFieldKind {
     },
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
+#[ts(export, export_to = "web/types/")]
 pub enum WebCompositeMode {
     OneOf,
     AnyOf,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "web/types/")]
 pub struct WebCompositeVariant {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
+    #[ts(type = "Record<string, unknown>")]
     pub schema: Value,
     pub is_object: bool,
 }

@@ -54,7 +54,7 @@ export function renderPreview(
   });
 }
 
-export function persistData(data: JsonValue, commit = false) {
+export function persistData(data: JsonValue) {
   return request('/api/save', {
     method: 'POST',
     json: { data },

@@ -101,8 +101,8 @@ function ensureContainer(
   if (existing === undefined || existing === null) {
     return isFinite(Number(next)) ? [] : {};
   }
-  if (Array.isArray(existing) || typeof existing === 'object') {
-    return deepClone(existing);
+  if (isContainer(existing)) {
+    return deepClone(existing as JsonValue[] | { [key: string]: JsonValue });
   }
   return isFinite(Number(next)) ? [] : {};
 }
@@ -111,7 +111,7 @@ export function mergeDefaults(
   base: JsonValue,
   defaults: Record<string, JsonValue | undefined>,
 ): JsonValue {
-  let result = deepClone(base ?? {});
+  let result: JsonValue = deepClone(base ?? {});
   for (const [pointer, value] of Object.entries(defaults)) {
     if (value === undefined) {
       continue;
@@ -128,4 +128,10 @@ export function deepClone<T extends JsonValue>(value: T): T {
   return typeof structuredClone === 'function'
     ? structuredClone(value)
     : (JSON.parse(JSON.stringify(value)) as T);
+}
+
+function isContainer(
+  value: JsonValue,
+): value is JsonValue[] | { [key: string]: JsonValue } {
+  return Array.isArray(value) || (typeof value === 'object' && value !== null);
 }

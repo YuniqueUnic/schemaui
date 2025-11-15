@@ -1,3 +1,18 @@
+import type { FieldError as ServerFieldError } from '@schemaui/types/FieldError';
+import type { PreviewRequest as ServerPreviewRequest } from '@schemaui/types/PreviewRequest';
+import type { PreviewResponse as ServerPreviewResponse } from '@schemaui/types/PreviewResponse';
+import type { SaveRequest as ServerSaveRequest } from '@schemaui/types/SaveRequest';
+import type { SessionResponse as ServerSessionResponse } from '@schemaui/types/SessionResponse';
+import type { ExitRequest as ServerExitRequest } from '@schemaui/types/ExitRequest';
+import type { ValidateRequest as ServerValidateRequest } from '@schemaui/types/ValidateRequest';
+import type { ValidationResponse as ServerValidationResponse } from '@schemaui/types/ValidationResponse';
+import type { WebBlueprint as GeneratedWebBlueprint } from '@schemaui/types/WebBlueprint';
+import type { WebCompositeVariant as GeneratedWebCompositeVariant } from '@schemaui/types/WebCompositeVariant';
+import type { WebField as GeneratedWebField } from '@schemaui/types/WebField';
+import type { WebFieldKind as GeneratedWebFieldKind } from '@schemaui/types/WebFieldKind';
+import type { WebRoot as GeneratedWebRoot } from '@schemaui/types/WebRoot';
+import type { WebSection as GeneratedWebSection } from '@schemaui/types/WebSection';
+
 export type JsonValue =
   | string
   | number
@@ -6,84 +21,56 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-export interface WebBlueprint {
-  title?: string | null;
-  description?: string | null;
-  roots: WebRoot[];
+export type FieldError = ServerFieldError;
+
+export type ValidationResponse = Omit<ServerValidationResponse, 'errors'> & {
+  errors: FieldError[];
+};
+
+export type SessionResponse = Omit<ServerSessionResponse, 'data' | 'blueprint'> & {
+  data: JsonValue;
+  blueprint: WebBlueprint;
+};
+
+export type SaveRequest = Omit<ServerSaveRequest, 'data'> & {
+  data: JsonValue;
+};
+
+export type ExitRequest = Omit<ServerExitRequest, 'data'> & {
+  data: JsonValue;
+};
+
+export type ValidateRequest = Omit<ServerValidateRequest, 'data'> & {
+  data: JsonValue;
+};
+
+export type PreviewRequest = Omit<ServerPreviewRequest, 'data'> & {
+  data: JsonValue;
+};
+
+export type PreviewResponse = ServerPreviewResponse;
+
+export interface WebField extends Omit<GeneratedWebField, 'default_value'> {
+  default_value?: JsonValue;
 }
 
-export interface WebRoot {
-  id: string;
-  title: string;
-  description?: string | null;
-  sections: WebSection[];
+export interface WebCompositeVariant
+  extends Omit<GeneratedWebCompositeVariant, 'schema'> {
+  schema: JsonValue;
 }
 
-export interface WebSection {
-  id: string;
-  title: string;
-  description?: string | null;
+export interface WebSection
+  extends Omit<GeneratedWebSection, 'fields' | 'sections'> {
   fields: WebField[];
   sections: WebSection[];
 }
 
-export interface WebField {
-  name: string;
-  label: string;
-  pointer: string;
-  description?: string | null;
-  required: boolean;
-  default_value?: JsonValue;
-  kind: WebFieldKind;
+export interface WebRoot extends Omit<GeneratedWebRoot, 'sections'> {
+  sections: WebSection[];
 }
 
-export type WebFieldKind =
-  | { type: 'string' }
-  | { type: 'integer' }
-  | { type: 'number' }
-  | { type: 'boolean' }
-  | { type: 'enum'; options: string[] }
-  | { type: 'array'; items?: WebFieldKind }
-  | { type: 'json' }
-  | {
-      type: 'composite';
-      mode: 'one_of' | 'any_of';
-      variants: WebCompositeVariant[];
-    }
-  | {
-      type: 'key_value';
-      key_title: string;
-      key_description?: string | null;
-      value_title: string;
-      value_description?: string | null;
-      value_kind: WebFieldKind;
-    };
-
-export interface WebCompositeVariant {
-  id: string;
-  title: string;
-  description?: string | null;
-  schema: JsonValue;
-  is_object: boolean;
+export interface WebBlueprint extends Omit<GeneratedWebBlueprint, 'roots'> {
+  roots: WebRoot[];
 }
 
-export interface SessionResponse {
-  title?: string | null;
-  blueprint: WebBlueprint;
-  data: JsonValue;
-  formats: string[];
-}
-
-export interface FieldError {
-  pointer: string;
-  message: string;
-}
-
-export interface ValidationResponse {
-  ok: boolean;
-  errors: FieldError[];
-}
-
-export interface PreviewResponse {
-  payload: string;
-}
+export type WebFieldKind = GeneratedWebFieldKind;
