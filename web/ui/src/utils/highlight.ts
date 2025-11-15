@@ -1,11 +1,11 @@
 export function highlightSyntax(payload: string, format: string): string {
   const escaped = payload
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
   const tokenized = escaped.replace(
-    /(\"(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\\"])*\"\\s*:?)|(\\b(true|false|null)\\b)|(-?\\d+(?:\\.\\d*)?(?:[eE][+-]?\\d+)?)/g,
+    /("(?:\\u[0-9a-fA-F]{4}|\\[^u]|[^\\"])*"\\s*:?)|(\\b(true|false|null)\\b)|(-?\\d+(?:\\.\\d*)?(?:[eE][+-]?\\d+)?)/g,
     (match, str, bool, _, num) => {
       if (str) {
         return /:$/.test(str)
@@ -22,7 +22,7 @@ export function highlightSyntax(payload: string, format: string): string {
     },
   );
 
-  if (format === 'yaml' || format === 'toml') {
+  if (format === "yaml" || format === "toml") {
     return tokenized.replace(
       /(^|\s)([A-Za-z0-9_-]+)(?=\s*:)/gm,
       (_, prefix, key) =>

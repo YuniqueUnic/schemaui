@@ -1,6 +1,6 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { clsx } from 'clsx';
-import { highlightSyntax } from '../utils/highlight';
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { clsx } from "clsx";
+import { highlightSyntax } from "../utils/highlight";
 
 interface PreviewPaneProps {
   formats: string[];
@@ -58,10 +58,10 @@ export const PreviewPane = memo(function PreviewPane({
               type="button"
               onClick={() => onFormatChange(option)}
               className={clsx(
-                'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition',
+                "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition",
                 option === format
-                  ? 'bg-brand-500/20 text-brand-700 dark:text-brand-200'
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
+                  ? "bg-brand-500/20 text-brand-700 dark:text-brand-200"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
               )}
             >
               {option.toUpperCase()}
@@ -84,16 +84,18 @@ export const PreviewPane = memo(function PreviewPane({
             disabled={!payload}
             className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-400 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200"
           >
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? "Copied" : "Copy"}
           </button>
         </div>
       </div>
       <div className="relative flex-1 overflow-auto bg-white px-5 py-4 font-mono text-xs leading-relaxed text-slate-800 dark:bg-slate-950 dark:text-slate-200">
-        {loading ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-950/70">
-            <div className="h-12 w-12 animate-spin rounded-full border-2 border-brand-400 border-t-transparent" />
-          </div>
-        ) : null}
+        {loading
+          ? (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-950/70">
+              <div className="h-12 w-12 animate-spin rounded-full border-2 border-brand-400 border-t-transparent" />
+            </div>
+          )
+          : null}
         <pre className="whitespace-pre text-xs leading-relaxed">
           <code dangerouslySetInnerHTML={{ __html: highlightSyntax(payload, format) }} />
         </pre>

@@ -1,56 +1,56 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { clsx } from 'clsx';
-import { AppHeader } from './components/AppHeader';
-import { TreePanel } from './components/TreePanel';
-import { EditorPane } from './components/EditorPane';
-import { PreviewPane } from './components/PreviewPane';
-import { StatusBar } from './components/StatusBar';
-import { useResizableColumns } from './hooks/useResizableColumns';
-import { applyBlueprintDefaults } from './utils/defaults';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { clsx } from "clsx";
+import { AppHeader } from "./components/AppHeader";
+import { TreePanel } from "./components/TreePanel";
+import { EditorPane } from "./components/EditorPane";
+import { PreviewPane } from "./components/PreviewPane";
+import { StatusBar } from "./components/StatusBar";
+import { useResizableColumns } from "./hooks/useResizableColumns";
+import { applyBlueprintDefaults } from "./utils/defaults";
 import {
   buildSectionTree,
   getBreadcrumbs,
   getSectionByPath,
   type SectionPath,
   type TreeNode,
-} from './utils/blueprint';
+} from "./utils/blueprint";
 import {
   exitSession,
   fetchSession,
   persistData,
   renderPreview,
   validateData,
-} from './api';
-import type { JsonValue, WebBlueprint } from './types';
-import { deepClone, setPointerValue } from './utils/jsonPointer';
-import { useTheme } from './theme';
-import './index.css';
+} from "./api";
+import type { JsonValue, WebBlueprint } from "./types";
+import { deepClone, setPointerValue } from "./utils/jsonPointer";
+import { useTheme } from "./theme";
+import "./index.css";
 
 interface ToastState {
   message: string;
-  kind: 'success' | 'error';
+  kind: "success" | "error";
 }
 
 export default function App() {
   const [blueprint, setBlueprint] = useState<WebBlueprint | undefined>();
   const [sessionTitle, setSessionTitle] = useState<string | null | undefined>();
-  const [formats, setFormats] = useState<string[]>(['json']);
+  const [formats, setFormats] = useState<string[]>(["json"]);
   const [data, setData] = useState<JsonValue>({});
-  const [status, setStatus] = useState('Loading schema…');
+  const [status, setStatus] = useState("Loading schema…");
   const [dirty, setDirty] = useState(false);
   const [validating, setValidating] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Map<string, string>>(
     () => new Map(),
   );
-  const [previewFormat, setPreviewFormat] = useState('json');
+  const [previewFormat, setPreviewFormat] = useState("json");
   const [previewPretty, setPreviewPretty] = useState(true);
-  const [previewPayload, setPreviewPayload] = useState('{}');
+  const [previewPayload, setPreviewPayload] = useState("{}");
   const [activePath, setActivePath] = useState<SectionPath>({
     rootIndex: 0,
     sectionPath: [],
   });
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [treeFilter, setTreeFilter] = useState('');
+  const [treeFilter, setTreeFilter] = useState("");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -61,10 +61,11 @@ export default function App() {
 
   const { sizes, startDrag } = useResizableColumns({ nav: 280, preview: 420 });
   const { theme } = useTheme();
-  const isMac =
-    typeof navigator !== 'undefined' &&
-    /(Mac|iPhone|iPad)/i.test(navigator?.platform ?? navigator?.userAgent ?? '');
-  const modifierKey = isMac ? '⌘' : 'Ctrl';
+  const isMac = typeof navigator !== "undefined" &&
+    /(Mac|iPhone|iPad)/i.test(
+      navigator?.platform ?? navigator?.userAgent ?? "",
+    );
+  const modifierKey = isMac ? "⌘" : "Ctrl";
 
   useEffect(() => {
     let mounted = true;
@@ -82,13 +83,13 @@ export default function App() {
         const availableFormats =
           payload.formats?.length && payload.formats.length > 0
             ? payload.formats
-            : ['json'];
+            : ["json"];
         setFormats(availableFormats);
         setPreviewFormat(
-          availableFormats.includes('json') ? 'json' : availableFormats[0],
+          availableFormats.includes("json") ? "json" : availableFormats[0],
         );
         setData(normalized);
-        setStatus('Ready');
+        setStatus("Ready");
         const initialPath = resolveInitialPath(payload.blueprint);
         setActivePath(initialPath);
         setExpanded(
@@ -102,12 +103,16 @@ export default function App() {
         setValidationErrors(new Map());
         await Promise.all([
           runValidation(normalized),
-          updatePreview(normalized, availableFormats[0] || 'json', previewPretty),
+          updatePreview(
+            normalized,
+            availableFormats[0] || "json",
+            previewPretty,
+          ),
         ]);
       } catch (error) {
         console.error(error);
-        setStatus('Failed to load schema payload');
-        setToast({ message: 'Unable to load schema', kind: 'error' });
+        setStatus("Failed to load schema payload");
+        setToast({ message: "Unable to load schema", kind: "error" });
       } finally {
         if (mounted) {
           setSessionLoading(false);
@@ -119,22 +124,15 @@ export default function App() {
     };
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        if (event.shiftKey) {
-          handleSaveAndExit();
-        } else {
-          handleSave();
-        }
+        handleSave();
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   });
 
   const sectionTree = useMemo(
@@ -160,8 +158,7 @@ export default function App() {
   const errorCount = validationErrors.size;
   const shortcuts = useMemo(
     () => [
-      { combo: `${modifierKey}+S`, label: 'Save' },
-      { combo: `Shift+${modifierKey}+S`, label: 'Save & Exit' },
+      { combo: `${modifierKey}+S`, label: "Save" },
     ],
     [modifierKey],
   );
@@ -203,15 +200,15 @@ export default function App() {
         }
         const next = new Map<string, string>();
         result.errors.forEach((error) => {
-          next.set(error.pointer || '/', error.message);
+          next.set(error.pointer || "/", error.message);
         });
         setValidationErrors(next);
-        setStatus(result.ok ? 'Validation passed' : 'Validation failed');
+        setStatus(result.ok ? "Validation passed" : "Validation failed");
       } catch (error) {
         console.error(error);
         if (seq === validationSequence.current) {
-          setStatus('Validation request failed');
-          setToast({ message: 'Validation failed', kind: 'error' });
+          setStatus("Validation request failed");
+          setToast({ message: "Validation failed", kind: "error" });
         }
       } finally {
         if (seq === validationSequence.current) {
@@ -236,7 +233,7 @@ export default function App() {
       } catch (error) {
         console.error(error);
         if (seq === previewSequence.current) {
-          setPreviewPayload('// Unable to render preview');
+          setPreviewPayload("// Unable to render preview");
         }
       } finally {
         if (seq === previewSequence.current) {
@@ -256,39 +253,29 @@ export default function App() {
       updatePreview(data, previewFormat, previewPretty);
     }, 240);
     return () => window.clearTimeout(timer);
-  }, [data, previewFormat, previewPretty, sessionLoading, runValidation, updatePreview]);
+  }, [
+    data,
+    previewFormat,
+    previewPretty,
+    sessionLoading,
+    runValidation,
+    updatePreview,
+  ]);
 
   const handleSave = useCallback(async () => {
     if (saving) return;
     setSaving(true);
-    setStatus('Saving…');
+    setStatus("Saving…");
     try {
       await persistData(data);
       setDirty(false);
       setLastSaved(new Date());
-      setToast({ message: 'Configuration saved', kind: 'success' });
-      setStatus('All changes saved.');
+      setToast({ message: "Configuration saved", kind: "success" });
+      setStatus("All changes saved.");
     } catch (error) {
       console.error(error);
-      setToast({ message: 'Save failed', kind: 'error' });
-      setStatus('Save failed');
-    } finally {
-      setSaving(false);
-    }
-  }, [data, saving]);
-
-  const handleSaveAndExit = useCallback(async () => {
-    if (saving) return;
-    setSaving(true);
-    setStatus('Saving & exiting…');
-    try {
-      await exitSession(data, true);
-      setToast({ message: 'Session closed. Check terminal for output.', kind: 'success' });
-      setDirty(false);
-    } catch (error) {
-      console.error(error);
-      setToast({ message: 'Failed to close session', kind: 'error' });
-      setStatus('Save & exit failed');
+      setToast({ message: "Save failed", kind: "error" });
+      setStatus("Save failed");
     } finally {
       setSaving(false);
     }
@@ -297,10 +284,10 @@ export default function App() {
   const handleExit = useCallback(async () => {
     try {
       await exitSession(data, false);
-      setToast({ message: 'Session closed without saving.', kind: 'success' });
+      setToast({ message: "Session closed without saving.", kind: "success" });
     } catch (error) {
       console.error(error);
-      setToast({ message: 'Exit failed', kind: 'error' });
+      setToast({ message: "Exit failed", kind: "error" });
     }
   }, [data]);
 
@@ -313,10 +300,10 @@ export default function App() {
   return (
     <div
       className={clsx(
-        'flex h-screen min-h-0 flex-col overflow-hidden',
-        theme === 'dark'
-          ? 'bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-white'
-          : 'bg-gradient-to-b from-slate-50 via-white to-slate-100 text-slate-900',
+        "flex h-screen min-h-0 flex-col overflow-hidden",
+        theme === "dark"
+          ? "bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-white"
+          : "bg-gradient-to-b from-slate-50 via-white to-slate-100 text-slate-900",
       )}
     >
       <AppHeader
@@ -325,7 +312,6 @@ export default function App() {
         dirty={dirty}
         saving={saving}
         onSave={handleSave}
-        onSaveAndExit={handleSaveAndExit}
         onExit={handleExit}
       />
       <main className="flex flex-1 min-h-0 overflow-hidden">
@@ -347,7 +333,7 @@ export default function App() {
         </div>
         <div
           className="w-2 cursor-col-resize bg-transparent"
-          onPointerDown={(event) => startDrag(event, 'nav')}
+          onPointerDown={(event) => startDrag(event, "nav")}
         />
         <section className="flex-1 min-h-0 bg-white dark:bg-slate-900/20">
           <EditorPane
@@ -361,7 +347,7 @@ export default function App() {
         </section>
         <div
           className="w-2 cursor-col-resize bg-transparent"
-          onPointerDown={(event) => startDrag(event, 'preview')}
+          onPointerDown={(event) => startDrag(event, "preview")}
         />
         <div
           className="shrink-0 border-l border-slate-200 bg-white dark:border-slate-800/80 dark:bg-transparent"
@@ -386,14 +372,16 @@ export default function App() {
         lastSaved={lastSaved}
         shortcuts={shortcuts}
       />
-      {toast ? (
-        <div
-          className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full border border-slate-700/70 bg-slate-900/90 px-6 py-3 text-sm text-white shadow-xl"
-          role="status"
-        >
-          {toast.message}
-        </div>
-      ) : null}
+      {toast
+        ? (
+          <div
+            className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full border border-slate-700/70 bg-slate-900/90 px-6 py-3 text-sm text-white shadow-xl"
+            role="status"
+          >
+            {toast.message}
+          </div>
+        )
+        : null}
     </div>
   );
 }

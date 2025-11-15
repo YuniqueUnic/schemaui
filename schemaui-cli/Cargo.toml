@@ -23,7 +23,7 @@ tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 
 [features]
 default = ["full", "web"]
-full = ["json", "yaml", "toml"]
+full = ["json", "yaml", "toml", "web"]
 json = ["schemaui/json"]
 yaml = ["schemaui/yaml"]
 toml = ["schemaui/toml"]

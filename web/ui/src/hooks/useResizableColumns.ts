@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
 export interface ColumnSizes {
   nav: number;
@@ -11,7 +11,7 @@ const LIMITS = {
   preview: { min: 320, max: 720 },
 };
 
-type DragTarget = 'nav' | 'preview' | null;
+type DragTarget = "nav" | "preview" | null;
 
 export function useResizableColumns(initial: ColumnSizes) {
   const [sizes, setSizes] = useState<ColumnSizes>(initial);
@@ -21,19 +21,22 @@ export function useResizableColumns(initial: ColumnSizes) {
     width: 0,
   });
 
-  const startDrag = useCallback((event: ReactPointerEvent, target: DragTarget) => {
-    dragTarget.current = target;
-    dragOrigin.current = {
-      startX: event.clientX,
-      width: target === 'nav' ? sizes.nav : sizes.preview,
-    };
-    (event.target as HTMLElement).setPointerCapture(event.pointerId);
-    document.body.classList.add('select-none', 'cursor-col-resize');
-  }, [sizes.nav, sizes.preview]);
+  const startDrag = useCallback(
+    (event: ReactPointerEvent, target: DragTarget) => {
+      dragTarget.current = target;
+      dragOrigin.current = {
+        startX: event.clientX,
+        width: target === "nav" ? sizes.nav : sizes.preview,
+      };
+      (event.target as HTMLElement).setPointerCapture(event.pointerId);
+      document.body.classList.add("select-none", "cursor-col-resize");
+    },
+    [sizes.nav, sizes.preview],
+  );
 
   const stopDrag = useCallback(() => {
     dragTarget.current = null;
-    document.body.classList.remove('select-none', 'cursor-col-resize');
+    document.body.classList.remove("select-none", "cursor-col-resize");
   }, []);
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function useResizableColumns(initial: ColumnSizes) {
       const target = dragTarget.current;
       if (!target) return;
       const delta = event.clientX - dragOrigin.current.startX;
-      if (target === 'nav') {
+      if (target === "nav") {
         const next = clamp(
           dragOrigin.current.width + delta,
           LIMITS.nav.min,
@@ -62,11 +65,11 @@ export function useResizableColumns(initial: ColumnSizes) {
       stopDrag();
     }
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
     return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
     };
   }, [stopDrag]);
 

@@ -2,7 +2,7 @@
   "name": "schemaui-web",
   "description": "SchemaUI web interface (offline SPA embedded via include_dir).",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

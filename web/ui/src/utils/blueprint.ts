@@ -1,4 +1,4 @@
-import type { WebBlueprint, WebField, WebSection } from '../types';
+import type { WebBlueprint, WebField, WebSection } from "../types";
 
 export interface SectionPath {
   rootIndex: number;
@@ -15,7 +15,9 @@ export interface TreeNode<T = unknown> {
   children: TreeNode<T>[];
 }
 
-export function buildSectionTree(blueprint?: WebBlueprint): TreeNode<SectionPath>[] {
+export function buildSectionTree(
+  blueprint?: WebBlueprint,
+): TreeNode<SectionPath>[] {
   if (!blueprint) return [];
   return blueprint.roots.map((root, rootIndex) => ({
     id: root.id || `root-${rootIndex}`,
@@ -25,7 +27,7 @@ export function buildSectionTree(blueprint?: WebBlueprint): TreeNode<SectionPath
     data: { rootIndex, sectionPath: [] },
     fieldPointers: [],
     children: (root.sections || []).map((section, index) =>
-      mapSection(section, rootIndex, [index], 1),
+      mapSection(section, rootIndex, [index], 1)
     ),
   }));
 }
@@ -37,7 +39,7 @@ function mapSection(
   depth: number,
 ): TreeNode<SectionPath> {
   return {
-    id: section.id || `${rootIndex}-${path.join('-')}`,
+    id: section.id || `${rootIndex}-${path.join("-")}`,
     depth,
     label: section.title || `Section ${path[path.length - 1] + 1}`,
     description: section.description,
@@ -46,7 +48,7 @@ function mapSection(
       .map((field) => field.pointer)
       .filter((pointer): pointer is string => Boolean(pointer)),
     children: (section.sections || []).map((child, idx) =>
-      mapSection(child, rootIndex, [...path, idx], depth + 1),
+      mapSection(child, rootIndex, [...path, idx], depth + 1)
     ),
   };
 }
@@ -92,7 +94,7 @@ export function getBreadcrumbs(
   if (!root) {
     return crumbs;
   }
-  crumbs.push(root.title || 'Root');
+  crumbs.push(root.title || "Root");
   let sections = root.sections || [];
   target.sectionPath.forEach((index) => {
     const section = sections?.[index];

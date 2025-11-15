@@ -1,7 +1,7 @@
-import { memo } from 'react';
-import { clsx } from 'clsx';
-import { ChevronRight, Search, Layers, FolderTree } from 'lucide-react';
-import type { TreeNode, SectionPath } from '../utils/blueprint';
+import { memo } from "react";
+import { clsx } from "clsx";
+import { ChevronRight, FolderTree, Layers, Search } from "lucide-react";
+import type { SectionPath, TreeNode } from "../utils/blueprint";
 
 interface TreePanelProps {
   nodes: TreeNode<SectionPath>[];
@@ -32,7 +32,10 @@ export const TreePanel = memo(function TreePanel({
         <div className="h-10 animate-pulse rounded-2xl bg-slate-800/60" />
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="h-9 animate-pulse rounded-xl bg-slate-800/60" />
+            <div
+              key={index}
+              className="h-9 animate-pulse rounded-xl bg-slate-800/60"
+            />
           ))}
         </div>
       </aside>
@@ -88,14 +91,12 @@ function TreeNodeItem({
   errorCounts,
 }: TreeNodeItemProps) {
   const normalizedFilter = filter.trim().toLowerCase();
-  const matchesFilter =
-    !normalizedFilter ||
+  const matchesFilter = !normalizedFilter ||
     node.label.toLowerCase().includes(normalizedFilter) ||
-    (node.description ?? '').toLowerCase().includes(normalizedFilter);
-  const anyChildVisible =
-    node.children.length > 0 &&
+    (node.description ?? "").toLowerCase().includes(normalizedFilter);
+  const anyChildVisible = node.children.length > 0 &&
     node.children.some((child) =>
-      nodeVisible(child, expanded, normalizedFilter),
+      nodeVisible(child, expanded, normalizedFilter)
     );
   if (!matchesFilter && !anyChildVisible) {
     return null;
@@ -110,58 +111,62 @@ function TreeNodeItem({
         type="button"
         onClick={() => onSelect(node.data, node.id)}
         className={clsx(
-          'group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-slate-700 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60',
+          "group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-slate-700 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60",
           activeId === node.id &&
-            'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-700 dark:text-brand-100',
+            "bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-700 dark:text-brand-100",
         )}
         style={{ paddingLeft: `${node.depth * 0.9 + 0.5}rem` }}
       >
-        {!isLeaf ? (
-          <span
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggle(node.id);
-            }}
-            className={clsx(
-              'mr-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition hover:border-brand-400 hover:text-brand-500 dark:border-slate-700 dark:text-slate-400 dark:hover:text-brand-300',
-            )}
-          >
-            <ChevronRight
+        {!isLeaf
+          ? (
+            <span
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggle(node.id);
+              }}
               className={clsx(
-                'h-3.5 w-3.5 transition-transform',
-                (isExpanded || normalizedFilter) && 'rotate-90',
+                "mr-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition hover:border-brand-400 hover:text-brand-500 dark:border-slate-700 dark:text-slate-400 dark:hover:text-brand-300",
               )}
-            />
-          </span>
-        ) : (
-          <span className="mr-2 h-6 w-6" />
-        )}
+            >
+              <ChevronRight
+                className={clsx(
+                  "h-3.5 w-3.5 transition-transform",
+                  (isExpanded || normalizedFilter) && "rotate-90",
+                )}
+              />
+            </span>
+          )
+          : <span className="mr-2 h-6 w-6" />}
         <Icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-brand-500 dark:text-slate-500 dark:group-hover:text-brand-300" />
         <span className="flex-1 truncate text-sm">
           {highlightMatch(node.label, normalizedFilter)}
         </span>
-        {nodeErrorCount > 0 ? (
-          <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-500 dark:text-rose-200">
-            {nodeErrorCount}
-          </span>
-        ) : null}
+        {nodeErrorCount > 0
+          ? (
+            <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-500 dark:text-rose-200">
+              {nodeErrorCount}
+            </span>
+          )
+          : null}
       </button>
-      {isExpanded && node.children.length > 0 ? (
-        <div className="space-y-0.5">
-          {node.children.map((child) => (
-            <TreeNodeItem
-              key={child.id}
-              node={child}
-              expanded={expanded}
-              activeId={activeId}
-              onToggle={onToggle}
-              onSelect={onSelect}
-              filter={filter}
-              errorCounts={errorCounts}
-            />
-          ))}
-        </div>
-      ) : null}
+      {isExpanded && node.children.length > 0
+        ? (
+          <div className="space-y-0.5">
+            {node.children.map((child) => (
+              <TreeNodeItem
+                key={child.id}
+                node={child}
+                expanded={expanded}
+                activeId={activeId}
+                onToggle={onToggle}
+                onSelect={onSelect}
+                filter={filter}
+                errorCounts={errorCounts}
+              />
+            ))}
+          </div>
+        )
+        : null}
     </div>
   );
 }
@@ -171,10 +176,9 @@ function nodeVisible(
   expanded: Set<string>,
   filter: string,
 ): boolean {
-  const matches =
-    !filter ||
+  const matches = !filter ||
     node.label.toLowerCase().includes(filter) ||
-    (node.description ?? '').toLowerCase().includes(filter);
+    (node.description ?? "").toLowerCase().includes(filter);
   if (matches) {
     return true;
   }

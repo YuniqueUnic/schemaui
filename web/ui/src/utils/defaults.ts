@@ -1,5 +1,5 @@
-import type { JsonValue, WebBlueprint, WebField, WebSection } from '../types';
-import { mergeDefaults } from './jsonPointer';
+import type { JsonValue, WebBlueprint, WebField, WebSection } from "../types";
+import { mergeDefaults } from "./jsonPointer";
 
 export function applyBlueprintDefaults(
   blueprint: WebBlueprint | undefined,
@@ -10,7 +10,9 @@ export function applyBlueprintDefaults(
   }
   const defaults: Record<string, JsonValue | undefined> = {};
   blueprint.roots.forEach((root) => {
-    root.sections?.forEach((section) => collectSectionDefaults(section, defaults));
+    root.sections?.forEach((section) =>
+      collectSectionDefaults(section, defaults)
+    );
   });
   return mergeDefaults(data, defaults);
 }
