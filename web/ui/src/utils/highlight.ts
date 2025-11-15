@@ -2,6 +2,7 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-yaml';
 import 'prismjs/components/prism-toml';
+import 'prismjs/themes/prism-tomorrow.css';
 
 const LANGUAGE_MAP: Record<string, Prism.Grammar> = {
   json: Prism.languages.json,
@@ -9,12 +10,15 @@ const LANGUAGE_MAP: Record<string, Prism.Grammar> = {
   toml: Prism.languages.toml,
 };
 
+export function normalizedLanguage(format: string): 'json' | 'yaml' | 'toml' {
+  if (format === 'yaml') return 'yaml';
+  if (format === 'toml') return 'toml';
+  return 'json';
+}
+
 export function highlightSyntax(payload: string, format: string): string {
-  const grammar = LANGUAGE_MAP[format] ?? Prism.languages.json;
-  const languageId = grammar === Prism.languages.yaml ? 'yaml'
-    : grammar === Prism.languages.toml
-      ? 'toml'
-      : 'json';
+  const languageId = normalizedLanguage(format);
+  const grammar = LANGUAGE_MAP[languageId];
   try {
     return Prism.highlight(payload ?? '', grammar, languageId);
   } catch {

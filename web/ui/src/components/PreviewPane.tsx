@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { clsx } from "clsx";
-import { highlightSyntax } from "../utils/highlight";
+import { highlightSyntax, normalizedLanguage } from "../utils/highlight";
 
 interface PreviewPaneProps {
   formats: string[];
@@ -98,7 +98,7 @@ export const PreviewPane = memo(function PreviewPane({
           : null}
         <pre className="relative whitespace-pre-wrap break-words rounded-xl bg-white px-4 py-3 text-xs leading-relaxed text-slate-800 dark:bg-slate-900 dark:text-slate-100">
           <code
-            className="language-json"
+            className={`language-${normalizedLanguage(format)}`}
             dangerouslySetInnerHTML={{ __html: highlightSyntax(payload, format) }}
           />
         </pre>
