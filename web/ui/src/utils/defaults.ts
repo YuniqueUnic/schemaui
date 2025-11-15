@@ -87,7 +87,7 @@ function inferKindDefault(kind: WebFieldKind): JsonValue {
     case "key_value":
       return {};
     case "composite":
-      return {};
+      return kind.mode === "any_of" ? [] : {};
     default:
       return {};
   }

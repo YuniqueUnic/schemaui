@@ -4,6 +4,7 @@ import type {
   JsonValue,
   WebCompositeVariant,
   WebField,
+  WebFieldKind,
   WebSection,
 } from "../types";
 import {
@@ -199,7 +200,20 @@ function FieldControl({
             ))}
           </select>
         );
-      case "array":
+      case "array": {
+        const arrayKind = field.kind;
+        if (isCompositeKind(arrayKind.items)) {
+          return (
+            <CompositeArrayEditor
+              pointer={pointer}
+              itemKind={arrayKind.items}
+              value={Array.isArray(value) ? value : []}
+              data={data}
+              errors={errors}
+              onChange={onChange}
+            />
+          );
+        }
         return (
           <PrimitiveArrayEditor
             pointer={pointer}
@@ -208,6 +222,7 @@ function FieldControl({
             onChange={onChange}
           />
         );
+      }
       case "composite":
         return (
           <CompositeFieldEditor
@@ -353,6 +368,163 @@ function PrimitiveArrayEditor({
   );
 }
 
+interface CompositeArrayEditorProps {
+  pointer: string;
+  itemKind: Extract<WebFieldKind, { type: "composite" }>;
+  value: JsonValue[];
+  data: JsonValue;
+  errors: Map<string, string>;
+  onChange: (pointer: string, value: JsonValue) => void;
+}
+
+function CompositeArrayEditor({
+  pointer,
+  itemKind,
+  value,
+  data,
+  errors,
+  onChange,
+}: CompositeArrayEditorProps) {
+  const entries = Array.isArray(value) ? value : [];
+  const variants = itemKind.variants || [];
+  const [nextVariantId, setNextVariantId] = useState<string | undefined>(
+    variants[0]?.id,
+  );
+  const [overlayIndex, setOverlayIndex] = useState<number | null>(null);
+
+  const handleAddEntry = () => {
+    if (!nextVariantId) {
+      return;
+    }
+    const variant = variants.find((entry) => entry.id === nextVariantId);
+    if (!variant) {
+      return;
+    }
+    const draft = buildVariantDefault(variant, pointer);
+    onChange(pointer, [...entries, draft]);
+  };
+
+  const handleRemove = (index: number) => {
+    const next = entries.filter((_, idx) => idx !== index);
+    onChange(pointer, next);
+  };
+
+  const handleVariantRebuild = (index: number, variantId: string) => {
+    if (!variantId) {
+      return;
+    }
+    const variant = variants.find((entry) => entry.id === variantId);
+    if (!variant) {
+      return;
+    }
+    const next = [...entries];
+    next[index] = buildVariantDefault(variant, pointer);
+    onChange(pointer, next);
+  };
+
+  const openOverlay = (index: number) => {
+    setOverlayIndex(index);
+  };
+
+  const closeOverlay = () => setOverlayIndex(null);
+
+  const overlayPointer =
+    overlayIndex !== null ? appendPointerSegment(pointer, overlayIndex.toString()) : null;
+
+  return (
+    <div className="space-y-4">
+      {entries.map((entry, index) => {
+        const entryPointer = appendPointerSegment(pointer, index.toString());
+        const variantId = detectVariantId(entry, variants);
+        const variant = variantId
+          ? variants.find((candidate) => candidate.id === variantId)
+          : undefined;
+        return (
+          <article
+            key={`${entryPointer}`}
+            className="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-950/30"
+          >
+            <header className="flex flex-wrap items-center gap-3">
+              <div>
+                <p className="text-sm font-semibold">Entry #{index + 1}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {variant ? variant.title : "Unknown variant"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => openOverlay(index)}
+                className="ml-auto rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-brand-400 hover:text-brand-500 dark:border-slate-700 dark:text-slate-200"
+              >
+                Edit overlay
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRemove(index)}
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 transition hover:border-rose-400 hover:text-rose-500 dark:border-slate-700 dark:text-slate-300"
+              >
+                Remove
+              </button>
+            </header>
+            <pre className="mt-3 max-h-32 overflow-auto rounded-xl bg-slate-900/5 p-3 text-xs text-slate-600 dark:bg-slate-900/40 dark:text-slate-200">
+              {renderEntrySummary(entry)}
+            </pre>
+          </article>
+        );
+      })}
+      {variants.length
+        ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
+            <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              Variant
+              <select
+                className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100"
+                value={nextVariantId ?? ""}
+                onChange={(event) =>
+                  setNextVariantId(event.target.value || undefined)}
+              >
+                {variants.map((variant) => (
+                  <option key={variant.id} value={variant.id}>
+                    {variant.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={handleAddEntry}
+              className="rounded-full border border-slate-300 px-4 py-1 text-xs font-semibold text-slate-600 transition hover:border-brand-400 hover:text-brand-500 dark:border-slate-700 dark:text-slate-200"
+            >
+              Add entry
+            </button>
+          </div>
+        )
+        : (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            No variants available for this array.
+          </p>
+        )}
+      {overlayIndex !== null && overlayPointer
+        ? (
+          <CompositeEntryOverlay
+            index={overlayIndex}
+            basePointer={pointer}
+            entryPointer={overlayPointer}
+            variants={variants}
+            data={data}
+            errors={errors}
+            value={entries[overlayIndex]}
+            onChange={onChange}
+            onRemove={handleRemove}
+            onVariantChange={handleVariantRebuild}
+            onClose={closeOverlay}
+          />
+        )
+        : null}
+    </div>
+  );
+}
+
 function defaultArrayValue(kind?: string): JsonValue {
   switch (kind) {
     case "number":
@@ -386,26 +558,63 @@ function CompositeFieldEditor({
   type CompositeKind = Extract<WebField["kind"], { type: "composite" }>;
   const compositeKind = field.kind as CompositeKind;
   const variants = compositeKind.variants || [];
-  const derivedVariantId = useMemo(
-    () => detectVariantId(value, variants),
-    [value, variants],
-  );
+  const isMulti = compositeKind.mode === "any_of";
+  const derivedVariantId = useMemo(() => {
+    if (isMulti) {
+      return undefined;
+    }
+    return detectVariantId(value, variants);
+  }, [isMulti, value, variants]);
   const [selectedVariant, setSelectedVariant] = useState<string | undefined>(
-    derivedVariantId || variants[0]?.id,
+    () => (!isMulti ? derivedVariantId || variants[0]?.id : undefined),
   );
 
   useEffect(() => {
+    if (isMulti) {
+      return;
+    }
     if (derivedVariantId && derivedVariantId !== selectedVariant) {
       setSelectedVariant(derivedVariantId);
     }
-  }, [derivedVariantId, selectedVariant]);
+  }, [derivedVariantId, isMulti, selectedVariant]);
 
-  const activeVariant = variants.find((variant) =>
-    variant.id === selectedVariant
-  ) ?? variants[0];
+  const entryMetadata = useMemo(() => {
+    const map = new Map<string, { index: number }>();
+    if (!isMulti || !Array.isArray(value)) {
+      return map;
+    }
+    value.forEach((entry, index) => {
+      const variantId = detectVariantId(entry, variants);
+      if (variantId && !map.has(variantId)) {
+        map.set(variantId, { index });
+      }
+    });
+    return map;
+  }, [isMulti, value, variants]);
 
-  const handleVariantSelect = (variantId: string) => {
-    if (variantId === selectedVariant) {
+  const unmatchedEntries = useMemo(() => {
+    if (!isMulti || !Array.isArray(value)) {
+      return [];
+    }
+    return value
+      .map((entry, index) => ({
+        index,
+        value: entry,
+        variantId: detectVariantId(entry, variants),
+      }))
+      .filter((item) => !item.variantId);
+  }, [isMulti, value, variants]);
+
+  if (!variants.length) {
+    return (
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        No variants available for this schema node.
+      </p>
+    );
+  }
+
+  const handleSingleVariantSelect = (variantId: string) => {
+    if (isMulti || variantId === selectedVariant) {
       return;
     }
     setSelectedVariant(variantId);
@@ -417,75 +626,281 @@ function CompositeFieldEditor({
     onChange(field.pointer, defaults);
   };
 
+  const handleMultiVariantToggle = (variantId: string, next: boolean) => {
+    if (!isMulti) {
+      return;
+    }
+    const entries = Array.isArray(value) ? [...value] : [];
+    const existing = entryMetadata.get(variantId);
+    if (!next) {
+      if (existing === undefined) {
+        return;
+      }
+      const prune = entries.filter((_, idx) => idx !== existing.index);
+      onChange(field.pointer, prune);
+      return;
+    }
+    if (existing !== undefined) {
+      return;
+    }
+    const variant = variants.find((entry) => entry.id === variantId);
+    if (!variant) {
+      return;
+    }
+    const defaults = buildVariantDefault(variant, field.pointer);
+    const insertAt = computeInsertIndex(
+      variantId,
+      variants,
+      entryMetadata,
+      entries.length,
+    );
+    entries.splice(insertAt, 0, defaults);
+    onChange(field.pointer, entries);
+  };
+
   const handleClear = () => {
+    if (isMulti) {
+      onChange(field.pointer, []);
+      return;
+    }
     setSelectedVariant(undefined);
-    const fallback = compositeKind.mode === "any_of"
-      ? []
-      : field.required
-      ? {}
-      : null;
+    const fallback = field.required ? {} : null;
     onChange(field.pointer, fallback as JsonValue);
   };
 
-  if (!variants.length) {
-    return (
-      <p className="text-sm text-slate-500 dark:text-slate-400">
-        No variants available for this schema node.
-      </p>
-    );
-  }
+  const activeVariant = !isMulti
+    ? variants.find((variant) => variant.id === selectedVariant) ?? variants[0]
+    : undefined;
+
+  const activeVariantEntries = isMulti
+    ? variants
+        .map((variant) => {
+          const entry = entryMetadata.get(variant.id);
+          return entry
+            ? { variant, entryIndex: entry.index }
+            : null;
+        })
+        .filter((entry): entry is {
+          variant: WebCompositeVariant;
+          entryIndex: number;
+        } => Boolean(entry))
+    : [];
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
-        {variants.map((variant) => {
-          const active = variant.id === activeVariant?.id;
-          return (
-            <button
-              type="button"
-              key={variant.id}
-              onClick={() => handleVariantSelect(variant.id)}
-              className={clsx(
-                "rounded-full border px-4 py-1 text-sm font-medium transition",
-                active
-                  ? "border-brand-400 bg-brand-400/10 text-brand-600 dark:border-brand-300 dark:text-brand-200"
-                  : "border-slate-300 text-slate-700 hover:border-brand-300 hover:text-brand-500 dark:border-slate-700 dark:text-slate-200",
-              )}
-            >
-              {variant.title}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          onClick={handleClear}
-          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-rose-400 hover:text-rose-500 dark:border-slate-700 dark:text-slate-300"
-        >
-          Clear
-        </button>
-      </div>
-      {activeVariant?.description
+      <VariantSelector
+        pointer={field.pointer}
+        mode={compositeKind.mode}
+        variants={variants}
+        selectedId={!isMulti ? selectedVariant : undefined}
+        activeIds={isMulti ? new Set(entryMetadata.keys()) : undefined}
+        onSelectVariant={handleSingleVariantSelect}
+        onToggleVariant={handleMultiVariantToggle}
+        onClear={handleClear}
+      />
+      {!isMulti && activeVariant?.description
         ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">
             {activeVariant.description}
           </p>
         )
         : null}
-      {activeVariant
-          ? (
-            <VariantSectionList
-              sections={activeVariant.sections}
-              data={data}
-              errors={errors}
-              onChange={onChange}
-            />
-          )
-          : (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Select a variant to display its fields.
-            </p>
-          )}
+      {!isMulti && activeVariant
+        ? (
+          <VariantSectionList
+            sections={activeVariant.sections}
+            data={data}
+            errors={errors}
+            onChange={onChange}
+          />
+        )
+        : null}
+      {isMulti && (activeVariantEntries.length > 0 || unmatchedEntries.length > 0)
+        ? (
+          <div className="space-y-4">
+            {activeVariantEntries.map(({ variant, entryIndex }) => {
+              const entryPointer = appendPointerSegment(
+                field.pointer,
+                entryIndex.toString(),
+              );
+              const remappedSections = remapVariantSections(
+                variant.sections,
+                field.pointer,
+                entryPointer,
+              );
+              return (
+                <article
+                  key={`${variant.id}-${entryIndex}`}
+                  className="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-950/30"
+                >
+                  <header className="flex flex-wrap items-center gap-3">
+                    <h4 className="text-sm font-semibold">
+                      {variant.title}
+                      <span className="ml-2 text-xs text-slate-500">
+                        Entry #{entryIndex + 1}
+                      </span>
+                    </h4>
+                    <span className="ml-auto" />
+                    <button
+                      type="button"
+                      onClick={() => handleMultiVariantToggle(variant.id, false)}
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500 hover:border-rose-400 hover:text-rose-500 dark:border-slate-700 dark:text-slate-300"
+                    >
+                      Remove
+                    </button>
+                  </header>
+                  {variant.description
+                    ? (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {variant.description}
+                      </p>
+                    )
+                    : null}
+                  <div className="mt-3">
+                    <VariantSectionList
+                      sections={remappedSections}
+                      data={data}
+                      errors={errors}
+                      onChange={onChange}
+                    />
+                  </div>
+                </article>
+              );
+            })}
+            {unmatchedEntries.length
+              ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-amber-600 dark:text-amber-300">
+                    The entries below could not be matched to a known variant.
+                    You can edit the raw JSON or remove the entry.
+                  </p>
+                  {unmatchedEntries.map((entry) => {
+                    const entryPointer = appendPointerSegment(
+                      field.pointer,
+                      entry.index.toString(),
+                    );
+                    return (
+                      <UnknownVariantEntry
+                        key={`unknown-${entry.index}`}
+                        index={entry.index}
+                        pointer={entryPointer}
+                        value={entry.value}
+                        onChange={onChange}
+                        onRemove={() => {
+                          if (!Array.isArray(value)) {
+                            return;
+                          }
+                          const next = value.filter((_, idx) => idx !== entry.index);
+                          onChange(field.pointer, next);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )
+              : null}
+          </div>
+        )
+        : null}
+      {isMulti && activeVariantEntries.length === 0 && unmatchedEntries.length === 0
+        ? (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Select one or more variants to edit.
+          </p>
+        )
+        : null}
     </div>
+  );
+}
+
+interface VariantSelectorProps {
+  pointer: string;
+  mode: "one_of" | "any_of";
+  variants: WebCompositeVariant[];
+  selectedId?: string;
+  activeIds?: Set<string>;
+  onSelectVariant: (variantId: string) => void;
+  onToggleVariant: (variantId: string, next: boolean) => void;
+  onClear: () => void;
+}
+
+function VariantSelector({
+  pointer,
+  mode,
+  variants,
+  selectedId,
+  activeIds,
+  onSelectVariant,
+  onToggleVariant,
+  onClear,
+}: VariantSelectorProps) {
+  const isMulti = mode === "any_of";
+  const groupName = `${pointer}-variants`;
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-950/30">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+            Variants
+          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {isMulti ? "Select one or more entries" : "Choose exactly one option"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-rose-400 hover:text-rose-500 dark:border-slate-700 dark:text-slate-300"
+        >
+          {isMulti ? "Clear selections" : "Reset"}
+        </button>
+      </div>
+      <div className="mt-4 space-y-2">
+        {variants.map((variant) => {
+          const checked = isMulti
+            ? activeIds?.has(variant.id) ?? false
+            : selectedId === variant.id;
+          return (
+            <label
+              key={variant.id}
+              className={clsx(
+                "flex items-start gap-3 rounded-xl border px-3 py-2 transition",
+                checked
+                  ? "border-brand-400 bg-brand-400/10 text-slate-900 dark:border-brand-300 dark:text-brand-50"
+                  : "border-slate-200 text-slate-700 hover:border-brand-300 dark:border-slate-700 dark:text-slate-200",
+              )}
+            >
+              <input
+                type={isMulti ? "checkbox" : "radio"}
+                name={groupName}
+                value={variant.id}
+                checked={checked}
+                onChange={(event) => {
+                  if (isMulti) {
+                    onToggleVariant(variant.id, event.target.checked);
+                  } else if (event.target.checked) {
+                    onSelectVariant(variant.id);
+                  }
+                }}
+                className="mt-1 h-4 w-4 accent-brand-500"
+              />
+              <div>
+                <p className="text-sm font-medium">
+                  {variant.title}
+                </p>
+                {variant.description
+                  ? (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {variant.description}
+                    </p>
+                  )
+                  : null}
+              </div>
+            </label>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -557,15 +972,184 @@ function VariantSectionList({
   );
 }
 
+interface CompositeEntryOverlayProps {
+  index: number;
+  basePointer: string;
+  entryPointer: string;
+  variants: WebCompositeVariant[];
+  value: JsonValue;
+  data: JsonValue;
+  errors: Map<string, string>;
+  onChange: (pointer: string, value: JsonValue) => void;
+  onRemove: (index: number) => void;
+  onVariantChange: (index: number, variantId: string) => void;
+  onClose: () => void;
+}
+
+function CompositeEntryOverlay({
+  index,
+  basePointer,
+  entryPointer,
+  variants,
+  value,
+  data,
+  errors,
+  onChange,
+  onRemove,
+  onVariantChange,
+  onClose,
+}: CompositeEntryOverlayProps) {
+  const variantId = detectVariantId(value, variants);
+  const variant = variantId
+    ? variants.find((entry) => entry.id === variantId)
+    : undefined;
+  const sections = variant
+    ? remapVariantSections(variant.sections, basePointer, entryPointer)
+    : [];
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-6">
+      <div className="relative w-full max-w-4xl rounded-3xl border border-slate-700 bg-slate-950/95 p-6 text-slate-100 shadow-2xl">
+        <header className="flex flex-wrap items-start gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
+              Composite Entry
+            </p>
+            <h3 className="text-2xl font-semibold">Entry #{index + 1}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemove(index)}
+            className="ml-auto rounded-full border border-rose-400 px-4 py-1 text-sm text-rose-200 transition hover:bg-rose-500/10"
+          >
+            Remove entry
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-600 px-4 py-1 text-sm text-slate-200 transition hover:border-slate-300"
+          >
+            Close
+          </button>
+        </header>
+        <div className="mt-4 space-y-4">
+          <VariantSelector
+            pointer={entryPointer}
+            mode="one_of"
+            variants={variants}
+            selectedId={variantId}
+            activeIds={undefined}
+            onSelectVariant={(variantKey) => onVariantChange(index, variantKey)}
+            onToggleVariant={() => {}}
+            onClear={() => {
+              if (variants[0]) {
+                onVariantChange(index, variants[0].id);
+              }
+            }}
+          />
+          {variant
+            ? (
+              <VariantSectionList
+                sections={sections}
+                data={data}
+                errors={errors}
+                onChange={onChange}
+              />
+            )
+            : (
+              <UnknownVariantEntry
+                index={index}
+                pointer={entryPointer}
+                value={value}
+                onChange={onChange}
+                onRemove={() => onRemove(index)}
+              />
+            )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function remapVariantSections(
+  sections: WebSection[],
+  basePointer: string,
+  entryPointer: string,
+): WebSection[] {
+  return sections.map((section) => ({
+    ...section,
+    fields: section.fields?.map((field) => ({
+      ...field,
+      pointer: remapPointerForEntry(field.pointer, basePointer, entryPointer),
+    })) || [],
+    sections: remapVariantSections(section.sections || [], basePointer, entryPointer),
+  }));
+}
+
+function remapPointerForEntry(
+  pointer: string,
+  basePointer: string,
+  entryPointer: string,
+): string {
+  if (!pointer) {
+    return entryPointer;
+  }
+  const relative = stripPointerPrefix(pointer, basePointer);
+  if (!relative || relative === "/") {
+    return entryPointer;
+  }
+  return joinPointer(entryPointer, relative);
+}
+
+function appendPointerSegment(pointer: string, segment: string): string {
+  const sanitizedSegment = segment.replace(/^\/+/, "");
+  if (!pointer || pointer === "/") {
+    return `/${sanitizedSegment}`;
+  }
+  const trimmed = pointer.endsWith("/") ? pointer.slice(0, -1) : pointer;
+  return `${trimmed}/${sanitizedSegment}`;
+}
+
+function joinPointer(basePointer: string, relative: string): string {
+  if (!relative || relative === "/") {
+    return basePointer || "/";
+  }
+  const normalizedRelative = relative.startsWith("/")
+    ? relative
+    : `/${relative}`;
+  if (!basePointer || basePointer === "/") {
+    return normalizedRelative;
+  }
+  const trimmed = basePointer.endsWith("/")
+    ? basePointer.slice(0, -1)
+    : basePointer;
+  return `${trimmed}${normalizedRelative}`;
+}
+
+function computeInsertIndex(
+  variantId: string,
+  variants: WebCompositeVariant[],
+  metadata: Map<string, { index: number }>,
+  currentLength: number,
+): number {
+  const order = variants.findIndex((variant) => variant.id === variantId);
+  if (order === -1) {
+    return currentLength;
+  }
+  for (let idx = order + 1; idx < variants.length; idx += 1) {
+    const neighbor = metadata.get(variants[idx].id);
+    if (neighbor) {
+      return neighbor.index;
+    }
+  }
+  return currentLength;
+}
+
 function detectVariantId(
   value: JsonValue | undefined,
   variants: WebCompositeVariant[],
 ): string | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
   for (const variant of variants) {
-    if (variantMatches(value as Record<string, JsonValue>, variant.schema)) {
+    if (variantMatches(value, variant.schema)) {
       return variant.id;
     }
   }
@@ -573,18 +1157,30 @@ function detectVariantId(
 }
 
 function variantMatches(
-  value: Record<string, JsonValue>,
+  value: JsonValue | undefined,
   schema: JsonValue,
 ): boolean {
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
-    return false;
+    return areJsonValuesEqual(value, schema);
   }
+
+  if (Object.prototype.hasOwnProperty.call(schema, "const")) {
+    return areJsonValuesEqual(value, (schema as any).const);
+  }
+
+  if (Array.isArray((schema as any).enum)) {
+    return (schema as any).enum.some((candidate: JsonValue) =>
+      areJsonValuesEqual(value, candidate)
+    );
+  }
+
   const properties = (schema as { [key: string]: JsonValue }).properties as
     | Record<string, JsonValue>
     | undefined;
-  if (!properties) {
+  if (!properties || !isJsonObject(value)) {
     return false;
   }
+
   let inspected = false;
   for (const [key, spec] of Object.entries(properties)) {
     if (!spec || typeof spec !== "object") {
@@ -644,6 +1240,97 @@ function collectFieldsFromSections(sections: WebSection[]): WebField[] {
   };
   walk(sections);
   return bucket;
+}
+
+function renderEntrySummary(entry: JsonValue): string {
+  if (entry === null || entry === undefined) {
+    return "null";
+  }
+  const text = typeof entry === "string"
+    ? entry
+    : JSON.stringify(entry, null, 2) ?? "";
+  const lines = text.split("\n");
+  if (lines.length <= 6) {
+    return text;
+  }
+  return `${lines.slice(0, 5).join("\n")}\n…`;
+}
+
+function isJsonObject(
+  candidate: JsonValue | undefined,
+): candidate is Record<string, JsonValue> {
+  return Boolean(candidate) && typeof candidate === "object" && !Array.isArray(candidate);
+}
+
+function isCompositeKind(
+  kind: WebFieldKind | undefined,
+): kind is Extract<WebFieldKind, { type: "composite" }> {
+  return Boolean(kind) && kind?.type === "composite";
+}
+
+interface UnknownVariantEntryProps {
+  index: number;
+  pointer: string;
+  value: JsonValue;
+  onChange: (pointer: string, value: JsonValue) => void;
+  onRemove: () => void;
+}
+
+function UnknownVariantEntry({
+  index,
+  pointer,
+  value,
+  onChange,
+  onRemove,
+}: UnknownVariantEntryProps) {
+  const [draft, setDraft] = useState(() => JSON.stringify(value, null, 2));
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(JSON.stringify(value, null, 2));
+    setError(null);
+  }, [value]);
+
+  const handleBlur = () => {
+    try {
+      const parsed = draft.trim() ? JSON.parse(draft) : null;
+      onChange(pointer, parsed as JsonValue);
+      setError(null);
+    } catch {
+      setError("Invalid JSON payload");
+    }
+  };
+
+  return (
+    <article className="rounded-2xl border border-amber-300/60 bg-amber-50/60 p-4 dark:border-amber-300/40 dark:bg-amber-950/20">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+          Unmatched entry #{index + 1}
+        </h4>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-full border border-amber-400 px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-200 dark:text-amber-100"
+        >
+          Remove
+        </button>
+      </div>
+      <textarea
+        className="mt-3 h-32 w-full rounded-xl border border-amber-200 bg-white/90 p-3 font-mono text-xs text-amber-900 outline-none focus:border-brand-400 focus:ring-1 focus:ring-brand-400 dark:border-amber-200/40 dark:bg-slate-950/70 dark:text-amber-100"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={handleBlur}
+        spellCheck={false}
+      />
+      {error
+        ? (
+          <p className="mt-2 text-xs text-rose-600 dark:text-rose-300">
+            {error}
+          </p>
+        )
+        : null}
+    </article>
+  );
 }
 
 function stripPointerPrefix(pointer: string, base: string): string {
