@@ -96,8 +96,11 @@ export const PreviewPane = memo(function PreviewPane({
             </div>
           )
           : null}
-        <pre className="whitespace-pre text-xs leading-relaxed">
-          <code dangerouslySetInnerHTML={{ __html: highlightSyntax(payload, format) }} />
+        <pre className="relative whitespace-pre-wrap break-words rounded-xl bg-white px-4 py-3 text-xs leading-relaxed text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+          <code
+            className="language-json"
+            dangerouslySetInnerHTML={{ __html: highlightSyntax(payload, format) }}
+          />
         </pre>
       </div>
     </aside>
