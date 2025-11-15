@@ -1,11 +1,14 @@
 use anyhow::Result;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use ts_rs::TS;
 
 use crate::domain::{
-    CompositeMode, FieldKind, FieldSchema, FormSchema, FormSection, RootSection, parse_form_schema,
+    CompositeMode, CompositeVariant, FieldKind, FieldSchema, FormSchema, FormSection, RootSection,
+    parse_form_schema,
 };
+
+const WRAPPED_FIELD_NAME: &str = "__value";
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export, export_to = "web/types/")]
@@ -92,6 +95,7 @@ pub struct WebCompositeVariant {
     #[ts(type = "Record<string, unknown>")]
     pub schema: Value,
     pub is_object: bool,
+    pub sections: Vec<WebSection>,
 }
 
 pub fn blueprint_from_schema(schema: &Value) -> Result<WebBlueprint> {
@@ -140,7 +144,7 @@ impl From<&FieldSchema> for WebField {
             pointer: field.pointer.clone(),
             description: field.description.clone(),
             required: field.required,
-            kind: WebFieldKind::from(&field.kind),
+            kind: WebFieldKind::from_field(&field.kind, &field.pointer),
             default_value: field.default.clone(),
         }
     }
@@ -148,6 +152,12 @@ impl From<&FieldSchema> for WebField {
 
 impl From<&FieldKind> for WebFieldKind {
     fn from(kind: &FieldKind) -> Self {
+        Self::from_field(kind, "/")
+    }
+}
+
+impl WebFieldKind {
+    fn from_field(kind: &FieldKind, pointer: &str) -> Self {
         match kind {
             FieldKind::String => WebFieldKind::String,
             FieldKind::Integer => WebFieldKind::Integer,
@@ -157,7 +167,7 @@ impl From<&FieldKind> for WebFieldKind {
                 options: options.clone(),
             },
             FieldKind::Array(inner) => WebFieldKind::Array {
-                items: Box::new(WebFieldKind::from(inner.as_ref())),
+                items: Box::new(WebFieldKind::from_field(inner.as_ref(), pointer)),
             },
             FieldKind::Json => WebFieldKind::Json,
             FieldKind::Composite(field) => WebFieldKind::Composite {
@@ -168,13 +178,7 @@ impl From<&FieldKind> for WebFieldKind {
                 variants: field
                     .variants
                     .iter()
-                    .map(|variant| WebCompositeVariant {
-                        id: variant.id.clone(),
-                        title: variant.title.clone(),
-                        description: variant.description.clone(),
-                        schema: variant.schema.clone(),
-                        is_object: variant.is_object,
-                    })
+                    .map(|variant| build_web_variant(pointer, variant))
                     .collect(),
             },
             FieldKind::KeyValue(spec) => WebFieldKind::KeyValue {
@@ -182,10 +186,110 @@ impl From<&FieldKind> for WebFieldKind {
                 key_description: spec.key_description.clone(),
                 value_title: spec.value_title.clone(),
                 value_description: spec.value_description.clone(),
-                value_kind: Box::new(WebFieldKind::from(spec.value_kind.as_ref())),
+                value_kind: Box::new(WebFieldKind::from_field(spec.value_kind.as_ref(), pointer)),
             },
         }
     }
+}
+
+fn build_web_variant(base_pointer: &str, variant: &CompositeVariant) -> WebCompositeVariant {
+    let overlay = overlay_schema(variant);
+    let sections = parse_form_schema(&overlay)
+        .map(|schema| {
+            let blueprint = WebBlueprint::from(&schema);
+            blueprint
+                .roots
+                .into_iter()
+                .flat_map(|root| {
+                    root.sections
+                        .into_iter()
+                        .map(|mut section| {
+                            prefix_section_pointers(&mut section, base_pointer);
+                            section
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(|err| {
+            eprintln!(
+                "Failed to build composite variant blueprint for '{}': {err}",
+                variant.title
+            );
+            Vec::new()
+        });
+
+    WebCompositeVariant {
+        id: variant.id.clone(),
+        title: variant.title.clone(),
+        description: variant.description.clone(),
+        schema: variant.schema.clone(),
+        is_object: variant.is_object,
+        sections,
+    }
+}
+
+fn overlay_schema(variant: &CompositeVariant) -> Value {
+    if variant.is_object {
+        variant.schema.clone()
+    } else {
+        wrap_non_object_schema(
+            &variant.schema,
+            &variant.title,
+            variant.description.as_deref(),
+        )
+    }
+}
+
+fn wrap_non_object_schema(schema: &Value, title: &str, description: Option<&str>) -> Value {
+    let mut property = schema.clone();
+    if let Value::Object(ref mut map) = property {
+        map.entry("title".to_string())
+            .or_insert_with(|| Value::String(title.to_string()));
+        if let Some(desc) = description
+            && !map.contains_key("description")
+        {
+            map.insert("description".to_string(), Value::String(desc.to_string()));
+        }
+    }
+    json!({
+        "type": "object",
+        "title": title,
+        "properties": {
+            WRAPPED_FIELD_NAME: property
+        },
+        "required": [WRAPPED_FIELD_NAME]
+    })
+}
+
+fn prefix_section_pointers(section: &mut WebSection, base_pointer: &str) {
+    for field in &mut section.fields {
+        field.pointer = join_pointer(base_pointer, &field.pointer);
+    }
+    for child in &mut section.sections {
+        prefix_section_pointers(child, base_pointer);
+    }
+}
+
+fn join_pointer(base: &str, child: &str) -> String {
+    let base = if base.is_empty() { "/" } else { base };
+    if child.is_empty() || child == "/" {
+        return base.to_string();
+    }
+    if base.is_empty() || base == "/" {
+        return child.to_string();
+    }
+    let separator = if base.ends_with('/') || child.starts_with('/') {
+        ""
+    } else {
+        "/"
+    };
+    format!(
+        "{}{}{}",
+        base.trim_end_matches('/'),
+        separator,
+        child.trim_start_matches('/')
+    )
 }
 
 #[cfg(test)]

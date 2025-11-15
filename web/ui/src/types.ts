@@ -50,13 +50,28 @@ export type PreviewRequest = Omit<ServerPreviewRequest, 'data'> & {
 
 export type PreviewResponse = ServerPreviewResponse;
 
-export interface WebField extends Omit<GeneratedWebField, 'default_value'> {
+type GeneratedCompositeKind = Extract<GeneratedWebFieldKind, { type: 'composite' }>;
+type GeneratedArrayKind = Extract<GeneratedWebFieldKind, { type: 'array' }>;
+type GeneratedKeyValueKind = Extract<GeneratedWebFieldKind, { type: 'key_value' }>;
+
+export type WebFieldKind =
+  | Exclude<
+    GeneratedWebFieldKind,
+    { type: 'composite' } | { type: 'array' } | { type: 'key_value' }
+  >
+  | (Omit<GeneratedCompositeKind, 'variants'> & { variants: WebCompositeVariant[] })
+  | (Omit<GeneratedArrayKind, 'items'> & { items: WebFieldKind })
+  | (Omit<GeneratedKeyValueKind, 'value_kind'> & { value_kind: WebFieldKind });
+
+export interface WebField extends Omit<GeneratedWebField, 'default_value' | 'kind'> {
   default_value?: JsonValue;
+  kind: WebFieldKind;
 }
 
 export interface WebCompositeVariant
-  extends Omit<GeneratedWebCompositeVariant, 'schema'> {
+  extends Omit<GeneratedWebCompositeVariant, 'schema' | 'sections'> {
   schema: JsonValue;
+  sections: WebSection[];
 }
 
 export interface WebSection
@@ -72,5 +87,3 @@ export interface WebRoot extends Omit<GeneratedWebRoot, 'sections'> {
 export interface WebBlueprint extends Omit<GeneratedWebBlueprint, 'roots'> {
   roots: WebRoot[];
 }
-
-export type WebFieldKind = GeneratedWebFieldKind;

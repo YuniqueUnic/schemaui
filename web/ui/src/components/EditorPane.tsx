@@ -1,6 +1,16 @@
-import { Fragment, memo, useMemo } from "react";
-import type { JsonValue, WebField, WebSection } from "../types";
-import { getPointerValue } from "../utils/jsonPointer";
+import { Fragment, memo, useEffect, useMemo, useState } from "react";
+import { clsx } from "clsx";
+import type {
+  JsonValue,
+  WebCompositeVariant,
+  WebField,
+  WebSection,
+} from "../types";
+import {
+  deepClone,
+  getPointerValue,
+  setPointerValue,
+} from "../utils/jsonPointer";
 import { ChevronRight } from "lucide-react";
 
 interface EditorPaneProps {
@@ -88,7 +98,9 @@ export const EditorPane = memo(function EditorPane({
               field={field}
               value={getPointerValue(data, field.pointer)}
               error={errors.get(field.pointer)}
+              errors={errors}
               onChange={onChange}
+              data={data}
             />
           ))}
         </div>
@@ -101,10 +113,19 @@ interface FieldControlProps {
   field: WebField;
   value: JsonValue | undefined;
   error?: string;
+  errors: Map<string, string>;
+  data: JsonValue;
   onChange: (pointer: string, value: JsonValue) => void;
 }
 
-function FieldControl({ field, value, error, onChange }: FieldControlProps) {
+function FieldControl({
+  field,
+  value,
+  error,
+  onChange,
+  data,
+  errors,
+}: FieldControlProps) {
   const id = field.pointer || field.name;
   const label = field.label || field.name;
   const description = field.description;
@@ -187,6 +208,16 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
             onChange={onChange}
           />
         );
+      case "composite":
+        return (
+          <CompositeFieldEditor
+            field={field}
+            value={value}
+            data={data}
+            errors={errors}
+            onChange={onChange}
+          />
+        );
       default:
         return (
           <textarea
@@ -211,7 +242,7 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
           />
         );
     }
-  }, [field.kind, id, onChange, pointer, value]);
+  }, [data, errors, field.kind, id, onChange, pointer, value]);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white/85 p-4 dark:border-slate-800/60 dark:bg-slate-950/30">
@@ -332,6 +363,314 @@ function defaultArrayValue(kind?: string): JsonValue {
     default:
       return "";
   }
+}
+
+interface CompositeFieldEditorProps {
+  field: WebField;
+  value: JsonValue | undefined;
+  data: JsonValue;
+  errors: Map<string, string>;
+  onChange: (pointer: string, value: JsonValue) => void;
+}
+
+function CompositeFieldEditor({
+  field,
+  value,
+  data,
+  errors,
+  onChange,
+}: CompositeFieldEditorProps) {
+  if (field.kind.type !== "composite") {
+    return null;
+  }
+  type CompositeKind = Extract<WebField["kind"], { type: "composite" }>;
+  const compositeKind = field.kind as CompositeKind;
+  const variants = compositeKind.variants || [];
+  const derivedVariantId = useMemo(
+    () => detectVariantId(value, variants),
+    [value, variants],
+  );
+  const [selectedVariant, setSelectedVariant] = useState<string | undefined>(
+    derivedVariantId || variants[0]?.id,
+  );
+
+  useEffect(() => {
+    if (derivedVariantId && derivedVariantId !== selectedVariant) {
+      setSelectedVariant(derivedVariantId);
+    }
+  }, [derivedVariantId, selectedVariant]);
+
+  const activeVariant = variants.find((variant) =>
+    variant.id === selectedVariant
+  ) ?? variants[0];
+
+  const handleVariantSelect = (variantId: string) => {
+    if (variantId === selectedVariant) {
+      return;
+    }
+    setSelectedVariant(variantId);
+    const variant = variants.find((entry) => entry.id === variantId);
+    if (!variant) {
+      return;
+    }
+    const defaults = buildVariantDefault(variant, field.pointer);
+    onChange(field.pointer, defaults);
+  };
+
+  const handleClear = () => {
+    setSelectedVariant(undefined);
+    const fallback = compositeKind.mode === "any_of"
+      ? []
+      : field.required
+      ? {}
+      : null;
+    onChange(field.pointer, fallback as JsonValue);
+  };
+
+  if (!variants.length) {
+    return (
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        No variants available for this schema node.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3">
+        {variants.map((variant) => {
+          const active = variant.id === activeVariant?.id;
+          return (
+            <button
+              type="button"
+              key={variant.id}
+              onClick={() => handleVariantSelect(variant.id)}
+              className={clsx(
+                "rounded-full border px-4 py-1 text-sm font-medium transition",
+                active
+                  ? "border-brand-400 bg-brand-400/10 text-brand-600 dark:border-brand-300 dark:text-brand-200"
+                  : "border-slate-300 text-slate-700 hover:border-brand-300 hover:text-brand-500 dark:border-slate-700 dark:text-slate-200",
+              )}
+            >
+              {variant.title}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={handleClear}
+          className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-rose-400 hover:text-rose-500 dark:border-slate-700 dark:text-slate-300"
+        >
+          Clear
+        </button>
+      </div>
+      {activeVariant?.description
+        ? (
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {activeVariant.description}
+          </p>
+        )
+        : null}
+      {activeVariant
+          ? (
+            <VariantSectionList
+              sections={activeVariant.sections}
+              data={data}
+              errors={errors}
+              onChange={onChange}
+            />
+          )
+          : (
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Select a variant to display its fields.
+            </p>
+          )}
+    </div>
+  );
+}
+
+interface VariantSectionListProps {
+  sections: WebSection[];
+  data: JsonValue;
+  errors: Map<string, string>;
+  onChange: (pointer: string, value: JsonValue) => void;
+}
+
+function VariantSectionList({
+  sections,
+  data,
+  errors,
+  onChange,
+}: VariantSectionListProps) {
+  if (!sections?.length) {
+    return (
+      <p className="rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300">
+        No fields defined for this variant.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {sections.map((section) => (
+        <div
+          key={section.id}
+          className="rounded-2xl border border-slate-200 bg-white/70 p-4 dark:border-slate-700/70 dark:bg-slate-900/40"
+        >
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold">{section.title}</h4>
+            {section.description
+              ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {section.description}
+                </p>
+              )
+              : null}
+          </div>
+          <div className="mt-3 space-y-4">
+            {section.fields?.map((child) => (
+              <FieldControl
+                key={child.pointer}
+                field={child}
+                value={getPointerValue(data, child.pointer)}
+                error={errors.get(child.pointer)}
+                errors={errors}
+                onChange={onChange}
+                data={data}
+              />
+            ))}
+          </div>
+          {section.sections?.length
+            ? (
+              <div className="mt-4 space-y-4">
+                <VariantSectionList
+                  sections={section.sections}
+                  data={data}
+                  errors={errors}
+                  onChange={onChange}
+                />
+              </div>
+            )
+            : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function detectVariantId(
+  value: JsonValue | undefined,
+  variants: WebCompositeVariant[],
+): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  for (const variant of variants) {
+    if (variantMatches(value as Record<string, JsonValue>, variant.schema)) {
+      return variant.id;
+    }
+  }
+  return undefined;
+}
+
+function variantMatches(
+  value: Record<string, JsonValue>,
+  schema: JsonValue,
+): boolean {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    return false;
+  }
+  const properties = (schema as { [key: string]: JsonValue }).properties as
+    | Record<string, JsonValue>
+    | undefined;
+  if (!properties) {
+    return false;
+  }
+  let inspected = false;
+  for (const [key, spec] of Object.entries(properties)) {
+    if (!spec || typeof spec !== "object") {
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(spec, "const")) {
+      inspected = true;
+      if (!areJsonValuesEqual(value[key], (spec as any).const)) {
+        return false;
+      }
+      continue;
+    }
+    if (Array.isArray((spec as any).enum)) {
+      inspected = true;
+      const actual = value[key];
+      const matches = (spec as any).enum.some((candidate: JsonValue) =>
+        areJsonValuesEqual(candidate, actual)
+      );
+      if (!matches) {
+        return false;
+      }
+    }
+  }
+  return inspected;
+}
+
+function areJsonValuesEqual(left: JsonValue | undefined, right: JsonValue) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function buildVariantDefault(
+  variant: WebCompositeVariant,
+  basePointer: string,
+): JsonValue {
+  const fields = collectFieldsFromSections(variant.sections);
+  let result: JsonValue = variant.is_object ? {} : null;
+  for (const child of fields) {
+    if (child.default_value === undefined) {
+      continue;
+    }
+    const relative = stripPointerPrefix(child.pointer, basePointer);
+    const normalized = relative || "/";
+    result = setRelativeValue(result, normalized, child.default_value);
+  }
+  return result;
+}
+
+function collectFieldsFromSections(sections: WebSection[]): WebField[] {
+  const bucket: WebField[] = [];
+  const walk = (list: WebSection[]) => {
+    list.forEach((section) => {
+      section.fields?.forEach((field) => bucket.push(field));
+      if (section.sections?.length) {
+        walk(section.sections);
+      }
+    });
+  };
+  walk(sections);
+  return bucket;
+}
+
+function stripPointerPrefix(pointer: string, base: string): string {
+  if (!base || base === "/") {
+    return pointer || "/";
+  }
+  const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
+  if (pointer === normalizedBase) {
+    return "/";
+  }
+  if (pointer.startsWith(`${normalizedBase}/`)) {
+    const remainder = pointer.slice(normalizedBase.length);
+    return remainder.startsWith("/") ? remainder : `/${remainder}`;
+  }
+  return pointer;
+}
+
+function setRelativeValue(
+  root: JsonValue,
+  pointer: string,
+  value: JsonValue,
+): JsonValue {
+  const normalized = pointer.startsWith("/") ? pointer : `/${pointer}`;
+  if (normalized === "/") {
+    return deepClone(value ?? null);
+  }
+  return setPointerValue(root ?? {}, normalized, deepClone(value ?? null));
 }
 
 function describeFieldKind(kind: WebField["kind"]): string {

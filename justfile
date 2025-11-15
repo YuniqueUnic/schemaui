@@ -6,8 +6,7 @@ default:
 # install all needed tools
 init:
     rustup component add rust-analyzer clippy rustfmt
-    cargo binstall prek --git https://github.com/j178/prek # need to check the bisntall command
-    # cargo install --locked --git https://github.com/j178/prek # need to check the install command
+    cargo binstall prek --git https://github.com/j178/prek 2>/dev/null || cargo install --locked --git https://github.com/j178/prek
     cd web/ui && pnpm install  # if no pnpm, use npm: `npm install`
 
 # install prek (which is the alternative tool of pre-commit)
