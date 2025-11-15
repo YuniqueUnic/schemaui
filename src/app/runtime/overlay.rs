@@ -608,7 +608,7 @@ impl CompositeEditorOverlay {
             CompositeOverlayTarget::ListEntry { .. }
                 | CompositeOverlayTarget::KeyValueEntry { .. }
                 | CompositeOverlayTarget::ArrayEntry { .. }
-        ) && !matches!(self.session(), OverlaySession::Composite(_))
+        )
     }
 
     pub(super) fn form_state(&self) -> &FormState {

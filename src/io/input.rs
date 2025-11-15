@@ -19,8 +19,7 @@ pub fn parse_document_str(contents: &str, format: DocumentFormat) -> Result<Valu
             serde_yaml::from_str::<Value>(contents).with_context(|| "failed to parse YAML document")
         }
         #[cfg(feature = "toml")]
-        DocumentFormat::Toml => contents
-            .parse::<toml::Value>()
+        DocumentFormat::Toml => toml::from_str::<toml::Value>(contents)
             .with_context(|| "failed to parse TOML document")
             .and_then(|value| {
                 serde_json::to_value(value).context("failed to convert TOML to JSON")

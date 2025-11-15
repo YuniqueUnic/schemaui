@@ -28,7 +28,7 @@ export const TreePanel = memo(function TreePanel({
 }: TreePanelProps) {
   if (loading) {
     return (
-      <aside className="flex h-full flex-col gap-3 border-r border-slate-800/70 bg-slate-950/80 p-6">
+      <aside className="flex h-full flex-col gap-3 border-r border-slate-200 bg-white p-6 dark:border-slate-800/70 dark:bg-slate-950/80">
         <div className="h-10 animate-pulse rounded-2xl bg-slate-800/60" />
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, index) => (
@@ -40,14 +40,14 @@ export const TreePanel = memo(function TreePanel({
   }
 
   return (
-    <aside className="flex h-full w-full flex-col border-r border-slate-800/70 bg-slate-950/80">
-      <label className="group relative mx-4 mt-4 flex items-center rounded-xl border border-slate-800/70 bg-slate-900/60 px-3 py-2">
-        <Search className="h-4 w-4 text-slate-500 transition group-focus-within:text-brand-300" />
+    <aside className="flex h-full w-full flex-col border-r border-slate-200 bg-white dark:border-slate-800/70 dark:bg-slate-950/80">
+      <label className="group relative mx-4 mt-4 flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition dark:border-slate-800/70 dark:bg-slate-900/60">
+        <Search className="h-4 w-4 text-slate-500 transition group-focus-within:text-brand-500 dark:text-slate-500 dark:group-focus-within:text-brand-300" />
         <input
           value={filter}
           onChange={(event) => onFilterChange(event.target.value)}
           placeholder="Search sections"
-          className="ml-2 flex-1 border-none bg-transparent text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none"
+          className="ml-2 flex-1 border-none bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none dark:text-slate-200 dark:placeholder:text-slate-500"
         />
       </label>
       <div className="mt-3 flex-1 overflow-auto px-2 pb-6">
@@ -110,9 +110,9 @@ function TreeNodeItem({
         type="button"
         onClick={() => onSelect(node.data, node.id)}
         className={clsx(
-          'group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-slate-300 transition hover:bg-slate-800/60',
+          'group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-slate-700 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60',
           activeId === node.id &&
-            'bg-gradient-to-r from-brand-500/20 via-brand-500/10 to-transparent text-brand-100',
+            'bg-gradient-to-r from-brand-500/10 via-brand-500/5 to-transparent text-brand-700 dark:text-brand-100',
         )}
         style={{ paddingLeft: `${node.depth * 0.9 + 0.5}rem` }}
       >
@@ -123,7 +123,7 @@ function TreeNodeItem({
               onToggle(node.id);
             }}
             className={clsx(
-              'mr-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-700 text-slate-400 transition hover:border-brand-400 hover:text-brand-300',
+              'mr-2 flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition hover:border-brand-400 hover:text-brand-500 dark:border-slate-700 dark:text-slate-400 dark:hover:text-brand-300',
             )}
           >
             <ChevronRight
@@ -136,12 +136,12 @@ function TreeNodeItem({
         ) : (
           <span className="mr-2 h-6 w-6" />
         )}
-        <Icon className="h-3.5 w-3.5 text-slate-500 group-hover:text-brand-300" />
+        <Icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-brand-500 dark:text-slate-500 dark:group-hover:text-brand-300" />
         <span className="flex-1 truncate text-sm">
           {highlightMatch(node.label, normalizedFilter)}
         </span>
         {nodeErrorCount > 0 ? (
-          <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-200">
+          <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-500 dark:text-rose-200">
             {nodeErrorCount}
           </span>
         ) : null}

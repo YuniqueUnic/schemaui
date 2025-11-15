@@ -305,7 +305,7 @@ async fn post_save(
 pub(crate) struct ExitRequest {
     #[ts(type = "Record<string, unknown>")]
     pub data: Value,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::web::session::default_true")]
     pub commit: bool,
 }
 
@@ -377,7 +377,7 @@ pub(crate) struct PreviewRequest {
     #[ts(type = "Record<string, unknown>")]
     pub data: Value,
     pub format: String,
-    #[serde(default = "default_true")]
+    #[serde(default = "crate::web::session::default_true")]
     pub pretty: bool,
 }
 

@@ -7,7 +7,7 @@
 }
 
 body {
-  @apply font-sans bg-slate-950 text-slate-100 min-h-screen overflow-hidden;
+  @apply font-sans min-h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
 }
 
 #root {

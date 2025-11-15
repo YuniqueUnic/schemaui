@@ -2,6 +2,18 @@ import type { Config } from 'tailwindcss';
 
 const config: Config = {
   darkMode: 'class',
+  safelist: [
+    'text-cyan-400',
+    'text-cyan-300',
+    'text-emerald-300',
+    'text-emerald-200',
+    'text-orange-300',
+    'text-orange-200',
+    'text-rose-300',
+    'text-rose-200',
+    'text-sky-300',
+    'text-sky-200',
+  ],
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {

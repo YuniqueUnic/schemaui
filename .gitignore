@@ -1,6 +1,7 @@
 /target
 instructions.txt
 
+bindings/
 docs/**/*.md
 docs/**/*.txt
 docs/**/*.gif

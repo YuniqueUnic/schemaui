@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { clsx } from 'clsx';
 import { AppHeader } from './components/AppHeader';
 import { TreePanel } from './components/TreePanel';
 import { EditorPane } from './components/EditorPane';
@@ -22,6 +23,7 @@ import {
 } from './api';
 import type { JsonValue, WebBlueprint } from './types';
 import { deepClone, setPointerValue } from './utils/jsonPointer';
+import { useTheme } from './theme';
 import './index.css';
 
 interface ToastState {
@@ -58,6 +60,7 @@ export default function App() {
   const previewSequence = useRef(0);
 
   const { sizes, startDrag } = useResizableColumns({ nav: 280, preview: 420 });
+  const { theme } = useTheme();
   const isMac =
     typeof navigator !== 'undefined' &&
     /(Mac|iPhone|iPad)/i.test(navigator?.platform ?? navigator?.userAgent ?? '');
@@ -308,7 +311,14 @@ export default function App() {
   }, [toast]);
 
   return (
-    <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-white">
+    <div
+      className={clsx(
+        'flex h-screen min-h-0 flex-col overflow-hidden',
+        theme === 'dark'
+          ? 'bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-white'
+          : 'bg-gradient-to-b from-slate-50 via-white to-slate-100 text-slate-900',
+      )}
+    >
       <AppHeader
         title={sessionTitle}
         description={blueprint?.description}
@@ -339,7 +349,7 @@ export default function App() {
           className="w-2 cursor-col-resize bg-transparent"
           onPointerDown={(event) => startDrag(event, 'nav')}
         />
-        <section className="flex-1 min-h-0 bg-slate-900/20">
+        <section className="flex-1 min-h-0 bg-white dark:bg-slate-900/20">
           <EditorPane
             section={activeSection}
             data={data}
@@ -354,7 +364,7 @@ export default function App() {
           onPointerDown={(event) => startDrag(event, 'preview')}
         />
         <div
-          className="shrink-0 border-l border-slate-800/80"
+          className="shrink-0 border-l border-slate-200 bg-white dark:border-slate-800/80 dark:bg-transparent"
           style={{ width: `${sizes.preview}px` }}
         >
           <PreviewPane

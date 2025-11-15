@@ -23,12 +23,12 @@ export const EditorPane = memo(function EditorPane({
   if (loading) {
     return (
       <div className="flex h-full flex-col gap-4 overflow-auto px-8 py-6">
-        <div className="h-6 w-56 animate-pulse rounded-full bg-slate-800/50" />
+        <div className="h-6 w-56 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800/50" />
         <div className="space-y-4">
           {Array.from({ length: 5 }).map((_, index) => (
             <div
               key={`skeleton-${index}`}
-              className="h-28 animate-pulse rounded-2xl bg-slate-800/40"
+              className="h-28 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800/40"
             />
           ))}
         </div>
@@ -38,9 +38,9 @@ export const EditorPane = memo(function EditorPane({
 
   if (!section || (!section.fields?.length && !section.sections?.length)) {
     return (
-      <div className="flex h-full flex-col items-center justify-center text-center text-sm text-slate-400">
+      <div className="flex h-full flex-col items-center justify-center text-center text-sm text-slate-600 dark:text-slate-400">
         <p>No fields in this section.</p>
-        <p className="text-xs text-slate-500">Select another node from the tree.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-500">Select another node from the tree.</p>
       </div>
     );
   }
@@ -48,25 +48,29 @@ export const EditorPane = memo(function EditorPane({
   return (
     <div className="flex h-full flex-col gap-4 overflow-auto px-8 py-6">
       {breadcrumbs.length ? (
-        <nav className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <nav className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-500">
           {breadcrumbs.map((crumb, index) => (
             <Fragment key={`${crumb}-${index}`}>
-              <span className="rounded-full bg-slate-900/70 px-3 py-1 text-slate-300">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
                 {crumb}
               </span>
               {index < breadcrumbs.length - 1 ? (
-                <ChevronRight className="h-3.5 w-3.5 text-slate-600" />
+                <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-600" />
               ) : null}
             </Fragment>
           ))}
         </nav>
       ) : null}
-      <article className="rounded-2xl border border-slate-800/70 bg-slate-900/40 p-6 shadow-shell">
+      <article className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-lg dark:border-slate-800/70 dark:bg-slate-900/40">
         <header>
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Section</p>
-          <h2 className="text-2xl font-semibold text-white">{section.title}</h2>
+          <p className="text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+            Section
+          </p>
+          <h2 className="text-2xl font-semibold">{section.title}</h2>
           {section.description ? (
-            <p className="mt-2 text-sm text-slate-400">{section.description}</p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              {section.description}
+            </p>
           ) : null}
         </header>
         <div className="mt-6 space-y-5">
@@ -98,6 +102,7 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
   const description = field.description;
   const required = field.required;
   const pointer = field.pointer;
+  const typeLabel = describeFieldKind(field.kind);
 
   const body = useMemo(() => {
     if (!pointer) {
@@ -109,7 +114,7 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
           <input
             id={id}
             type="text"
-            className="rounded-xl border border-slate-700/70 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 outline-none ring-brand-400/50 focus:border-brand-400 focus:ring-2"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-brand-400/50 focus:border-brand-400 focus:ring-2 dark:border-slate-700/70 dark:bg-slate-900/40 dark:text-slate-100"
             value={(value as string) ?? ''}
             onChange={(event) => onChange(pointer, event.target.value)}
             spellCheck={false}
@@ -127,7 +132,7 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
           <input
             id={id}
             type="number"
-            className="rounded-xl border border-slate-700/70 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 outline-none ring-brand-400/50 focus:border-brand-400 focus:ring-2"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-brand-400/50 focus:border-brand-400 focus:ring-2 dark:border-slate-700/70 dark:bg-slate-900/40 dark:text-slate-100"
             value={Number.isNaN(parsedValue) ? '' : parsedValue}
             onChange={(event) => {
               const next = event.target.value;
@@ -146,14 +151,14 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
               checked={Boolean(value)}
               onChange={(event) => onChange(pointer, event.target.checked)}
             />
-            <span className="text-sm text-slate-200">Enabled</span>
+            <span className="text-sm text-slate-700 dark:text-slate-200">Enabled</span>
           </label>
         );
       case 'enum':
         return (
           <select
             id={id}
-            className="w-full rounded-xl border border-slate-700/70 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 outline-none ring-brand-400/50 focus:border-brand-400 focus:ring-2"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-brand-400/50 focus:border-brand-400 focus:ring-2 dark:border-slate-700/70 dark:bg-slate-900/40 dark:text-slate-100"
             value={(value as string) ?? field.kind.options?.[0] ?? ''}
             onChange={(event) => onChange(pointer, event.target.value)}
           >
@@ -178,7 +183,7 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
           <textarea
             id={id}
             rows={6}
-            className="rounded-2xl border border-slate-700/70 bg-slate-900/40 px-3 py-2 font-mono text-sm text-slate-100 outline-none ring-brand-400/50 focus:border-brand-400 focus:ring-2"
+            className="rounded-2xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm text-slate-900 outline-none ring-brand-400/50 focus:border-brand-400 focus:ring-2 dark:border-slate-700/70 dark:bg-slate-900/40 dark:text-slate-100"
             value={value ? JSON.stringify(value, null, 2) : ''}
             onChange={(event) => {
               const text = event.target.value;
@@ -200,18 +205,21 @@ function FieldControl({ field, value, error, onChange }: FieldControlProps) {
   }, [field.kind, id, onChange, pointer, value]);
 
   return (
-    <section className="rounded-2xl border border-slate-800/60 bg-slate-950/30 p-4">
-      <div className="flex items-center gap-2">
-        <label htmlFor={id} className="text-sm font-medium text-white">
-          {label} {required ? <span className="text-rose-300">*</span> : null}
+    <section className="rounded-2xl border border-slate-200 bg-white/85 p-4 dark:border-slate-800/60 dark:bg-slate-950/30">
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor={id} className="text-sm font-medium">
+          {label} {required ? <span className="text-rose-500">*</span> : null}
         </label>
         <span className="font-mono text-[10px] text-slate-500">{pointer}</span>
+        <span className="ml-auto rounded-full border border-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          {typeLabel}
+        </span>
       </div>
       {description ? (
-        <p className="mt-1 text-xs text-slate-400">{description}</p>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{description}</p>
       ) : null}
       <div className="mt-3">{body}</div>
-      {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-rose-600 dark:text-rose-300">{error}</p> : null}
     </section>
   );
 }
@@ -259,7 +267,7 @@ function PrimitiveArrayEditor({
             <span className="text-xs text-slate-500">[{index}]</span>
             <input
               type={itemKind === 'boolean' ? 'text' : itemKind === 'number' || itemKind === 'integer' ? 'number' : 'text'}
-              className="flex-1 rounded-xl border border-slate-700/70 bg-slate-900/40 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-400"
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-brand-400 dark:border-slate-700/70 dark:bg-slate-900/40 dark:text-slate-100"
               value={
                 typeof entry === 'string' || typeof entry === 'number'
                   ? String(entry)
@@ -281,7 +289,7 @@ function PrimitiveArrayEditor({
             <button
               type="button"
               onClick={() => removeItem(index)}
-              className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-rose-400 hover:text-rose-300"
+              className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-rose-400 hover:text-rose-500 dark:border-slate-700 dark:text-slate-300 dark:hover:text-rose-300"
             >
               Remove
             </button>
@@ -297,4 +305,25 @@ function PrimitiveArrayEditor({
       </button>
     </div>
   );
+}
+
+function describeFieldKind(kind: WebField['kind']): string {
+  switch (kind.type) {
+    case 'string':
+    case 'integer':
+    case 'number':
+    case 'boolean':
+    case 'json':
+      return kind.type;
+    case 'enum':
+      return `enum (${kind.options.length})`;
+    case 'array':
+      return `array<${describeFieldKind(kind.items)}>`;
+    case 'composite':
+      return `${kind.mode === 'one_of' ? 'oneOf' : 'anyOf'} (${kind.variants.length})`;
+    case 'key_value':
+      return `map<key, ${describeFieldKind(kind.value_kind)}>`;
+    default:
+      return 'field';
+  }
 }

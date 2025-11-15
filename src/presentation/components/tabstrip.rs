@@ -139,7 +139,7 @@ fn compute_visible_window(labels: &[TabLabel], selected: usize, available: usize
             if width + extra <= available {
                 start -= 1;
                 width += extra;
-                expanded = true;
+                continue;
             }
         }
         if end < labels.len() {
