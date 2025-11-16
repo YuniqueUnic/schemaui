@@ -29,10 +29,8 @@ use ts_rs::TS;
 
 use crate::io::{DocumentFormat, input::schema_with_defaults};
 
-use super::{
-    assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider},
-    ui_ast::{UiAst, build_ui_ast},
-};
+use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
+use crate::ui_ast::{UiAst, build_ui_ast};
 
 pub struct WebSessionBuilder {
     schema: Value,

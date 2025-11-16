@@ -6,28 +6,34 @@ use schemars::schema::{
 };
 use serde::Serialize;
 use serde_json::{Map, Value};
+#[cfg(feature = "web")]
 use ts_rs::TS;
 
 use crate::schema::{loader::load_root_schema, resolver::SchemaResolver};
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = "web/types/ui-ast.ts")]
+pub mod form_schema;
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "web", derive(TS))]
+#[cfg_attr(feature = "web", ts(export, export_to = "web/types/ui-ast.ts"))]
 pub struct UiAst {
     pub roots: Vec<UiNode>,
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "web", derive(TS))]
 pub struct UiNode {
     pub pointer: String,
     pub title: Option<String>,
     pub description: Option<String>,
     pub required: bool,
-    #[ts(type = "Record<string, unknown> | null")]
+    #[cfg_attr(feature = "web", ts(type = "Record<string, unknown> | null"))]
     pub default_value: Option<Value>,
     pub kind: UiNodeKind,
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "web", derive(TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UiNodeKind {
     Field {
@@ -50,7 +56,8 @@ pub enum UiNodeKind {
     },
 }
 
-#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "web", derive(TS))]
 #[serde(rename_all = "snake_case")]
 pub enum ScalarKind {
     String,
@@ -59,21 +66,23 @@ pub enum ScalarKind {
     Boolean,
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "web", derive(TS))]
 #[serde(rename_all = "snake_case")]
 pub enum CompositeMode {
     OneOf,
     AnyOf,
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "web", derive(TS))]
 pub struct UiVariant {
     pub id: String,
     pub title: Option<String>,
     pub description: Option<String>,
     pub is_object: bool,
     pub node: UiNodeKind,
-    #[ts(type = "Record<string, unknown>")]
+    #[cfg_attr(feature = "web", ts(type = "Record<string, unknown>"))]
     pub schema: Value,
 }
 

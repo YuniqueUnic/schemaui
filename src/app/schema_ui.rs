@@ -4,12 +4,12 @@ use serde_json::Value;
 use std::{borrow::Cow, sync::Arc, time::Duration};
 
 use crate::{
-    domain::parse_form_schema,
     form::FormState,
     io::{
         self, DocumentFormat,
         output::{self, OutputOptions},
     },
+    ui_ast::{build_ui_ast, form_schema::form_schema_from_ui_ast},
 };
 
 use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions, runtime::App};
@@ -185,7 +185,8 @@ impl SchemaUI {
         } = self;
 
         let validator = validator_for(&schema).context("failed to compile JSON schema")?;
-        let form_schema = parse_form_schema(&schema)?;
+        let ui_ast = build_ui_ast(&schema)?;
+        let form_schema = form_schema_from_ui_ast(&ui_ast);
         let palette = options.component_palette();
         let form_state = FormState::from_schema_with_palette(&form_schema, palette);
 
