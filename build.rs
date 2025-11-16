@@ -25,6 +25,19 @@ fn main() {
     }
     let dist_index = manifest_dir.join("web/dist/index.html");
 
+    // When `cargo package`/`cargo publish` copies the source into target/package/*,
+    // build scripts must not mutate that copy. Instead, require that the dist
+    // bundle is already present and up-to-date.
+    if in_cargo_package_dir(&manifest_dir) {
+        if should_build(&web_ui_dir, &dist_index) || !dist_index.exists() {
+            panic!(
+                "web/dist is missing or stale during cargo publish; run `npm run build` \
+                 (or set SCHEMAUI_WEB_FORCE_BUILD=1) before publishing."
+            );
+        }
+        return;
+    }
+
     if !should_build(&web_ui_dir, &dist_index) {
         return;
     }
@@ -118,4 +131,10 @@ fn ensure_node_modules(web_ui_dir: &Path) {
             panic!("npm ci (web/ui) failed with status {status}");
         }
     }
+}
+
+fn in_cargo_package_dir(manifest_dir: &Path) -> bool {
+    manifest_dir
+        .ancestors()
+        .any(|p| p.ends_with(Path::new("target/package")))
 }
