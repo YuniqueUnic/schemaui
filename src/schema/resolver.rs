@@ -32,10 +32,8 @@ impl<'a> SchemaResolver<'a> {
     }
 
     pub fn definitions_snapshot(&self) -> Option<Value> {
-        self.raw
-            .as_object()
-            .and_then(|obj| obj.get("definitions"))
-            .cloned()
+        let obj = self.raw.as_object()?;
+        obj.get("$defs").or_else(|| obj.get("definitions")).cloned()
     }
 
     fn follow_reference(&self, reference: &str) -> Result<SchemaObject> {

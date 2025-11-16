@@ -50,7 +50,7 @@ pub enum UiNodeKind {
     },
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
+#[derive(Debug, Clone, Copy, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum ScalarKind {
     String,
@@ -175,8 +175,8 @@ fn visit_schema(
             default_value,
             kind: UiNodeKind::Array {
                 item: Box::new(item_node),
-                min_items: array.min_items,
-                max_items: array.max_items,
+                min_items: array.min_items.map(|v| v as u64),
+                max_items: array.max_items.map(|v| v as u64),
             },
         });
     }
@@ -270,8 +270,8 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
         let item_node = visit_kind(resolver, &items_schema)?;
         return Ok(UiNodeKind::Array {
             item: Box::new(item_node),
-            min_items: array.min_items,
-            max_items: array.max_items,
+            min_items: array.min_items.map(|v| v as u64),
+            max_items: array.max_items.map(|v| v as u64),
         });
     }
 
@@ -308,7 +308,12 @@ fn build_variants(resolver: &SchemaResolver<'_>, schemas: &[Schema]) -> Result<V
         let resolved = resolver.resolve_schema(variant)?;
         let normalized = normalize_schema(&resolved)?;
         let node = visit_kind(resolver, &normalized)?;
-        let schema_value = schema_to_value(&resolved)?;
+        let mut schema_value = schema_to_value(&resolved)?;
+        if let Some(defs) = resolver.definitions_snapshot()
+            && let Value::Object(ref mut map) = schema_value
+        {
+            map.entry("$defs".to_string()).or_insert(defs);
+        }
         let title = normalized
             .metadata
             .as_ref()
@@ -346,10 +351,10 @@ fn infer_default_scalar(scalar: ScalarKind, opts: Option<&Vec<String>>) -> Optio
         ScalarKind::Number => Value::Number(0.into()),
         ScalarKind::Boolean => Value::Bool(false),
     };
-    if let Some(options) = opts {
-        if let Some(first) = options.first() {
-            return Some(Value::String(first.clone()));
-        }
+    if let Some(options) = opts
+        && let Some(first) = options.first()
+    {
+        return Some(Value::String(first.clone()));
     }
     Some(val)
 }
@@ -409,54 +414,13 @@ fn merge_all_of(resolver: &SchemaResolver<'_>, all_of: &[Schema]) -> Result<Sche
     if all_of.is_empty() {
         bail!("allOf must contain at least one schema");
     }
-    let mut merged = Map::<String, Value>::new();
-    let mut required: HashSet<String> = HashSet::new();
-
+    let mut acc = Value::Object(Map::new());
     for schema in all_of {
         let resolved = resolver.resolve_schema(schema)?;
         let value = schema_to_value(&resolved)?;
-        if let Value::Object(map) = value {
-            for (key, val) in map {
-                match key.as_str() {
-                    "properties" => {
-                        let entry = merged
-                            .entry("properties".into())
-                            .or_insert_with(|| Value::Object(Map::new()));
-                        if let (Value::Object(base), Value::Object(next)) = (entry, val) {
-                            for (prop, schema_val) in next {
-                                base.insert(prop, schema_val);
-                            }
-                        } else {
-                            merged.insert("properties".into(), val);
-                        }
-                    }
-                    "required" => {
-                        if let Value::Array(items) = val {
-                            for item in items {
-                                if let Value::String(s) = item {
-                                    required.insert(s);
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        merged.insert(key, val);
-                    }
-                }
-            }
-        }
+        acc = deep_merge(acc, value);
     }
-
-    if !required.is_empty() {
-        merged.insert(
-            "required".into(),
-            Value::Array(required.into_iter().map(Value::String).collect()),
-        );
-    }
-
-    let merged_value = Value::Object(merged);
-    serde_json::from_value::<SchemaObject>(merged_value)
-        .context("failed to deserialize merged allOf schema")
+    serde_json::from_value::<SchemaObject>(acc).context("failed to deserialize merged allOf schema")
 }
 
 fn resolve_array_items(
@@ -471,8 +435,7 @@ fn resolve_array_items(
         SingleOrVec::Single(schema) => schema.as_ref(),
         SingleOrVec::Vec(list) => list
             .first()
-            .context("tuple arrays must have at least one item")?
-            .as_ref(),
+            .context("tuple arrays must have at least one item")?,
     };
     resolver.resolve_schema(first)
 }
@@ -531,6 +494,42 @@ fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
         };
     }
     format!("Variant {}", index + 1)
+}
+
+fn deep_merge(base: Value, addition: Value) -> Value {
+    match (base, addition) {
+        (Value::Object(mut a), Value::Object(b)) => {
+            for (key, value) in b {
+                let merged = if let Some(existing) = a.remove(&key) {
+                    deep_merge(existing, value)
+                } else {
+                    value
+                };
+                a.insert(key, merged);
+            }
+            Value::Object(a)
+        }
+        (Value::Array(mut a), Value::Array(mut b)) => {
+            a.append(&mut b);
+            dedup_array(&mut a);
+            Value::Array(a)
+        }
+        (_, new_value) => new_value,
+    }
+}
+
+fn dedup_array(values: &mut Vec<Value>) {
+    let mut index = 0;
+    while index < values.len() {
+        let is_duplicate = values[..index]
+            .iter()
+            .any(|existing| existing == &values[index]);
+        if is_duplicate {
+            values.remove(index);
+        } else {
+            index += 1;
+        }
+    }
 }
 
 fn append_pointer(base: &str, segment: &str) -> String {
