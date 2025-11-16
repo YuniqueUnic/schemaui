@@ -3,13 +3,64 @@
 @tailwind utilities;
 
 :root {
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  color-scheme: light;
+  --app-surface: #f7f9fc;
+  --app-panel: #ffffff;
+  --app-panel-muted: #eff4ff;
+  --app-card: #ffffff;
+  --app-border: rgba(15, 23, 42, 0.12);
+  --app-text: #0f172a;
+  --app-text-muted: #475569;
+  --app-accent: #2563eb;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --app-surface: #060c18;
+  --app-panel: #0b1424;
+  --app-panel-muted: #111c2f;
+  --app-card: #14223a;
+  --app-border: rgba(148, 163, 184, 0.16);
+  --app-text: #e2e8f0;
+  --app-text-muted: #94a3b8;
+  --app-accent: #0ea5e9;
+}
+
+:root.light {
+  color-scheme: light;
 }
 
 body {
-  @apply font-sans min-h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  @apply font-sans min-h-screen overflow-hidden;
+  background-color: var(--app-surface);
+  color: var(--app-text);
 }
 
-#root {
-  @apply min-h-screen;
+#root { @apply min-h-screen; }
+
+.app-shell { background-color: var(--app-surface); color: var(--app-text); }
+.app-panel { background-color: var(--app-panel); border-color: var(--app-border); }
+.app-panel-muted { background-color: var(--app-panel-muted); border-color: var(--app-border); }
+.app-card { background-color: var(--app-card); border: 1px solid var(--app-border); border-radius: 1rem; }
+.text-primary { color: var(--app-text); }
+.text-muted { color: var(--app-text-muted); }
+.border-theme { border-color: var(--app-border); }
+.bg-panel { background-color: var(--app-panel); }
+
+@layer components {
+  .input-surface {
+    background-color: var(--app-panel);
+    color: var(--app-text);
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    width: 100%;
+  }
+  .button-ghost {
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
+    border-radius: 9999px;
+    padding: 0.4rem 0.9rem;
+  }
 }

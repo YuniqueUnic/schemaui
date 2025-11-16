@@ -49,8 +49,8 @@ export const PreviewPane = memo(function PreviewPane({
   }, [payload]);
 
   return (
-    <aside className="flex h-full w-full flex-col border-l border-slate-200 bg-white dark:border-slate-800/70 dark:bg-slate-950/70">
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800/70">
+    <aside className="flex h-full w-full flex-col app-panel">
+      <div className="flex items-center justify-between border-b border-theme px-5 py-4">
         <div className="flex items-center gap-2">
           {formats.map((option) => (
             <button
@@ -60,8 +60,8 @@ export const PreviewPane = memo(function PreviewPane({
               className={clsx(
                 "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition",
                 option === format
-                  ? "bg-brand-500/20 text-brand-700 dark:text-brand-200"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
+                  ? "bg-[var(--app-accent)]/20 text-[var(--app-accent)]"
+                  : "text-muted hover:text-[var(--app-accent)]",
               )}
             >
               {option.toUpperCase()}
@@ -69,12 +69,12 @@ export const PreviewPane = memo(function PreviewPane({
           ))}
         </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <label className="flex items-center gap-2 text-xs text-muted">
             <input
               type="checkbox"
               checked={pretty}
               onChange={(event) => onPrettyChange(event.target.checked)}
-              className="h-4 w-4 accent-brand-400"
+              className="h-4 w-4 accent-[var(--app-accent)]"
             />
             Pretty format
           </label>
@@ -82,21 +82,21 @@ export const PreviewPane = memo(function PreviewPane({
             type="button"
             onClick={handleCopy}
             disabled={!payload}
-            className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-400 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200"
+            className="rounded-full border border-theme px-3 py-1.5 text-xs font-semibold text-[var(--app-text)] transition hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {copied ? "Copied" : "Copy"}
           </button>
         </div>
       </div>
-      <div className="relative flex-1 overflow-auto bg-white px-5 py-4 font-mono text-xs leading-relaxed text-slate-800 dark:bg-slate-950 dark:text-slate-200">
+      <div className="relative flex-1 overflow-auto bg-[var(--app-panel)] px-5 py-4 font-mono text-xs leading-relaxed text-[var(--app-text)]">
         {loading
           ? (
-            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/70 dark:bg-slate-950/70">
-              <div className="h-12 w-12 animate-spin rounded-full border-2 border-brand-400 border-t-transparent" />
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-[var(--app-panel)]/80">
+              <div className="h-12 w-12 animate-spin rounded-full border-2 border-[var(--app-accent)] border-t-transparent" />
             </div>
           )
           : null}
-        <pre className="relative whitespace-pre-wrap break-words rounded-xl bg-white px-4 py-3 text-xs leading-relaxed text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+        <pre className="relative whitespace-pre-wrap break-words rounded-xl bg-[var(--app-card)] px-4 py-3 text-xs leading-relaxed text-[var(--app-text)]">
           <code
             className={`language-${normalizedLanguage(format)}`}
             dangerouslySetInnerHTML={{ __html: highlightSyntax(payload, format) }}

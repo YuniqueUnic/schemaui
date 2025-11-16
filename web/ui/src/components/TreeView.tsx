@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import type { UiAst, UiNode } from '../types';
 
 interface TreeViewProps {
@@ -22,14 +21,14 @@ export function TreeView({ ast, selectedPointer, onSelect }: TreeViewProps) {
 
   if (!items.length) {
     return (
-      <div className="flex h-full items-center justify-center text-xs text-slate-500">
+      <div className="flex h-full items-center justify-center text-xs text-muted">
         No schema
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto px-3 py-4 text-sm text-slate-200">
+    <div className="h-full overflow-y-auto px-3 py-4 text-sm text-primary">
       {items.map((item) => (
         <TreeRow
           key={item.pointer}
@@ -69,15 +68,15 @@ function TreeRow({
       <button
         type="button"
         onClick={() => onSelect(item.pointer)}
-        className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-white/5 ${
-          isActive ? 'bg-white/10 text-sky-200' : 'text-slate-300'
+        className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-[var(--app-panel-muted)] ${
+          isActive ? 'bg-[var(--app-panel-muted)] text-[var(--app-accent)]' : 'text-primary'
         }`}
         style={{ paddingLeft: 8 + item.depth * 12 }}
       >
         {item.hasChildren ? (
           <span
             onClick={toggle}
-            className="inline-flex h-4 w-4 items-center justify-center rounded border border-slate-600 bg-slate-900 text-[10px] text-slate-400 group-hover:border-slate-500"
+            className="inline-flex h-4 w-4 items-center justify-center rounded border border-theme bg-panel text-[10px] text-muted group-hover:border-theme"
           >
             {isCollapsed ? '+' : '–'}
           </span>

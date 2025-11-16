@@ -12,7 +12,7 @@ interface StatusBarProps {
 }
 
 const DEFAULT_SHORTCUTS: ShortcutHint[] = [
-  { combo: "⌘/Ctrl + S", label: "Save" }, // ONLY THIS COMMAND IS USEFUL. DO NOT DELETE
+  { combo: "⌘/Ctrl + S", label: "Save" },
   // { combo: "⌘/Ctrl + Enter", label: "Validate" },
   // { combo: "⌘/Ctrl + .", label: "Theme" },
 ];
@@ -25,7 +25,7 @@ export function StatusBar({
   shortcuts = DEFAULT_SHORTCUTS,
 }: StatusBarProps) {
   return (
-    <footer className="flex items-center justify-between border-t border-slate-800/70 bg-slate-950/70 px-6 py-3 text-xs text-slate-300">
+    <footer className="app-panel flex items-center justify-between border-t border-theme px-6 py-3 text-xs text-muted">
       <div className="flex items-center gap-3">
         <Badge
           label={dirty ? "Unsaved changes" : "Synced"}
@@ -39,18 +39,18 @@ export function StatusBar({
             : "Schema valid"}
           tone={validating ? "sky" : errorCount > 0 ? "rose" : "emerald"}
         />
-        <span>{status}</span>
+        <span className="text-[var(--app-text)]">{status}</span>
       </div>
       <div className="flex items-center gap-4">
         {shortcuts.map((shortcut) => (
           <span
             key={shortcut.combo}
-            className="inline-flex items-center gap-2 text-slate-400"
+            className="inline-flex items-center gap-2 text-[var(--app-text)]"
           >
-            <kbd className="rounded-md border border-slate-800 bg-slate-900/60 px-2 py-1 text-[10px] font-semibold text-slate-100">
+            <kbd className="rounded-md border border-theme bg-[var(--app-panel-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--app-text)]">
               {shortcut.combo}
             </kbd>
-            <span>{shortcut.label}</span>
+            <span className="text-muted">{shortcut.label}</span>
           </span>
         ))}
       </div>
@@ -62,10 +62,10 @@ type BadgeTone = "emerald" | "rose" | "amber" | "sky";
 
 function Badge({ label, tone }: { label: string; tone: BadgeTone }) {
   const styles: Record<BadgeTone, string> = {
-    emerald: "border-emerald-400/60 text-emerald-200",
-    rose: "border-rose-400/60 text-rose-200",
-    amber: "border-amber-400/60 text-amber-200",
-    sky: "border-sky-400/60 text-sky-200",
+    emerald: "border-emerald-600/60 text-emerald-400",
+    rose: "border-rose-600/60 text-rose-400",
+    amber: "border-amber-600/60 text-amber-400",
+    sky: "border-sky-600/60 text-sky-400",
   };
   return (
     <span

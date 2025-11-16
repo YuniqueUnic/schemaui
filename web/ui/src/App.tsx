@@ -154,7 +154,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0b1121] text-slate-200">
+      <div className="app-shell flex h-screen items-center justify-center">
         Loading session…
       </div>
     );
@@ -162,7 +162,7 @@ export default function App() {
 
   return (
     <OverlayProvider>
-      <div className="flex h-screen flex-col bg-[#0b1121] text-slate-100">
+      <div className="app-shell flex h-screen flex-col">
         <AppHeader
           title={session?.title ?? session?.ui_ast?.roots[0]?.title}
           description={session?.ui_ast?.roots[0]?.description}
@@ -172,12 +172,12 @@ export default function App() {
           onSave={handleSave}
           onExit={handleExit}
         />
-        <div className="flex flex-1 overflow-hidden border-t border-b border-slate-800/70 bg-slate-950">
+        <div className="app-panel-muted flex flex-1 overflow-hidden border-y border-theme">
           <aside
-            className="flex flex-col border-r border-slate-800/70 bg-slate-950/60 text-slate-100"
+            className="app-panel flex flex-col border-r border-theme text-[var(--app-text)]"
             style={{ width: sizes.nav }}
           >
-            <div className="flex items-center justify-between border-b border-slate-800/70 px-4 py-3 text-xs uppercase tracking-[0.3em] text-slate-400">
+            <div className="border-b border-theme px-4 py-3 text-xs uppercase tracking-[0.3em] text-muted">
               Schema
             </div>
             <TreeView
@@ -190,7 +190,7 @@ export default function App() {
             className="w-1 cursor-col-resize bg-transparent"
             onPointerDown={(event) => startDrag(event, "nav")}
           />
-          <main className="flex flex-1 flex-col overflow-hidden bg-slate-950/30 px-6 py-4">
+          <main className="app-panel flex flex-1 flex-col overflow-hidden px-6 py-4">
             <EditorBreadcrumbs node={selectedNode} pointer={selectedPointer} />
             <div className="mt-4 flex-1 overflow-y-auto pr-4 text-sm">
               {selectedNode
@@ -214,7 +214,7 @@ export default function App() {
             onPointerDown={(event) => startDrag(event, "preview")}
           />
           <section
-            className="flex h-full flex-col border-l border-slate-800/70 bg-slate-950/60 text-slate-100"
+            className="app-panel flex h-full flex-col border-l border-theme"
             style={{ width: sizes.preview }}
           >
             <PreviewPane
@@ -279,18 +279,18 @@ function EditorBreadcrumbs(
     return null;
   }
   return (
-    <nav className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+    <nav className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
       {segments.map((segment, index) => (
         <span
           key={`${segment}-${index}`}
-          className="rounded-full bg-white/5 px-3 py-1 text-slate-200"
+          className="rounded-full bg-white/5 px-3 py-1 text-slate-400"
         >
           {segment}
         </span>
       ))}
       {node?.required
         ? (
-          <span className="text-[10px] uppercase tracking-[0.3em] text-rose-400">
+          <span className="text-[10px] uppercase tracking-[0.3em] text-rose-600">
             Required
           </span>
         )
