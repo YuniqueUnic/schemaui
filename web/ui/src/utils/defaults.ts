@@ -69,7 +69,7 @@ function resolveDefaultValue(field: WebField): JsonValue {
   return field.default_value ?? inferKindDefault(field.kind);
 }
 
-function inferKindDefault(kind: WebFieldKind): JsonValue {
+export function inferKindDefault(kind: WebFieldKind): JsonValue {
   switch (kind.type) {
     case "string":
       return "";

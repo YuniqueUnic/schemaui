@@ -1,4 +1,4 @@
-import type { WebBlueprint, WebField, WebSection } from "../types";
+import type { UiAst, UiSection } from "../ui-ast";
 
 export interface SectionPath {
   rootIndex: number;
@@ -16,24 +16,38 @@ export interface TreeNode<T = unknown> {
 }
 
 export function buildSectionTree(
-  blueprint?: WebBlueprint,
+  ast?: UiAst,
 ): TreeNode<SectionPath>[] {
-  if (!blueprint) return [];
-  return blueprint.roots.map((root, rootIndex) => ({
-    id: root.id || `root-${rootIndex}`,
-    depth: 0,
-    label: root.title || `Root ${rootIndex + 1}`,
-    description: root.description,
-    data: { rootIndex, sectionPath: [] },
-    fieldPointers: [],
-    children: (root.sections || []).map((section, index) =>
-      mapSection(section, rootIndex, [index], 1)
-    ),
-  }));
+  if (!ast) return [];
+  const nodes: TreeNode<SectionPath>[] = [];
+  ast.roots.forEach((root, rootIndex) => {
+    const sections = root.sections || [];
+    if (sections.length === 1) {
+      const collapsed: UiSection = {
+        ...sections[0],
+        title: sections[0].title || root.title,
+        description: sections[0].description ?? root.description,
+      };
+      nodes.push(mapSection(collapsed, rootIndex, [0], 0));
+      return;
+    }
+    nodes.push({
+      id: root.id || `root-${rootIndex}`,
+      depth: 0,
+      label: root.title || `Root ${rootIndex + 1}`,
+      description: root.description,
+      data: { rootIndex, sectionPath: [] },
+      fieldPointers: [],
+      children: sections.map((section, index) =>
+        mapSection(section, rootIndex, [index], 1)
+      ),
+    });
+  });
+  return nodes;
 }
 
 function mapSection(
-  section: WebSection,
+  section: UiSection,
   rootIndex: number,
   path: number[],
   depth: number,
@@ -44,8 +58,8 @@ function mapSection(
     label: section.title || `Section ${path[path.length - 1] + 1}`,
     description: section.description,
     data: { rootIndex, sectionPath: path },
-    fieldPointers: (section.fields || [])
-      .map((field) => field.pointer)
+    fieldPointers: (section.children || [])
+      .map((node) => node.pointer)
       .filter((pointer): pointer is string => Boolean(pointer)),
     children: (section.sections || []).map((child, idx) =>
       mapSection(child, rootIndex, [...path, idx], depth + 1)
@@ -54,22 +68,26 @@ function mapSection(
 }
 
 export function getSectionByPath(
-  blueprint: WebBlueprint | undefined,
+  ast: UiAst | undefined,
   target: SectionPath,
-): WebSection | undefined {
-  if (!blueprint) return undefined;
-  const root = blueprint.roots[target.rootIndex];
+): UiSection | undefined {
+  if (!ast) return undefined;
+  const root = ast.roots[target.rootIndex];
   if (!root) return undefined;
   if (target.sectionPath.length === 0) {
+    const soleChild = root.sections?.length === 1 ? root.sections[0] : undefined;
+    if (soleChild && (soleChild.children?.length ?? 0) > 0) {
+      return soleChild;
+    }
     return {
       id: root.id,
       title: root.title,
       description: root.description,
-      fields: [],
+      children: [],
       sections: root.sections ?? [],
     };
   }
-  let current: WebSection | undefined;
+  let current: UiSection | undefined;
   let sections = root.sections || [];
   for (const index of target.sectionPath) {
     current = sections?.[index];
@@ -78,19 +96,15 @@ export function getSectionByPath(
   return current;
 }
 
-export function collectFields(section?: WebSection): WebField[] {
-  return section?.fields ?? [];
-}
-
 export function getBreadcrumbs(
-  blueprint: WebBlueprint | undefined,
+  ast: UiAst | undefined,
   target: SectionPath,
 ): string[] {
-  if (!blueprint) {
+  if (!ast) {
     return [];
   }
   const crumbs: string[] = [];
-  const root = blueprint.roots[target.rootIndex];
+  const root = ast.roots[target.rootIndex];
   if (!root) {
     return crumbs;
   }

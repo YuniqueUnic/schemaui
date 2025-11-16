@@ -25,6 +25,7 @@ import {
 import type { JsonValue, ValidationResponse, WebBlueprint } from "./types";
 import { deepClone, setPointerValue } from "./utils/jsonPointer";
 import { useTheme } from "./theme";
+import { buildUiAst, type UiAst } from "./ui-ast";
 import "./index.css";
 
 interface ToastState {
@@ -34,6 +35,7 @@ interface ToastState {
 
 export default function App() {
   const [blueprint, setBlueprint] = useState<WebBlueprint | undefined>();
+  const [uiAst, setUiAst] = useState<UiAst | undefined>();
   const [sessionTitle, setSessionTitle] = useState<string | null | undefined>();
   const [formats, setFormats] = useState<string[]>(["json"]);
   const [data, setData] = useState<JsonValue>({});
@@ -83,6 +85,7 @@ export default function App() {
           payload.data ?? {},
         );
         setBlueprint(payload.blueprint);
+        setUiAst(buildUiAst(payload.blueprint));
         setSessionTitle(payload.title ?? payload.blueprint?.title);
         const availableFormats =
           payload.formats?.length && payload.formats.length > 0
@@ -140,18 +143,18 @@ export default function App() {
   });
 
   const sectionTree = useMemo(
-    () => buildSectionTree(blueprint),
-    [blueprint],
+    () => buildSectionTree(uiAst),
+    [uiAst],
   );
 
   const activeSection = useMemo(
-    () => getSectionByPath(blueprint, activePath),
-    [blueprint, activePath],
+    () => getSectionByPath(uiAst, activePath),
+    [uiAst, activePath],
   );
 
   const breadcrumbs = useMemo(
-    () => getBreadcrumbs(blueprint, activePath),
-    [blueprint, activePath],
+    () => getBreadcrumbs(uiAst, activePath),
+    [uiAst, activePath],
   );
 
   const nodeErrorCounts = useMemo(
