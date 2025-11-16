@@ -6,12 +6,6 @@ import type { SessionResponse as ServerSessionResponse } from '@schemaui/types/S
 import type { ExitRequest as ServerExitRequest } from '@schemaui/types/ExitRequest';
 import type { ValidateRequest as ServerValidateRequest } from '@schemaui/types/ValidateRequest';
 import type { ValidationResponse as ServerValidationResponse } from '@schemaui/types/ValidationResponse';
-import type { WebBlueprint as GeneratedWebBlueprint } from '@schemaui/types/WebBlueprint';
-import type { WebCompositeVariant as GeneratedWebCompositeVariant } from '@schemaui/types/WebCompositeVariant';
-import type { WebField as GeneratedWebField } from '@schemaui/types/WebField';
-import type { WebFieldKind as GeneratedWebFieldKind } from '@schemaui/types/WebFieldKind';
-import type { WebRoot as GeneratedWebRoot } from '@schemaui/types/WebRoot';
-import type { WebSection as GeneratedWebSection } from '@schemaui/types/WebSection';
 
 export type JsonValue =
   | string
@@ -27,9 +21,9 @@ export type ValidationResponse = Omit<ServerValidationResponse, 'errors'> & {
   errors: FieldError[];
 };
 
-export type SessionResponse = Omit<ServerSessionResponse, 'data' | 'blueprint'> & {
+export type SessionResponse = Omit<ServerSessionResponse, 'data' | 'ui_ast'> & {
   data: JsonValue;
-  blueprint: WebBlueprint;
+  ui_ast: UiAst;
 };
 
 export type SaveRequest = Omit<ServerSaveRequest, 'data'> & {
@@ -50,40 +44,38 @@ export type PreviewRequest = Omit<ServerPreviewRequest, 'data'> & {
 
 export type PreviewResponse = ServerPreviewResponse;
 
-type GeneratedCompositeKind = Extract<GeneratedWebFieldKind, { type: 'composite' }>;
-type GeneratedArrayKind = Extract<GeneratedWebFieldKind, { type: 'array' }>;
-type GeneratedKeyValueKind = Extract<GeneratedWebFieldKind, { type: 'key_value' }>;
+export type ScalarKind = 'string' | 'integer' | 'number' | 'boolean';
+export type CompositeMode = 'one_of' | 'any_of';
 
-export type WebFieldKind =
-  | Exclude<
-    GeneratedWebFieldKind,
-    { type: 'composite' } | { type: 'array' } | { type: 'key_value' }
-  >
-  | (Omit<GeneratedCompositeKind, 'variants'> & { variants: WebCompositeVariant[] })
-  | (Omit<GeneratedArrayKind, 'items'> & { items: WebFieldKind })
-  | (Omit<GeneratedKeyValueKind, 'value_kind'> & { value_kind: WebFieldKind });
+export type UiNodeKind =
+  | { type: 'field'; scalar: ScalarKind; enum_options?: string[] | null }
+  | { type: 'array'; item: UiNodeKind; min_items?: number | null; max_items?: number | null }
+  | {
+    type: 'composite';
+    mode: CompositeMode;
+    allow_multiple: boolean;
+    variants: UiVariant[];
+  }
+  | { type: 'object'; children: UiNode[]; required: string[] };
 
-export interface WebField extends Omit<GeneratedWebField, 'default_value' | 'kind'> {
-  default_value?: JsonValue;
-  kind: WebFieldKind;
+export interface UiNode {
+  pointer: string;
+  title?: string | null;
+  description?: string | null;
+  required: boolean;
+  default_value?: JsonValue | null;
+  kind: UiNodeKind;
 }
 
-export interface WebCompositeVariant
-  extends Omit<GeneratedWebCompositeVariant, 'schema' | 'sections'> {
+export interface UiVariant {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  is_object: boolean;
+  node: UiNodeKind;
   schema: JsonValue;
-  sections: WebSection[];
 }
 
-export interface WebSection
-  extends Omit<GeneratedWebSection, 'fields' | 'sections'> {
-  fields: WebField[];
-  sections: WebSection[];
-}
-
-export interface WebRoot extends Omit<GeneratedWebRoot, 'sections'> {
-  sections: WebSection[];
-}
-
-export interface WebBlueprint extends Omit<GeneratedWebBlueprint, 'roots'> {
-  roots: WebRoot[];
+export interface UiAst {
+  roots: UiNode[];
 }

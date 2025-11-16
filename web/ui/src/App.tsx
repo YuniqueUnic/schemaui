@@ -1,129 +1,56 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { clsx } from "clsx";
-import { AppHeader } from "./components/AppHeader";
-import { TreePanel } from "./components/TreePanel";
-import { EditorPane } from "./components/EditorPane";
-import { PreviewPane } from "./components/PreviewPane";
-import { StatusBar } from "./components/StatusBar";
-import { ExitGuardDialog } from "./components/ExitGuardDialog";
-import { useResizableColumns } from "./hooks/useResizableColumns";
-import { applyBlueprintDefaults } from "./utils/defaults";
-import {
-  buildSectionTree,
-  getBreadcrumbs,
-  getSectionByPath,
-  type SectionPath,
-  type TreeNode,
-} from "./utils/blueprint";
+import { useEffect, useRef, useState } from 'react';
+import { AppHeader } from './components/AppHeader';
+import { NodeRenderer } from './components/NodeRenderer';
+import { PreviewPane } from './components/PreviewPane';
+import { StatusBar } from './components/StatusBar';
 import {
   exitSession,
   fetchSession,
   persistData,
   renderPreview,
   validateData,
-} from "./api";
-import type { JsonValue, ValidationResponse, WebBlueprint } from "./types";
-import { deepClone, setPointerValue } from "./utils/jsonPointer";
-import { useTheme } from "./theme";
-import { buildUiAst, type UiAst } from "./ui-ast";
-import "./index.css";
-
-interface ToastState {
-  message: string;
-  kind: "success" | "error";
-}
+} from './api';
+import type { JsonValue, SessionResponse } from './types';
+import { applyUiDefaults } from './ui-ast';
+import { deepClone, getPointerValue, setPointerValue } from './utils/jsonPointer';
+import './index.css';
 
 export default function App() {
-  const [blueprint, setBlueprint] = useState<WebBlueprint | undefined>();
-  const [uiAst, setUiAst] = useState<UiAst | undefined>();
-  const [sessionTitle, setSessionTitle] = useState<string | null | undefined>();
-  const [formats, setFormats] = useState<string[]>(["json"]);
+  const [session, setSession] = useState<SessionResponse | null>(null);
   const [data, setData] = useState<JsonValue>({});
-  const [status, setStatus] = useState("Loading schema…");
-  const [dirty, setDirty] = useState(false);
-  const [validating, setValidating] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Map<string, string>>(
-    () => new Map(),
-  );
-  const [previewFormat, setPreviewFormat] = useState("json");
+  const [formats, setFormats] = useState<string[]>(['json']);
+  const [previewFormat, setPreviewFormat] = useState('json');
   const [previewPretty, setPreviewPretty] = useState(true);
-  const [previewPayload, setPreviewPayload] = useState("{}");
-  const [activePath, setActivePath] = useState<SectionPath>({
-    rootIndex: 0,
-    sectionPath: [],
-  });
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [treeFilter, setTreeFilter] = useState("");
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [previewPayload, setPreviewPayload] = useState('{}');
+  const [errors, setErrors] = useState<Map<string, string>>(new Map());
+  const [dirty, setDirty] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(true);
-  const [previewPending, setPreviewPending] = useState(false);
-  const [exitPromptOpen, setExitPromptOpen] = useState(false);
-  const [exitPending, setExitPending] = useState(false);
-  const [exitCheckPending, setExitCheckPending] = useState(false);
-  const validationSequence = useRef(0);
-  const previewSequence = useRef(0);
-
-  const { sizes, startDrag } = useResizableColumns({ nav: 280, preview: 420 });
-  const { theme } = useTheme();
-  const isMac = typeof navigator !== "undefined" &&
-    /(Mac|iPhone|iPad)/i.test(
-      navigator?.platform ?? navigator?.userAgent ?? "",
-    );
-  const modifierKey = isMac ? "⌘" : "Ctrl";
+  const [exiting, setExiting] = useState(false);
+  const [status, setStatus] = useState('Loading schema…');
+  const validationSeq = useRef(0);
+  const previewSeq = useRef(0);
 
   useEffect(() => {
     let mounted = true;
-    setSessionLoading(true);
     (async () => {
       try {
         const payload = await fetchSession();
         if (!mounted) return;
-        const normalized = applyBlueprintDefaults(
-          payload.blueprint,
-          payload.data ?? {},
-        );
-        setBlueprint(payload.blueprint);
-        setUiAst(buildUiAst(payload.blueprint));
-        setSessionTitle(payload.title ?? payload.blueprint?.title);
+        const withDefaults = applyUiDefaults(payload.ui_ast, payload.data ?? {});
+        setSession(payload);
+        setData(withDefaults);
         const availableFormats =
-          payload.formats?.length && payload.formats.length > 0
-            ? payload.formats
-            : ["json"];
+          payload.formats?.length && payload.formats.length > 0 ? payload.formats : ['json'];
         setFormats(availableFormats);
-        setPreviewFormat(
-          availableFormats.includes("json") ? "json" : availableFormats[0],
-        );
-        setData(normalized);
-        setStatus("Ready");
-        const initialPath = resolveInitialPath(payload.blueprint);
-        setActivePath(initialPath);
-        setExpanded(
-          new Set(
-            payload.blueprint.roots.map(
-              (root, index) => root.id || root.title || `root-${index}`,
-            ),
-          ),
-        );
-        setDirty(false);
-        setValidationErrors(new Map());
-        await Promise.all([
-          runValidation(normalized),
-          updatePreview(
-            normalized,
-            availableFormats[0] || "json",
-            previewPretty,
-          ),
-        ]);
+        setPreviewFormat(availableFormats.includes('json') ? 'json' : availableFormats[0]);
+        setStatus('Ready');
+        await Promise.all([runValidation(withDefaults), updatePreview(withDefaults, previewPretty, availableFormats[0])]);
       } catch (error) {
         console.error(error);
-        setStatus("Failed to load schema payload");
-        setToast({ message: "Unable to load schema", kind: "error" });
+        setStatus('Failed to load session');
       } finally {
-        if (mounted) {
-          setSessionLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     })();
     return () => {
@@ -131,356 +58,120 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        handleSave();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  });
-
-  const sectionTree = useMemo(
-    () => buildSectionTree(uiAst),
-    [uiAst],
-  );
-
-  const activeSection = useMemo(
-    () => getSectionByPath(uiAst, activePath),
-    [uiAst, activePath],
-  );
-
-  const breadcrumbs = useMemo(
-    () => getBreadcrumbs(uiAst, activePath, sectionTree),
-    [uiAst, activePath, sectionTree],
-  );
-
-  const nodeErrorCounts = useMemo(
-    () => aggregateErrors(sectionTree, validationErrors),
-    [sectionTree, validationErrors],
-  );
-
-  const errorCount = validationErrors.size;
-  const exitErrors = useMemo(
-    () => Array.from(validationErrors.entries()),
-    [validationErrors],
-  );
-  const shortcuts = useMemo(
-    () => [
-      { combo: `${modifierKey}+S`, label: "Save" },
-    ],
-    [modifierKey],
-  );
-  const exiting = exitPending || exitCheckPending;
-
-  const handleFieldChange = useCallback(
-    (pointer: string, value: JsonValue) => {
-      setDirty(true);
-      setData((prev) => setPointerValue(prev ?? {}, pointer, deepClone(value)));
-    },
-    [],
-  );
-
-  const handleTreeSelect = useCallback((path: SectionPath, nodeId: string) => {
-    setActivePath(path);
-    setExpanded((prev) => new Set(prev).add(nodeId));
-  }, []);
-
-  const handleToggleNode = useCallback((nodeId: string) => {
-    setExpanded((prev) => {
-      const clone = new Set(prev);
-      if (clone.has(nodeId)) {
-        clone.delete(nodeId);
-      } else {
-        clone.add(nodeId);
-      }
-      return clone;
-    });
-  }, []);
-
-  const applyValidationResult = useCallback(
-    (result: ValidationResponse) => {
+  const runValidation = async (value: JsonValue) => {
+    const seq = ++validationSeq.current;
+    setErrors(new Map(errors)); // trigger state update
+    try {
+      const result = await validateData(value);
+      if (seq !== validationSeq.current) return;
       const next = new Map<string, string>();
-      result.errors.forEach((error) => {
-        next.set(error.pointer || "/", error.message);
-      });
-      setValidationErrors(next);
-      setStatus(result.ok ? "Validation passed" : "Validation failed");
-      return result;
-    },
-    [],
-  );
-
-  const runValidation = useCallback(
-    async (draft: JsonValue): Promise<ValidationResponse | undefined> => {
-      const seq = validationSequence.current + 1;
-      validationSequence.current = seq;
-      setValidating(true);
-      try {
-        const result = await validateData(draft);
-        if (seq === validationSequence.current) {
-          applyValidationResult(result);
-        }
-        return result;
-      } catch (error) {
-        console.error(error);
-        if (seq === validationSequence.current) {
-          setStatus("Validation request failed");
-          setToast({ message: "Validation failed", kind: "error" });
-        }
-      } finally {
-        if (seq === validationSequence.current) {
-          setValidating(false);
-        }
-      }
-    },
-    [applyValidationResult],
-  );
-
-  const updatePreview = useCallback(
-    async (draft: JsonValue, format: string, pretty: boolean) => {
-      const seq = previewSequence.current + 1;
-      previewSequence.current = seq;
-      setPreviewPending(true);
-      try {
-        const payload = await renderPreview(draft, format, pretty);
-        if (seq !== previewSequence.current) {
-          return;
-        }
-        setPreviewPayload(payload.payload);
-      } catch (error) {
-        console.error(error);
-        if (seq === previewSequence.current) {
-          setPreviewPayload("// Unable to render preview");
-        }
-      } finally {
-        if (seq === previewSequence.current) {
-          setPreviewPending(false);
-        }
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (sessionLoading) {
-      return;
+      result.errors?.forEach((err) => next.set(err.pointer || '', err.message));
+      setErrors(next);
+    } catch (error) {
+      console.error('validate failed', error);
     }
-    const timer = window.setTimeout(() => {
-      runValidation(data);
-      updatePreview(data, previewFormat, previewPretty);
-    }, 240);
-    return () => window.clearTimeout(timer);
-  }, [
-    data,
-    previewFormat,
-    previewPretty,
-    sessionLoading,
-    runValidation,
-    updatePreview,
-  ]);
+  };
 
-  const handleSave = useCallback(async () => {
-    if (saving) return;
+  const updatePreview = async (value: JsonValue, pretty: boolean, format: string) => {
+    const seq = ++previewSeq.current;
+    try {
+      const result = await renderPreview(value, format, pretty);
+      if (seq !== previewSeq.current) return;
+      setPreviewPayload(result.payload);
+    } catch (error) {
+      console.error('preview failed', error);
+    }
+  };
+
+  const handleChange = (pointer: string, value: JsonValue) => {
+    setData((prev) => {
+      const next = setPointerValue(prev, pointer, deepClone(value));
+      runValidation(next);
+      updatePreview(next, previewPretty, previewFormat);
+      setDirty(true);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!session) return;
     setSaving(true);
-    setStatus("Saving…");
     try {
       await persistData(data);
       setDirty(false);
-      setLastSaved(new Date());
-      setToast({ message: "Configuration saved", kind: "success" });
-      setStatus("All changes saved.");
-    } catch (error) {
-      console.error(error);
-      setToast({ message: "Save failed", kind: "error" });
-      setStatus("Save failed");
     } finally {
       setSaving(false);
     }
-  }, [data, saving]);
+  };
 
-  const finalizeExit = useCallback(
-    async (commit: boolean) => {
-      if (exitPending) {
-        return;
-      }
-      setExitPending(true);
-      try {
-        await exitSession(data, commit);
-        setToast({
-          message: commit
-            ? "Session closed with the latest changes."
-            : "Session closed using the last saved configuration.",
-          kind: "success",
-        });
-        setStatus("Session closed");
-        setExitPromptOpen(false);
-      } catch (error) {
-        console.error(error);
-        setToast({ message: "Exit failed", kind: "error" });
-      } finally {
-        setExitPending(false);
-      }
-    },
-    [data, exitPending],
-  );
-
-  const handleExit = useCallback(async () => {
-    if (exitCheckPending || exitPending) {
-      return;
-    }
-    setExitCheckPending(true);
+  const handleExit = async () => {
+    setExiting(true);
     try {
-      const result = await runValidation(data);
-      if (!result) {
-        return;
-      }
-      if (result.errors.length > 0) {
-        setExitPromptOpen(true);
-        return;
-      }
-      await finalizeExit(true);
+      await exitSession(data, true);
     } finally {
-      setExitCheckPending(false);
+      setExiting(false);
     }
-  }, [data, exitCheckPending, exitPending, finalizeExit, runValidation]);
+  };
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 2400);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  const headerTitle = session?.title;
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-slate-600 dark:text-slate-300">
+        Loading session…
+      </div>
+    );
+  }
 
   return (
-    <div
-      className={clsx(
-        "flex h-screen min-h-0 flex-col overflow-hidden",
-        theme === "dark"
-          ? "bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-white"
-          : "bg-gradient-to-b from-slate-50 via-white to-slate-100 text-slate-900",
-      )}
-    >
+    <div className="flex h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <AppHeader
-        title={sessionTitle}
-        description={blueprint?.description}
+        title={headerTitle}
+        description={undefined}
         dirty={dirty}
         saving={saving}
         exiting={exiting}
         onSave={handleSave}
         onExit={handleExit}
       />
-      <main className="flex flex-1 min-h-0 overflow-hidden">
-        <div
-          className="shrink-0 border-r border-slate-800/80"
-          style={{ width: `${sizes.nav}px` }}
-        >
-          <TreePanel
-            nodes={sectionTree}
-            expanded={expanded}
-            activeId={activeSection?.id}
-            onToggle={handleToggleNode}
-            onSelect={handleTreeSelect}
-            filter={treeFilter}
-            onFilterChange={setTreeFilter}
-            errorCounts={nodeErrorCounts}
-            loading={sessionLoading}
-          />
-        </div>
-        <div
-          className="w-2 cursor-col-resize bg-transparent"
-          onPointerDown={(event) => startDrag(event, "nav")}
-        />
-        <section className="flex-1 min-h-0 bg-white dark:bg-slate-900/20">
-          <EditorPane
-            section={activeSection}
-            data={data}
-            errors={validationErrors}
-            onChange={handleFieldChange}
-            breadcrumbs={breadcrumbs}
-            loading={sessionLoading}
-          />
+      <main className="flex min-h-0 flex-1 divide-x divide-slate-200 dark:divide-slate-800">
+        <section className="min-h-0 flex-1 overflow-auto p-6">
+          <div className="mx-auto flex max-w-5xl flex-col gap-4">
+            {session?.ui_ast?.roots?.map((node) => (
+              <NodeRenderer
+                key={node.pointer}
+                node={node}
+                value={getPointerValue(data, node.pointer)}
+                errors={errors}
+                onChange={handleChange}
+              />
+            ))}
+          </div>
         </section>
-        <div
-          className="w-2 cursor-col-resize bg-transparent"
-          onPointerDown={(event) => startDrag(event, "preview")}
-        />
-        <div
-          className="shrink-0 border-l border-slate-200 bg-white dark:border-slate-800/80 dark:bg-transparent"
-          style={{ width: `${sizes.preview}px` }}
-        >
+        <section className="w-[38%] min-w-[320px]">
           <PreviewPane
             formats={formats}
             format={previewFormat}
-            onFormatChange={setPreviewFormat}
+            onFormatChange={(fmt) => {
+              setPreviewFormat(fmt);
+              updatePreview(data, previewPretty, fmt);
+            }}
             pretty={previewPretty}
-            onPrettyChange={setPreviewPretty}
+            onPrettyChange={(pretty) => {
+              setPreviewPretty(pretty);
+              updatePreview(data, pretty, previewFormat);
+            }}
             payload={previewPayload}
-            loading={previewPending}
+            loading={false}
           />
-        </div>
+        </section>
       </main>
       <StatusBar
         status={status}
         dirty={dirty}
-        validating={validating}
-        errorCount={errorCount}
-        lastSaved={lastSaved}
-        shortcuts={shortcuts}
+        validating={false}
+        errorCount={errors.size}
       />
-      {exitPromptOpen
-        ? (
-          <ExitGuardDialog
-            errors={exitErrors}
-            forcing={exitPending}
-            onCancel={() => setExitPromptOpen(false)}
-            onForceExit={() => finalizeExit(false)}
-          />
-        )
-        : null}
-      {toast
-        ? (
-          <div
-            className="pointer-events-none fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full border border-slate-700/70 bg-slate-900/90 px-6 py-3 text-sm text-white shadow-xl"
-            role="status"
-          >
-            {toast.message}
-          </div>
-        )
-        : null}
     </div>
   );
-}
-
-function resolveInitialPath(blueprint: WebBlueprint): SectionPath {
-  if (!blueprint.roots.length) {
-    return { rootIndex: 0, sectionPath: [] };
-  }
-  const rootIndex = 0;
-  const root = blueprint.roots[rootIndex];
-  if (!root.sections?.length) {
-    return { rootIndex, sectionPath: [] };
-  }
-  return { rootIndex, sectionPath: [0] };
-}
-
-function aggregateErrors(
-  nodes: TreeNode<SectionPath>[],
-  errors: Map<string, string>,
-) {
-  const counts = new Map<string, number>();
-  const walk = (node: TreeNode<SectionPath>): number => {
-    let total = node.fieldPointers.reduce(
-      (sum, pointer) => sum + (errors.has(pointer) ? 1 : 0),
-      0,
-    );
-    node.children.forEach((child) => {
-      total += walk(child);
-    });
-    counts.set(node.id, total);
-    return total;
-  };
-  nodes.forEach((node) => walk(node));
-  return counts;
 }

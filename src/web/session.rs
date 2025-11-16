@@ -31,7 +31,7 @@ use crate::io::{DocumentFormat, input::schema_with_defaults};
 
 use super::{
     assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider},
-    blueprint::{WebBlueprint, blueprint_from_schema},
+    ui_ast::{UiAst, build_ui_ast},
 };
 
 pub struct WebSessionBuilder {
@@ -78,10 +78,10 @@ impl WebSessionBuilder {
             .take()
             .unwrap_or_else(|| Value::Object(Map::new()));
         let schema = schema_with_defaults(&self.schema, &data);
-        let blueprint = blueprint_from_schema(&schema)?;
+        let ui_ast = build_ui_ast(&schema)?;
         Ok(WebSessionConfig {
             title: self.title,
-            blueprint,
+            ui_ast,
             data,
             schema,
             asset_provider: self.asset_provider,
@@ -92,7 +92,7 @@ impl WebSessionBuilder {
 #[derive(Debug, Clone)]
 pub struct WebSessionConfig {
     pub title: Option<String>,
-    pub blueprint: WebBlueprint,
+    pub ui_ast: UiAst,
     pub data: Value,
     pub schema: Value,
     pub asset_provider: Arc<dyn WebAssetProvider>,
@@ -173,7 +173,7 @@ pub async fn serve_session(config: WebSessionConfig, options: ServeOptions) -> R
 pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandles)> {
     let WebSessionConfig {
         title,
-        blueprint,
+        ui_ast,
         data,
         schema,
         asset_provider,
@@ -183,7 +183,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let shared = SharedState {
         title,
-        blueprint: Arc::new(blueprint),
+        ui_ast: Arc::new(ui_ast),
         data: Arc::new(Mutex::new(data)),
         formats: DocumentFormat::available_formats(),
         validator,
@@ -236,7 +236,7 @@ impl SessionHandles {
 #[derive(Clone)]
 struct SharedState {
     title: Option<String>,
-    blueprint: Arc<WebBlueprint>,
+    ui_ast: Arc<UiAst>,
     data: Arc<Mutex<Value>>,
     formats: Vec<DocumentFormat>,
     validator: Arc<Validator>,
@@ -265,7 +265,7 @@ impl FinishLine {
 #[ts(export, export_to = "web/types/")]
 pub(crate) struct SessionResponse {
     pub title: Option<String>,
-    pub blueprint: WebBlueprint,
+    pub ui_ast: UiAst,
     #[ts(type = "Record<string, unknown>")]
     pub data: Value,
     pub formats: Vec<String>,
@@ -290,7 +290,7 @@ async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
     const DEFAULT_PATH: &str = "/tmp/schemaui-session.json";
     let payload = SessionResponse {
         title: state.title.clone(),
-        blueprint: (*state.blueprint).clone(),
+        ui_ast: (*state.ui_ast).clone(),
         data: state.data.lock().await.clone(),
         formats: state.formats.iter().map(|f| f.to_string()).collect(),
     };

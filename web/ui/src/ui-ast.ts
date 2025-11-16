@@ -1,172 +1,100 @@
-import type {
-  JsonValue,
-  WebBlueprint,
-  WebCompositeVariant,
-  WebField,
-  WebFieldKind,
-  WebRoot,
-  WebSection,
-} from "./types";
-import { inferKindDefault } from "./utils/defaults";
-import { deepClone } from "./utils/jsonPointer";
+import type { JsonValue, UiAst, UiNode, UiNodeKind, UiVariant } from './types';
+import { deepClone, getPointerValue, mergeDefaults, setPointerValue } from './utils/jsonPointer';
 
-export interface UiAst {
-  roots: UiRootNode[];
-}
+export function applyUiDefaults(ast: UiAst | undefined, data: JsonValue): JsonValue {
+  if (!ast) return ensureObjectRoot(data);
 
-export interface UiRootNode {
-  id: string;
-  title?: string | null;
-  description?: string | null;
-  sections: UiSection[];
-}
+  const defaults: Record<string, JsonValue | undefined> = {};
+  ast.roots.forEach((node) => collectDefaults(node, defaults));
 
-export interface UiSection {
-  id: string;
-  title?: string | null;
-  description?: string | null;
-  children: UiNode[];
-  sections: UiSection[];
-}
-
-export type UiNode =
-  | UiFieldNode
-  | UiArrayNode
-  | UiCompositeNode
-  | UiKeyValueNode;
-
-interface UiNodeBase {
-  id: string;
-  name: string;
-  label: string;
-  pointer: string;
-  description?: string | null;
-  required: boolean;
-  defaultValue: JsonValue;
-}
-
-export interface UiFieldNode extends UiNodeBase {
-  kind: "field";
-  fieldType: "string" | "integer" | "number" | "boolean" | "enum" | "json";
-  options?: string[];
-}
-
-export interface UiArrayNode extends UiNodeBase {
-  kind: "array";
-  items: WebFieldKind;
-  minItems?: number;
-  maxItems?: number;
-}
-
-type CompositeMode = "one_of" | "any_of" | "all_of";
-
-export interface UiCompositeNode extends UiNodeBase {
-  kind: "composite";
-  mode: CompositeMode;
-  variants: WebCompositeVariant[];
-}
-
-type KeyValueKind = Extract<WebFieldKind, { type: "key_value" }>;
-
-export interface UiKeyValueNode extends UiNodeBase {
-  kind: "key_value";
-  spec: KeyValueKind;
-}
-
-export function buildUiAst(blueprint?: WebBlueprint | null): UiAst {
-  if (!blueprint) {
-    return { roots: [] };
+  let result = mergeDefaults(ensureObjectRoot(data), defaults);
+  // fallback: if value becomes undefined after merge, write default explicitly
+  for (const [pointer, value] of Object.entries(defaults)) {
+    if (value === undefined) continue;
+    const current = getPointerValue(result, pointer);
+    if (current === undefined || current === null) {
+      result = setPointerValue(result, pointer, deepClone(value));
+    }
   }
-  return {
-    roots: blueprint.roots.map((root, index) => mapRoot(root, index)),
-  };
+  return result;
 }
 
-function mapRoot(root: WebRoot, index: number): UiRootNode {
-  return {
-    id: root.id || `root-${index}`,
-    title: root.title,
-    description: root.description,
-    sections: (root.sections ?? []).map((section) =>
-      mapSection(section)),
-  };
+export function variantDefault(variant: UiVariant): JsonValue {
+  return defaultForKind(variant.node);
 }
 
-function mapSection(section: WebSection): UiSection {
-  return {
-    id: section.id,
-    title: section.title,
-    description: section.description,
-    children: (section.fields ?? []).map((field) => toUiNode(field)),
-    sections: (section.sections ?? []).map((child) => mapSection(child)),
-  };
-}
-
-export function toUiNode(field: WebField): UiNode {
-  const base: UiNodeBase = {
-    id: field.pointer || field.name,
-    name: field.name,
-    label: field.label || field.name,
-    pointer: field.pointer || "/",
-    description: field.description,
-    required: field.required,
-    defaultValue: resolveDefaultValue(field),
-  };
-
-  switch (field.kind.type) {
-    case "string":
-    case "integer":
-    case "number":
-    case "boolean":
-      return {
-        ...base,
-        kind: "field",
-        fieldType: field.kind.type,
-      };
-    case "enum":
-      return {
-        ...base,
-        kind: "field",
-        fieldType: "enum",
-        options: field.kind.options ?? [],
-      };
-    case "json":
-      return {
-        ...base,
-        kind: "field",
-        fieldType: "json",
-      };
-    case "array":
-      return {
-        ...base,
-        kind: "array",
-        items: field.kind.items,
-      };
-    case "composite":
-      return {
-        ...base,
-        kind: "composite",
-        mode: (field.kind.mode ?? "one_of") as CompositeMode,
-        variants: field.kind.variants ?? [],
-      };
-    case "key_value":
-      return {
-        ...base,
-        kind: "key_value",
-        spec: field.kind,
-      };
+export function defaultForKind(kind: UiNodeKind): JsonValue {
+  switch (kind.type) {
+    case 'field': {
+      if (kind.enum_options?.length) {
+        return kind.enum_options[0] as JsonValue;
+      }
+      switch (kind.scalar) {
+        case 'integer':
+        case 'number':
+          return 0;
+        case 'boolean':
+          return false;
+        case 'string':
+        default:
+          return '';
+      }
+    }
+    case 'array':
+      return [];
+    case 'object':
+      return {};
+    case 'composite':
+      if (kind.allow_multiple) {
+        return [];
+      }
+      if (kind.variants[0]) {
+        return variantDefault(kind.variants[0]);
+      }
+      return {};
     default:
-      return {
-        ...base,
-        kind: "field",
-        fieldType: "json",
-      };
+      return {};
   }
 }
 
-function resolveDefaultValue(field: WebField): JsonValue {
-  if (field.default_value !== undefined && field.default_value !== null) {
-    return deepClone(field.default_value);
+function collectDefaults(node: UiNode, store: Record<string, JsonValue | undefined>) {
+  if (node.pointer) {
+    const fallback = node.default_value ?? defaultForKind(node.kind);
+    store[node.pointer] = deepClone(fallback);
   }
-  return deepClone(inferKindDefault(field.kind));
+
+  if (node.kind.type === 'array') {
+    // default entry defaults to item default
+    if (node.kind.item) {
+      const placeholder = defaultForKind(node.kind.item);
+      const defaultValue = node.default_value ?? [];
+      if (Array.isArray(defaultValue) && defaultValue.length === 0) {
+        store[node.pointer] = [placeholder] as JsonValue[];
+      }
+    }
+  }
+
+  if (node.kind.type === 'object') {
+    node.kind.children.forEach((child) => collectDefaults(child, store));
+  }
+
+  if (node.kind.type === 'composite') {
+    node.kind.variants.forEach((variant) => walkVariant(variant, store, node.pointer));
+  }
+}
+
+function walkVariant(variant: UiVariant, store: Record<string, JsonValue | undefined>, basePointer: string) {
+  const defaultValue = variantDefault(variant);
+  store[basePointer] = deepClone(defaultValue);
+  // if object-like, descend children to write nested defaults
+  if (variant.node.type === 'object') {
+    variant.node.children.forEach((child) => collectDefaults(child, store));
+  }
+}
+
+function ensureObjectRoot(value: JsonValue): JsonValue {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value;
 }
