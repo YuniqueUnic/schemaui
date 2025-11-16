@@ -21,6 +21,7 @@ use jsonschema::{Validator, validator_for};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use tokio::{
+    fs,
     net::TcpListener,
     sync::{Mutex, oneshot},
 };
@@ -196,6 +197,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
 
     let router = Router::new()
         .route("/api/session", get(get_session))
+        .route("/api/session/export", get(get_session_export))
         .route("/api/save", post(post_save))
         .route("/api/exit", post(post_exit))
         .route("/api/validate", post(post_validate))
@@ -270,13 +272,33 @@ pub(crate) struct SessionResponse {
 }
 
 async fn get_session(State(state): State<SharedState>) -> impl IntoResponse {
+    Json(build_and_maybe_dump_session(&state).await)
+}
+
+async fn get_session_export(State(state): State<SharedState>) -> impl IntoResponse {
+    let payload = build_and_maybe_dump_session(&state).await;
+    (
+        [(
+            header::CONTENT_DISPOSITION,
+            "attachment; filename=\"session.json\"",
+        )],
+        Json(payload),
+    )
+}
+
+async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
+    const DEFAULT_PATH: &str = "/tmp/schemaui-session.json";
     let payload = SessionResponse {
         title: state.title.clone(),
         blueprint: (*state.blueprint).clone(),
         data: state.data.lock().await.clone(),
         formats: state.formats.iter().map(|f| f.to_string()).collect(),
     };
-    Json(payload)
+    if let Ok(serialized) = serde_json::to_vec_pretty(&payload) {
+        let path = std::env::var("SCHEMAUI_SESSION_DUMP").unwrap_or_else(|_| DEFAULT_PATH.into());
+        let _ = fs::write(path, serialized).await;
+    }
+    payload
 }
 
 #[derive(Deserialize, TS)]
