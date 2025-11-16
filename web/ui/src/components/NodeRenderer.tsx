@@ -16,26 +16,22 @@ export function NodeRenderer({ node, value, errors, onChange, renderMode = 'stac
   const overlay = useOverlay();
   const error = errors.get(node.pointer);
 
-  if (node.kind.type === 'object') {
-    return null;
-  }
-
   const chromeClass =
     renderMode === 'inline'
       ? 'space-y-3'
-      : 'space-y-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 px-4 py-3 shadow-[0_10px_60px_rgba(15,23,42,0.25)] backdrop-blur';
+      : node.kind.type === 'object'
+      ? 'space-y-4'
+      : 'space-y-3 border-b border-slate-800/70 pb-4';
 
   return (
     <div className={chromeClass}>
-      <header className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-slate-100">
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-100">
             {node.title ?? node.pointer}
-            {node.required ? (
-              <span className="ml-2 text-xs uppercase tracking-[0.3em] text-rose-400">*</span>
-            ) : null}
+            {node.required ? <span className="ml-2 text-[10px] uppercase tracking-[0.3em] text-rose-400">required</span> : null}
           </p>
-          {node.description ? <p className="text-xs text-slate-400">{node.description}</p> : null}
+          {node.description ? <p className="text-xs text-slate-500">{node.description}</p> : null}
         </div>
       </header>
       {renderBody(node, value, errors, onChange, overlay)}
@@ -62,9 +58,36 @@ function renderBody(
       return renderArrayControl(node as ArrayNode, value, errors, onChange, overlay);
     case 'composite':
       return renderCompositeControl(node as CompositeNode, value, errors, onChange, overlay);
+    case 'object':
+      return renderObjectControl(node, value, errors, onChange);
     default:
       return null;
   }
+}
+
+function renderObjectControl(
+  node: UiNode,
+  value: JsonValue | undefined,
+  errors: Map<string, string>,
+  onChange: (pointer: string, value: JsonValue) => void,
+) {
+  if (node.kind.type !== 'object') {
+    return null;
+  }
+  return (
+    <div className="space-y-4">
+      {(node.kind.children ?? []).map((child) => (
+        <NodeRenderer
+          key={child.pointer}
+          node={child}
+          value={extractChildValue(value, child.pointer)}
+          errors={errors}
+          onChange={onChange}
+          renderMode="inline"
+        />
+      ))}
+    </div>
+  );
 }
 
 function renderFieldControl(
@@ -76,7 +99,7 @@ function renderFieldControl(
   if (node.kind.enum_options?.length) {
     return (
       <select
-        className="w-full rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
+        className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
         value={(resolved as string) ?? ''}
         onChange={(event) => onChange(node.pointer, event.target.value)}
       >
@@ -95,7 +118,7 @@ function renderFieldControl(
       return (
         <input
           type="number"
-          className="w-full rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
+          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
           value={typeof resolved === 'number' ? resolved : 0}
           onChange={(event) => onChange(node.pointer, Number(event.target.value))}
         />
@@ -117,7 +140,7 @@ function renderFieldControl(
       return (
         <input
           type="text"
-          className="w-full rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
+          className="w-full rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none"
           value={(resolved as string) ?? ''}
           onChange={(event) => onChange(node.pointer, event.target.value)}
         />
@@ -135,12 +158,20 @@ function renderArrayControl(
   const entries = Array.isArray(value) ? (value as JsonValue[]) : [];
 
   const editEntry = (index: number, initial?: JsonValue) => {
+    const entryNode: UiNode = {
+      pointer: `${node.pointer}/${index}`,
+      title: node.title ? `${node.title} entry ${index + 1}` : `Entry ${index + 1}`,
+      description: node.description,
+      required: false,
+      default_value: node.default_value,
+      kind: node.kind.item,
+    };
     overlay.open({
       title: `${node.title ?? node.pointer} · Item ${index + 1}`,
       content: (close) => (
         <div className="space-y-4">
           <NodeRenderer
-            node={{ ...node, kind: node.kind.item }}
+            node={entryNode}
             value={initial ?? entries[index]}
             errors={errors}
             onChange={(_pointer, newValue) => {
@@ -177,25 +208,22 @@ function renderArrayControl(
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {entries.map((entry, index) => (
-        <div
-          key={`${node.pointer}-${index}`}
-          className="flex items-center justify-between rounded-xl border border-slate-800/70 bg-slate-950/40 px-3 py-2 text-xs text-slate-300"
-        >
+        <div key={`${node.pointer}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-800/70 bg-slate-950/40 px-3 py-2 text-xs text-slate-300">
           <span className="truncate">[{index + 1}] {formatValueSummary(entry)}</span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => editEntry(index, entry)}
-              className="rounded-full border border-slate-700 px-3 py-1 text-[10px] font-semibold text-slate-200 hover:border-sky-400"
+              className="text-xs text-sky-300 hover:text-sky-200"
             >
               Edit
             </button>
             <button
               type="button"
               onClick={() => removeEntry(index)}
-              className="rounded-full border border-rose-500/60 px-3 py-1 text-[10px] font-semibold text-rose-300 hover:border-rose-400"
+              className="text-xs text-rose-300 hover:text-rose-200"
             >
               Remove
             </button>
@@ -205,7 +233,7 @@ function renderArrayControl(
       <button
         type="button"
         onClick={addEntry}
-        className="rounded-full border border-dashed border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-sky-400"
+        className="text-xs font-semibold text-slate-300 hover:text-sky-200"
       >
         + Add entry
       </button>
@@ -227,33 +255,32 @@ function renderCompositeControl(
 
   if (allow_multiple) {
     const entries = Array.isArray(value) ? (value as JsonValue[]) : [];
-    const addVariantEntry = () => {
-      const base = variants[0];
-      const placeholder = variantDefault(base);
-      onChange(node.pointer, [...entries, placeholder]);
-    };
-
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         {entries.map((entry, index) => {
           const activeVariant = determineVariant(entry, variants);
           return (
-            <div
-              key={`${node.pointer}-variant-${index}`}
-              className="rounded-xl border border-slate-800/70 bg-slate-950/40 px-3 py-2 text-xs text-slate-300"
-            >
+            <div key={`${node.pointer}-variant-${index}`} className="rounded-lg border border-slate-800/70 bg-slate-950/40 px-3 py-2 text-xs text-slate-300">
               <div className="flex items-center justify-between gap-2">
                 <span>{activeVariant?.title ?? `Variant ${index + 1}`}</span>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      const entryNode: UiNode = {
+                        pointer: `${node.pointer}/${index}`,
+                        title: activeVariant?.title ?? `Variant ${index + 1}`,
+                        description: activeVariant?.description,
+                        required: false,
+                        default_value: node.default_value,
+                        kind: activeVariant?.node ?? variants[0].node,
+                      };
                       overlay.open({
                         title: `${node.title ?? node.pointer} · Variant entry`,
                         content: (close) => (
                           <div className="space-y-4">
                             <NodeRenderer
-                              node={{ ...node, kind: activeVariant?.node ?? variants[0].node }}
+                              node={entryNode}
                               value={entry}
                               errors={errors}
                               onChange={(_pointer, newValue) => {
@@ -274,9 +301,9 @@ function renderCompositeControl(
                             </div>
                           </div>
                         ),
-                      })
-                    }
-                    className="rounded-full border border-slate-700 px-3 py-1 text-[10px] font-semibold text-slate-200 hover:border-sky-400"
+                      });
+                    }}
+                    className="text-xs text-sky-300 hover:text-sky-200"
                   >
                     Edit
                   </button>
@@ -286,7 +313,7 @@ function renderCompositeControl(
                       const next = entries.filter((_, idx) => idx !== index);
                       onChange(node.pointer, next);
                     }}
-                    className="rounded-full border border-rose-500/60 px-3 py-1 text-[10px] font-semibold text-rose-300 hover:border-rose-400"
+                    className="text-xs text-rose-300 hover:text-rose-200"
                   >
                     Remove
                   </button>
@@ -297,8 +324,8 @@ function renderCompositeControl(
         })}
         <button
           type="button"
-          onClick={addVariantEntry}
-          className="rounded-full border border-dashed border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-sky-400"
+          onClick={() => onChange(node.pointer, [...entries, variantDefault(variants[0])])}
+          className="text-xs font-semibold text-slate-300 hover:text-sky-200"
         >
           + Add variant entry
         </button>
@@ -308,10 +335,10 @@ function renderCompositeControl(
 
   const activeVariant = determineVariant(value, variants) ?? variants[0];
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex flex-wrap gap-2 text-xs">
         {variants.map((variant) => (
-          <label key={variant.id} className="inline-flex cursor-pointer items-center gap-2">
+          <label key={variant.id} className="inline-flex cursor-pointer items-center gap-2 text-slate-300">
             <input
               type="radio"
               name={node.pointer}
@@ -319,9 +346,7 @@ function renderCompositeControl(
               onChange={() => onChange(node.pointer, variantDefault(variant))}
               className="accent-sky-400"
             />
-            <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">
-              {variant.title ?? variant.id}
-            </span>
+            <span>{variant.title ?? variant.id}</span>
           </label>
         ))}
       </div>
@@ -333,7 +358,14 @@ function renderCompositeControl(
             content: (close) => (
               <div className="space-y-4">
                 <NodeRenderer
-                  node={{ ...node, kind: activeVariant.node }}
+                  node={{
+                    pointer: node.pointer,
+                    title: activeVariant.title ?? node.title,
+                    description: activeVariant.description ?? node.description,
+                    required: node.required,
+                    default_value: node.default_value,
+                    kind: activeVariant.node,
+                  }}
                   value={value}
                   errors={errors}
                   onChange={onChange}
@@ -352,7 +384,7 @@ function renderCompositeControl(
             ),
           })
         }
-        className="rounded-full border border-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-200 hover:border-sky-400"
+        className="text-xs font-semibold text-slate-300 hover:text-sky-200"
       >
         Edit variant ({mode === 'one_of' ? 'single' : 'any'})
       </button>
@@ -362,6 +394,33 @@ function renderCompositeControl(
 
 function determineVariant(value: JsonValue | undefined, variants: UiVariant[]) {
   return variants.find((variant) => variantMatches(value, variant.schema)) ?? variants[0];
+}
+
+function extractChildValue(container: JsonValue | undefined, pointer: string): JsonValue | undefined {
+  if (container === null || container === undefined) {
+    return undefined;
+  }
+  const token = pointerSegment(pointer);
+  if (!token) {
+    return undefined;
+  }
+  if (Array.isArray(container)) {
+    const index = Number(token);
+    return Number.isNaN(index) ? undefined : container[index];
+  }
+  if (typeof container === 'object') {
+    return (container as Record<string, JsonValue>)[token];
+  }
+  return undefined;
+}
+
+function pointerSegment(pointer: string): string | undefined {
+  if (!pointer || pointer === '/') {
+    return undefined;
+  }
+  const segments = pointer.split('/').filter(Boolean);
+  const raw = segments[segments.length - 1];
+  return raw?.replace(/~1/g, '/').replace(/~0/g, '~');
 }
 
 function formatValueSummary(value: JsonValue | undefined): string {
