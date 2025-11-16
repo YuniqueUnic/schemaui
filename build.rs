@@ -36,6 +36,8 @@ fn main() {
         return;
     }
 
+    ensure_node_modules(&web_ui_dir);
+
     println!("cargo:warning=Building web UI bundle via npm run build…");
     let status = Command::new("npm")
         .arg("run")
@@ -91,4 +93,29 @@ fn command_exists(cmd: &str) -> bool {
         .status()
         .map(|status| status.success())
         .unwrap_or(false)
+}
+
+fn ensure_node_modules(web_ui_dir: &Path) {
+    let node_modules = web_ui_dir.join("node_modules");
+    let package_lock = web_ui_dir.join("package-lock.json");
+
+    let lock_time = package_lock.metadata().ok().and_then(|m| m.modified().ok());
+    let modules_time = node_modules.metadata().ok().and_then(|m| m.modified().ok());
+
+    let needs_install = !node_modules.exists()
+        || lock_time
+            .zip(modules_time)
+            .is_some_and(|(lock, modules)| lock > modules);
+
+    if needs_install {
+        println!("cargo:warning=Installing web UI dependencies via npm ci…");
+        let status = Command::new("npm")
+            .arg("ci")
+            .current_dir(web_ui_dir)
+            .status()
+            .expect("failed to invoke npm");
+        if !status.success() {
+            panic!("npm ci (web/ui) failed with status {status}");
+        }
+    }
 }
