@@ -13,6 +13,14 @@ documentation = "https://docs.rs/schemaui"
 description = "A Rust library for generating TUI and Web UIs from JSON Schemas for configuration management."
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+exclude = [
+    "web/ui/node_modules/**",
+    "web/ui/.vite/**",
+    "web/ui/.tmp/**",
+    "web/ui/.DS_Store",
+    "docs/**/*.gif",
+    "docs/**/*.mp4",
+]
 
 [features]
 default = ["tui", "json"]
