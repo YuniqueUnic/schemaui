@@ -1,6 +1,6 @@
 [package]
 name = "schemaui-cli"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 authors = ["unic <yuniqueunic@gmail.com>"]
 description = "CLI wrapper for schemaui, rendering JSON Schemas as TUIs"
