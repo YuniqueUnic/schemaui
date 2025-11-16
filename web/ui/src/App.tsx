@@ -153,8 +153,8 @@ export default function App() {
   );
 
   const breadcrumbs = useMemo(
-    () => getBreadcrumbs(uiAst, activePath),
-    [uiAst, activePath],
+    () => getBreadcrumbs(uiAst, activePath, sectionTree),
+    [uiAst, activePath, sectionTree],
   );
 
   const nodeErrorCounts = useMemo(

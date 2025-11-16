@@ -13,6 +13,7 @@ export interface TreeNode<T = unknown> {
   data: T;
   fieldPointers: string[];
   children: TreeNode<T>[];
+  breadcrumbs: string[];
 }
 
 export function buildSectionTree(
@@ -23,23 +24,23 @@ export function buildSectionTree(
   ast.roots.forEach((root, rootIndex) => {
     const sections = root.sections || [];
     if (sections.length === 1) {
-      const collapsed: UiSection = {
-        ...sections[0],
-        title: sections[0].title || root.title,
-        description: sections[0].description ?? root.description,
-      };
-      nodes.push(mapSection(collapsed, rootIndex, [0], 0));
+      nodes.push(
+        mapSection(sections[0], rootIndex, [0], 0, [], root.description),
+      );
       return;
     }
+    const rootLabel = root.title || `Root ${rootIndex + 1}`;
+    const ancestry = [rootLabel];
     nodes.push({
       id: root.id || `root-${rootIndex}`,
       depth: 0,
-      label: root.title || `Root ${rootIndex + 1}`,
+      label: rootLabel,
       description: root.description,
       data: { rootIndex, sectionPath: [] },
       fieldPointers: [],
+      breadcrumbs: ancestry,
       children: sections.map((section, index) =>
-        mapSection(section, rootIndex, [index], 1)
+        mapSection(section, rootIndex, [index], 1, ancestry)
       ),
     });
   });
@@ -51,19 +52,24 @@ function mapSection(
   rootIndex: number,
   path: number[],
   depth: number,
+  ancestors: string[],
+  fallbackDescription?: string | null,
 ): TreeNode<SectionPath> {
+  const label = section.title || `Section ${path[path.length - 1] + 1}`;
+  const breadcrumbs = [...ancestors, label];
   return {
     id: section.id || `${rootIndex}-${path.join("-")}`,
     depth,
-    label: section.title || `Section ${path[path.length - 1] + 1}`,
-    description: section.description,
+    label,
+    description: section.description ?? fallbackDescription,
     data: { rootIndex, sectionPath: path },
     fieldPointers: (section.children || [])
       .map((node) => node.pointer)
       .filter((pointer): pointer is string => Boolean(pointer)),
     children: (section.sections || []).map((child, idx) =>
-      mapSection(child, rootIndex, [...path, idx], depth + 1)
+      mapSection(child, rootIndex, [...path, idx], depth + 1, breadcrumbs)
     ),
+    breadcrumbs,
   };
 }
 
@@ -99,7 +105,14 @@ export function getSectionByPath(
 export function getBreadcrumbs(
   ast: UiAst | undefined,
   target: SectionPath,
+  tree?: TreeNode<SectionPath>[],
 ): string[] {
+  if (tree) {
+    const node = findTreeNode(tree, target);
+    if (node) {
+      return node.breadcrumbs;
+    }
+  }
   if (!ast) {
     return [];
   }
@@ -118,4 +131,26 @@ export function getBreadcrumbs(
     }
   });
   return crumbs;
+}
+
+function findTreeNode(
+  nodes: TreeNode<SectionPath>[],
+  target: SectionPath,
+): TreeNode<SectionPath> | undefined {
+  for (const node of nodes) {
+    if (samePath(node.data, target)) {
+      return node;
+    }
+    const child = findTreeNode(node.children || [], target);
+    if (child) {
+      return child;
+    }
+  }
+  return undefined;
+}
+
+function samePath(a: SectionPath, b: SectionPath): boolean {
+  if (a.rootIndex !== b.rootIndex) return false;
+  if (a.sectionPath.length !== b.sectionPath.length) return false;
+  return a.sectionPath.every((value, index) => value === b.sectionPath[index]);
 }

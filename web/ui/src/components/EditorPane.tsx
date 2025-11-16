@@ -596,7 +596,8 @@ function CompositeFieldEditor({
   onChange,
 }: CompositeFieldEditorProps) {
   const variants = node.variants || [];
-  const isMulti = node.mode === "any_of";
+  const multiCapable = variants.some((variant) => variant.is_object);
+  const isMulti = node.mode === "any_of" && multiCapable;
   const isAllOf = node.mode === "all_of";
   const derivedVariantId = useMemo(() => {
     if (isMulti || isAllOf) {
@@ -768,6 +769,7 @@ function CompositeFieldEditor({
         onSelectVariant={handleSingleVariantSelect}
         onToggleVariant={handleMultiVariantToggle}
         onClear={handleClear}
+        allowMultiple={isMulti}
       />
       {!isMulti && activeVariant?.description
         ? (
@@ -893,6 +895,7 @@ interface VariantSelectorProps {
   onSelectVariant: (variantId: string) => void;
   onToggleVariant: (variantId: string, next: boolean) => void;
   onClear: () => void;
+  allowMultiple?: boolean;
 }
 
 function VariantSelector({
@@ -904,8 +907,9 @@ function VariantSelector({
   onSelectVariant,
   onToggleVariant,
   onClear,
+  allowMultiple,
 }: VariantSelectorProps) {
-  const isMulti = mode === "any_of";
+  const isMulti = allowMultiple ?? mode === "any_of";
   const groupName = `${pointer}-variants`;
   return (
     <section className="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-950/30">
@@ -1148,6 +1152,7 @@ function CompositeEntryOverlay({
                 onVariantChange(index, variants[0].id);
               }
             }}
+            allowMultiple={false}
           />
           {variant
             ? (
