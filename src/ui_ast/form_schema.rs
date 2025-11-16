@@ -9,50 +9,66 @@ use super::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
 
 /// Build a legacy `FormSchema` tree from the canonical [`UiAst`].
 pub fn form_schema_from_ui_ast(ast: &UiAst) -> FormSchema {
-    let mut sections = Vec::new();
+    let mut roots = Vec::new();
     let mut general_fields = Vec::new();
 
     for node in &ast.roots {
         match &node.kind {
-            UiNodeKind::Object { .. } => sections.push(build_section_from_object(node)),
+            UiNodeKind::Object { .. } => {
+                let section = build_section_from_object(node);
+                roots.push(RootSection {
+                    id: section.id.clone(),
+                    title: node
+                        .title
+                        .clone()
+                        .unwrap_or_else(|| prettify_label(&section.id)),
+                    description: node.description.clone(),
+                    sections: vec![section],
+                });
+            }
             _ => general_fields.push(field_schema_from_node(node, "general")),
         }
     }
 
     if !general_fields.is_empty() {
-        sections.insert(
+        roots.insert(
             0,
-            FormSection {
+            RootSection {
                 id: "general".into(),
                 title: "General".into(),
                 description: None,
-                path: Vec::new(),
-                fields: general_fields,
-                children: Vec::new(),
+                sections: vec![FormSection {
+                    id: "general".into(),
+                    title: "General".into(),
+                    description: None,
+                    path: Vec::new(),
+                    fields: general_fields,
+                    children: Vec::new(),
+                }],
             },
         );
     }
 
-    if sections.is_empty() {
-        sections.push(FormSection {
+    if roots.is_empty() {
+        roots.push(RootSection {
             id: "general".into(),
             title: "General".into(),
             description: None,
-            path: Vec::new(),
-            fields: Vec::new(),
-            children: Vec::new(),
+            sections: vec![FormSection {
+                id: "general".into(),
+                title: "General".into(),
+                description: None,
+                path: Vec::new(),
+                fields: Vec::new(),
+                children: Vec::new(),
+            }],
         });
     }
 
     FormSchema {
         title: None,
         description: None,
-        roots: vec![RootSection {
-            id: "root".into(),
-            title: "Schema".into(),
-            description: None,
-            sections,
-        }],
+        roots,
     }
 }
 

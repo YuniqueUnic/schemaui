@@ -5,7 +5,10 @@ use std::{
 
 use serde_json::{Map, Value, json};
 
-use crate::domain::{CompositeField, CompositeMode, parse_form_schema};
+use crate::{
+    domain::{CompositeField, CompositeMode},
+    ui_ast::{build_ui_ast, form_schema::form_schema_from_ui_ast},
+};
 
 use super::{
     error::FieldCoercionError,
@@ -685,10 +688,11 @@ impl CompositeVariantState {
             return Ok(());
         }
         let schema_value = self.overlay_schema();
-        let schema = parse_form_schema(&schema_value).map_err(|err| FieldCoercionError {
+        let ui_ast = build_ui_ast(&schema_value).map_err(|err| FieldCoercionError {
             pointer: pointer.to_string(),
             message: format!("failed to parse composite variant '{}': {err}", self.title),
         })?;
+        let schema = form_schema_from_ui_ast(&ui_ast);
         *self.form.borrow_mut() = Some(FormState::from_schema_with_palette(
             &schema,
             Arc::clone(&self.palette),
