@@ -15,14 +15,16 @@ pub struct Cli {
     #[command(flatten)]
     pub common: CommonArgs,
 
-    #[cfg(feature = "web")]
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
 
-#[cfg(feature = "web")]
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Launch the interactive terminal UI
+    Tui,
+
+    #[cfg(feature = "web")]
     /// Launch the interactive web UI instead of the terminal UI
     Web(WebCommand),
 }
