@@ -27,23 +27,8 @@ export function VariantSelector({
         );
     }
 
-    const modeLabel = mode === "one_of"
-        ? "OneOf (select exactly one)"
-        : "AnyOf (value satisfies at least one)";
-
-    const modeColor = mode === "one_of"
-        ? "bg-purple-500/10 text-purple-400"
-        : "bg-blue-500/10 text-blue-400";
-
     return (
-        <div className="space-y-3">
-            {/* Mode Label */}
-            <div className="flex items-center gap-2">
-                <Badge variant="outline" className={modeColor}>
-                    {modeLabel}
-                </Badge>
-            </div>
-
+        <div className="space-y-2">
             {/* Variant Cards */}
             <div className="space-y-2">
                 {variants.map((variant, index) => {
@@ -53,67 +38,48 @@ export function VariantSelector({
                         <Card
                             key={variant.id}
                             className={`
-                p-4 cursor-pointer transition-all hover:border-primary/50
+                p-2 cursor-pointer transition-all hover:border-primary/50
                 ${
                                 isActive
-                                    ? "border-primary bg-primary/5 shadow-md"
+                                    ? "border-primary bg-primary/5 shadow-sm"
                                     : "border-border hover:bg-accent/50"
                             }
               `}
                             onClick={() => onSelect(variant)}
                         >
-                            <div className="flex items-start gap-3">
+                            <div className="flex items-center gap-2">
                                 {/* Selection Indicator */}
-                                <div className="pt-0.5">
+                                <div className="shrink-0">
                                     {isActive
                                         ? (
-                                            <CheckCircle2 className="h-5 w-5 text-primary" />
+                                            <CheckCircle2 className="h-4 w-4 text-primary" />
                                         )
                                         : (
-                                            <Circle className="h-5 w-5 text-muted-foreground" />
+                                            <Circle className="h-4 w-4 text-muted-foreground" />
                                         )}
                                 </div>
 
                                 {/* Variant Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-sm font-semibold text-foreground">
-                                            #{index + 1}{" "}
-                                            {variant.title || variant.id}
-                                        </span>
-                                        {isActive && (
-                                            <Badge
-                                                variant="secondary"
-                                                className="text-[10px] px-1.5 py-0"
-                                            >
-                                                Active
-                                            </Badge>
-                                        )}
-                                    </div>
-
-                                    {/* Type Information */}
-                                    <div className="flex items-center gap-2 mb-2">
+                                <div className="flex-1 min-w-0 flex items-center gap-2">
+                                    <span className="text-sm font-medium text-foreground">
+                                        #{index + 1}
+                                    </span>
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px] font-mono shrink-0"
+                                    >
+                                        {formatTypeInfo(variant)}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground truncate">
+                                        {variant.title || variant.id}
+                                    </span>
+                                    {isActive && (
                                         <Badge
-                                            variant="outline"
-                                            className="text-[10px] font-mono"
+                                            variant="secondary"
+                                            className="text-[10px] px-1.5 py-0 shrink-0"
                                         >
-                                            {formatTypeInfo(variant)}
+                                            Active
                                         </Badge>
-                                        {variant.is_object && (
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px]"
-                                            >
-                                                object
-                                            </Badge>
-                                        )}
-                                    </div>
-
-                                    {/* Description */}
-                                    {variant.description && (
-                                        <p className="text-xs text-muted-foreground line-clamp-2">
-                                            {variant.description}
-                                        </p>
                                     )}
                                 </div>
                             </div>

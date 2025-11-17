@@ -33,6 +33,21 @@ function isSimpleKind(kind: UiNodeKind): boolean {
   return kind.type === "field" && !kind.enum_options;
 }
 
+/**
+ * Infers the type of a value for display purposes
+ */
+function inferValueType(value: JsonValue | undefined): string {
+  if (value === null || value === undefined) return "null";
+  if (typeof value === "string") return "string";
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? "integer" : "number";
+  }
+  if (typeof value === "boolean") return "boolean";
+  if (Array.isArray(value)) return "array";
+  if (typeof value === "object") return "object";
+  return "unknown";
+}
+
 // ============================================================================
 // Helper Components
 // ============================================================================
@@ -396,36 +411,44 @@ function renderArrayControl(
 
   return (
     <div className="space-y-2">
-      {entries.map((entry, index) => (
-        <Card
-          key={`${node.pointer}-${index}`}
-          className="flex items-center justify-between px-3 py-2"
-        >
-          <span className="truncate text-sm">
-            <Badge variant="secondary" className="mr-2">{index + 1}</Badge>
-            {formatValueSummary(entry)}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => editEntry(index, entry)}
-            >
-              Edit
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => removeEntry(index)}
-              className="text-destructive hover:text-destructive"
-            >
-              Remove
-            </Button>
-          </div>
-        </Card>
-      ))}
+      {entries.map((entry, index) => {
+        const entryType = inferValueType(entry);
+        return (
+          <Card
+            key={`${node.pointer}-${index}`}
+            className="flex items-center justify-between px-3 py-2"
+          >
+            <div className="flex items-center gap-2 truncate flex-1">
+              <Badge variant="secondary">{index + 1}</Badge>
+              <Badge variant="outline" className="font-mono text-xs">
+                {entryType}
+              </Badge>
+              <span className="truncate text-sm">
+                {formatValueSummary(entry)}
+              </span>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => editEntry(index, entry)}
+              >
+                Edit
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeEntry(index)}
+                className="text-destructive hover:text-destructive"
+              >
+                Remove
+              </Button>
+            </div>
+          </Card>
+        );
+      })}
       <Button
         type="button"
         variant="ghost"
@@ -504,16 +527,23 @@ function renderCompositeControl(
       <div className="space-y-2">
         {entries.map((entry, index) => {
           const activeVariant = determineVariant(entry, variants);
+          const entryType = inferValueType(entry);
           return (
             <Card
               key={`${node.pointer}-variant-${index}`}
               className="px-3 py-2"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">
-                  {activeVariant?.title ?? `Variant ${index + 1}`}
-                </span>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2 flex-1">
+                  <Badge variant="secondary">{index + 1}</Badge>
+                  <Badge variant="outline" className="font-mono text-xs">
+                    {entryType}
+                  </Badge>
+                  <span className="text-sm font-medium truncate">
+                    {activeVariant?.title ?? `Variant ${index + 1}`}
+                  </span>
+                </div>
+                <div className="flex gap-2 shrink-0">
                   <Button
                     type="button"
                     variant="ghost"
