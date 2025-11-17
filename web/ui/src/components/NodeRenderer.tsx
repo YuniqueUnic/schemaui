@@ -20,6 +20,23 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 
+// ============================================================================
+// Type Classification Helpers
+// ============================================================================
+
+/**
+ * Determines if a UI node kind represents a simple, primitive type that can be
+ * rendered inline without requiring a dialog/overlay.
+ * Simple types: string, number, integer, boolean (without enum options)
+ */
+function isSimpleKind(kind: UiNodeKind): boolean {
+  return kind.type === "field" && !kind.enum_options;
+}
+
+// ============================================================================
+// Helper Components
+// ============================================================================
+
 // Helper component for editing array items with local state
 function ArrayItemEditor({
   node,
@@ -270,7 +287,76 @@ function renderArrayControl(
   overlay: ReturnType<typeof useOverlay>,
 ) {
   const entries = Array.isArray(value) ? (value as JsonValue[]) : [];
+  const itemKind = node.kind.item;
 
+  // Check if array items are simple types that can be rendered inline
+  const isSimpleItemType = isSimpleKind(itemKind);
+
+  const removeEntry = (index: number) => {
+    const next = entries.filter((_, idx) => idx !== index);
+    onChange(node.pointer, next);
+  };
+
+  // -------------------------
+  // Simple Type Array Rendering (Inline)
+  // -------------------------
+  if (isSimpleItemType && itemKind.type === "field") {
+    const addSimpleEntry = () => {
+      const placeholder = defaultForKind(itemKind);
+      const next = [...entries, placeholder];
+      onChange(node.pointer, next);
+    };
+
+    const updateEntry = (index: number, newValue: JsonValue) => {
+      const next = [...entries];
+      next[index] = newValue;
+      onChange(node.pointer, next);
+    };
+
+    return (
+      <div className="space-y-2">
+        {entries.map((entry, index) => (
+          <div
+            key={`${node.pointer}-${index}`}
+            className="flex items-center gap-2"
+          >
+            <Badge variant="secondary" className="shrink-0">
+              {index + 1}
+            </Badge>
+            <div className="flex-1">
+              {renderSimpleFieldInline(
+                itemKind,
+                entry,
+                (newValue) => updateEntry(index, newValue),
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => removeEntry(index)}
+              className="text-destructive hover:text-destructive shrink-0"
+            >
+              Remove
+            </Button>
+          </div>
+        ))}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={addSimpleEntry}
+          className="w-full"
+        >
+          + Add entry
+        </Button>
+      </div>
+    );
+  }
+
+  // -------------------------
+  // Complex Type Array Rendering (With Dialog)
+  // -------------------------
   const editEntry = (index: number, initial?: JsonValue) => {
     const entryNode: UiNode = {
       pointer: `${node.pointer}/${index}`,
@@ -280,7 +366,7 @@ function renderArrayControl(
       description: node.description,
       required: false,
       default_value: node.default_value,
-      kind: node.kind.item,
+      kind: itemKind,
     };
     overlay.open({
       title: `${node.title ?? node.pointer} · Item ${index + 1}`,
@@ -302,15 +388,10 @@ function renderArrayControl(
   };
 
   const addEntry = () => {
-    const placeholder = defaultForKind(node.kind.item);
+    const placeholder = defaultForKind(itemKind);
     const next = [...entries, placeholder];
     onChange(node.pointer, next);
     editEntry(next.length - 1, placeholder);
-  };
-
-  const removeEntry = (index: number) => {
-    const next = entries.filter((_, idx) => idx !== index);
-    onChange(node.pointer, next);
   };
 
   return (
@@ -356,6 +437,53 @@ function renderArrayControl(
       </Button>
     </div>
   );
+}
+
+/**
+ * Renders a simple field control inline (for use in arrays)
+ * Returns just the input control without labels or error messages
+ */
+function renderSimpleFieldInline(
+  fieldKind: Extract<UiNodeKind, { type: "field" }>,
+  value: JsonValue | undefined,
+  onChange: (value: JsonValue) => void,
+): ReactNode {
+  const resolved = value ?? defaultForKind(fieldKind);
+
+  switch (fieldKind.scalar) {
+    case "integer":
+    case "number":
+      return (
+        <Input
+          type="number"
+          value={typeof resolved === "number" ? resolved : 0}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="h-9"
+        />
+      );
+    case "boolean":
+      return (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={Boolean(resolved)}
+            onCheckedChange={(checked) => onChange(checked)}
+          />
+          <span className="text-xs text-muted-foreground">
+            {resolved ? "true" : "false"}
+          </span>
+        </div>
+      );
+    case "string":
+    default:
+      return (
+        <Input
+          type="text"
+          value={(resolved as string) ?? ""}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-9"
+        />
+      );
+  }
 }
 
 function renderCompositeControl(
@@ -483,38 +611,38 @@ function renderCompositeControl(
   }
 
   const activeVariant = determineVariant(value, variants) ?? variants[0];
+
   return (
-    <VariantSelector
-      variants={variants}
-      mode={mode}
-      activeVariantId={activeVariant.id}
-      onSelect={(variant) => onChange(node.pointer, variantDefault(variant))}
-      onEdit={() =>
-        overlay.open({
-          title: `${node.title ?? node.pointer} · ${
-            activeVariant.title ?? "Variant"
-          }`,
-          content: (close) => (
-            <VariantEntryEditor
-              node={{
-                pointer: node.pointer,
-                title: activeVariant.title ?? node.title,
-                description: activeVariant.description ?? node.description,
-                required: node.required,
-                default_value: node.default_value,
-                kind: activeVariant.node,
-              }}
-              initialValue={value ?? variantDefault(activeVariant)}
-              errors={errors}
-              onSave={(newValue) => {
-                onChange(node.pointer, newValue);
-                close();
-              }}
-              onClose={close}
-            />
-          ),
-        })}
-    />
+    <div className="space-y-4">
+      {/* Variant Selector (Radio Group) */}
+      <VariantSelector
+        variants={variants}
+        mode={mode}
+        activeVariantId={activeVariant.id}
+        onSelect={(variant) => onChange(node.pointer, variantDefault(variant))}
+      />
+
+      {/* Direct rendering of the selected variant's content */}
+      <div className="border-l-2 border-primary/30 pl-4">
+        <p className="text-xs text-muted-foreground mb-3">
+          {activeVariant.title ?? "Selected Variant"} content:
+        </p>
+        <NodeRenderer
+          node={{
+            pointer: node.pointer,
+            title: undefined, // Don't show title again as it's shown above
+            description: activeVariant.description,
+            required: false,
+            default_value: node.default_value,
+            kind: activeVariant.node,
+          }}
+          value={value ?? variantDefault(activeVariant)}
+          errors={errors}
+          onChange={onChange}
+          renderMode="inline"
+        />
+      </div>
+    </div>
   );
 }
 

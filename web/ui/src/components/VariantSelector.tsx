@@ -122,7 +122,7 @@ export function VariantSelector({
                 })}
             </div>
 
-            {/* Edit Button */}
+            {/* Edit Button (optional, only shown when onEdit is provided) */}
             {onEdit && activeVariantId && (
                 <Button
                     type="button"
@@ -138,7 +138,7 @@ export function VariantSelector({
             {/* Help Text */}
             <p className="text-[11px] text-muted-foreground">
                 {mode === "one_of"
-                    ? "Click a card to select it as the active variant"
+                    ? "Select a variant type. The corresponding editor will appear below."
                     : "This field can match multiple schemas"}
             </p>
         </div>
