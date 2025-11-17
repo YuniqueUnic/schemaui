@@ -590,22 +590,15 @@ impl CompositeState {
                 }
             }
             CompositeMode::AnyOf => {
-                let mut values = Vec::new();
-                for variant in self.variants.iter().filter(|variant| variant.active) {
-                    let form = variant.borrow_form(self.pointer())?;
-                    match form.try_build_value() {
-                        Ok(value) => {
-                            let actual = variant.unwrap_overlay_value(value, self.pointer())?;
-                            values.push(actual);
-                        }
-                        Err(mut err) => {
-                            err.pointer = join_pointer(self.pointer(), &err.pointer);
-                            return Err(err);
-                        }
-                    }
-                }
+                // anyOf: 选择第一个激活的变体作为主值
+                // 多个激活的变体主要用于验证：告诉系统这个值应该同时符合多个 schema
+                let active_variants: Vec<_> = self
+                    .variants
+                    .iter()
+                    .filter(|variant| variant.active)
+                    .collect();
 
-                if values.is_empty() {
+                if active_variants.is_empty() {
                     if required {
                         Err(FieldCoercionError {
                             pointer: self.pointer.clone(),
@@ -615,7 +608,20 @@ impl CompositeState {
                         Ok(None)
                     }
                 } else {
-                    Ok(Some(Value::Array(values)))
+                    // 返回第一个激活变体的值
+                    // 注意：anyOf 不是返回数组，而是一个值可以同时满足多个 schema
+                    let primary = active_variants[0];
+                    let form = primary.borrow_form(self.pointer())?;
+                    match form.try_build_value() {
+                        Ok(value) => {
+                            let actual = primary.unwrap_overlay_value(value, self.pointer())?;
+                            Ok(Some(actual))
+                        }
+                        Err(mut err) => {
+                            err.pointer = join_pointer(self.pointer(), &err.pointer);
+                            Err(err)
+                        }
+                    }
                 }
             }
         }
