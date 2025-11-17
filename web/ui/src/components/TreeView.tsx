@@ -1,5 +1,8 @@
-import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import type { UiAst, UiNode } from '../types';
+import { type Dispatch, type SetStateAction, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, File } from "lucide-react";
+import type { UiAst, UiNode } from "../types";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface TreeViewProps {
   ast?: UiAst | null;
@@ -28,18 +31,20 @@ export function TreeView({ ast, selectedPointer, onSelect }: TreeViewProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-3 py-4 text-sm text-primary">
-      {items.map((item) => (
-        <TreeRow
-          key={item.pointer}
-          item={item}
-          collapsed={collapsed}
-          setCollapsed={setCollapsed}
-          selectedPointer={selectedPointer}
-          onSelect={onSelect}
-        />
-      ))}
-    </div>
+    <ScrollArea className="h-full">
+      <div className="px-3 py-4 text-sm">
+        {items.map((item) => (
+          <TreeRow
+            key={item.pointer}
+            item={item}
+            collapsed={collapsed}
+            setCollapsed={setCollapsed}
+            selectedPointer={selectedPointer}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    </ScrollArea>
   );
 }
 
@@ -64,25 +69,29 @@ function TreeRow({
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       <button
         type="button"
         onClick={() => onSelect(item.pointer)}
-        className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-[var(--app-panel-muted)] ${
-          isActive ? 'bg-[var(--app-panel-muted)] text-[var(--app-accent)]' : 'text-primary'
-        }`}
-        style={{ paddingLeft: 8 + item.depth * 12 }}
-      >
-        {item.hasChildren ? (
-          <span
-            onClick={toggle}
-            className="inline-flex h-4 w-4 items-center justify-center rounded border border-theme bg-panel text-[10px] text-muted group-hover:border-theme"
-          >
-            {isCollapsed ? '+' : '–'}
-          </span>
-        ) : (
-          <span className="inline-block h-4 w-4" />
+        className={cn(
+          "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+          "hover:bg-accent hover:text-accent-foreground",
+          isActive && "bg-accent text-accent-foreground font-medium",
         )}
+        style={{ paddingLeft: 8 + item.depth * 16 }}
+      >
+        {item.hasChildren
+          ? (
+            <span
+              onClick={toggle}
+              className="flex items-center justify-center"
+            >
+              {isCollapsed
+                ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </span>
+          )
+          : <File className="h-4 w-4 text-muted-foreground" />}
         <span className="truncate text-left">{item.label}</span>
       </button>
       {!isCollapsed &&
@@ -102,8 +111,10 @@ function TreeRow({
 
 function buildTree(nodes: UiNode[], depth: number): TreeItem[] {
   return nodes.map((node) => {
-    const label = node.title ?? pointerSegment(node.pointer) ?? 'field';
-    const children = node.kind.type === 'object' ? buildTree(node.kind.children ?? [], depth + 1) : [];
+    const label = node.title ?? pointerSegment(node.pointer) ?? "field";
+    const children = node.kind.type === "object"
+      ? buildTree(node.kind.children ?? [], depth + 1)
+      : [];
     return {
       pointer: node.pointer,
       label,
@@ -115,7 +126,7 @@ function buildTree(nodes: UiNode[], depth: number): TreeItem[] {
 }
 
 function pointerSegment(pointer: string): string | undefined {
-  if (!pointer || pointer === '/') return undefined;
-  const segments = pointer.split('/').filter(Boolean);
-  return segments[segments.length - 1]?.replace(/~1/g, '/').replace(/~0/g, '~');
+  if (!pointer || pointer === "/") return undefined;
+  const segments = pointer.split("/").filter(Boolean);
+  return segments[segments.length - 1]?.replace(/~1/g, "/").replace(/~0/g, "~");
 }

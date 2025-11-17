@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AppHeader } from "./components/AppHeader";
 import { NodeRenderer } from "./components/NodeRenderer";
 import { PreviewPane } from "./components/PreviewPane";
@@ -86,8 +87,16 @@ export default function App() {
       const next = new Map<string, string>();
       result.errors?.forEach((err) => next.set(err.pointer || "", err.message));
       setErrors(next);
+
+      // Show toast for validation errors
+      if (next.size > 0) {
+        toast.error(
+          `Found ${next.size} validation error${next.size > 1 ? "s" : ""}`,
+        );
+      }
     } catch (error) {
       console.error("validate failed", error);
+      toast.error("Validation failed");
     }
   };
 
@@ -118,19 +127,39 @@ export default function App() {
 
   const handleSave = useCallback(async () => {
     if (!session) return;
+    if (errors.size > 0) {
+      toast.error(
+        `Cannot save: ${errors.size} validation error${
+          errors.size > 1 ? "s" : ""
+        } found`,
+      );
+      return;
+    }
     setSaving(true);
     try {
       await persistData(data);
       setDirty(false);
+      toast.success("Changes saved successfully");
+    } catch (error) {
+      console.error("Save failed", error);
+      toast.error("Failed to save changes");
     } finally {
       setSaving(false);
     }
-  }, [session, data]);
+  }, [session, data, errors]);
 
   const handleExit = async () => {
+    if (dirty) {
+      toast.warning("You have unsaved changes. Please save before exiting.");
+      return;
+    }
     setExiting(true);
     try {
       await exitSession(data, true);
+      toast.success("Session ended successfully");
+    } catch (error) {
+      console.error("Exit failed", error);
+      toast.error("Failed to exit session");
     } finally {
       setExiting(false);
     }
@@ -173,8 +202,9 @@ export default function App() {
           onExit={handleExit}
         />
         <div className="app-panel-muted flex flex-1 overflow-hidden border-y border-theme">
+          {/* Navigation Panel - Hidden on mobile (< md), shown on desktop */}
           <aside
-            className="app-panel flex flex-col border-r border-theme text-[var(--app-text)]"
+            className="hidden md:flex app-panel flex-col border-r border-theme text-[var(--app-text)]"
             style={{ width: sizes.nav }}
           >
             <div className="border-b border-theme px-4 py-3 text-xs uppercase tracking-[0.3em] text-muted">
@@ -186,13 +216,15 @@ export default function App() {
               onSelect={(pointer) => setSelectedPointer(pointer)}
             />
           </aside>
+          {/* Resizer - Hidden on mobile */}
           <div
-            className="w-1 cursor-col-resize bg-transparent"
+            className="hidden md:block w-1 cursor-col-resize bg-transparent"
             onPointerDown={(event) => startDrag(event, "nav")}
           />
-          <main className="app-panel flex flex-1 flex-col overflow-hidden px-6 py-4">
+          {/* Main Editor Panel */}
+          <main className="app-panel flex flex-1 flex-col overflow-hidden px-4 md:px-6 py-4">
             <EditorBreadcrumbs node={selectedNode} pointer={selectedPointer} />
-            <div className="mt-4 flex-1 overflow-y-auto pr-4 text-sm">
+            <div className="mt-4 flex-1 overflow-y-auto pr-2 md:pr-4 text-sm">
               {selectedNode
                 ? (
                   <EditorBody
@@ -203,18 +235,20 @@ export default function App() {
                   />
                 )
                 : (
-                  <div className="text-center text-slate-500">
+                  <div className="text-center text-muted-foreground">
                     Select a node from the tree to start editing.
                   </div>
                 )}
             </div>
           </main>
+          {/* Resizer - Hidden on mobile and tablet (< lg) */}
           <div
-            className="w-1 cursor-col-resize bg-transparent"
+            className="hidden lg:block w-1 cursor-col-resize bg-transparent"
             onPointerDown={(event) => startDrag(event, "preview")}
           />
+          {/* Preview Panel - Hidden on tablet (< lg), shown on large screens */}
           <section
-            className="app-panel flex h-full flex-col border-l border-theme"
+            className="hidden lg:flex app-panel h-full flex-col border-l border-theme"
             style={{ width: sizes.preview }}
           >
             <PreviewPane

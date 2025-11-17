@@ -25,13 +25,13 @@ export function StatusBar({
   shortcuts = DEFAULT_SHORTCUTS,
 }: StatusBarProps) {
   return (
-    <footer className="app-panel flex items-center justify-between border-t border-theme px-6 py-3 text-xs text-muted">
-      <div className="flex items-center gap-3">
+    <footer className="app-panel flex flex-wrap items-center justify-between gap-2 md:gap-4 border-t border-theme px-4 md:px-6 py-2 md:py-3 text-xs text-muted">
+      <div className="flex items-center gap-2 md:gap-3 flex-wrap">
         <Badge
           variant={dirty ? "default" : "secondary"}
           className="text-[10px] uppercase tracking-wide"
         >
-          {dirty ? "Unsaved changes" : "Synced"}
+          {dirty ? "Unsaved" : "Synced"}
         </Badge>
         <Badge
           variant={errorCount > 0 ? "destructive" : "secondary"}
@@ -40,12 +40,14 @@ export function StatusBar({
           {validating
             ? "Validating…"
             : errorCount > 0
-            ? `${errorCount} errors`
-            : "Schema valid"}
+            ? `${errorCount} error${errorCount > 1 ? "s" : ""}`
+            : "Valid"}
         </Badge>
-        <span className="text-[var(--app-text)]">{status}</span>
+        <span className="text-[var(--app-text)] hidden md:inline">
+          {status}
+        </span>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="hidden lg:flex items-center gap-4">
         {shortcuts.map((shortcut) => (
           <span
             key={shortcut.combo}
