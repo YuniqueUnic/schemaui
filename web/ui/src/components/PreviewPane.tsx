@@ -1,6 +1,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { clsx } from "clsx";
 import { highlightSyntax, normalizedLanguage } from "../utils/highlight";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface PreviewPaneProps {
   formats: string[];
@@ -53,39 +55,39 @@ export const PreviewPane = memo(function PreviewPane({
       <div className="flex items-center justify-between border-b border-theme px-5 py-4">
         <div className="flex items-center gap-2">
           {formats.map((option) => (
-            <button
+            <Button
               key={option}
-              type="button"
+              variant={option === format ? "default" : "ghost"}
+              size="sm"
               onClick={() => onFormatChange(option)}
-              className={clsx(
-                "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition",
-                option === format
-                  ? "bg-[var(--app-accent)]/20 text-[var(--app-accent)]"
-                  : "text-muted hover:text-[var(--app-accent)]",
-              )}
+              className="rounded-full text-xs font-semibold uppercase tracking-wide"
             >
               {option.toUpperCase()}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-muted">
-            <input
-              type="checkbox"
+          <div className="flex items-center gap-2">
+            <Switch
+              id="pretty-format"
               checked={pretty}
-              onChange={(event) => onPrettyChange(event.target.checked)}
-              className="h-4 w-4 accent-[var(--app-accent)]"
+              onCheckedChange={onPrettyChange}
             />
-            Pretty format
-          </label>
-          <button
-            type="button"
+            <Label
+              htmlFor="pretty-format"
+              className="text-xs text-muted-foreground cursor-pointer"
+            >
+              Pretty format
+            </Label>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleCopy}
             disabled={!payload}
-            className="rounded-full border border-theme px-3 py-1.5 text-xs font-semibold text-[var(--app-text)] transition hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         </div>
       </div>
       <div className="relative flex-1 overflow-auto bg-[var(--app-panel)] px-5 py-4 font-mono text-xs leading-relaxed text-[var(--app-text)]">

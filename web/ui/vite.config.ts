@@ -18,6 +18,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@schemaui/types': path.resolve(workspaceRoot, 'types'),
+      '@': path.resolve(thisDir, './src'),
     },
   },
   server: {

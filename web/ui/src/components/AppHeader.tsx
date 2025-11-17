@@ -1,7 +1,8 @@
 import { memo } from "react";
-import { clsx } from "clsx";
 import { Moon, Power, Save, Sun } from "lucide-react";
 import { useTheme } from "../theme";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface AppHeaderProps {
   title?: string | null;
@@ -41,30 +42,26 @@ export const AppHeader = memo(function AppHeader({
           : null}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <span
-          className={clsx(
-            "rounded-full border px-4 py-1 text-sm font-medium uppercase tracking-wide",
-            dirty
-              ? "border-amber-600/60 text-amber-400"
-              : "border-emerald-600/60 text-emerald-400",
-          )}
+        <Badge
+          variant={dirty ? "default" : "secondary"}
+          className="px-4 py-1 text-xs uppercase tracking-wide"
         >
           {dirty ? "Unsaved" : "Synced"}
-        </span>
+        </Badge>
 
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onSave}
           disabled={saving}
-          className="inline-flex items-center gap-2 rounded-full border border-theme px-4 py-1 text-sm font-semibold text-[var(--app-text)] transition hover:text-[var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
           Save
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           onClick={toggle}
-          className="inline-flex items-center gap-2 rounded-full border border-theme px-3 py-1 text-sm font-medium text-[var(--app-text)] transition hover:text-[var(--app-accent)]"
         >
           {theme === "dark"
             ? (
@@ -77,16 +74,16 @@ export const AppHeader = memo(function AppHeader({
                 <Moon className="h-4 w-4" /> Dark
               </>
             )}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
           onClick={onExit}
           disabled={saving || exiting}
-          className="inline-flex items-center gap-2 rounded-full border border-rose-400/80 px-4 py-1 text-sm text-rose-400 transition hover:bg-rose-400/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Power className="h-4 w-4" />
           {exiting ? "Exiting…" : "Exit"}
-        </button>
+        </Button>
       </div>
     </header>
   );

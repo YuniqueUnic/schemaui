@@ -4,6 +4,20 @@ import type { JsonValue, UiNode, UiNodeKind, UiVariant } from "../types";
 import { defaultForKind, variantDefault } from "../ui-ast";
 import type { ReactNode } from "react";
 
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
 interface NodeRendererProps {
   node: UiNode;
   value: JsonValue | undefined;
@@ -121,17 +135,21 @@ function renderFieldControl(
   const resolved = value ?? node.default_value ?? defaultForKind(node.kind);
   if (node.kind.enum_options?.length) {
     return (
-      <select
-        className="w-full input-surface focus:border-[var(--app-accent)] focus:outline-none"
+      <Select
         value={(resolved as string) ?? ""}
-        onChange={(event) => onChange(node.pointer, event.target.value)}
+        onValueChange={(newValue) => onChange(node.pointer, newValue)}
       >
-        {node.kind.enum_options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Select an option" />
+        </SelectTrigger>
+        <SelectContent>
+          {node.kind.enum_options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     );
   }
 
@@ -139,9 +157,8 @@ function renderFieldControl(
     case "integer":
     case "number":
       return (
-        <input
+        <Input
           type="number"
-          className="input-surface focus:border-[var(--app-accent)] focus:outline-none"
           value={typeof resolved === "number" ? resolved : 0}
           onChange={(event) =>
             onChange(node.pointer, Number(event.target.value))}
@@ -149,22 +166,19 @@ function renderFieldControl(
       );
     case "boolean":
       return (
-        <label className="inline-flex items-center gap-3 text-sm text-primary">
-          <input
-            type="checkbox"
+        <div className="flex items-center gap-3">
+          <Switch
             checked={Boolean(resolved)}
-            onChange={(event) => onChange(node.pointer, event.target.checked)}
-            className="h-4 w-4 rounded border-theme bg-panel text-[var(--app-accent)]"
+            onCheckedChange={(checked) => onChange(node.pointer, checked)}
           />
-          Toggle
-        </label>
+          <Label className="text-sm text-muted-foreground">Toggle</Label>
+        </div>
       );
     case "string":
     default:
       return (
-        <input
+        <Input
           type="text"
-          className="input-surface focus:border-[var(--app-accent)] focus:outline-none"
           value={(resolved as string) ?? ""}
           onChange={(event) => onChange(node.pointer, event.target.value)}
         />
@@ -207,14 +221,10 @@ function renderArrayControl(
             }}
             renderMode="inline"
           />
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={close}
-              className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-sky-500"
-            >
+          <div className="flex justify-end mt-4">
+            <Button onClick={close} variant="outline" size="sm">
               Done
-            </button>
+            </Button>
           </div>
         </div>
       ),
@@ -236,38 +246,44 @@ function renderArrayControl(
   return (
     <div className="space-y-2">
       {entries.map((entry, index) => (
-        <div
+        <Card
           key={`${node.pointer}-${index}`}
-          className="flex items-center justify-between rounded-lg border border-theme bg-panel px-3 py-2 text-xs text-primary"
+          className="flex items-center justify-between px-3 py-2"
         >
-          <span className="truncate">
-            [{index + 1}] {formatValueSummary(entry)}
+          <span className="truncate text-sm">
+            <Badge variant="secondary" className="mr-2">{index + 1}</Badge>
+            {formatValueSummary(entry)}
           </span>
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => editEntry(index, entry)}
-              className="text-xs text-[var(--app-accent)] hover:text-[var(--app-accent)]"
             >
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => removeEntry(index)}
-              className="text-xs text-rose-300 hover:text-rose-200"
+              className="text-destructive hover:text-destructive"
             >
               Remove
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       ))}
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={addEntry}
-        className="text-xs font-semibold text-primary hover:text-[var(--app-accent)]"
+        className="w-full"
       >
         + Add entry
-      </button>
+      </Button>
     </div>
   );
 }
@@ -291,15 +307,19 @@ function renderCompositeControl(
         {entries.map((entry, index) => {
           const activeVariant = determineVariant(entry, variants);
           return (
-            <div
+            <Card
               key={`${node.pointer}-variant-${index}`}
-              className="rounded-lg border border-theme bg-panel px-3 py-2 text-xs text-primary"
+              className="px-3 py-2"
             >
               <div className="flex items-center justify-between gap-2">
-                <span>{activeVariant?.title ?? `Variant ${index + 1}`}</span>
+                <span className="text-sm font-medium">
+                  {activeVariant?.title ?? `Variant ${index + 1}`}
+                </span>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       const entryNode: UiNode = {
                         pointer: `${node.pointer}/${index}`,
@@ -324,46 +344,49 @@ function renderCompositeControl(
                               }}
                               renderMode="inline"
                             />
-                            <div className="flex justify-end">
-                              <button
-                                type="button"
+                            <div className="flex justify-end mt-4">
+                              <Button
                                 onClick={close}
-                                className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-sky-500"
+                                variant="outline"
+                                size="sm"
                               >
                                 Done
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         ),
                       });
                     }}
-                    className="text-xs text-[var(--app-accent)] hover:text-[var(--app-accent)]"
                   >
                     Edit
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       const next = entries.filter((_, idx) => idx !== index);
                       onChange(node.pointer, next);
                     }}
-                    className="text-xs text-rose-300 hover:text-rose-200"
+                    className="text-destructive hover:text-destructive"
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </div>
+            </Card>
           );
         })}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() =>
             onChange(node.pointer, [...entries, variantDefault(variants[0])])}
-          className="text-xs font-semibold text-slate-300 hover:text-sky-200"
+          className="w-full"
         >
           + Add variant entry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -388,8 +411,10 @@ function renderCompositeControl(
           </label>
         ))}
       </div>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={() =>
           overlay.open({
             title: `${node.title ?? node.pointer} · ${
@@ -411,22 +436,18 @@ function renderCompositeControl(
                   onChange={onChange}
                   renderMode="inline"
                 />
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-sky-500"
-                  >
+                <div className="flex justify-end mt-4">
+                  <Button onClick={close} variant="outline" size="sm">
                     Done
-                  </button>
+                  </Button>
                 </div>
               </div>
             ),
           })}
-        className="text-xs font-semibold text-slate-300 hover:text-sky-200"
+        className="w-full mt-2"
       >
         Edit variant ({mode === "one_of" ? "single" : "any"})
-      </button>
+      </Button>
     </div>
   );
 }
