@@ -699,7 +699,6 @@ mod tests {
             pointer: "/unicode".into(),
             title: "Unicode".into(),
             description: None,
-            section_id: "sec".into(),
             kind: FieldKind::String,
             required: false,
             default: Some(Value::String(value.to_string())),

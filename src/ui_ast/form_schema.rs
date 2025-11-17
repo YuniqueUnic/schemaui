@@ -26,7 +26,7 @@ pub fn form_schema_from_ui_ast(ast: &UiAst) -> FormSchema {
                     sections: vec![section],
                 });
             }
-            _ => general_fields.push(field_schema_from_node(node, "general")),
+            _ => general_fields.push(field_schema_from_node(node)),
         }
     }
 
@@ -91,7 +91,7 @@ fn build_section_from_object(node: &UiNode) -> FormSection {
         for child in inner {
             match &child.kind {
                 UiNodeKind::Object { .. } => children.push(build_section_from_object(child)),
-                _ => fields.push(field_schema_from_node(child, &id)),
+                _ => fields.push(field_schema_from_node(child)),
             }
         }
     }
@@ -106,7 +106,7 @@ fn build_section_from_object(node: &UiNode) -> FormSection {
     }
 }
 
-fn field_schema_from_node(node: &UiNode, section_id: &str) -> FieldSchema {
+fn field_schema_from_node(node: &UiNode) -> FieldSchema {
     let path = pointer_segments(&node.pointer);
     let name = path
         .last()
@@ -120,7 +120,6 @@ fn field_schema_from_node(node: &UiNode, section_id: &str) -> FieldSchema {
         pointer: node.pointer.clone(),
         title,
         description: node.description.clone(),
-        section_id: section_id.to_string(),
         kind: field_kind_from_node_kind(&node.kind),
         required: node.required,
         default: node.default_value.clone(),

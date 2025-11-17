@@ -280,7 +280,6 @@ impl From<FieldSchemaStub> for crate::domain::FieldSchema {
             pointer: "/value".to_string(),
             title: format!("{} item", stub.template.label),
             description: stub.template.description,
-            section_id: "array_entry".to_string(),
             kind: stub.template.item_kind,
             required: true,
             default: Some(stub.value),

@@ -355,7 +355,7 @@ fn build_field_schema(
     schema: &SchemaObject,
     name: &str,
     path: Vec<String>,
-    section: SectionInfo,
+    _section: SectionInfo,
     required: bool,
 ) -> Result<FieldSchema> {
     let normalized = normalize_schema(resolver, schema)?;
@@ -379,7 +379,6 @@ fn build_field_schema(
         pointer: to_pointer(&path),
         title,
         description,
-        section_id: section.id,
         kind,
         required,
         default,

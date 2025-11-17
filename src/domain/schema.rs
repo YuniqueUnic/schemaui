@@ -84,12 +84,9 @@ pub struct FieldSchema {
     pub pointer: String,
     pub title: String,
     pub description: Option<String>,
-    #[allow(dead_code)]
-    pub section_id: String,
     pub kind: FieldKind,
     pub required: bool,
     pub default: Option<Value>,
-    #[allow(dead_code)]
     pub metadata: HashMap<String, Value>,
 }
 

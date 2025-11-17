@@ -1727,7 +1727,6 @@ mod tests {
             pointer: "/allowed_methods".to_string(),
             title: "Allowed Methods".to_string(),
             description: None,
-            section_id: "app".to_string(),
             kind: FieldKind::Array(Box::new(FieldKind::String)),
             required: false,
             default: Some(json!(["GET"])),

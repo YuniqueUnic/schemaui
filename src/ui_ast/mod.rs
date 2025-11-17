@@ -374,7 +374,62 @@ fn infer_default_for_composite(variants: &[UiVariant], allow_multiple: bool) -> 
     if allow_multiple {
         return Some(Value::Array(Vec::new()));
     }
-    variants.first().and_then(|v| default_for_kind(&v.node))
+
+    // Generate a unique default value for the first variant
+    // that can be unambiguously identified
+    variants.first().and_then(generate_variant_default)
+}
+
+/// Generate a default value for a variant that uniquely identifies it
+fn generate_variant_default(variant: &UiVariant) -> Option<Value> {
+    // For object variants, check if there are const fields that uniquely identify the variant
+    if variant.is_object
+        && let UiNodeKind::Object { children, required } = &variant.node
+    {
+        let mut obj = Map::new();
+
+        // First, check the schema for const fields that uniquely identify this variant
+        if let Value::Object(schema_obj) = &variant.schema
+            && let Some(Value::Object(props)) = schema_obj.get("properties")
+        {
+            for (key, prop_schema) in props {
+                if let Value::Object(prop_obj) = prop_schema {
+                    // Set const fields to uniquely identify the variant
+                    if let Some(const_val) = prop_obj.get("const") {
+                        obj.insert(key.clone(), const_val.clone());
+                    }
+                }
+            }
+        }
+
+        // Then add defaults for all required fields
+        for child in children {
+            let field_name = child.pointer.split('/').next_back().unwrap_or("");
+            if !field_name.is_empty()
+                && required.contains(&field_name.to_string())
+                && !obj.contains_key(field_name)
+            {
+                if let Some(default) = &child.default_value {
+                    obj.insert(field_name.to_string(), default.clone());
+                } else if let Some(default) = default_for_kind(&child.kind) {
+                    obj.insert(field_name.to_string(), default);
+                }
+            }
+        }
+
+        return Some(Value::Object(obj));
+    }
+
+    // For array variants, return an array with a sample element to distinguish between types
+    if let UiNodeKind::Array { item, .. } = &variant.node
+        && let Some(item_default) = default_for_kind(item)
+    {
+        // Return array with one default element to make it distinguishable
+        return Some(Value::Array(vec![item_default]));
+    }
+
+    // For other variants, use the standard default
+    default_for_kind(&variant.node)
 }
 
 fn default_for_kind(kind: &UiNodeKind) -> Option<Value> {
