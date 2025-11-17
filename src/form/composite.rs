@@ -213,6 +213,7 @@ impl CompositeListState {
             multi: entry.state.is_multi(),
             options: entry.state.option_titles(),
             active: entry.state.active_flags(),
+            descriptions: entry.state.variant_descriptions(),
         })
     }
 
@@ -445,6 +446,13 @@ impl CompositeState {
         self.variants
             .iter()
             .map(|variant| variant.title.clone())
+            .collect()
+    }
+
+    pub fn variant_descriptions(&self) -> Vec<Option<String>> {
+        self.variants
+            .iter()
+            .map(|variant| variant.description.clone())
             .collect()
     }
 

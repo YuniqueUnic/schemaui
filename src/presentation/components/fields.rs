@@ -305,6 +305,13 @@ pub(crate) fn meta_lines(
 ) -> Vec<Line<'static>> {
     let mut parts = Vec::new();
     parts.push(format!("type: {}", field_type_label(&field.schema.kind)));
+
+    // 添加约束信息
+    let constraints = extract_constraints(&field.schema);
+    if !constraints.is_empty() {
+        parts.push(format!("constraints: {}", constraints.join(", ")));
+    }
+
     if let Some(desc) = field
         .schema
         .description
@@ -361,6 +368,107 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Composite(_) => "composite".to_string(),
         FieldKind::KeyValue(_) => "map".to_string(),
     }
+}
+
+fn extract_constraints(schema: &crate::domain::FieldSchema) -> Vec<String> {
+    use crate::domain::FieldKind;
+    let mut constraints = Vec::new();
+
+    // format 约束
+    if let Some(format) = schema.metadata.get("format") {
+        if let Some(format_str) = format.as_str() {
+            constraints.push(format!("format: {}", format_str));
+        }
+    }
+
+    // pattern 约束
+    if let Some(pattern) = schema.metadata.get("pattern") {
+        if let Some(pattern_str) = pattern.as_str() {
+            let truncated = if pattern_str.len() > 30 {
+                format!("{}...", &pattern_str[..27])
+            } else {
+                pattern_str.to_string()
+            };
+            constraints.push(format!("pattern: {}", truncated));
+        }
+    }
+
+    // 字符串长度约束
+    if matches!(schema.kind, FieldKind::String) {
+        if let Some(min) = schema.metadata.get("minLength").and_then(|v| v.as_u64()) {
+            if let Some(max) = schema.metadata.get("maxLength").and_then(|v| v.as_u64()) {
+                constraints.push(format!("length: {}..{}", min, max));
+            } else {
+                constraints.push(format!("minLength: {}", min));
+            }
+        } else if let Some(max) = schema.metadata.get("maxLength").and_then(|v| v.as_u64()) {
+            constraints.push(format!("maxLength: {}", max));
+        }
+    }
+
+    // 数值范围约束
+    if matches!(schema.kind, FieldKind::Integer | FieldKind::Number) {
+        let min = schema
+            .metadata
+            .get("minimum")
+            .and_then(|v| v.as_f64().or_else(|| v.as_i64().map(|i| i as f64)));
+        let max = schema
+            .metadata
+            .get("maximum")
+            .and_then(|v| v.as_f64().or_else(|| v.as_i64().map(|i| i as f64)));
+
+        if let (Some(min_val), Some(max_val)) = (min, max) {
+            if matches!(schema.kind, FieldKind::Integer) {
+                constraints.push(format!("range: {}..{}", min_val as i64, max_val as i64));
+            } else {
+                constraints.push(format!("range: {:.2}..{:.2}", min_val, max_val));
+            }
+        } else if let Some(min_val) = min {
+            constraints.push(format!(
+                "min: {}",
+                if matches!(schema.kind, FieldKind::Integer) {
+                    format!("{}", min_val as i64)
+                } else {
+                    format!("{:.2}", min_val)
+                }
+            ));
+        } else if let Some(max_val) = max {
+            constraints.push(format!(
+                "max: {}",
+                if matches!(schema.kind, FieldKind::Integer) {
+                    format!("{}", max_val as i64)
+                } else {
+                    format!("{:.2}", max_val)
+                }
+            ));
+        }
+
+        // multipleOf 约束
+        if let Some(multiple) = schema.metadata.get("multipleOf").and_then(|v| v.as_f64()) {
+            constraints.push(format!("multipleOf: {}", multiple));
+        }
+    }
+
+    // 数组项数约束
+    if matches!(schema.kind, FieldKind::Array(_)) {
+        if let Some(min) = schema.metadata.get("minItems").and_then(|v| v.as_u64()) {
+            if let Some(max) = schema.metadata.get("maxItems").and_then(|v| v.as_u64()) {
+                constraints.push(format!("items: {}..{}", min, max));
+            } else {
+                constraints.push(format!("minItems: {}", min));
+            }
+        } else if let Some(max) = schema.metadata.get("maxItems").and_then(|v| v.as_u64()) {
+            constraints.push(format!("maxItems: {}", max));
+        }
+
+        if let Some(unique) = schema.metadata.get("uniqueItems").and_then(|v| v.as_bool()) {
+            if unique {
+                constraints.push("unique".to_string());
+            }
+        }
+    }
+
+    constraints
 }
 
 fn composite_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
@@ -437,51 +545,68 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
         return Some(lines);
     }
 
-    let label = if view.multi { "AnyOf" } else { "OneOf" };
-    let mut spans = Vec::new();
-    spans.push(Span::styled(
-        format!("  {label}: "),
+    // 改进：更清晰的标签
+    let label = if view.multi {
+        "AnyOf (value satisfies at least one)"
+    } else {
+        "OneOf (select exactly one)"
+    };
+    lines.push(Line::from(vec![Span::styled(
+        format!("  {label}"),
         Style::default()
             .fg(Color::Magenta)
             .add_modifier(Modifier::BOLD),
-    ));
+    )]));
+
+    // 改进：每个选项独立一行
     for (idx, option) in view.options.iter().enumerate() {
-        if view.multi {
-            let mark = if view.active.get(idx).copied().unwrap_or(false) {
-                "[x]"
-            } else {
-                "[ ]"
-            };
-            spans.push(Span::styled(
-                format!(" {mark} "),
-                Style::default().fg(Color::DarkGray),
-            ));
-        }
-        let style = if view.active.get(idx).copied().unwrap_or(false) {
+        let is_active = view.active.get(idx).copied().unwrap_or(false);
+        let mark = if view.multi {
+            if is_active { "[x]" } else { "[ ]" }
+        } else {
+            if is_active { "(•)" } else { "( )" }
+        };
+
+        let style = if is_active {
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::Gray)
         };
-        spans.push(Span::styled(format!("#{} {}", idx + 1, option), style));
-        if idx + 1 != view.options.len() {
-            spans.push(Span::styled(
-                if view.multi { "  " } else { " | " },
-                Style::default().fg(Color::DarkGray),
-            ));
-        }
-    }
-    let hint = if view.multi {
-        "  (Enter toggles, Ctrl+E opens editor)"
-    } else {
-        "  (Enter to choose variant, Ctrl+E edits)"
-    };
-    spans.push(Span::styled(hint, Style::default().fg(Color::DarkGray)));
-    lines.push(Line::from(spans));
 
+        let mut spans = vec![
+            Span::styled(format!("    {mark} "), Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("#{} {}", idx + 1, option), style),
+        ];
+
+        // 改进：显示描述
+        if let Some(Some(desc)) = view.descriptions.get(idx) {
+            if !desc.is_empty() {
+                spans.push(Span::styled(
+                    format!(" - {}", desc),
+                    Style::default().fg(Color::Gray),
+                ));
+            }
+        }
+
+        lines.push(Line::from(spans));
+    }
+
+    // 改进：更清晰的操作提示
+    let hint = if view.multi {
+        "  Press Enter to toggle • Ctrl+E to open editor"
+    } else {
+        "  Press Enter to select • Ctrl+E to open editor"
+    };
+    lines.push(Line::from(vec![Span::styled(
+        hint,
+        Style::default().fg(Color::DarkGray),
+    )]));
+
+    // 改进：显示当前激活的变体
     if view.multi {
-        let active_titles = view
+        let active_titles: Vec<_> = view
             .options
             .iter()
             .enumerate()
@@ -492,15 +617,16 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
                     .filter(|flag| *flag)
                     .map(|_| format!("#{} {}", idx + 1, title))
             })
-            .collect::<Vec<_>>();
+            .collect();
+
         if active_titles.is_empty() {
             lines.push(Line::from(vec![Span::styled(
-                "    Active variants: <none>",
+                "  Active: <none selected>",
                 Style::default().fg(Color::Gray),
             )]));
         } else {
             lines.push(Line::from(vec![
-                Span::styled("    Active variants: ", Style::default().fg(Color::Gray)),
+                Span::styled("  Active: ", Style::default().fg(Color::Gray)),
                 Span::styled(active_titles.join(", "), Style::default().fg(Color::White)),
             ]));
         }

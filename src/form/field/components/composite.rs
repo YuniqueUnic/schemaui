@@ -137,6 +137,7 @@ impl CompositeViewAdapter {
             multi: state.is_multi(),
             options,
             active: state.active_flags(),
+            descriptions: state.variant_descriptions(),
         })
     }
 

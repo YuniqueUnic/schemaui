@@ -221,4 +221,5 @@ pub struct CompositeSelectorView {
     pub multi: bool,
     pub options: Vec<String>,
     pub active: Vec<bool>,
+    pub descriptions: Vec<Option<String>>,
 }

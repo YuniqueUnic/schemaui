@@ -3,6 +3,7 @@ import { variantMatches } from "../utils/variantMatch";
 import type { JsonValue, UiNode, UiNodeKind, UiVariant } from "../types";
 import { defaultForKind, variantDefault } from "../ui-ast";
 import type { ReactNode } from "react";
+import { VariantSelector } from "./VariantSelector";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -483,58 +484,37 @@ function renderCompositeControl(
 
   const activeVariant = determineVariant(value, variants) ?? variants[0];
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-2 text-xs">
-        {variants.map((variant) => (
-          <label
-            key={variant.id}
-            className="inline-flex cursor-pointer items-center gap-2 text-slate-300"
-          >
-            <input
-              type="radio"
-              name={node.pointer}
-              checked={variant.id === activeVariant.id}
-              onChange={() => onChange(node.pointer, variantDefault(variant))}
-              className="accent-sky-400"
+    <VariantSelector
+      variants={variants}
+      mode={mode}
+      activeVariantId={activeVariant.id}
+      onSelect={(variant) => onChange(node.pointer, variantDefault(variant))}
+      onEdit={() =>
+        overlay.open({
+          title: `${node.title ?? node.pointer} · ${
+            activeVariant.title ?? "Variant"
+          }`,
+          content: (close) => (
+            <VariantEntryEditor
+              node={{
+                pointer: node.pointer,
+                title: activeVariant.title ?? node.title,
+                description: activeVariant.description ?? node.description,
+                required: node.required,
+                default_value: node.default_value,
+                kind: activeVariant.node,
+              }}
+              initialValue={value ?? variantDefault(activeVariant)}
+              errors={errors}
+              onSave={(newValue) => {
+                onChange(node.pointer, newValue);
+                close();
+              }}
+              onClose={close}
             />
-            <span>{variant.title ?? variant.id}</span>
-          </label>
-        ))}
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() =>
-          overlay.open({
-            title: `${node.title ?? node.pointer} · ${
-              activeVariant.title ?? "Variant"
-            }`,
-            content: (close) => (
-              <VariantEntryEditor
-                node={{
-                  pointer: node.pointer,
-                  title: activeVariant.title ?? node.title,
-                  description: activeVariant.description ?? node.description,
-                  required: node.required,
-                  default_value: node.default_value,
-                  kind: activeVariant.node,
-                }}
-                initialValue={value ?? variantDefault(activeVariant)}
-                errors={errors}
-                onSave={(newValue) => {
-                  onChange(node.pointer, newValue);
-                  close();
-                }}
-                onClose={close}
-              />
-            ),
-          })}
-        className="w-full mt-2"
-      >
-        Edit variant ({mode === "one_of" ? "single" : "any"})
-      </Button>
-    </div>
+          ),
+        })}
+    />
   );
 }
 
