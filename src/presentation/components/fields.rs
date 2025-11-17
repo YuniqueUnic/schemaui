@@ -375,22 +375,22 @@ fn extract_constraints(schema: &crate::domain::FieldSchema) -> Vec<String> {
     let mut constraints = Vec::new();
 
     // format 约束
-    if let Some(format) = schema.metadata.get("format") {
-        if let Some(format_str) = format.as_str() {
-            constraints.push(format!("format: {}", format_str));
-        }
+    if let Some(format) = schema.metadata.get("format")
+        && let Some(format_str) = format.as_str()
+    {
+        constraints.push(format!("format: {}", format_str));
     }
 
     // pattern 约束
-    if let Some(pattern) = schema.metadata.get("pattern") {
-        if let Some(pattern_str) = pattern.as_str() {
-            let truncated = if pattern_str.len() > 30 {
-                format!("{}...", &pattern_str[..27])
-            } else {
-                pattern_str.to_string()
-            };
-            constraints.push(format!("pattern: {}", truncated));
-        }
+    if let Some(pattern) = schema.metadata.get("pattern")
+        && let Some(pattern_str) = pattern.as_str()
+    {
+        let truncated = if pattern_str.len() > 30 {
+            format!("{}...", &pattern_str[..27])
+        } else {
+            pattern_str.to_string()
+        };
+        constraints.push(format!("pattern: {}", truncated));
     }
 
     // 字符串长度约束
@@ -461,10 +461,10 @@ fn extract_constraints(schema: &crate::domain::FieldSchema) -> Vec<String> {
             constraints.push(format!("maxItems: {}", max));
         }
 
-        if let Some(unique) = schema.metadata.get("uniqueItems").and_then(|v| v.as_bool()) {
-            if unique {
-                constraints.push("unique".to_string());
-            }
+        if let Some(unique) = schema.metadata.get("uniqueItems").and_then(|v| v.as_bool())
+            && unique
+        {
+            constraints.push("unique".to_string());
         }
     }
 
@@ -563,8 +563,10 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
         let is_active = view.active.get(idx).copied().unwrap_or(false);
         let mark = if view.multi {
             if is_active { "[x]" } else { "[ ]" }
+        } else if is_active {
+            "(•)"
         } else {
-            if is_active { "(•)" } else { "( )" }
+            "( )"
         };
 
         let style = if is_active {
@@ -581,13 +583,13 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
         ];
 
         // 改进：显示描述
-        if let Some(Some(desc)) = view.descriptions.get(idx) {
-            if !desc.is_empty() {
-                spans.push(Span::styled(
-                    format!(" - {}", desc),
-                    Style::default().fg(Color::Gray),
-                ));
-            }
+        if let Some(Some(desc)) = view.descriptions.get(idx)
+            && !desc.is_empty()
+        {
+            spans.push(Span::styled(
+                format!(" - {}", desc),
+                Style::default().fg(Color::Gray),
+            ));
         }
 
         lines.push(Line::from(spans));

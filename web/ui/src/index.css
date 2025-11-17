@@ -14,7 +14,7 @@
     --app-text: #0f172a;
     --app-text-muted: #475569;
     --app-accent: #2563eb;
-    
+
     /* shadcn/ui variables - light mode */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -49,7 +49,7 @@
     --app-text: #e2e8f0;
     --app-text-muted: #94a3b8;
     --app-accent: #0ea5e9;
-    
+
     /* shadcn/ui variables - dark mode */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;

@@ -665,7 +665,7 @@ fn describe_schema_shape(schema: &SchemaObject) -> String {
     if let Some(instance) = instance_type(schema) {
         match instance {
             InstanceType::String => {
-                // 添加format信息
+                // 添加 format 信息
                 if let Some(format) = schema.format.as_ref() {
                     return format!("string({})", format);
                 }
@@ -674,35 +674,35 @@ fn describe_schema_shape(schema: &SchemaObject) -> String {
             InstanceType::Integer => {
                 // 添加范围信息
                 let mut parts = vec!["integer".to_string()];
-                if let Some(number) = schema.number.as_ref() {
-                    if number.minimum.is_some() || number.maximum.is_some() {
-                        let min = number
-                            .minimum
-                            .as_ref()
-                            .map(|n| format!("{:.0}", n))
-                            .unwrap_or("*".to_string());
-                        let max = number
-                            .maximum
-                            .as_ref()
-                            .map(|n| format!("{:.0}", n))
-                            .unwrap_or("*".to_string());
-                        parts.push(format!("[{}..{}]", min, max));
-                    }
+                if let Some(number) = schema.number.as_ref()
+                    && (number.minimum.is_some() || number.maximum.is_some())
+                {
+                    let min = number
+                        .minimum
+                        .as_ref()
+                        .map(|n| format!("{:.0}", n))
+                        .unwrap_or("*".to_string());
+                    let max = number
+                        .maximum
+                        .as_ref()
+                        .map(|n| format!("{:.0}", n))
+                        .unwrap_or("*".to_string());
+                    parts.push(format!("[{}..{}]", min, max));
                 }
                 return parts.join(" ");
             }
             InstanceType::Number => return "number".to_string(),
             InstanceType::Boolean => return "boolean".to_string(),
             InstanceType::Array => {
-                if let Some(array) = schema.array.as_ref() {
-                    if let Some(item) = describe_array_items(array) {
-                        // 确保返回详细的 item 类型
-                        return if item.is_empty() || item == "any" {
-                            "array".to_string()
-                        } else {
-                            format!("{item}[]")
-                        };
-                    }
+                if let Some(array) = schema.array.as_ref()
+                    && let Some(item) = describe_array_items(array)
+                {
+                    // 确保返回详细的 item 类型
+                    return if item.is_empty() || item == "any" {
+                        "array".to_string()
+                    } else {
+                        format!("{item}[]")
+                    };
                 }
                 return "array".to_string();
             }
