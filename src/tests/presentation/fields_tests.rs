@@ -12,7 +12,6 @@ fn make_field() -> FieldState {
         pointer: "/test".into(),
         title: "Test".into(),
         description: None,
-        section_id: "sec".into(),
         kind: FieldKind::String,
         required: false,
         default: None,

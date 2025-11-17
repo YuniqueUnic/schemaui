@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 
 use crate::{
@@ -15,7 +15,6 @@ fn integer_field_schema() -> FieldSchema {
         pointer: "/threshold".to_string(),
         title: "Threshold".to_string(),
         description: None,
-        section_id: "root".to_string(),
         kind: FieldKind::Integer,
         required: false,
         default: Some(Value::Number(0.into())),
@@ -30,7 +29,6 @@ fn bool_field_schema() -> FieldSchema {
         pointer: "/enabled".to_string(),
         title: "Enabled".to_string(),
         description: None,
-        section_id: "root".to_string(),
         kind: FieldKind::Boolean,
         required: false,
         default: Some(Value::Bool(false)),
@@ -64,7 +62,6 @@ fn key_value_schema() -> FieldSchema {
         pointer: "/labels".to_string(),
         title: "Labels".to_string(),
         description: None,
-        section_id: "root".to_string(),
         kind: FieldKind::KeyValue(Box::new(template)),
         required: false,
         default: None,
@@ -89,8 +86,7 @@ fn integer_step_uses_component_palette() {
 fn bool_labels_follow_palette_configuration() {
     let options = UiOptions::default().with_bool_labels("On", "Off");
     let palette = options.component_palette();
-    let mut field =
-        FieldState::from_schema_with_palette(bool_field_schema(), Arc::clone(&palette));
+    let mut field = FieldState::from_schema_with_palette(bool_field_schema(), Arc::clone(&palette));
 
     assert_eq!(field.display_value(), "Off");
 
@@ -105,8 +101,7 @@ fn overlay_context_uses_custom_instructions() {
     let options =
         UiOptions::default().with_overlay_instructions("Ctrl+X remove • Ctrl+Y duplicate");
     let palette = options.component_palette();
-    let field =
-        FieldState::from_schema_with_palette(key_value_schema(), Arc::clone(&palette));
+    let field = FieldState::from_schema_with_palette(key_value_schema(), Arc::clone(&palette));
 
     let context = field
         .overlay_context()

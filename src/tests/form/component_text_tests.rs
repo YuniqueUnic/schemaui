@@ -12,7 +12,6 @@ fn integer_schema() -> FieldSchema {
         pointer: "/count".to_string(),
         title: "count".to_string(),
         description: None,
-        section_id: "section".to_string(),
         kind: FieldKind::Integer,
         required: false,
         default: None,

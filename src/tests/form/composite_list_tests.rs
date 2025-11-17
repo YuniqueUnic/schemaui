@@ -46,7 +46,6 @@ fn composite_list_field() -> FieldState {
         pointer: "/deepItems".to_string(),
         title: "Deep Items".to_string(),
         description: None,
-        section_id: "root".to_string(),
         kind: FieldKind::Array(Box::new(FieldKind::Composite(Box::new(template)))),
         required: false,
         default: None,

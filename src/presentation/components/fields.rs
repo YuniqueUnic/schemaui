@@ -363,9 +363,28 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Number => "number".to_string(),
         FieldKind::Boolean => "boolean".to_string(),
         FieldKind::Enum(_) => "enum".to_string(),
-        FieldKind::Array(inner) => format!("{}[]", field_type_label(inner)),
+        FieldKind::Array(inner) => match inner.as_ref() {
+            FieldKind::Json => "object[]".to_string(),
+            FieldKind::Composite(comp) => {
+                // Get more descriptive label for composite arrays
+                match &comp.mode {
+                    crate::domain::CompositeMode::OneOf => {
+                        if comp.variants.len() == 1 {
+                            format!("{}[]", comp.variants[0].title)
+                        } else {
+                            "choice[]".to_string()
+                        }
+                    }
+                    crate::domain::CompositeMode::AnyOf => "multi-choice[]".to_string(),
+                }
+            }
+            _ => format!("{}[]", field_type_label(inner)),
+        },
         FieldKind::Json => "object".to_string(),
-        FieldKind::Composite(_) => "composite".to_string(),
+        FieldKind::Composite(comp) => match &comp.mode {
+            crate::domain::CompositeMode::OneOf => "choice".to_string(),
+            crate::domain::CompositeMode::AnyOf => "multi-choice".to_string(),
+        },
         FieldKind::KeyValue(_) => "map".to_string(),
     }
 }

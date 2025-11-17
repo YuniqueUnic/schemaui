@@ -5,7 +5,7 @@ use crate::{
     form::{FieldState, FormState, RootSectionState, SectionState},
 };
 
-fn text_field(pointer: &str, title: &str, section_id: &str) -> FieldState {
+fn text_field(pointer: &str, title: &str) -> FieldState {
     let path: Vec<String> = pointer
         .trim_start_matches('/')
         .split('/')
@@ -17,7 +17,6 @@ fn text_field(pointer: &str, title: &str, section_id: &str) -> FieldState {
         pointer: pointer.to_string(),
         title: title.to_string(),
         description: None,
-        section_id: section_id.to_string(),
         kind: FieldKind::String,
         required: false,
         default: None,
@@ -40,14 +39,10 @@ fn section(id: &str, title: &str, depth: usize, fields: Vec<FieldState>) -> Sect
 
 fn sample_form_state() -> FormState {
     let general_fields = vec![
-        text_field("/general/name", "name", "general"),
-        text_field("/general/url", "url", "general"),
+        text_field("/general/name", "name"),
+        text_field("/general/url", "url"),
     ];
-    let child_fields = vec![text_field(
-        "/general/child/address",
-        "address",
-        "general_child",
-    )];
+    let child_fields = vec![text_field("/general/child/address", "address")];
     let root_general = RootSectionState {
         id: "general".to_string(),
         title: "General".to_string(),
@@ -59,7 +54,7 @@ fn sample_form_state() -> FormState {
         ],
     };
 
-    let site_fields = vec![text_field("/site/enabled", "enabled", "site")];
+    let site_fields = vec![text_field("/site/enabled", "enabled")];
     let root_site = RootSectionState {
         id: "site".to_string(),
         title: "Site".to_string(),

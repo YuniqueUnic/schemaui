@@ -10,7 +10,6 @@ fn mk_field(name: &str) -> FieldState {
         pointer: format!("/{name}"),
         title: name.to_string(),
         description: None,
-        section_id: "test".to_string(),
         kind: FieldKind::String,
         required: false,
         default: None,

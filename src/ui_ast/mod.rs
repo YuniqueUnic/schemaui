@@ -548,18 +548,108 @@ fn schema_description(schema: &SchemaObject) -> Option<String> {
 }
 
 fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
+    // First check if this is a reference, use the reference name
+    if let Some(reference) = schema.reference.as_ref()
+        && let Some(name) = reference.split('/').next_back()
+    {
+        // Convert camelCase/PascalCase to readable format
+        return humanize_identifier(name);
+    }
+
+    // For objects with const fields, try to generate a meaningful name
+    if let Some(obj) = schema.object.as_ref() {
+        // Check for a 'type' const field which often identifies variants
+        if let Some(type_prop) = obj.properties.get("type")
+            && let Some(const_val) = get_const_value(type_prop)
+            && let Some(s) = const_val.as_str()
+        {
+            return s.to_string();
+        }
+
+        // Check for 'id' or 'name' fields which might identify the variant
+        for key in ["id", "name", "key"] {
+            if obj.properties.contains_key(key) {
+                let base_type = instance_type(schema)
+                    .map(|t| format!("{:?}", t).to_lowercase())
+                    .unwrap_or_else(|| "variant".to_string());
+                return format!("{} with {}", base_type, key);
+            }
+        }
+    }
+
+    // For arrays, describe what kind of array
+    if let Some(array) = schema.array.as_ref()
+        && let Some(items) = &array.items
+    {
+        match items {
+            SingleOrVec::Single(item_schema) => {
+                // Try to get a meaningful name for the item type
+                if let Schema::Object(item_obj) = item_schema.as_ref()
+                    && let Some(item_ref) = item_obj.reference.as_ref()
+                    && let Some(name) = item_ref.split('/').next_back()
+                {
+                    return format!("{} array", humanize_identifier(name));
+                }
+            }
+            SingleOrVec::Vec(_) => {
+                return "Tuple array".to_string();
+            }
+        }
+    }
+
+    // Fallback to basic type description
     if let Some(instance) = instance_type(schema) {
         return match instance {
-            InstanceType::String => "string".to_string(),
-            InstanceType::Integer => "integer".to_string(),
-            InstanceType::Number => "number".to_string(),
-            InstanceType::Boolean => "boolean".to_string(),
-            InstanceType::Array => "array".to_string(),
-            InstanceType::Object => "object".to_string(),
-            InstanceType::Null => format!("Variant {}", index + 1),
+            InstanceType::String => "Text".to_string(),
+            InstanceType::Integer => "Integer".to_string(),
+            InstanceType::Number => "Number".to_string(),
+            InstanceType::Boolean => "Boolean".to_string(),
+            InstanceType::Array => "List".to_string(),
+            InstanceType::Object => "Object".to_string(),
+            InstanceType::Null => format!("Option {}", index + 1),
         };
     }
-    format!("Variant {}", index + 1)
+
+    format!("Option {}", index + 1)
+}
+
+fn humanize_identifier(s: &str) -> String {
+    // Convert camelCase or PascalCase to readable format
+    // e.g., "simpleItem" -> "Simple Item", "URLConfig" -> "URL Config"
+    let mut result = String::new();
+    let mut prev_upper = false;
+
+    for (i, ch) in s.chars().enumerate() {
+        if ch.is_uppercase() {
+            if i > 0 && !prev_upper {
+                result.push(' ');
+            }
+            result.push(ch);
+            prev_upper = true;
+        } else {
+            if i == 0 {
+                result.push(ch.to_ascii_uppercase());
+            } else {
+                result.push(ch);
+            }
+            prev_upper = false;
+        }
+    }
+
+    result
+}
+
+fn get_const_value(schema: &Schema) -> Option<&Value> {
+    if let Schema::Object(obj) = schema {
+        if let Some(const_val) = obj.const_value.as_ref() {
+            return Some(const_val);
+        }
+        // Also check in extensions for const
+        if let Some(const_val) = obj.extensions.get("const") {
+            return Some(const_val);
+        }
+    }
+    None
 }
 
 fn deep_merge(base: Value, addition: Value) -> Value {
