@@ -1,5 +1,10 @@
 import { useOverlay } from "./Overlay";
 import { variantMatches } from "../utils/variantMatch";
+import {
+  joinPointer,
+  setPointerValue,
+  splitPointer,
+} from "../utils/jsonPointer";
 import type { JsonValue, UiNode, UiNodeKind, UiVariant } from "../types";
 import { defaultForKind, variantDefault } from "../ui-ast";
 import type { ReactNode } from "react";
@@ -768,49 +773,32 @@ function applyLocalChangeForEditor(
   changedPointer: string,
   newValue: JsonValue,
 ): JsonValue {
-  if (!changedPointer || changedPointer === rootPointer) {
+  // If the editor reports a change for the root itself (or no pointer),
+  // replace the entire local value.
+  if (
+    !changedPointer || changedPointer === rootPointer || changedPointer === "/"
+  ) {
     return newValue;
   }
 
-  const rootSegments = rootPointer.split("/").filter(Boolean);
-  const allSegments = changedPointer.split("/").filter(Boolean);
+  const rootSegments = splitPointer(rootPointer);
+  const changedSegments = splitPointer(changedPointer);
 
-  if (allSegments.length <= rootSegments.length) {
-    return newValue;
-  }
+  // In dialogs, child nodes often use pointers that are *relative* to the
+  // entry (e.g. "/key" inside an array item editor whose root pointer is
+  // "/d/d1/d2/d3/config/features/0"). We need to support both:
+  //   - absolute pointers that start with the root pointer
+  //   - relative pointers that should be interpreted under the root
+  const hasCommonPrefix = rootSegments.length > 0 &&
+    rootSegments.length <= changedSegments.length &&
+    rootSegments.every((segment, index) => segment === changedSegments[index]);
 
-  const relativeSegments = allSegments.slice(rootSegments.length);
+  const relativeSegments = hasCommonPrefix
+    ? changedSegments.slice(rootSegments.length)
+    : changedSegments;
 
-  const setRec = (container: JsonValue, segmentIndex: number): JsonValue => {
-    if (segmentIndex >= relativeSegments.length) {
-      return newValue;
-    }
-
-    const rawSegment = relativeSegments[segmentIndex]
-      .replace(/~1/g, "/")
-      .replace(/~0/g, "~");
-
-    if (Array.isArray(container)) {
-      const index = Number(rawSegment);
-      if (Number.isNaN(index)) {
-        return newValue;
-      }
-      const next = [...container];
-      next[index] = setRec(container[index], segmentIndex + 1);
-      return next;
-    }
-
-    if (container && typeof container === "object") {
-      const next = { ...(container as Record<string, JsonValue>) };
-      const previous = (container as Record<string, JsonValue>)[rawSegment];
-      next[rawSegment] = setRec(previous, segmentIndex + 1);
-      return next;
-    }
-
-    return newValue;
-  };
-
-  return setRec(currentValue, 0);
+  const relativePointer = joinPointer(relativeSegments);
+  return setPointerValue(currentValue, relativePointer, newValue);
 }
 
 function extractChildValue(

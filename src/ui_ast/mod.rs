@@ -149,9 +149,10 @@ fn visit_schema(
         }
         if let Some(any_of) = subs.any_of.as_ref() {
             let variants = build_variants(resolver, any_of)?;
-            let allow_multiple = variants
-                .iter()
-                .any(|v| matches!(&v.node, UiNodeKind::Object { .. }));
+            // For anyOf, default to single selection (allow_multiple = false)
+            // This ensures proper radio group UI for single-value anyOf
+            // and correct behavior for array items with anyOf
+            let allow_multiple = false;
             let default_value = infer_default_for_composite(&variants, allow_multiple);
             return Ok(UiNode {
                 pointer,
@@ -259,9 +260,10 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
         }
         if let Some(any_of) = subs.any_of.as_ref() {
             let variants = build_variants(resolver, any_of)?;
-            let allow_multiple = variants
-                .iter()
-                .any(|v| matches!(&v.node, UiNodeKind::Object { .. }));
+            // For anyOf, default to single selection (allow_multiple = false)
+            // This ensures proper radio group UI for single-value anyOf
+            // and correct behavior for array items with anyOf
+            let allow_multiple = false;
             return Ok(UiNodeKind::Composite {
                 mode: CompositeMode::AnyOf,
                 allow_multiple,

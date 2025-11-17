@@ -1,0 +1,367 @@
+{
+    "$schema": "https://json-schema.org/draft-07/schema#",
+    "title": "Comprehensive Test Schema",
+    "description": "Tests all edge cases for anyOf, oneOf, arrays, and deep nesting",
+    "type": "object",
+    "properties": {
+        "simpleTypes": {
+            "type": "object",
+            "title": "1. Simple Types",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "title": "Text Field",
+                    "minLength": 1,
+                    "maxLength": 50
+                },
+                "number": {
+                    "type": "number",
+                    "title": "Number Field",
+                    "minimum": 0,
+                    "maximum": 100
+                },
+                "toggle": {
+                    "type": "boolean",
+                    "title": "Boolean Toggle"
+                },
+                "dropdown": {
+                    "type": "string",
+                    "title": "Dropdown",
+                    "enum": [
+                        "option1",
+                        "option2",
+                        "option3"
+                    ]
+                }
+            }
+        },
+        "simpleArrays": {
+            "type": "object",
+            "title": "2. Simple Arrays (should inline)",
+            "properties": {
+                "strings": {
+                    "type": "array",
+                    "title": "String Array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "numbers": {
+                    "type": "array",
+                    "title": "Number Array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "booleans": {
+                    "type": "array",
+                    "title": "Boolean Array",
+                    "items": {
+                        "type": "boolean"
+                    }
+                }
+            }
+        },
+        "singleAnyOf": {
+            "title": "3. Single anyOf (should be radio group)",
+            "anyOf": [
+                {
+                    "type": "string",
+                    "title": "Text Option",
+                    "maxLength": 20
+                },
+                {
+                    "type": "number",
+                    "title": "Number Option",
+                    "minimum": 0
+                },
+                {
+                    "type": "array",
+                    "title": "Array Option",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            ]
+        },
+        "singleOneOf": {
+            "title": "4. Single oneOf (should be radio group)",
+            "oneOf": [
+                {
+                    "type": "object",
+                    "title": "Person",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "const": "person"
+                        },
+                        "name": {
+                            "type": "string"
+                        },
+                        "age": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "type",
+                        "name"
+                    ]
+                },
+                {
+                    "type": "object",
+                    "title": "Company",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "const": "company"
+                        },
+                        "companyName": {
+                            "type": "string"
+                        },
+                        "employees": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "type",
+                        "companyName"
+                    ]
+                }
+            ]
+        },
+        "arrayOfAnyOf": {
+            "type": "array",
+            "title": "5. Array of anyOf items",
+            "items": {
+                "anyOf": [
+                    {
+                        "type": "string",
+                        "title": "Text Item"
+                    },
+                    {
+                        "type": "number",
+                        "title": "Number Item"
+                    },
+                    {
+                        "type": "object",
+                        "title": "Object Item",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "value": {
+                                "type": "number"
+                            }
+                        },
+                        "required": [
+                            "id"
+                        ]
+                    }
+                ]
+            }
+        },
+        "arrayOfOneOf": {
+            "type": "array",
+            "title": "6. Array of oneOf items",
+            "items": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "title": "Task",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "const": "task"
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "completed": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "title"
+                        ]
+                    },
+                    {
+                        "type": "object",
+                        "title": "Note",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "const": "note"
+                            },
+                            "content": {
+                                "type": "string"
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "content"
+                        ]
+                    }
+                ]
+            }
+        },
+        "objectArray": {
+            "type": "array",
+            "title": "7. Array of Objects",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "title": "Key"
+                    },
+                    "value": {
+                        "type": "string",
+                        "title": "Value"
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "title": "Enabled"
+                    }
+                },
+                "required": [
+                    "key"
+                ]
+            }
+        },
+        "deepNesting": {
+            "type": "object",
+            "title": "8. Deep Nesting Test",
+            "properties": {
+                "level1": {
+                    "type": "object",
+                    "title": "Level 1",
+                    "properties": {
+                        "level2": {
+                            "type": "object",
+                            "title": "Level 2",
+                            "properties": {
+                                "level3": {
+                                    "type": "object",
+                                    "title": "Level 3",
+                                    "properties": {
+                                        "level4": {
+                                            "type": "object",
+                                            "title": "Level 4",
+                                            "properties": {
+                                                "level5AnyOf": {
+                                                    "title": "Level 5 anyOf",
+                                                    "anyOf": [
+                                                        {
+                                                            "type": "string",
+                                                            "title": "String at depth 5"
+                                                        },
+                                                        {
+                                                            "type": "array",
+                                                            "title": "Array at depth 5",
+                                                            "items": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    ]
+                                                },
+                                                "level5Array": {
+                                                    "type": "array",
+                                                    "title": "Level 5 Array of anyOf",
+                                                    "items": {
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "string",
+                                                                "title": "String Item"
+                                                            },
+                                                            {
+                                                                "type": "object",
+                                                                "title": "Object Item",
+                                                                "properties": {
+                                                                    "deep": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "value": {
+                                                                        "type": "number"
+                                                                    }
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "nestedArrayOfArrays": {
+            "type": "array",
+            "title": "9. Array of Arrays",
+            "items": {
+                "type": "array",
+                "items": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ]
+                }
+            }
+        },
+        "complexComposite": {
+            "type": "object",
+            "title": "10. Complex Composite",
+            "properties": {
+                "config": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "title": "List Config",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "type": "object",
+                            "title": "Object Config",
+                            "properties": {
+                                "mode": {
+                                    "type": "string",
+                                    "enum": [
+                                        "basic",
+                                        "advanced"
+                                    ]
+                                },
+                                "settings": {
+                                    "type": "object",
+                                    "properties": {
+                                        "timeout": {
+                                            "type": "integer"
+                                        },
+                                        "retries": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

@@ -71,13 +71,13 @@ export default function App() {
         console.error(error);
         setStatus("Failed to load session");
       } finally {
-        if (mounted) setLoading(false);
+        setLoading(false);
       }
     })();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [previewPretty]);
 
   const runValidation = async (value: JsonValue) => {
     const seq = ++validationSeq.current;
