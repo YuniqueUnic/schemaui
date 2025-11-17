@@ -87,16 +87,8 @@ export default function App() {
       const next = new Map<string, string>();
       result.errors?.forEach((err) => next.set(err.pointer || "", err.message));
       setErrors(next);
-
-      // Show toast for validation errors
-      if (next.size > 0) {
-        toast.error(
-          `Found ${next.size} validation error${next.size > 1 ? "s" : ""}`,
-        );
-      }
     } catch (error) {
       console.error("validate failed", error);
-      toast.error("Validation failed");
     }
   };
 

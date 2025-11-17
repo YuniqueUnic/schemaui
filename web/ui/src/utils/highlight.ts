@@ -2,7 +2,7 @@ import Prism from 'prismjs';
 import 'prismjs/components/prism-json';
 import 'prismjs/components/prism-yaml';
 import 'prismjs/components/prism-toml';
-import 'prismjs/themes/prism-tomorrow.css';
+// Custom theme will be defined in index.css
 
 const LANGUAGE_MAP: Record<string, Prism.Grammar> = {
   json: Prism.languages.json,

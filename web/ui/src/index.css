@@ -117,3 +117,135 @@ body {
     padding: 0.4rem 0.9rem;
   }
 }
+
+/* Prism.js Syntax Highlighting - Custom Theme */
+/* Light Mode */
+:root {
+  --prism-background: #f8fafc;
+  --prism-foreground: #1e293b;
+  --prism-comment: #64748b;
+  --prism-string: #0ea5e9;
+  --prism-number: #8b5cf6;
+  --prism-boolean: #ec4899;
+  --prism-null: #f59e0b;
+  --prism-keyword: #dc2626;
+  --prism-property: #059669;
+  --prism-punctuation: #475569;
+  --prism-operator: #0891b2;
+}
+
+/* Dark Mode */
+:root.dark {
+  --prism-background: #0f172a;
+  --prism-foreground: #e2e8f0;
+  --prism-comment: #64748b;
+  --prism-string: #22d3ee;
+  --prism-number: #a78bfa;
+  --prism-boolean: #f472b6;
+  --prism-null: #fbbf24;
+  --prism-keyword: #fb7185;
+  --prism-property: #34d399;
+  --prism-punctuation: #94a3b8;
+  --prism-operator: #06b6d4;
+}
+
+/* Prism token styles */
+code[class*="language-"],
+pre[class*="language-"] {
+  color: var(--prism-foreground);
+  background: transparent;
+  text-shadow: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  direction: ltr;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  tab-size: 2;
+  hyphens: none;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: var(--prism-comment);
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: var(--prism-punctuation);
+}
+
+.token.property,
+.token.tag,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: var(--prism-property);
+}
+
+.token.boolean {
+  color: var(--prism-boolean);
+  font-weight: 600;
+}
+
+.token.number {
+  color: var(--prism-number);
+  font-weight: 600;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: var(--prism-string);
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string,
+.token.variable {
+  color: var(--prism-operator);
+}
+
+.token.atrule,
+.token.attr-value,
+.token.function,
+.token.class-name {
+  color: var(--prism-keyword);
+}
+
+.token.keyword {
+  color: var(--prism-keyword);
+  font-weight: 600;
+}
+
+.token.regex,
+.token.important {
+  color: var(--prism-number);
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+.token.entity {
+  cursor: help;
+}
+
+.token.null {
+  color: var(--prism-null);
+  font-weight: 600;
+}

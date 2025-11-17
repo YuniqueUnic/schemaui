@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface OverlayOptions {
   title?: string;
@@ -39,16 +38,16 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
     <OverlayContext.Provider value={{ open, close }}>
       {children}
       <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-        <DialogContent className="max-w-3xl max-h-[85vh]">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>{options?.title || "Details"}</DialogTitle>
             {options?.description && (
               <DialogDescription>{options.description}</DialogDescription>
             )}
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
+          <div className="max-h-[60vh] overflow-y-auto pr-4">
             {options?.content(close)}
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </OverlayContext.Provider>
