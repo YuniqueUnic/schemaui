@@ -17,6 +17,81 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+
+// Helper component for editing array items with local state
+function ArrayItemEditor({
+  node,
+  initialValue,
+  errors,
+  onSave,
+  onClose,
+}: {
+  node: UiNode;
+  initialValue: JsonValue;
+  errors: Map<string, string>;
+  onSave: (value: JsonValue) => void;
+  onClose: () => void;
+}) {
+  const [localValue, setLocalValue] = useState<JsonValue>(initialValue);
+
+  return (
+    <div className="space-y-4">
+      <NodeRenderer
+        node={node}
+        value={localValue}
+        errors={errors}
+        onChange={(_pointer, newValue) => setLocalValue(newValue)}
+        renderMode="inline"
+      />
+      <div className="flex justify-end gap-2 mt-4">
+        <Button onClick={onClose} variant="ghost" size="sm">
+          Cancel
+        </Button>
+        <Button onClick={() => onSave(localValue)} variant="outline" size="sm">
+          Done
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Helper component for editing variant entries with local state
+function VariantEntryEditor({
+  node,
+  initialValue,
+  errors,
+  onSave,
+  onClose,
+}: {
+  node: UiNode;
+  initialValue: JsonValue;
+  errors: Map<string, string>;
+  onSave: (value: JsonValue) => void;
+  onClose: () => void;
+}) {
+  const [localValue, setLocalValue] = useState<JsonValue>(initialValue);
+
+  return (
+    <div className="space-y-4">
+      <NodeRenderer
+        node={node}
+        value={localValue}
+        errors={errors}
+        onChange={(_pointer, newValue) => setLocalValue(newValue)}
+        renderMode="inline"
+      />
+      <div className="flex justify-end gap-2 mt-4">
+        <Button onClick={onClose} variant="ghost" size="sm">
+          Cancel
+        </Button>
+        <Button onClick={() => onSave(localValue)} variant="outline" size="sm">
+          Done
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 interface NodeRendererProps {
   node: UiNode;
@@ -209,24 +284,18 @@ function renderArrayControl(
     overlay.open({
       title: `${node.title ?? node.pointer} · Item ${index + 1}`,
       content: (close) => (
-        <div className="space-y-4">
-          <NodeRenderer
-            node={entryNode}
-            value={initial ?? entries[index]}
-            errors={errors}
-            onChange={(_pointer, newValue) => {
-              const next = [...entries];
-              next[index] = newValue;
-              onChange(node.pointer, next);
-            }}
-            renderMode="inline"
-          />
-          <div className="flex justify-end mt-4">
-            <Button onClick={close} variant="outline" size="sm">
-              Done
-            </Button>
-          </div>
-        </div>
+        <ArrayItemEditor
+          node={entryNode}
+          initialValue={initial ?? entries[index]}
+          errors={errors}
+          onSave={(newValue) => {
+            const next = [...entries];
+            next[index] = newValue;
+            onChange(node.pointer, next);
+            close();
+          }}
+          onClose={close}
+        />
       ),
     });
   };
@@ -332,28 +401,18 @@ function renderCompositeControl(
                       overlay.open({
                         title: `${node.title ?? node.pointer} · Variant entry`,
                         content: (close) => (
-                          <div className="space-y-4">
-                            <NodeRenderer
-                              node={entryNode}
-                              value={entry}
-                              errors={errors}
-                              onChange={(_pointer, newValue) => {
-                                const next = [...entries];
-                                next[index] = newValue;
-                                onChange(node.pointer, next);
-                              }}
-                              renderMode="inline"
-                            />
-                            <div className="flex justify-end mt-4">
-                              <Button
-                                onClick={close}
-                                variant="outline"
-                                size="sm"
-                              >
-                                Done
-                              </Button>
-                            </div>
-                          </div>
+                          <VariantEntryEditor
+                            node={entryNode}
+                            initialValue={entry}
+                            errors={errors}
+                            onSave={(newValue) => {
+                              const next = [...entries];
+                              next[index] = newValue;
+                              onChange(node.pointer, next);
+                              close();
+                            }}
+                            onClose={close}
+                          />
                         ),
                       });
                     }}
@@ -381,8 +440,39 @@ function renderCompositeControl(
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() =>
-            onChange(node.pointer, [...entries, variantDefault(variants[0])])}
+          onClick={() => {
+            const newEntry = variantDefault(variants[0]);
+            const next = [...entries, newEntry];
+            onChange(node.pointer, next);
+            // Open editor for the new entry
+            setTimeout(() => {
+              const entryNode: UiNode = {
+                pointer: `${node.pointer}/${entries.length}`,
+                title: variants[0]?.title ?? `Variant ${entries.length + 1}`,
+                description: variants[0]?.description,
+                required: false,
+                default_value: node.default_value,
+                kind: variants[0].node,
+              };
+              overlay.open({
+                title: `${node.title ?? node.pointer} · New variant entry`,
+                content: (close) => (
+                  <VariantEntryEditor
+                    node={entryNode}
+                    initialValue={newEntry}
+                    errors={errors}
+                    onSave={(updatedValue) => {
+                      const updated = [...next];
+                      updated[entries.length] = updatedValue;
+                      onChange(node.pointer, updated);
+                      close();
+                    }}
+                    onClose={close}
+                  />
+                ),
+              });
+            }, 0);
+          }}
           className="w-full"
         >
           + Add variant entry
@@ -421,27 +511,23 @@ function renderCompositeControl(
               activeVariant.title ?? "Variant"
             }`,
             content: (close) => (
-              <div className="space-y-4">
-                <NodeRenderer
-                  node={{
-                    pointer: node.pointer,
-                    title: activeVariant.title ?? node.title,
-                    description: activeVariant.description ?? node.description,
-                    required: node.required,
-                    default_value: node.default_value,
-                    kind: activeVariant.node,
-                  }}
-                  value={value}
-                  errors={errors}
-                  onChange={onChange}
-                  renderMode="inline"
-                />
-                <div className="flex justify-end mt-4">
-                  <Button onClick={close} variant="outline" size="sm">
-                    Done
-                  </Button>
-                </div>
-              </div>
+              <VariantEntryEditor
+                node={{
+                  pointer: node.pointer,
+                  title: activeVariant.title ?? node.title,
+                  description: activeVariant.description ?? node.description,
+                  required: node.required,
+                  default_value: node.default_value,
+                  kind: activeVariant.node,
+                }}
+                initialValue={value ?? variantDefault(activeVariant)}
+                errors={errors}
+                onSave={(newValue) => {
+                  onChange(node.pointer, newValue);
+                  close();
+                }}
+                onClose={close}
+              />
             ),
           })}
         className="w-full mt-2"
