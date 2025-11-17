@@ -74,7 +74,15 @@ function ArrayItemEditor({
         node={node}
         value={localValue}
         errors={errors}
-        onChange={(_pointer, newValue) => setLocalValue(newValue)}
+        onChange={(changedPointer, newValue) =>
+          setLocalValue((previous) =>
+            applyLocalChangeForEditor(
+              node.pointer,
+              previous,
+              changedPointer,
+              newValue,
+            )
+          )}
         renderMode="inline"
       />
       <div className="flex justify-end gap-2 mt-4">
@@ -111,7 +119,15 @@ function VariantEntryEditor({
         node={node}
         value={localValue}
         errors={errors}
-        onChange={(_pointer, newValue) => setLocalValue(newValue)}
+        onChange={(changedPointer, newValue) =>
+          setLocalValue((previous) =>
+            applyLocalChangeForEditor(
+              node.pointer,
+              previous,
+              changedPointer,
+              newValue,
+            )
+          )}
         renderMode="inline"
       />
       <div className="flex justify-end gap-2 mt-4">
@@ -640,7 +656,7 @@ function renderCompositeControl(
     );
   }
 
-  const activeVariant = determineVariant(value, variants) ?? variants[0];
+  const activeVariant = determineBestVariant(value, variants);
 
   return (
     <div className="space-y-4">
@@ -679,6 +695,122 @@ function renderCompositeControl(
 function determineVariant(value: JsonValue | undefined, variants: UiVariant[]) {
   return variants.find((variant) => variantMatches(value, variant.schema)) ??
     variants[0];
+}
+
+/**
+ * Improved variant determination that handles ambiguous cases.
+ * When multiple variants match (e.g., empty array matches both string[] and number[]),
+ * we check if the value exactly matches a variant's default value to disambiguate.
+ */
+function determineBestVariant(
+  value: JsonValue | undefined,
+  variants: UiVariant[],
+): UiVariant {
+  const matchingVariants = variants.filter((v) =>
+    variantMatches(value, v.schema)
+  );
+
+  // If exactly one variant matches, use it
+  if (matchingVariants.length === 1) {
+    return matchingVariants[0];
+  }
+
+  // If multiple variants match, try to find the one whose default exactly matches value
+  if (matchingVariants.length > 1) {
+    const exactMatch = matchingVariants.find((v) => {
+      const defaultVal = variantDefault(v);
+      return deepEqualValues(value, defaultVal);
+    });
+    if (exactMatch) {
+      return exactMatch;
+    }
+    // Fall back to first matching variant
+    return matchingVariants[0];
+  }
+
+  // No matches, return first variant as fallback
+  return variants[0];
+}
+
+/**
+ * Deep equality check for JSON values
+ */
+function deepEqualValues(
+  a: JsonValue | undefined,
+  b: JsonValue | undefined,
+): boolean {
+  if (a === b) return true;
+  if (a === null || a === undefined || b === null || b === undefined) {
+    return a === b;
+  }
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((val, idx) => deepEqualValues(val, b[idx]));
+  }
+  if (typeof a === "object" && typeof b === "object") {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((key) =>
+      deepEqualValues(
+        (a as Record<string, JsonValue>)[key],
+        (b as Record<string, JsonValue>)[key],
+      )
+    );
+  }
+  return false;
+}
+
+function applyLocalChangeForEditor(
+  rootPointer: string,
+  currentValue: JsonValue,
+  changedPointer: string,
+  newValue: JsonValue,
+): JsonValue {
+  if (!changedPointer || changedPointer === rootPointer) {
+    return newValue;
+  }
+
+  const rootSegments = rootPointer.split("/").filter(Boolean);
+  const allSegments = changedPointer.split("/").filter(Boolean);
+
+  if (allSegments.length <= rootSegments.length) {
+    return newValue;
+  }
+
+  const relativeSegments = allSegments.slice(rootSegments.length);
+
+  const setRec = (container: JsonValue, segmentIndex: number): JsonValue => {
+    if (segmentIndex >= relativeSegments.length) {
+      return newValue;
+    }
+
+    const rawSegment = relativeSegments[segmentIndex]
+      .replace(/~1/g, "/")
+      .replace(/~0/g, "~");
+
+    if (Array.isArray(container)) {
+      const index = Number(rawSegment);
+      if (Number.isNaN(index)) {
+        return newValue;
+      }
+      const next = [...container];
+      next[index] = setRec(container[index], segmentIndex + 1);
+      return next;
+    }
+
+    if (container && typeof container === "object") {
+      const next = { ...(container as Record<string, JsonValue>) };
+      const previous = (container as Record<string, JsonValue>)[rawSegment];
+      next[rawSegment] = setRec(previous, segmentIndex + 1);
+      return next;
+    }
+
+    return newValue;
+  };
+
+  return setRec(currentValue, 0);
 }
 
 function extractChildValue(
