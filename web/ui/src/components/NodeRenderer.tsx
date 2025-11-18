@@ -1,14 +1,18 @@
 import { useOverlay } from "./Overlay";
-import { variantMatches } from "../utils/variantMatch";
-import {
-  joinPointer,
-  setPointerValue,
-  splitPointer,
-} from "../utils/jsonPointer";
-import type { JsonValue, UiNode, UiNodeKind, UiVariant } from "../types";
+import type { JsonValue, UiNode, UiNodeKind } from "../types";
 import { defaultForKind, variantDefault } from "../ui-ast";
 import type { ReactNode } from "react";
 import { VariantSelector } from "./VariantSelector";
+import {
+  determineBestVariant,
+  determineVariant,
+} from "../utils/variantHelpers";
+import {
+  extractChildValue,
+  formatValueSummary,
+  inferValueType,
+  isSimpleKind,
+} from "../utils/typeHelpers";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,34 +28,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-
-// ============================================================================
-// Type Classification Helpers
-// ============================================================================
-
-/**
- * Determines if a UI node kind represents a simple, primitive type that can be
- * rendered inline without requiring a dialog/overlay.
- * Simple types: string, number, integer, boolean (without enum options)
- */
-function isSimpleKind(kind: UiNodeKind): boolean {
-  return kind.type === "field" && !kind.enum_options;
-}
-
-/**
- * Infers the type of a value for display purposes
- */
-function inferValueType(value: JsonValue | undefined): string {
-  if (value === null || value === undefined) return "null";
-  if (typeof value === "string") return "string";
-  if (typeof value === "number") {
-    return Number.isInteger(value) ? "integer" : "number";
-  }
-  if (typeof value === "boolean") return "boolean";
-  if (Array.isArray(value)) return "array";
-  if (typeof value === "object") return "object";
-  return "unknown";
-}
+import {
+  joinPointer,
+  setPointerValue,
+  splitPointer,
+} from "../utils/jsonPointer";
 
 // ============================================================================
 // Helper Components
@@ -866,84 +847,12 @@ function renderCompositeControl(
   );
 }
 
-function determineVariant(value: JsonValue | undefined, variants: UiVariant[]) {
-  return variants.find((variant) => variantMatches(value, variant.schema)) ??
-    variants[0];
-}
-
-/**
- * Improved variant determination that handles ambiguous cases.
- * When multiple variants match (e.g., empty array matches both string[] and number[]),
- * we check if the value exactly matches a variant's default value to disambiguate.
- */
-function determineBestVariant(
-  value: JsonValue | undefined,
-  variants: UiVariant[],
-): UiVariant {
-  const matchingVariants = variants.filter((v) =>
-    variantMatches(value, v.schema)
-  );
-
-  // If exactly one variant matches, use it
-  if (matchingVariants.length === 1) {
-    return matchingVariants[0];
-  }
-
-  // If multiple variants match, try to find the one whose default exactly matches value
-  if (matchingVariants.length > 1) {
-    const exactMatch = matchingVariants.find((v) => {
-      const defaultVal = variantDefault(v);
-      return deepEqualValues(value, defaultVal);
-    });
-    if (exactMatch) {
-      return exactMatch;
-    }
-    // Fall back to first matching variant
-    return matchingVariants[0];
-  }
-
-  // No matches, return first variant as fallback
-  return variants[0];
-}
-
-/**
- * Deep equality check for JSON values
- */
-function deepEqualValues(
-  a: JsonValue | undefined,
-  b: JsonValue | undefined,
-): boolean {
-  if (a === b) return true;
-  if (a === null || a === undefined || b === null || b === undefined) {
-    return a === b;
-  }
-  if (typeof a !== typeof b) return false;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    return a.every((val, idx) => deepEqualValues(val, b[idx]));
-  }
-  if (typeof a === "object" && typeof b === "object") {
-    const aKeys = Object.keys(a);
-    const bKeys = Object.keys(b);
-    if (aKeys.length !== bKeys.length) return false;
-    return aKeys.every((key) =>
-      deepEqualValues(
-        (a as Record<string, JsonValue>)[key],
-        (b as Record<string, JsonValue>)[key],
-      )
-    );
-  }
-  return false;
-}
-
 function applyLocalChangeForEditor(
   rootPointer: string,
   currentValue: JsonValue,
   changedPointer: string,
   newValue: JsonValue,
 ): JsonValue {
-  // If the editor reports a change for the root itself (or no pointer),
-  // replace the entire local value.
   if (
     !changedPointer || changedPointer === rootPointer || changedPointer === "/"
   ) {
@@ -953,11 +862,6 @@ function applyLocalChangeForEditor(
   const rootSegments = splitPointer(rootPointer);
   const changedSegments = splitPointer(changedPointer);
 
-  // In dialogs, child nodes often use pointers that are *relative* to the
-  // entry (e.g. "/key" inside an array item editor whose root pointer is
-  // "/d/d1/d2/d3/config/features/0"). We need to support both:
-  //   - absolute pointers that start with the root pointer
-  //   - relative pointers that should be interpreted under the root
   const hasCommonPrefix = rootSegments.length > 0 &&
     rootSegments.length <= changedSegments.length &&
     rootSegments.every((segment, index) => segment === changedSegments[index]);
@@ -968,48 +872,4 @@ function applyLocalChangeForEditor(
 
   const relativePointer = joinPointer(relativeSegments);
   return setPointerValue(currentValue, relativePointer, newValue);
-}
-
-function extractChildValue(
-  container: JsonValue | undefined,
-  pointer: string,
-): JsonValue | undefined {
-  if (container === null || container === undefined) {
-    return undefined;
-  }
-  const token = pointerSegment(pointer);
-  if (!token) {
-    return undefined;
-  }
-  if (Array.isArray(container)) {
-    const index = Number(token);
-    return Number.isNaN(index) ? undefined : container[index];
-  }
-  if (typeof container === "object") {
-    return (container as Record<string, JsonValue>)[token];
-  }
-  return undefined;
-}
-
-function pointerSegment(pointer: string): string | undefined {
-  if (!pointer || pointer === "/") {
-    return undefined;
-  }
-  const segments = pointer.split("/").filter(Boolean);
-  const raw = segments[segments.length - 1];
-  return raw?.replace(/~1/g, "/").replace(/~0/g, "~");
-}
-
-function formatValueSummary(value: JsonValue | undefined): string {
-  if (value === null || value === undefined) return "empty";
-  if (typeof value === "string") return value || '""';
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  if (Array.isArray(value)) return `[items: ${value.length}]`;
-  if (typeof value === "object") {
-    const keys = Object.keys(value as Record<string, JsonValue>);
-    return keys.length ? `{ ${keys.slice(0, 3).join(", ")} }` : "{}";
-  }
-  return "value";
 }

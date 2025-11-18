@@ -1,4 +1,5 @@
 import type { JsonValue } from "../types";
+import { deepEqual } from "./deepEqual";
 
 type JsonSchema = JsonValue;
 
@@ -227,32 +228,4 @@ function typeMatches(value: JsonValue | undefined, expected: string): boolean {
     default:
       return true;
   }
-}
-
-function deepEqual(
-  a: JsonValue | undefined,
-  b: JsonValue | undefined,
-): boolean {
-  if (a === b) {
-    return true;
-  }
-  if (typeof a !== typeof b) {
-    return false;
-  }
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    return a.every((entry, index) => deepEqual(entry, b[index]));
-  }
-  if (a && typeof a === "object" && b && typeof b === "object") {
-    const aKeys = Object.keys(a);
-    const bKeys = Object.keys(b);
-    if (aKeys.length !== bKeys.length) return false;
-    return aKeys.every((key) =>
-      deepEqual(
-        (a as Record<string, JsonValue>)[key],
-        (b as Record<string, JsonValue>)[key],
-      )
-    );
-  }
-  return false;
 }

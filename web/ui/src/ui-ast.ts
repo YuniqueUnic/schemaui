@@ -5,6 +5,11 @@ import {
   mergeDefaults,
   setPointerValue,
 } from "./utils/jsonPointer";
+import {
+  extractSchemaProperties,
+  identifyVariantType,
+} from "./utils/variantHelpers";
+import { VARIANT_CONFIGS } from "./constants/variantDefaults";
 
 export function applyUiDefaults(
   ast: UiAst | undefined,
@@ -28,11 +33,13 @@ export function applyUiDefaults(
 }
 
 export function variantDefault(variant: UiVariant): JsonValue {
-  // For object variants, check if there are const fields that can uniquely identify the variant
+  // For object variants, use configurable variant identification
   if (variant.node.type === "object") {
     const result: Record<string, JsonValue> = {};
 
     // First, set any const fields from the schema to ensure unique identification
+    const schemaProperties = extractSchemaProperties(variant.schema);
+
     if (
       variant.schema && typeof variant.schema === "object" &&
       "properties" in variant.schema
@@ -47,61 +54,24 @@ export function variantDefault(variant: UiVariant): JsonValue {
       }
     }
 
-    // Then add defaults for required fields, using unique values when possible
-    // Identify variant type by examining schema properties
-    const schemaProperties =
-      (variant.schema && typeof variant.schema === "object" &&
-          !Array.isArray(variant.schema) && "properties" in variant.schema)
-        ? (variant.schema.properties as Record<string, unknown>)
-        : {};
+    // Identify variant type using configuration
+    const variantType = identifyVariantType(schemaProperties);
+    const variantConfig = variantType ? VARIANT_CONFIGS[variantType] : null;
 
-    // Identify variant types by their property signatures
-    const hasLabel = "label" in schemaProperties;
-    const hasEnabled = "enabled" in schemaProperties;
-    const hasValues = "values" in schemaProperties;
-    const hasUrl = "url" in schemaProperties;
-    const hasPriority = "priority" in schemaProperties;
-    const hasActive = "active" in schemaProperties;
-
-    // simpleItem: {id, label?, enabled?}
-    const isSimpleItem = (hasLabel || hasEnabled) && !hasValues && !hasUrl;
-    // numericItem: {id, values?}
-    const isNumericItem = hasValues && !hasLabel && !hasEnabled;
-    // target: {url, priority?, active?}
-    const isTarget = hasUrl && (hasPriority || hasActive);
-
+    // Process each child node
     for (const child of variant.node.children) {
       const key = child.pointer.split("/").pop() || "";
       if (!(key in result)) {
-        // Special handling for specific variant types to ensure uniqueness
-        if (key === "id") {
-          // Generate unique IDs based on the schema reference or variant ID
-          if (isSimpleItem) {
-            result[key] = 1001; // Unique ID for simpleItem
-          } else if (isNumericItem) {
-            result[key] = 2001; // Unique ID for numericItem
-          } else if (variant.id) {
-            // Generic hash-based ID for other variants
-            const hash = variant.id.split("").reduce(
-              (acc, char) => acc + char.charCodeAt(0),
-              0,
-            );
-            result[key] = hash % 1000;
-          } else {
-            result[key] = 0;
-          }
-        } else if (key === "label" && isSimpleItem) {
-          // Give simpleItem a default label to distinguish it
-          result[key] = "item";
-        } else if (key === "values" && isNumericItem) {
-          // Give numericItem some default values to distinguish it
-          result[key] = [1];
-        } else if (key === "url" && isTarget) {
-          // For target objects with uri format, provide a valid URL
-          result[key] = "https://example.com";
-        } else if (key === "priority" && isTarget) {
-          // For target objects, set priority within valid range (1-10)
-          result[key] = 5;
+        // Use variant-specific defaults if available
+        if (variantConfig && key in variantConfig.defaults) {
+          result[key] = variantConfig.defaults[key] as JsonValue;
+        } else if (key === "id" && !variantConfig) {
+          // Fallback: Generate hash-based ID for unknown variants
+          const hash = variant.id.split("").reduce(
+            (acc, char) => acc + char.charCodeAt(0),
+            0,
+          );
+          result[key] = hash % 1000;
         } else {
           result[key] = child.default_value ?? defaultForKind(child.kind);
         }
@@ -112,7 +82,6 @@ export function variantDefault(variant: UiVariant): JsonValue {
     if (variant.node.required) {
       for (const requiredKey of variant.node.required) {
         if (!(requiredKey in result)) {
-          // Find the child node for this key
           const childNode = variant.node.children.find(
             (c) => c.pointer.split("/").pop() === requiredKey,
           );
@@ -130,7 +99,6 @@ export function variantDefault(variant: UiVariant): JsonValue {
   // For array variants, add a sample element to distinguish between string[] and number[]
   if (variant.node.type === "array") {
     const itemDefault = defaultForKind(variant.node.item);
-    // Return array with one default element to make it distinguishable
     return [itemDefault];
   }
 
