@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, File } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, File } from "lucide-react";
 import type { UiAst, UiNode } from "../types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 interface TreeViewProps {
   ast?: UiAst | null;
   selectedPointer?: string;
+  errors?: Map<string, string>;
   onSelect(pointer: string): void;
 }
 
@@ -18,9 +19,21 @@ interface TreeItem {
   children: TreeItem[];
 }
 
-export function TreeView({ ast, selectedPointer, onSelect }: TreeViewProps) {
+export function TreeView(
+  { ast, selectedPointer, errors, onSelect }: TreeViewProps,
+) {
   const items = useMemo(() => buildTree(ast?.roots ?? [], 0), [ast]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  // Check if a pointer or any of its children have errors
+  const hasError = (pointer: string): boolean => {
+    if (errors?.has(pointer)) return true;
+    // Check if any child path has an error
+    for (const errorPath of errors?.keys() ?? []) {
+      if (errorPath.startsWith(pointer + "/")) return true;
+    }
+    return false;
+  };
 
   if (!items.length) {
     return (
@@ -40,6 +53,7 @@ export function TreeView({ ast, selectedPointer, onSelect }: TreeViewProps) {
             collapsed={collapsed}
             setCollapsed={setCollapsed}
             selectedPointer={selectedPointer}
+            hasError={hasError}
             onSelect={onSelect}
           />
         ))}
@@ -53,16 +67,19 @@ function TreeRow({
   collapsed,
   setCollapsed,
   selectedPointer,
+  hasError,
   onSelect,
 }: {
   item: TreeItem;
   collapsed: Record<string, boolean>;
   setCollapsed: Dispatch<SetStateAction<Record<string, boolean>>>;
   selectedPointer?: string;
+  hasError: (pointer: string) => boolean;
   onSelect(pointer: string): void;
 }) {
   const isActive = item.pointer === selectedPointer;
   const isCollapsed = collapsed[item.pointer];
+  const itemHasError = hasError(item.pointer);
   const toggle = (event: React.MouseEvent) => {
     event.stopPropagation();
     setCollapsed((prev) => ({ ...prev, [item.pointer]: !prev[item.pointer] }));
@@ -92,7 +109,12 @@ function TreeRow({
             </span>
           )
           : <File className="h-4 w-4 text-muted-foreground" />}
-        <span className="truncate text-left">{item.label}</span>
+        <span className="truncate text-left flex items-center gap-2">
+          {item.label}
+          {itemHasError && (
+            <AlertCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
+          )}
+        </span>
       </button>
       {!isCollapsed &&
         item.children.map((child) => (
@@ -102,6 +124,7 @@ function TreeRow({
             collapsed={collapsed}
             setCollapsed={setCollapsed}
             selectedPointer={selectedPointer}
+            hasError={hasError}
             onSelect={onSelect}
           />
         ))}

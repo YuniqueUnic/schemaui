@@ -11,6 +11,7 @@ interface StatusBarProps {
   validating: boolean;
   errorCount: number;
   shortcuts?: ShortcutHint[];
+  onErrorsClick?: () => void;
 }
 
 const DEFAULT_SHORTCUTS: ShortcutHint[] = [
@@ -23,6 +24,7 @@ export function StatusBar({
   validating,
   errorCount,
   shortcuts = DEFAULT_SHORTCUTS,
+  onErrorsClick,
 }: StatusBarProps) {
   return (
     <footer className="app-panel flex flex-wrap items-center justify-between gap-2 md:gap-4 border-t border-theme px-4 md:px-6 py-2 md:py-3 text-xs text-muted">
@@ -35,7 +37,12 @@ export function StatusBar({
         </Badge>
         <Badge
           variant={errorCount > 0 ? "destructive" : "secondary"}
-          className="text-[10px] uppercase tracking-wide"
+          className={`text-[10px] uppercase tracking-wide ${
+            errorCount > 0 && onErrorsClick
+              ? "cursor-pointer hover:opacity-80"
+              : ""
+          }`}
+          onClick={errorCount > 0 && onErrorsClick ? onErrorsClick : undefined}
         >
           {validating
             ? "Validating…"

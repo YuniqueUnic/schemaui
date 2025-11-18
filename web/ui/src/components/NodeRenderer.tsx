@@ -828,11 +828,13 @@ function renderCompositeControl(
               }
 
               // Case 2: Relative path (e.g., /value)
+              // Only handle if it's a shallow relative path (no nested slashes)
               if (
                 changedPointer.startsWith("/") &&
-                !changedPointer.startsWith(node.pointer)
+                !changedPointer.startsWith(node.pointer) &&
+                changedPointer.substring(1).indexOf("/") === -1 // No nested slashes
               ) {
-                const fieldName = changedPointer.substring(1).split("/")[0];
+                const fieldName = changedPointer.substring(1);
                 console.log(
                   "Relative path - Updating field:",
                   fieldName,

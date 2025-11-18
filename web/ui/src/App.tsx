@@ -6,6 +6,7 @@ import { PreviewPane } from "./components/PreviewPane";
 import { StatusBar } from "./components/StatusBar";
 import { TreeView } from "./components/TreeView";
 import { OverlayProvider } from "./components/Overlay";
+import { ValidationErrorsDialog } from "./components/ValidationErrorsDialog";
 import {
   exitSession,
   fetchSession,
@@ -37,9 +38,14 @@ export default function App() {
   const [exiting, setExiting] = useState(false);
   const [status, setStatus] = useState("Loading schema…");
   const [selectedPointer, setSelectedPointer] = useState<string>("");
+  const [showErrorsDialog, setShowErrorsDialog] = useState(false);
   const validationSeq = useRef(0);
   const previewSeq = useRef(0);
+  const sessionIdRef = useRef<string>("");
   const { sizes, startDrag } = useResizableColumns({ nav: 280, preview: 380 });
+
+  // localStorage key for persisting data
+  const getStorageKey = () => `schemaui-session-${sessionIdRef.current}`;
 
   useEffect(() => {
     let mounted = true;
@@ -47,9 +53,25 @@ export default function App() {
       try {
         const payload = await fetchSession();
         if (!mounted) return;
+
+        // Generate a session ID based on schema title or timestamp
+        sessionIdRef.current = payload.title || `session-${Date.now()}`;
+
+        // Try to restore data from localStorage
+        let restoredData: JsonValue | null = null;
+        try {
+          const stored = localStorage.getItem(getStorageKey());
+          if (stored) {
+            restoredData = JSON.parse(stored);
+            toast.info("Restored previous session data");
+          }
+        } catch (err) {
+          console.error("Failed to restore from localStorage", err);
+        }
+
         const withDefaults = applyUiDefaults(
           payload.ui_ast,
-          payload.data ?? {},
+          restoredData || payload.data || {},
         );
         setSession(payload);
         setData(withDefaults);
@@ -113,6 +135,14 @@ export default function App() {
       runValidation(next);
       updatePreview(next, previewPretty, previewFormat);
       setDirty(true);
+
+      // Persist to localStorage
+      try {
+        localStorage.setItem(getStorageKey(), JSON.stringify(next));
+      } catch (err) {
+        console.error("Failed to save to localStorage", err);
+      }
+
       return next;
     });
   };
@@ -123,14 +153,30 @@ export default function App() {
       toast.error(
         `Cannot save: ${errors.size} validation error${
           errors.size > 1 ? "s" : ""
-        } found`,
+        } found. Click to view details.`,
+        {
+          duration: 5000,
+          action: {
+            label: "View Errors",
+            onClick: () => setShowErrorsDialog(true),
+          },
+        },
       );
+      setShowErrorsDialog(true);
       return;
     }
     setSaving(true);
     try {
       await persistData(data);
       setDirty(false);
+
+      // Clear localStorage after successful save
+      try {
+        localStorage.removeItem(getStorageKey());
+      } catch (err) {
+        console.error("Failed to clear localStorage", err);
+      }
+
       toast.success("Changes saved successfully");
     } catch (error) {
       console.error("Save failed", error);
@@ -205,6 +251,7 @@ export default function App() {
             <TreeView
               ast={session?.ui_ast}
               selectedPointer={selectedPointer}
+              errors={errors}
               onSelect={(pointer) => setSelectedPointer(pointer)}
             />
           </aside>
@@ -265,6 +312,15 @@ export default function App() {
           dirty={dirty}
           validating={false}
           errorCount={errors.size}
+          onErrorsClick={errors.size > 0
+            ? () => setShowErrorsDialog(true)
+            : undefined}
+        />
+        <ValidationErrorsDialog
+          open={showErrorsDialog}
+          onOpenChange={setShowErrorsDialog}
+          errors={errors}
+          onNavigateToError={(pointer) => setSelectedPointer(pointer)}
         />
       </div>
     </OverlayProvider>

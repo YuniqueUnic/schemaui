@@ -202,10 +202,10 @@ function walkVariant(
 ) {
   const defaultValue = variantDefault(variant);
   store[basePointer] = deepClone(defaultValue);
-  // if object-like, descend children to write nested defaults
-  if (variant.node.type === "object") {
-    variant.node.children.forEach((child) => collectDefaults(child, store));
-  }
+  // Note: We don't recursively collect defaults for variant children here
+  // because they should only be applied when this specific variant is active.
+  // The variantDefault function already handles generating the complete default
+  // object for the variant, including all its required fields.
 }
 
 function ensureObjectRoot(value: JsonValue): JsonValue {
