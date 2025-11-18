@@ -152,12 +152,12 @@ impl CompositeListState {
         changed
     }
 
-    pub fn add_entry(&mut self) -> usize {
+    pub fn add_entry(&mut self, variant_index: Option<usize>) -> usize {
         let entry_pointer = format!("{}/entry_{}", self.pointer, self.counter);
         self.counter += 1;
         let mut state =
             CompositeState::new(&entry_pointer, &self.template, Arc::clone(&self.palette));
-        state.ensure_editable_variant();
+        state.ensure_editable_variant_with_index(variant_index);
         self.entries.push(CompositeListEntry {
             pointer: entry_pointer,
             state,
@@ -309,6 +309,26 @@ impl CompositeListState {
             multi: entry.state.is_multi(),
             active: entry.state.active_flags(),
         })
+    }
+
+    /// Get variant selector popup for adding new entry
+    pub fn variant_selector_popup(&self) -> Option<CompositePopupData> {
+        let options = self.template.variant_titles();
+        if options.len() <= 1 {
+            return None; // No need to select if only one variant
+        }
+        let count = options.len();
+        Some(CompositePopupData {
+            options,
+            selected: 0,
+            multi: false,
+            active: vec![false; count],
+        })
+    }
+
+    /// Get the number of available variants
+    pub fn variant_count(&self) -> usize {
+        self.template.variant_count()
     }
 
     pub fn apply_selection(&mut self, selection: usize, flags: Option<Vec<bool>>) -> bool {
@@ -505,17 +525,22 @@ impl CompositeState {
     }
 
     pub fn ensure_editable_variant(&mut self) {
+        self.ensure_editable_variant_with_index(None);
+    }
+
+    pub fn ensure_editable_variant_with_index(&mut self, variant_index: Option<usize>) {
         if self.variants.is_empty() {
             return;
         }
         if self.active_indices().is_empty() {
+            let target_index = variant_index.unwrap_or(0).min(self.variants.len() - 1);
             match self.mode {
                 CompositeMode::OneOf => {
-                    let _ = self.apply_single(0);
+                    let _ = self.apply_single(target_index);
                 }
                 CompositeMode::AnyOf => {
-                    if let Some(first) = self.variants.first_mut() {
-                        first.active = true;
+                    if let Some(variant) = self.variants.get_mut(target_index) {
+                        variant.active = true;
                     }
                 }
             }

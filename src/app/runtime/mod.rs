@@ -25,10 +25,15 @@ mod overlay;
 
 use overlay::CompositeEditorOverlay;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum PopupOwner {
     Root,
     Composite,
+    /// Variant selector for composite list add_entry
+    VariantSelector {
+        field_pointer: String,
+        overlay_host: Option<overlay::OverlayHost>,
+    },
 }
 
 struct AppPopup {
@@ -91,7 +96,7 @@ impl App {
                         let multi_flags = popup.active().map(|flags| flags.to_vec());
                         (pointer, selection, multi_flags)
                     };
-                    let owner = app_popup.owner;
+                    let owner = app_popup.owner.clone();
                     self.popup = None;
                     self.apply_popup_selection_data(owner, &pointer, selection, multi_flags);
                     if self.options.auto_validate {
@@ -330,7 +335,7 @@ impl App {
             return true;
         }
 
-        match owner {
+        match &owner {
             PopupOwner::Root => {
                 if let Some(field) = self.form_state.focused_field_mut() {
                     field.ensure_composite_list_popup_entry();
@@ -343,13 +348,20 @@ impl App {
                     field.ensure_composite_list_popup_entry();
                 }
             }
+            PopupOwner::VariantSelector { .. } => {
+                // Variant selector popup is created directly, no field preparation needed
+            }
         }
 
-        let field_opt = match owner {
+        let field_opt = match &owner {
             PopupOwner::Root => self.form_state.focused_field(),
             PopupOwner::Composite => self
                 .active_overlay()
                 .and_then(|editor| editor.form_state().focused_field()),
+            PopupOwner::VariantSelector { .. } => {
+                // Variant selector popup doesn't use focused field
+                return false;
+            }
         };
         let Some(field) = field_opt else {
             return false;

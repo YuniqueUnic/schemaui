@@ -48,6 +48,16 @@ pub struct CompositeField {
     pub variants: Vec<CompositeVariant>,
 }
 
+impl CompositeField {
+    pub fn variant_titles(&self) -> Vec<String> {
+        self.variants.iter().map(|v| v.title.clone()).collect()
+    }
+
+    pub fn variant_count(&self) -> usize {
+        self.variants.len()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeyValueField {
     pub key_title: String,

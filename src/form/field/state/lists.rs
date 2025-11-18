@@ -101,6 +101,23 @@ impl FieldState {
         }
     }
 
+    pub fn composite_list_variant_selector_popup(&self) -> Option<CompositePopupData> {
+        self.component.composite_list_variant_selector()
+    }
+
+    pub fn composite_list_variant_count(&self) -> usize {
+        self.component.composite_list_variant_count()
+    }
+
+    pub fn composite_list_add_entry_with_variant(&mut self, variant_index: usize) -> bool {
+        if self.component.collection_add_with_variant(variant_index) {
+            self.after_edit();
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn composite_list_remove_entry(&mut self) -> bool {
         if self.component.collection_remove() {
             self.after_edit();

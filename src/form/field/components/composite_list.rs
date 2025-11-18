@@ -79,8 +79,21 @@ impl FieldComponent for CompositeListComponent {
     }
 
     fn collection_add(&mut self) -> bool {
-        self.state.add_entry();
+        self.state.add_entry(None);
         true
+    }
+
+    fn collection_add_with_variant(&mut self, variant_index: usize) -> bool {
+        self.state.add_entry(Some(variant_index));
+        true
+    }
+
+    fn composite_list_variant_selector(&self) -> Option<CompositePopupData> {
+        self.state.variant_selector_popup()
+    }
+
+    fn composite_list_variant_count(&self) -> usize {
+        self.state.variant_count()
     }
 
     fn collection_remove(&mut self) -> bool {

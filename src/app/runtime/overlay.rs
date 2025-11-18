@@ -1532,6 +1532,13 @@ impl App {
                     self.run_overlay_validation();
                 }
             }
+            PopupOwner::VariantSelector {
+                field_pointer,
+                overlay_host,
+            } => {
+                // Handle variant selector: add entry with selected variant
+                self.handle_variant_selector_result(&field_pointer, overlay_host, selection);
+            }
         }
     }
 

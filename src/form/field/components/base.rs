@@ -117,6 +117,18 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
         false
     }
 
+    fn collection_add_with_variant(&mut self, _variant_index: usize) -> bool {
+        false
+    }
+
+    fn composite_list_variant_selector(&self) -> Option<CompositePopupData> {
+        None
+    }
+
+    fn composite_list_variant_count(&self) -> usize {
+        0
+    }
+
     fn collection_remove(&mut self) -> bool {
         false
     }

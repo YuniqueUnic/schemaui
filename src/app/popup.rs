@@ -63,6 +63,23 @@ impl PopupState {
         }
     }
 
+    /// Create a popup for variant selector
+    pub(crate) fn for_variant_selector(
+        field_pointer: String,
+        title: String,
+        options: Vec<String>,
+        selected: usize,
+    ) -> Self {
+        Self {
+            field_pointer,
+            title,
+            options,
+            selected,
+            multi: false,
+            toggles: Vec::new(),
+        }
+    }
+
     pub(crate) fn select_previous(&mut self) {
         if self.options.is_empty() {
             return;
