@@ -36,11 +36,13 @@ pub struct WebCommand {
     pub common: CommonArgs,
 
     /// Bind address for the temporary HTTP server
-    #[arg(long = "host", value_name = "IP", default_value = "127.0.0.1")]
+    #[rustfmt::skip]
+    #[arg(alias = "bind", alias = "listen")]
+    #[arg( short = 'l', long = "host", value_name = "IP", default_value = "127.0.0.1" )]
     pub host: IpAddr,
 
     /// Bind port for the temporary HTTP server (0 picks a random free port)
-    #[arg(long = "port", value_name = "PORT", default_value_t = 0)]
+    #[arg(short = 'p', long = "port", value_name = "PORT", default_value_t = 0)]
     pub port: u16,
 }
 

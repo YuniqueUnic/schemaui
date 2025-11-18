@@ -14,7 +14,7 @@ pub mod web;
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use app::{SchemaUI, UiOptions};
+pub use app::{SchemaUI, UiFrontend, UiOptions};
 pub use io::{
     DocumentFormat,
     input::{
@@ -24,5 +24,5 @@ pub use io::{
 };
 
 pub mod prelude {
-    pub use super::{SchemaUI, UiOptions};
+    pub use super::{SchemaUI, UiFrontend, UiOptions};
 }
