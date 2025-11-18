@@ -107,9 +107,8 @@ pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
     let mut roots = Vec::new();
     for (name, schema) in &object.properties {
         let resolved = resolver.resolve_schema(schema)?;
-        let normalized = normalize_schema(&resolved)?;
         let pointer = append_pointer("", name);
-        let node = visit_schema(&resolver, &normalized, pointer, required.contains(name))?;
+        let node = visit_schema(&resolver, &resolved, pointer, required.contains(name))?;
         roots.push(node);
     }
 
@@ -132,40 +131,24 @@ fn visit_schema(
 
     if let Some(subs) = schema.subschemas.as_ref() {
         if let Some(one_of) = subs.one_of.as_ref() {
-            let variants = build_variants(resolver, one_of)?;
-            let default_value = infer_default_for_composite(&variants, false);
-            return Ok(UiNode {
+            return build_composite_node(
+                resolver,
+                one_of,
+                CompositeMode::OneOf,
+                schema,
                 pointer,
-                title: schema_title(schema),
-                description: schema_description(schema),
                 required,
-                default_value,
-                kind: UiNodeKind::Composite {
-                    mode: CompositeMode::OneOf,
-                    allow_multiple: false,
-                    variants,
-                },
-            });
+            );
         }
         if let Some(any_of) = subs.any_of.as_ref() {
-            let variants = build_variants(resolver, any_of)?;
-            // For anyOf, default to single selection (allow_multiple = false)
-            // This ensures proper radio group UI for single-value anyOf
-            // and correct behavior for array items with anyOf
-            let allow_multiple = false;
-            let default_value = infer_default_for_composite(&variants, allow_multiple);
-            return Ok(UiNode {
+            return build_composite_node(
+                resolver,
+                any_of,
+                CompositeMode::AnyOf,
+                schema,
                 pointer,
-                title: schema_title(schema),
-                description: schema_description(schema),
                 required,
-                default_value,
-                kind: UiNodeKind::Composite {
-                    mode: CompositeMode::AnyOf,
-                    allow_multiple,
-                    variants,
-                },
-            });
+            );
         }
     }
 
@@ -200,14 +183,8 @@ fn visit_schema(
         let required_set = required_set(obj);
         for (name, child_schema) in &obj.properties {
             let resolved = resolver.resolve_schema(child_schema)?;
-            let normalized = normalize_schema(&resolved)?;
             let child_ptr = append_pointer(&pointer, name);
-            let child = visit_schema(
-                resolver,
-                &normalized,
-                child_ptr,
-                required_set.contains(name),
-            )?;
+            let child = visit_schema(resolver, &resolved, child_ptr, required_set.contains(name))?;
             children.push(child);
         }
         let default_value = schema_default(schema).or(Some(Value::Object(Map::new())));
@@ -240,6 +217,52 @@ fn visit_schema(
     })
 }
 
+fn build_composite_kind(
+    resolver: &SchemaResolver<'_>,
+    schemas: &[Schema],
+    mode: CompositeMode,
+) -> Result<UiNodeKind> {
+    let variants = build_variants(resolver, schemas)?;
+    // For both oneOf and anyOf, use single selection (allow_multiple = false)
+    // This ensures proper radio group UI for single-value composites
+    // and correct behavior for array items
+    let allow_multiple = false;
+    Ok(UiNodeKind::Composite {
+        mode,
+        allow_multiple,
+        variants,
+    })
+}
+
+fn build_composite_node(
+    resolver: &SchemaResolver<'_>,
+    schemas: &[Schema],
+    mode: CompositeMode,
+    schema: &SchemaObject,
+    pointer: String,
+    required: bool,
+) -> Result<UiNode> {
+    let kind = build_composite_kind(resolver, schemas, mode)?;
+    let default_value = if let UiNodeKind::Composite {
+        variants,
+        allow_multiple,
+        ..
+    } = &kind
+    {
+        infer_default_for_composite(variants, *allow_multiple)
+    } else {
+        None
+    };
+    Ok(UiNode {
+        pointer,
+        title: schema_title(schema),
+        description: schema_description(schema),
+        required,
+        default_value,
+        kind,
+    })
+}
+
 fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<UiNodeKind> {
     if let Some(subs) = schema.subschemas.as_ref()
         && let Some(all_of) = subs.all_of.as_ref()
@@ -251,24 +274,10 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
 
     if let Some(subs) = schema.subschemas.as_ref() {
         if let Some(one_of) = subs.one_of.as_ref() {
-            let variants = build_variants(resolver, one_of)?;
-            return Ok(UiNodeKind::Composite {
-                mode: CompositeMode::OneOf,
-                allow_multiple: false,
-                variants,
-            });
+            return build_composite_kind(resolver, one_of, CompositeMode::OneOf);
         }
         if let Some(any_of) = subs.any_of.as_ref() {
-            let variants = build_variants(resolver, any_of)?;
-            // For anyOf, default to single selection (allow_multiple = false)
-            // This ensures proper radio group UI for single-value anyOf
-            // and correct behavior for array items with anyOf
-            let allow_multiple = false;
-            return Ok(UiNodeKind::Composite {
-                mode: CompositeMode::AnyOf,
-                allow_multiple,
-                variants,
-            });
+            return build_composite_kind(resolver, any_of, CompositeMode::AnyOf);
         }
     }
 
@@ -295,9 +304,8 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
         let mut children = Vec::new();
         for (name, schema) in &obj.properties {
             let resolved = resolver.resolve_schema(schema)?;
-            let normalized = normalize_schema(&resolved)?;
             let pointer = append_pointer("", name);
-            let node = visit_schema(resolver, &normalized, pointer, required.contains(name))?;
+            let node = visit_schema(resolver, &resolved, pointer, required.contains(name))?;
             children.push(node);
         }
         return Ok(UiNodeKind::Object {
@@ -317,24 +325,23 @@ fn build_variants(resolver: &SchemaResolver<'_>, schemas: &[Schema]) -> Result<V
     let mut out = Vec::new();
     for (index, variant) in schemas.iter().enumerate() {
         let resolved = resolver.resolve_schema(variant)?;
-        let normalized = normalize_schema(&resolved)?;
-        let node = visit_kind(resolver, &normalized)?;
+        let node = visit_kind(resolver, &resolved)?;
         let mut schema_value = schema_to_value(&resolved)?;
         if let Some(defs) = resolver.definitions_snapshot()
             && let Value::Object(ref mut map) = schema_value
         {
             map.entry("$defs".to_string()).or_insert(defs);
         }
-        let title = normalized
+        let title = resolved
             .metadata
             .as_ref()
             .and_then(|m| m.title.clone())
-            .or_else(|| Some(default_variant_title(index, &normalized)));
-        let description = normalized
+            .or_else(|| Some(default_variant_title(index, &resolved)));
+        let description = resolved
             .metadata
             .as_ref()
             .and_then(|m| m.description.clone());
-        let is_object = is_object_schema(&normalized);
+        let is_object = is_object_schema(&resolved);
         out.push(UiVariant {
             id: format!("variant_{}", index),
             title,
@@ -345,10 +352,6 @@ fn build_variants(resolver: &SchemaResolver<'_>, schemas: &[Schema]) -> Result<V
         });
     }
     Ok(out)
-}
-
-fn normalize_schema(schema: &SchemaObject) -> Result<SchemaObject> {
-    Ok(schema.clone())
 }
 
 fn schema_default(schema: &SchemaObject) -> Option<Value> {
