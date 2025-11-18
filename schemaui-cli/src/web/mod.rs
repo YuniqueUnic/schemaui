@@ -1,6 +1,6 @@
 use color_eyre::eyre::{Report, Result};
+use schemaui::SchemaUI;
 use schemaui::web::session::ServeOptions as WebServeOptions;
-use schemaui::{SchemaUI, WebFrontend};
 
 use crate::cli::WebCommand;
 use crate::session::{SessionBundle, prepare_session};
@@ -33,9 +33,6 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
         host: cmd.host,
         port: cmd.port,
     };
-    let frontend = WebFrontend { serve };
 
-    ui.run_with_frontend(frontend)
-        .map_err(Report::msg)
-        .map(|_| ())
+    ui.run_web(serve).map_err(Report::msg).map(|_| ())
 }

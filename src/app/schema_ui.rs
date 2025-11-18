@@ -11,6 +11,9 @@ use crate::io::{
 use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions};
 use crate::core::frontend::Frontend;
 use crate::form::field::components::ComponentPalette;
+use crate::tui::session::TuiFrontend;
+#[cfg(feature = "web")]
+use crate::web::{frontend::WebFrontend, session::ServeOptions as WebServeOptions};
 
 #[derive(Debug)]
 pub struct SchemaUI {
@@ -182,6 +185,28 @@ impl SchemaUI {
     pub fn with_composite_multi_hint(mut self, hint: impl Into<Cow<'static, str>>) -> Self {
         self.options = self.options.clone().with_composite_multi_hint(hint);
         self
+    }
+
+    /// Run using the default TUI frontend.
+    ///
+    /// This is equivalent to `self.run_tui()` and keeps backward-compatible
+    /// semantics: the crate defaults to TUI mode.
+    pub fn run(self) -> Result<Value> {
+        self.run_tui()
+    }
+
+    /// Run explicitly in TUI mode, using the options configured on this
+    /// `SchemaUI` builder.
+    pub fn run_tui(self) -> Result<Value> {
+        let options = self.options.clone();
+        self.run_with_frontend(TuiFrontend { options })
+    }
+
+    /// Run in Web mode, using the given serve options to configure the
+    /// temporary HTTP server.
+    #[cfg(feature = "web")]
+    pub fn run_web(self, serve: WebServeOptions) -> Result<Value> {
+        self.run_with_frontend(WebFrontend { serve })
     }
 
     pub fn run_with_frontend<F>(self, frontend: F) -> Result<Value>
