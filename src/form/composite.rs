@@ -7,7 +7,8 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     domain::{CompositeField, CompositeMode},
-    ui_ast::{build_ui_ast, form_schema::form_schema_from_ui_ast},
+    tui::model::form_schema_from_ui_ast,
+    ui_ast::build_ui_ast,
 };
 
 use super::{

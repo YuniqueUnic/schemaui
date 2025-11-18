@@ -11,8 +11,6 @@ use ts_rs::TS;
 
 use crate::schema::{loader::load_root_schema, resolver::SchemaResolver};
 
-pub mod form_schema;
-
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "web", derive(TS))]
 #[cfg_attr(feature = "web", ts(export, export_to = "web/types/ui-ast.ts"))]

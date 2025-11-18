@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use crate::domain::{
+use crate::ui_ast::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
+
+use super::form_schema::{
     CompositeField, CompositeMode as DomainCompositeMode, CompositeVariant, FieldKind, FieldSchema,
     FormSchema, FormSection, RootSection,
 };
-
-use super::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
 
 /// Build a legacy `FormSchema` tree from the canonical [`UiAst`].
 pub fn form_schema_from_ui_ast(ast: &UiAst) -> FormSchema {
