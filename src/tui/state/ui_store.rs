@@ -77,17 +77,6 @@ impl SectionTabsStore {
             true
         }
     }
-
-    pub fn advance(&mut self, delta: i32, len: usize) -> bool {
-        if len == 0 {
-            self.current = 0;
-            return false;
-        }
-        let len_i32 = len as i32;
-        let mut next = self.current as i32 + delta;
-        next = ((next % len_i32) + len_i32) % len_i32;
-        self.set(next as usize, len)
-    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]

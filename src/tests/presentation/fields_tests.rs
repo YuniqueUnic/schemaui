@@ -1,7 +1,7 @@
 use crate::tui::view::components::fields::meta_lines;
 use crate::{
-    form::FieldState,
     tui::model::{FieldKind, FieldSchema},
+    tui::state::FieldState,
 };
 use ratatui::style::{Color, Modifier};
 

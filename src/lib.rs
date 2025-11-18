@@ -2,7 +2,6 @@
 #![doc = include_str!("../README.md")]
 
 mod core;
-mod form;
 pub mod io;
 // mod presentation;
 mod schema;

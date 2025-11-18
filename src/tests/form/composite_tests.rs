@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde_json::json;
 
 use crate::{
-    form::CompositeState,
     tui::model::{CompositeField, CompositeMode, CompositeVariant},
+    tui::state::CompositeState,
     tui::state::field::components::ComponentPalette,
 };
 

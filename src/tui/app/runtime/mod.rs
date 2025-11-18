@@ -1,4 +1,4 @@
-use crate::form::{FormCommand, FormEngine, FormState};
+use crate::tui::state::{FormCommand, FormEngine, FormState};
 use crate::tui::view::{self, CompositeOverlay, UiContext};
 use anyhow::{Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};

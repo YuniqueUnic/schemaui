@@ -1718,9 +1718,9 @@ impl App {
 mod tests {
     use super::*;
     use crate::{
-        form::{FieldState, FormState, SectionState},
         tui::app::options::UiOptions,
         tui::model::{FieldKind, FieldSchema},
+        tui::state::{FieldState, FormState, SectionState},
     };
     use serde_json::json;
     use std::collections::HashMap;

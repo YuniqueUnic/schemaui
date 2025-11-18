@@ -1,6 +1,6 @@
 use crate::{
-    form::{FieldState, FormState, RootSectionState, SectionState},
     tui::model::{FieldKind, FieldSchema},
+    tui::state::{FieldState, FormState, RootSectionState, SectionState},
 };
 
 fn mk_field(name: &str) -> FieldState {

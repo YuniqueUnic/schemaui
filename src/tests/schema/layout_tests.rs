@@ -1,5 +1,5 @@
 use crate::{
-    schema::layout::build_form_schema,
+    schema::build_form_schema,
     tui::model::{FieldKind, FieldSchema, FormSchema, FormSection},
 };
 use serde_json::{Value, json};

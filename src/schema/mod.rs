@@ -1,7 +1,5 @@
-pub mod layout;
 pub mod loader;
 pub mod metadata;
 pub mod resolver;
 
-#[cfg(test)]
-pub use layout::build_form_schema;
+pub use crate::tui::model::build_form_schema;
