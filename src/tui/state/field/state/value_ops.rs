@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use crate::form::error::FieldCoercionError;
+use crate::tui::state::error::FieldCoercionError;
 
 use super::FieldState;
 

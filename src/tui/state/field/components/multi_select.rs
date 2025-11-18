@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::domain::FieldSchema;
-use crate::form::error::FieldCoercionError;
+use crate::tui::model::FieldSchema;
+use crate::tui::state::error::FieldCoercionError;
 
 use super::{ComponentKind, FieldComponent, MultiSelectStateRef, palette::ComponentPalette};
 

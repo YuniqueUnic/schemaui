@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
-use crate::domain::{FieldKind, FieldSchema, KeyValueField};
+use crate::tui::model::{FieldKind, FieldSchema, KeyValueField};
 
 use super::{
     error::FieldCoercionError,

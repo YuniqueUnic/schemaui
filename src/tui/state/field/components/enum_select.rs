@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::domain::FieldSchema;
+use crate::tui::model::FieldSchema;
+use crate::tui::state::error::FieldCoercionError;
+use crate::tui::state::field::convert::value_to_string;
 
 use super::{ComponentKind, EnumStateRef, FieldComponent, palette::ComponentPalette};
-use crate::form::field::convert::value_to_string;
 
 #[derive(Debug, Clone)]
 pub struct EnumComponent {
@@ -86,10 +87,7 @@ impl FieldComponent for EnumComponent {
         }
     }
 
-    fn current_value(
-        &self,
-        _schema: &FieldSchema,
-    ) -> Result<Option<Value>, crate::form::error::FieldCoercionError> {
+    fn current_value(&self, _schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
         Ok(self.options.get(self.selected).cloned().map(Value::String))
     }
 

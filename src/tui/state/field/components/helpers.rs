@@ -1,9 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::domain::{FieldKind, FieldSchema};
+use crate::tui::model::{FieldKind, FieldSchema};
+use crate::tui::state::field::convert::{NumericStepValue, adjust_numeric_value};
 
 use super::{ComponentKind, palette::ComponentPalette};
-use crate::form::field::convert::{NumericStepValue, adjust_numeric_value};
 
 pub(crate) fn handle_text_edit(
     buffer: &mut String,

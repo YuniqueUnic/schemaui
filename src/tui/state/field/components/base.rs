@@ -2,11 +2,13 @@ use crossterm::event::KeyEvent;
 use serde_json::Value;
 
 use super::helpers::OverlayContext;
-use crate::domain::FieldSchema;
-use crate::form::array::{ArrayEditorContext, ArrayEditorSession};
-use crate::form::composite::{CompositeEditorSession, CompositeListEditorContext};
-use crate::form::error::FieldCoercionError;
-use crate::form::key_value::{KeyValueEditorContext, KeyValueEditorSession};
+use crate::tui::model::FieldSchema;
+use crate::tui::state::array::{ArrayEditorContext, ArrayEditorSession};
+use crate::tui::state::composite::{
+    CompositeEditorSession, CompositeListEditorContext, CompositeVariantSummary,
+};
+use crate::tui::state::error::FieldCoercionError;
+use crate::tui::state::key_value::{KeyValueEditorContext, KeyValueEditorSession};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ComponentKind {
@@ -67,7 +69,7 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
         None
     }
 
-    fn composite_summaries(&self) -> Option<Vec<crate::form::composite::CompositeVariantSummary>> {
+    fn composite_summaries(&self) -> Option<Vec<CompositeVariantSummary>> {
         None
     }
 

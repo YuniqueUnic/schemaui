@@ -2,9 +2,11 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::domain::{CompositeField, FieldSchema};
-use crate::form::composite::{CompositeListEditorContext, CompositeListState};
-use crate::form::error::FieldCoercionError;
+use crate::tui::model::{CompositeField, FieldSchema};
+use crate::tui::state::composite::{
+    CompositeEditorSession, CompositeListEditorContext, CompositeListState,
+};
+use crate::tui::state::error::FieldCoercionError;
 
 use super::helpers::{EntryPanelState, OverlayContext, format_collection_value, list_hint_for};
 use super::{
@@ -115,7 +117,7 @@ impl FieldComponent for CompositeListComponent {
     fn restore_composite_list_editor(
         &mut self,
         entry_index: usize,
-        session: crate::form::CompositeEditorSession,
+        session: CompositeEditorSession,
     ) {
         self.state.restore_entry_editor(entry_index, session);
     }

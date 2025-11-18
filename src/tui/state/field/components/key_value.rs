@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::domain::{FieldSchema, KeyValueField};
-use crate::form::error::FieldCoercionError;
-use crate::form::key_value::{KeyValueEditorContext, KeyValueEditorSession, KeyValueState};
+use crate::tui::model::{FieldSchema, KeyValueField};
+use crate::tui::state::error::FieldCoercionError;
+use crate::tui::state::key_value::{KeyValueEditorContext, KeyValueEditorSession, KeyValueState};
 
 use super::helpers::{EntryPanelState, OverlayContext, format_collection_value, list_hint_for};
 use super::{ComponentKind, FieldComponent, palette::ComponentPalette};

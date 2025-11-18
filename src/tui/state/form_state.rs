@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
-use crate::domain::FormSchema;
+use crate::tui::model::FormSchema;
 
 use super::{
     error::FieldCoercionError,
     field::{FieldState, components::ComponentPalette},
     section::SectionState,
+    ui_store::UiStores,
 };
-use crate::form::ui::UiStores;
 
 #[derive(Debug, Clone)]
 pub struct RootSectionState {

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::domain::{FieldKind, FieldSchema};
+use crate::tui::model::{FieldKind, FieldSchema};
 
 use super::super::components::{
     ArrayBufferComponent, BoolComponent, CompositeComponent, CompositeListComponent, EnumComponent,

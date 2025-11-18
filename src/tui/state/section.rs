@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::domain::FormSection;
+use crate::tui::model::FormSection;
 
 use super::field::{FieldState, components::ComponentPalette};
 

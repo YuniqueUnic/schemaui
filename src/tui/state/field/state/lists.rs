@@ -2,12 +2,12 @@ use super::super::components::{
     ComponentKind, CompositePopupData, CompositeSelectorView, EnumStateRef,
 };
 use super::FieldState;
-use crate::form::error::FieldCoercionError;
-use crate::form::{
-    array::{ArrayEditorContext, ArrayEditorSession},
-    composite::{CompositeEditorSession, CompositeListEditorContext, CompositeVariantSummary},
-    key_value::{KeyValueEditorContext, KeyValueEditorSession},
+use crate::tui::state::array::{ArrayEditorContext, ArrayEditorSession};
+use crate::tui::state::composite::{
+    CompositeEditorSession, CompositeListEditorContext, CompositeVariantSummary,
 };
+use crate::tui::state::error::FieldCoercionError;
+use crate::tui::state::key_value::{KeyValueEditorContext, KeyValueEditorSession};
 
 impl FieldState {
     pub fn composite_selector_view(&self) -> Option<CompositeSelectorView> {

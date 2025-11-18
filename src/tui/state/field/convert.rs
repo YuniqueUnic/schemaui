@@ -1,8 +1,7 @@
 use serde_json::Value;
 
-use crate::domain::{FieldKind, FieldSchema};
-
-use crate::form::error::FieldCoercionError;
+use crate::tui::model::{FieldKind, FieldSchema};
+use crate::tui::state::error::FieldCoercionError;
 
 pub(super) fn value_to_string(value: &Value) -> String {
     match value {

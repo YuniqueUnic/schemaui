@@ -2,12 +2,14 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use crate::domain::{FieldKind, FieldSchema};
-use crate::form::error::FieldCoercionError;
+use crate::tui::model::{FieldKind, FieldSchema};
+use crate::tui::state::error::FieldCoercionError;
+use crate::tui::state::field::convert::{
+    integer_value, number_value, string_value, value_to_string,
+};
 
 use super::helpers::handle_text_edit;
 use super::{ComponentKind, FieldComponent, palette::ComponentPalette};
-use crate::form::field::convert::{integer_value, number_value, string_value, value_to_string};
 
 #[derive(Debug, Clone)]
 pub struct TextComponent {

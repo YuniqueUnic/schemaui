@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde_json::{Number, Value, json};
 
-use crate::domain::FieldKind;
+use crate::tui::model::{FieldKind, FieldSchema};
 
 use super::{
     error::FieldCoercionError, field::FieldState, field::components::ComponentPalette,
@@ -272,9 +272,9 @@ impl FieldSchemaStub {
     }
 }
 
-impl From<FieldSchemaStub> for crate::domain::FieldSchema {
+impl From<FieldSchemaStub> for FieldSchema {
     fn from(stub: FieldSchemaStub) -> Self {
-        crate::domain::FieldSchema {
+        FieldSchema {
             name: "value".to_string(),
             path: vec!["value".to_string()],
             pointer: "/value".to_string(),

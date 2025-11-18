@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crossterm::event::KeyCode;
 use serde_json::Value;
 
-use crate::domain::{CompositeField, FieldSchema};
-use crate::form::composite::CompositeState;
-use crate::form::error::FieldCoercionError;
+use crate::tui::model::{CompositeField, FieldSchema};
+use crate::tui::state::composite::{
+    CompositeEditorSession, CompositeState, CompositeVariantSummary,
+};
+use crate::tui::state::error::FieldCoercionError;
 
 use super::{
     ComponentKind, CompositePopupData, CompositeSelectorView, FieldComponent,
@@ -62,7 +64,7 @@ impl FieldComponent for CompositeComponent {
         self.view.selector(&self.state)
     }
 
-    fn composite_summaries(&self) -> Option<Vec<crate::form::composite::CompositeVariantSummary>> {
+    fn composite_summaries(&self) -> Option<Vec<CompositeVariantSummary>> {
         self.view.summaries(&self.state)
     }
 
@@ -86,11 +88,11 @@ impl FieldComponent for CompositeComponent {
         &mut self,
         pointer: &str,
         variant_index: usize,
-    ) -> Result<crate::form::CompositeEditorSession, FieldCoercionError> {
+    ) -> Result<CompositeEditorSession, FieldCoercionError> {
         self.state.take_editor_session(pointer, variant_index)
     }
 
-    fn restore_composite_editor(&mut self, session: crate::form::CompositeEditorSession) {
+    fn restore_composite_editor(&mut self, session: CompositeEditorSession) {
         self.state.restore_editor_session(session);
     }
 }
@@ -141,10 +143,7 @@ impl CompositeViewAdapter {
         })
     }
 
-    fn summaries(
-        &self,
-        state: &CompositeState,
-    ) -> Option<Vec<crate::form::composite::CompositeVariantSummary>> {
+    fn summaries(&self, state: &CompositeState) -> Option<Vec<CompositeVariantSummary>> {
         let summaries = state.active_summaries();
         if summaries.is_empty() {
             None

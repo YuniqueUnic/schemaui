@@ -7,6 +7,7 @@ pub mod form_state;
 pub mod key_value;
 pub mod reducers;
 pub mod section;
+pub mod ui_store;
 
 pub use actions::FormCommand;
 pub use array::ArrayEditorSession;

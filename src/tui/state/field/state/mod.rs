@@ -3,7 +3,7 @@ mod input;
 mod lists;
 mod value_ops;
 
-use crate::domain::FieldSchema;
+use crate::tui::model::FieldSchema;
 
 use super::components::{ComponentKind, FieldComponent, helpers::OverlayContext};
 
