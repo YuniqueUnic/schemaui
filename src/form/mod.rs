@@ -1,23 +1,12 @@
-pub mod actions;
-mod array;
-mod composite;
-mod error;
-pub(crate) mod field;
-pub(crate) mod key_value;
-pub mod reducers;
-mod section;
-mod state;
-pub mod ui;
+pub use crate::tui::state::{
+    ArrayEditorSession, CompositeEditorSession, CompositePopupData, FieldState, FormCommand,
+    FormEngine, FormState, KeyValueEditorSession, SectionState, actions, apply_command, array,
+    composite, error, field, form_state, key_value, reducers, section,
+};
 
-pub use actions::FormCommand;
-pub use array::ArrayEditorSession;
-pub use composite::CompositeEditorSession;
 #[cfg(test)]
-pub(crate) use composite::CompositeState;
-pub use field::{CompositePopupData, FieldState};
-pub use key_value::KeyValueEditorSession;
-pub use reducers::{FormEngine, apply_command};
-pub use section::SectionState;
-pub use state::FormState;
-#[cfg(test)]
-pub(crate) use state::RootSectionState;
+pub(crate) use crate::tui::state::{CompositeState, RootSectionState};
+
+// TUI view helpers still live under `form::ui` for now and will be moved
+// into a dedicated tui::view module in the next steps.
+pub mod ui;

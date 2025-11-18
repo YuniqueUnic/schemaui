@@ -14,7 +14,7 @@ use crate::{
 use super::{
     error::FieldCoercionError,
     field::components::{ComponentPalette, CompositePopupData, CompositeSelectorView},
-    state::FormState,
+    form_state::FormState,
 };
 
 #[derive(Debug, Clone)]
@@ -742,9 +742,12 @@ impl CompositeVariantState {
 
     fn borrow_form(&self, pointer: &str) -> Result<RefMut<'_, FormState>, FieldCoercionError> {
         self.ensure_form_ready(pointer)?;
-        Ok(RefMut::map(self.form.borrow_mut(), |slot| {
-            slot.as_mut().expect("variant form should be initialized")
-        }))
+        Ok(RefMut::map(
+            self.form.borrow_mut(),
+            |slot: &mut Option<FormState>| {
+                slot.as_mut().expect("variant form should be initialized")
+            },
+        ))
     }
 
     fn take_form(&self, pointer: &str) -> Result<FormState, FieldCoercionError> {

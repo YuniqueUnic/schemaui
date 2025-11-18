@@ -7,8 +7,8 @@ use crate::domain::{FieldKind, FieldSchema, KeyValueField};
 use super::{
     error::FieldCoercionError,
     field::{FieldState, components::ComponentPalette},
+    form_state::FormState,
     section::SectionState,
-    state::FormState,
 };
 
 #[derive(Debug, Clone)]

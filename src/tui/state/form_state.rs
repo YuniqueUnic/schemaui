@@ -8,8 +8,8 @@ use super::{
     error::FieldCoercionError,
     field::{FieldState, components::ComponentPalette},
     section::SectionState,
-    ui::UiStores,
 };
+use crate::form::ui::UiStores;
 
 #[derive(Debug, Clone)]
 pub struct RootSectionState {

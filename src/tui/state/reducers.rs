@@ -1,6 +1,6 @@
 use jsonschema::Validator;
 
-use super::{actions::FormCommand, state::FormState};
+use super::{actions::FormCommand, form_state::FormState};
 
 pub fn apply_command(state: &mut FormState, command: FormCommand) {
     match command {

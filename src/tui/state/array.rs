@@ -6,7 +6,7 @@ use crate::domain::FieldKind;
 
 use super::{
     error::FieldCoercionError, field::FieldState, field::components::ComponentPalette,
-    section::SectionState, state::FormState,
+    form_state::FormState, section::SectionState,
 };
 
 #[derive(Debug, Clone)]
