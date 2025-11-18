@@ -9,6 +9,5 @@ mod terminal;
 mod validation;
 
 pub use options::UiOptions;
-#[cfg(test)]
 pub(crate) use runtime::App;
 pub use schema_ui::{SchemaUI, UiFrontend};

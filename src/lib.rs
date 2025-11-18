@@ -7,6 +7,7 @@ mod form;
 pub mod io;
 mod presentation;
 mod schema;
+mod tui;
 pub mod ui_ast;
 #[cfg(feature = "web")]
 pub mod web;
