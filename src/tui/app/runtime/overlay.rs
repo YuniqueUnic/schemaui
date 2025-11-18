@@ -906,7 +906,7 @@ impl App {
         let base = self
             .keymap_store
             .help_text(KeymapContext::Overlay)
-            .unwrap_or_else(|| "Ctrl+S save • Esc cancel".to_string());
+            .unwrap_or_else(|| "Ctrl+S save • Esc/Ctrl+Q exit overlay".to_string());
         if let Some(editor) = self.active_overlay() {
             format!("L{} · {}", editor.level(), base)
         } else {

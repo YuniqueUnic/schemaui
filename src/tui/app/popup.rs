@@ -1,5 +1,5 @@
 use crate::{
-    form::{CompositePopupData, FieldState},
+    tui::state::{CompositePopupData, FieldState},
     tui::view::PopupRender,
 };
 

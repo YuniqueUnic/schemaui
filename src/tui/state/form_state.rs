@@ -227,49 +227,35 @@ impl FormState {
         }
     }
 
-    pub fn advance_focus_forward(&mut self) {
+    fn advance_focus_by(&mut self, delta: i32) {
         self.normalize_focus();
         if self.roots.is_empty() {
             return;
         }
-        if let Some(section) = self.active_section() {
-            let len = section.fields.len();
-            if len > 0 && self.field_index() + 1 < len {
-                self.ui.fields.advance(1, len);
-                self.normalize_focus();
-                return;
-            }
+        let positions = self.focus_positions();
+        if positions.is_empty() {
+            return;
         }
-        self.advance_section(1);
-        self.ui.fields.reset();
+        let len = positions.len() as i32;
+        let current = self.current_focus_position();
+        let current_idx = current
+            .and_then(|curr| positions.iter().position(|pos| *pos == curr))
+            .unwrap_or(0);
+        let mut next = current_idx as i32 + delta;
+        next = ((next % len) + len) % len;
+        let (root_idx, section_idx, field_idx) = positions[next as usize];
+        self.set_root_index(root_idx);
+        self.set_section_index(section_idx);
+        self.set_field_index(field_idx);
         self.normalize_focus();
     }
 
+    pub fn advance_focus_forward(&mut self) {
+        self.advance_focus_by(1);
+    }
+
     pub fn advance_focus_backward(&mut self) {
-        self.normalize_focus();
-        if self.roots.is_empty() {
-            return;
-        }
-        if let Some(section) = self.active_section() {
-            let len = section.fields.len();
-            if len > 0 && self.field_index() > 0 {
-                self.ui.fields.advance(-1, len);
-                self.normalize_focus();
-                return;
-            }
-        }
-        self.advance_section(-1);
-        self.normalize_focus();
-        if let Some(current) = self.active_section() {
-            let len = current.fields.len();
-            if len == 0 {
-                self.ui.fields.reset();
-            } else {
-                self.ui.fields.set(len.saturating_sub(1), len);
-            }
-        } else {
-            self.ui.fields.reset();
-        }
+        self.advance_focus_by(-1);
     }
 
     pub fn focus_next_section(&mut self, delta: i32) {
