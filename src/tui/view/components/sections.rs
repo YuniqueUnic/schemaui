@@ -4,9 +4,20 @@ use ratatui::{
     widgets::{Block, Borders},
 };
 
-use crate::form::ui::{RootTabsView, SectionTabsView};
-
 use super::tabstrip::render_tab_strip;
+
+#[derive(Debug, Clone)]
+pub struct RootTabsView {
+    pub titles: Vec<String>,
+    pub selected: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct SectionTabsView {
+    pub titles: Vec<String>,
+    pub selected: usize,
+    pub label: String,
+}
 
 pub fn render_root_tabs(frame: &mut Frame<'_>, area: Rect, view: &RootTabsView) {
     render_tab_strip(frame, area, &view.titles, view.selected, "Root Sections");

@@ -10,8 +10,8 @@ use crate::io::{
 
 use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions};
 use crate::core::frontend::Frontend;
-use crate::form::field::components::ComponentPalette;
 use crate::tui::session::TuiFrontend;
+use crate::tui::state::field::components::ComponentPalette;
 #[cfg(feature = "web")]
 use crate::web::{frontend::WebFrontend, session::ServeOptions as WebServeOptions};
 

@@ -4,11 +4,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
 };
 
-use crate::form::FormState;
+use crate::tui::state::FormState;
 
 use super::{
     fields::render_fields,
-    sections::{render_root_tabs, render_section_tabs},
+    sections::{RootTabsView, SectionTabsView, render_root_tabs, render_section_tabs},
 };
 
 pub fn render_body(
@@ -24,12 +24,12 @@ pub fn render_body(
         return;
     }
 
-    let root_tabs_view = form_state.root_tabs_view();
+    let root_tabs_view = build_root_tabs_view(form_state);
     let show_root_tabs = root_tabs_view
         .as_ref()
         .map(|view| view.titles.len() > 1)
         .unwrap_or(false);
-    let section_tabs_view = form_state.section_tabs_view();
+    let section_tabs_view = build_section_tabs_view(form_state);
     let show_section_tabs = section_tabs_view
         .as_ref()
         .map(|view| view.titles.len() > 1)
@@ -63,4 +63,37 @@ pub fn render_body(
         index += 1;
     }
     render_fields(frame, chunks[index], form_state, enable_cursor);
+}
+
+fn build_root_tabs_view(form_state: &FormState) -> Option<RootTabsView> {
+    if form_state.roots.is_empty() {
+        return None;
+    }
+    Some(RootTabsView {
+        titles: form_state
+            .roots
+            .iter()
+            .map(|root| root.title.clone())
+            .collect(),
+        selected: form_state.root_index(),
+    })
+}
+
+fn build_section_tabs_view(form_state: &FormState) -> Option<SectionTabsView> {
+    let root = form_state.active_root()?;
+    Some(SectionTabsView {
+        titles: root
+            .sections
+            .iter()
+            .map(|section| {
+                if section.depth == 0 {
+                    section.title.clone()
+                } else {
+                    format!("{}{}", ">".repeat(section.depth), section.title)
+                }
+            })
+            .collect(),
+        selected: form_state.section_index(),
+        label: format!("{} Sections", root.title),
+    })
 }

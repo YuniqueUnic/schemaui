@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
 };
 
-use crate::form::FormState;
+use crate::tui::state::FormState;
 
 use super::components::{render_body, render_composite_overlay, render_footer, render_popup};
 

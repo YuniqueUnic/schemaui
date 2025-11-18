@@ -1,7 +1,7 @@
 use jsonschema::Validator;
 use serde_json::Value;
 
-use crate::form::FormState;
+use crate::tui::state::FormState;
 
 #[derive(Debug)]
 pub enum ValidationOutcome {

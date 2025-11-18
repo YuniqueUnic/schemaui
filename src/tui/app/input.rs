@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crossterm::event::KeyEvent;
 
-use crate::form::FormCommand;
+use crate::tui::state::FormCommand;
 
 use super::keymap::KeymapStore;
 

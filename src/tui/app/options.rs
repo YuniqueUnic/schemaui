@@ -4,7 +4,7 @@ use super::{
     input::KeyBindingMap,
     keymap::{self, KeymapStore},
 };
-use crate::form::field::components::{
+use crate::tui::state::field::components::{
     BoolTogglePresentation, CollectionHints, ComponentPalette, CompositeHints, EnumBehaviour,
     NumericTuning,
 };

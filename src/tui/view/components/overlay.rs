@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
-use crate::form::FormState;
+use crate::tui::state::FormState;
 
 use super::super::view::CompositeOverlay;
 use super::{body::render_body, layout::popup_rect, tabstrip::render_tab_strip};

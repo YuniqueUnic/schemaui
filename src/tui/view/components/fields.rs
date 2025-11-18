@@ -7,10 +7,8 @@ use ratatui::{
 };
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use crate::{
-    domain::FieldKind,
-    form::{FieldState, FormState, SectionState, ui::FieldsView},
-};
+use crate::tui::model::{CompositeMode, FieldKind, FieldSchema};
+use crate::tui::state::{FieldState, FormState, SectionState};
 
 pub fn render_fields(
     frame: &mut Frame<'_>,
@@ -18,16 +16,15 @@ pub fn render_fields(
     form_state: &mut FormState,
     enable_cursor: bool,
 ) {
-    let Some(fields_view) = form_state.fields_view() else {
-        let placeholder =
-            Paragraph::new("No section selected").block(Block::default().borders(Borders::ALL));
-        frame.render_widget(placeholder, area);
-        return;
+    let (section, selected_index) = match form_state.active_section_mut() {
+        Some((section, selected)) => (section, selected),
+        None => {
+            let placeholder =
+                Paragraph::new("No section selected").block(Block::default().borders(Borders::ALL));
+            frame.render_widget(placeholder, area);
+            return;
+        }
     };
-    let FieldsView {
-        section,
-        selected: selected_index,
-    } = fields_view;
 
     let mut field_area = area;
     if let Some(description) = &section.description {
@@ -368,29 +365,28 @@ fn field_type_label(kind: &FieldKind) -> String {
             FieldKind::Composite(comp) => {
                 // Get more descriptive label for composite arrays
                 match &comp.mode {
-                    crate::domain::CompositeMode::OneOf => {
+                    CompositeMode::OneOf => {
                         if comp.variants.len() == 1 {
                             format!("{}[]", comp.variants[0].title)
                         } else {
                             "choice[]".to_string()
                         }
                     }
-                    crate::domain::CompositeMode::AnyOf => "multi-choice[]".to_string(),
+                    CompositeMode::AnyOf => "multi-choice[]".to_string(),
                 }
             }
             _ => format!("{}[]", field_type_label(inner)),
         },
         FieldKind::Json => "object".to_string(),
         FieldKind::Composite(comp) => match &comp.mode {
-            crate::domain::CompositeMode::OneOf => "choice".to_string(),
-            crate::domain::CompositeMode::AnyOf => "multi-choice".to_string(),
+            CompositeMode::OneOf => "choice".to_string(),
+            CompositeMode::AnyOf => "multi-choice".to_string(),
         },
         FieldKind::KeyValue(_) => "map".to_string(),
     }
 }
 
-fn extract_constraints(schema: &crate::domain::FieldSchema) -> Vec<String> {
-    use crate::domain::FieldKind;
+fn extract_constraints(schema: &FieldSchema) -> Vec<String> {
     let mut constraints = Vec::new();
 
     // format 约束
@@ -707,8 +703,8 @@ fn wrap_with_prefix(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{FieldKind, FieldSchema};
-    use crate::form::FieldState;
+    use crate::tui::model::{FieldKind, FieldSchema};
+    use crate::tui::state::FieldState;
     use serde_json::Value;
 
     fn field_with_value(value: &str) -> FieldState {

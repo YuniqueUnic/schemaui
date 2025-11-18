@@ -2,9 +2,9 @@ use anyhow::Result;
 use serde_json::Value;
 
 use crate::core::frontend::{Frontend, FrontendContext};
-use crate::form::FormState;
 use crate::tui::app::{App, UiOptions};
 use crate::tui::model::form_schema_from_ui_ast;
+use crate::tui::state::FormState;
 
 /// TUI frontend implementation that consumes a prepared `FrontendContext`
 /// and runs the interactive terminal UI.

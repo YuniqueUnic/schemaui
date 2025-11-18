@@ -4,14 +4,12 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use jsonschema::{Validator, validator_for};
 
-use crate::form::field::components::{CompositeSelectorView, helpers::OverlayContext};
-use crate::{
-    app::keymap::KeymapContext,
-    domain::{CompositeMode, FieldKind},
-    form::{
-        ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand, FormEngine, FormState,
-        KeyValueEditorSession, apply_command,
-    },
+use crate::app::keymap::KeymapContext;
+use crate::tui::model::{CompositeMode, FieldKind};
+use crate::tui::state::field::components::{CompositeSelectorView, helpers::OverlayContext};
+use crate::tui::state::{
+    ArrayEditorSession, CompositeEditorSession, FieldState, FormCommand, FormEngine, FormState,
+    KeyValueEditorSession, apply_command,
 };
 
 use super::super::input::{AppCommand, CommandDispatch};

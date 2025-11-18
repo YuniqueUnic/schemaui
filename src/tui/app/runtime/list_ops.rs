@@ -1,5 +1,5 @@
 use super::{App, overlay::OverlayHost};
-use crate::form::FieldState;
+use crate::tui::state::{CompositePopupData, FieldState};
 
 impl App {
     pub(super) fn list_field_pointer(&self) -> Option<String> {
@@ -82,7 +82,7 @@ impl App {
     fn show_variant_selector_popup(
         &mut self,
         field_pointer: String,
-        popup_data: crate::form::CompositePopupData,
+        popup_data: CompositePopupData,
         overlay_host: Option<OverlayHost>,
     ) {
         use super::super::popup::PopupState;
