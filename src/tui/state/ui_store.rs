@@ -29,7 +29,6 @@ impl RootTabsStore {
             true
         }
     }
-    #[allow(dead_code)]
     pub fn advance(&mut self, delta: i32, len: usize) -> bool {
         if len == 0 {
             self.current = 0;

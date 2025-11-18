@@ -9,5 +9,5 @@ pub mod terminal;
 pub mod validation;
 
 pub use options::UiOptions;
-pub use schema_ui::SchemaUI;
 pub(crate) use runtime::App;
+pub use schema_ui::SchemaUI;

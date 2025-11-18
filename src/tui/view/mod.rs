@@ -1,4 +1,4 @@
 pub mod components;
-mod view;
+mod frame;
 
-pub use view::{CompositeOverlay, PopupRender, UiContext, draw};
+pub use frame::{CompositeOverlay, PopupRender, UiContext, draw};

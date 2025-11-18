@@ -53,9 +53,9 @@
 io::input (serde_json::Value)
   → schema::loader::load_root_schema            // 反序列化 RootSchema
   → schema::resolver::SchemaResolver            // 解析 $ref / JSON Pointer
-  → schema::layout::build_form_schema           // 构建 FormSchema 树
-  → form::state::FormState::from_schema         // 具化 FieldState
-  → app::runtime::App                           // 驱动 TUI + 验证
+  → schema::build_form_schema                   // 构建 FormSchema 树
+  → tui::state::FormState::from_schema          // 具化 FieldState
+  → tui::app::runtime::App                      // 驱动 TUI + 验证
   → io::output::emit (optional)                 // 写入最终 Value
 ```
 
@@ -96,10 +96,10 @@ schema 而不是遇到未定义的行为。
 
 ## 5. 验证与错误显示
 
-文件：`src/app/validation.rs` + `form::reducers`。
+文件：`src/tui/app/validation.rs` + `tui::state::reducers`。
 
-1. `SchemaUI::run` 预先编译 `jsonschema::Validator`（panic 成为带上下文的
-   `color-eyre` 报告）。
+1. 核心管线（`SchemaPipeline` + `FrontendContext`）会预先编译
+   `jsonschema::Validator`（panic 成为带上下文的 `color-eyre` 报告）。
 2. 每次编辑发出 `FormCommand::FieldEdited { pointer }`。`FormEngine` 通过
    `FormState::try_build_value` 重建 JSON 值并将其馈送到验证器。
 3. `ValidationOutcome::Invalid` 清除旧错误，通过 `FormState::set_error`
@@ -232,8 +232,9 @@ Form focus ──Ctrl+E──▶ try_open_composite_editor
 ## 9. 公共 API 与输出钩子
 
 - **`SchemaUI`**（`src/app/schema_ui.rs`）– 库消费者的入口点。公开原始 schema
-  值、schema+data 对和推断 schema 的构造函数。在调用 `.run()` 之前链接
-  `.with_title`、`.with_options`、`.with_output` 或 `.with_default_data`。
+  值、schema+data 对和推断 schema 的构造函数。在将其传递给前端之前，链接
+  `.with_title`、`.with_options`、`.with_output` 或 `.with_default_data`，然后通
+  过 `.run_with_frontend(frontend)` 启动 UI。
 - **`UiOptions`** – 切换 UI 行为（滴答率、自动验证、帮助可见性、通过
   `KeyBindingMap` 的自定义键绑定）。
 - **`OutputOptions` + `OutputDestination`** – 配置格式、美化和目标。由 CLI

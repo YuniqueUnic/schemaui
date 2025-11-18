@@ -49,7 +49,7 @@ serde_json = "1"
 ```
 
 ```rust,ignore
-use schemaui::SchemaUI;
+use schemaui::prelude::*;
 use serde_json::json;
 
 fn main() -> color_eyre::Result<()> {
@@ -86,35 +86,49 @@ fn main() -> color_eyre::Result<()> {
         "required": ["metadata", "runtime"]
     });
 
-    let value = SchemaUI::new(schema)
+    let options = UiOptions::default();
+    let ui = SchemaUI::new(schema)
         .with_title("SchemaUI Demo")
-        .run()?;
+        .with_options(options.clone());
+    let frontend = TuiFrontend { options };
+    let value = ui.run_with_frontend(frontend)?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 ```
 
+## Public API surface
+
+For library integrations, the main entry points are:
+
+- **TUI runtime**: `crate::tui::app::{SchemaUI, UiOptions}` and
+  `crate::tui::session::TuiFrontend`
+- **TUI state**: `crate::tui::state::*` (for example `FormState`, `FormCommand`,
+  `FormEngine`, `SectionState`)
+- **Schema backend**: `crate::schema::build_form_schema` (builds `FormSchema`
+  from a JSON Schema value)
+
 ## Architecture Snapshot
 
 ```text
-┌─────────────┐   parse/merge    ┌───────────────┐   layout + typing   ┌─────────────┐
-│ io::input   ├─────────────────▶│ schema::*     ├────────────────────▶│ form::*     │
-└─────────────┘                  │ (loader /     │                     │ (state,     │
-                                 │ resolver /    │                     │ sections,   │
-┌─────────────┐   emit Value     │ layout)       │   FormState         │ reducers)   │
-│ io::output  ◀──────────────────┴───────────────┘                     └────────┬────┘
+┌─────────────┐   parse/merge    ┌───────────────┐   layout + typing      ┌───────────────┐
+│ io::input   ├─────────────────▶│ schema        ├───────────────────────▶│ tui::state    │
+└─────────────┘                  │ (loader /     │                        │ (FormState,   │
+                                 │ resolver /    │                        │ sections,     │
+┌─────────────┐   emit Value     │ build_form_   │   FormSchema           │ reducers)     │
+│ io::output  ◀──────────────────┴────schema─────┘                        └────────┬──────┘
 └─────────────┘                                                      focus/edits│
                                                                                 │
-                                                                     ┌──────────▼────────┐
-                                                                     │ app::runtime      │
-                                                                     │ (InputRouter,     │
-                                                                     │ overlays, status) │
-                                                                     └──────────┬────────┘
+                                                                     ┌──────────▼──────────┐
+                                                                     │ tui::app::runtime   │
+                                                                     │ (InputRouter,       │
+                                                                     │ overlays, status)   │
+                                                                     └──────────┬──────────┘
                                                                                 │ draw
-                                                                     ┌──────────▼────────┐
-                                                                     │ presentation::*   │
-                                                                     │ (ratatui view)    │
-                                                                     └───────────────────┘
+                                                                     ┌──────────▼──────────┐
+                                                                     │ tui::view::*        │
+                                                                     │ (ratatui view)      │
+                                                                     └─────────────────────┘
 ```
 
 This layout mirrors the actual modules under `src/`, making it easy to map any
@@ -296,14 +310,14 @@ overlays, and documentation all consume a single source of truth.
 
 ## Runtime Layers
 
-| Layer               | Module(s)                                                                  | Responsibilities                                                                |
-| ------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Ingestion           | `io::input`, `schema::loader`, `schema::resolver`                          | Parse JSON/TOML/YAML, resolve `$ref`, and normalize metadata.                   |
-| Layout typing       | `schema::layout`                                                           | Produce `FormSchema` (roots/sections/fields) from resolved schemas.             |
-| Form state          | `form::state`, `form::section`, `form::field`                              | Track focus, pointers, dirty flags, coercions, and errors.                      |
-| Commands & reducers | `form::actions`, `form::reducers`, `app::validation`                       | Define `FormCommand`, mutate state, and route validation results.               |
-| Runtime controller  | `app::runtime`, `app::overlay`, `app::popup`, `app::status`, `app::keymap` | Event loop, InputRouter dispatch, overlay lifecycle, help text, status updates. |
-| Presentation        | `presentation::view`, `presentation::components::*`                        | Render tabs, field lists, popups, overlays, and footer via `ratatui`.           |
+| Layer               | Module(s)                                                 | Responsibilities                                                                |
+| ------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Ingestion           | `io::input`, `schema::loader`, `schema::resolver`         | Parse JSON/TOML/YAML, resolve `$ref`, and normalize metadata.                   |
+| Layout typing       | `schema::build_form_schema`                               | Produce `FormSchema` (roots/sections/fields) from resolved schemas.             |
+| Form state          | `tui::state::{form_state, section, field}`                | Track focus, pointers, dirty flags, coercions, and errors.                      |
+| Commands & reducers | `tui::state::{actions, reducers}`, `tui::app::validation` | Define `FormCommand`, mutate state, and route validation results.               |
+| Runtime controller  | `tui::app::{runtime, overlay, popup, status, keymap}`     | Event loop, InputRouter dispatch, overlay lifecycle, help text, status updates. |
+| Presentation        | `tui::view` and `tui::view::components::*`                | Render tabs, field lists, popups, overlays, and footer via `ratatui`.           |
 
 Each module is kept under ~600 LOC (hard cap 800) to honor the KISS principle
 and make refactors manageable.
@@ -357,16 +371,16 @@ schemaui \
 
 ## Key Dependencies
 
-| Crate                                       | Purpose                                                  |
-| ------------------------------------------- | -------------------------------------------------------- |
-| `serde`, `serde_json`, `serde_yaml`, `toml` | Parsing and serializing schema/config data.              |
-| `schemars`                                  | Draft-07 schema representation used by `schema::layout`. |
-| `jsonschema`                                | Runtime validation for forms and overlays.               |
-| `ratatui`                                   | Rendering widgets, layouts, overlays, and footer.        |
-| `crossterm`                                 | Terminal events consumed by `InputRouter`.               |
-| `indexmap`                                  | Order-preserving maps for schema traversal.              |
-| `once_cell`                                 | Lazy parsing of the keymap JSON.                         |
-| `clap`, `color-eyre` (CLI)                  | Argument parsing and ergonomic diagnostics.              |
+| Crate                                       | Purpose                                                     |
+| ------------------------------------------- | ----------------------------------------------------------- |
+| `serde`, `serde_json`, `serde_yaml`, `toml` | Parsing and serializing schema/config data.                 |
+| `schemars`                                  | Draft-07 schema representation used by the `schema` module. |
+| `jsonschema`                                | Runtime validation for forms and overlays.                  |
+| `ratatui`                                   | Rendering widgets, layouts, overlays, and footer.           |
+| `crossterm`                                 | Terminal events consumed by `InputRouter`.                  |
+| `indexmap`                                  | Order-preserving maps for schema traversal.                 |
+| `once_cell`                                 | Lazy parsing of the keymap JSON.                            |
+| `clap`, `color-eyre` (CLI)                  | Argument parsing and ergonomic diagnostics.                 |
 
 ## Documentation Map
 

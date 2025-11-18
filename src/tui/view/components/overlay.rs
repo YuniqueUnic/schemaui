@@ -7,7 +7,7 @@ use ratatui::{
 
 use crate::tui::state::FormState;
 
-use super::super::view::CompositeOverlay;
+use super::super::frame::CompositeOverlay;
 use super::{body::render_body, layout::popup_rect, tabstrip::render_tab_strip};
 
 pub fn render_composite_overlay(

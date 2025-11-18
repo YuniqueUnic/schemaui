@@ -41,7 +41,7 @@ serde_json = "1"
 ```
 
 ```rust
-use schemaui::SchemaUI;
+use schemaui::prelude::*;
 use serde_json::json;
 
 fn main() -> color_eyre::Result<()> {
@@ -78,35 +78,49 @@ fn main() -> color_eyre::Result<()> {
         "required": ["metadata", "runtime"]
     });
 
-    let value = SchemaUI::new(schema)
+    let options = UiOptions::default();
+    let ui = SchemaUI::new(schema)
         .with_title("SchemaUI 演示")
-        .run()?;
+        .with_options(options.clone());
+    let frontend = TuiFrontend { options };
+    let value = ui.run_with_frontend(frontend)?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 ```
 
+## 公共 API 入口
+
+在作为库集成 schemaui 时，主要的入口包括：
+
+- **TUI 运行时**：`crate::tui::app::{SchemaUI, UiOptions}`（配合
+  `crate::tui::session::TuiFrontend` 使用）
+- **TUI 状态**：`crate::tui::state::*`（例如
+  `FormState`、`FormCommand`、`FormEngine`、`SectionState` 等）
+- **Schema 后端**：`crate::schema::build_form_schema`（从 JSON Schema 构建
+  `FormSchema`）
+
 ## 架构快照
 
 ```
-┌─────────────┐   解析/合并     ┌──────────────┐   布局+输入  ┌─────────────┐
-│ io::input   ├────────────────▶│ schema::*    ├─────────────▶│ form::*     │
-└─────────────┘                 │ (加载器/     │              │ (状态,      │
-                                │ 解析器/      │              │ 部分,       │
-┌─────────────┐   输出值        │ 布局)        │   FormState  │ 状态机)     │
-│ io::output  ◀─────────────────┴──────────────┘              └────────┬────┘
-└─────────────┘                                             焦点/编辑  │
-                                                                       │
-                                                                ┌──────▼────────┐
-                                                                │ app::runtime  │
-                                                                │ (输入路由器,  │
-                                                                │ 覆盖层, 状态) │
-                                                                └──────┬────────┘
-                                                                       │ 绘制
-                                                                ┌──────▼────────┐
-                                                                │ presentation::*│
-                                                                │ (ratatui视图)  │
-                                                                └────────────────┘
+┌─────────────┐   解析/合并     ┌──────────────┐   布局+类型          ┌───────────────┐
+│ io::input   ├────────────────▶│ schema       ├────────────────────▶│ tui::state    │
+└─────────────┘                 │ (loader/     │                     │ (FormState,   │
+                                │ resolver/    │                     │ sections,     │
+┌─────────────┐   输出值        │ build_form_  │   FormSchema        │ reducers)     │
+│ io::output  ◀─────────────────┴────schema────┘                     └────────┬──────┘
+└─────────────┘                                             焦点/编辑          │
+                                                                               │
+                                                                        ┌──────▼──────────┐
+                                                                        │ tui::app::runtime │
+                                                                        │ (输入路由器,      │
+                                                                        │ 覆盖层, 状态)    │
+                                                                        └──────┬──────────┘
+                                                                               │ 绘制
+                                                                        ┌──────▼──────────┐
+                                                                        │ tui::view::*    │
+                                                                        │ (ratatui 视图)  │
+                                                                        └─────────────────┘
 ```
 
 此布局反映了`src/`下的实际模块，便于将任何代码更改映射到其架构责任。
@@ -123,7 +137,8 @@ fn main() -> color_eyre::Result<()> {
 
 ## JSON Schema → TUI 映射
 
-`schema::layout::build_form_schema`遍历完全解析的模式，并将每个子树映射为`FormSection`/`FieldSchema`：
+`schema::build_form_schema` 遍历完全解析的模式，并将每个子树映射为
+`FormSection`/`FieldSchema`：
 
 | 模式功能                                                     | 结果控件                                                |
 | ------------------------------------------------------------ | ------------------------------------------------------- |
@@ -145,10 +160,10 @@ fn main() -> color_eyre::Result<()> {
 - 覆盖层（复合变体、键值映射、列表条目）会根据当前正在编辑的子模式启动自己的验证器，因此问题会在离开覆盖层之前浮出水面。
 
 ```
-┌─────────────┐ 解析模式   ┌─────────────────┐ 膨胀状态        ┌────────────┐
-│ SchemaUI::run├──────────▶│ domain::parse   ├────────────────▶│ FormState  │
-└─────┬───────┘            │ (schema::layout)│                 └──────┬─────┘
-      │ validator_for()    └─────────────────┘           编辑         │
+┌─────────────┐ 解析模式   ┌───────────────────────────────┐ 膨胀状态        ┌────────────┐
+│ SchemaUI::run├──────────▶│ schema::build_form_schema     ├───────────────▶│ FormState  │
+└─────┬───────┘            │ (tui::model::FormSchema)      │                 └──────┬─────┘
+      │ validator_for()    └───────────────────────────────┘           编辑         │
       │                                                        ┌──────▼─────────┐
       └────────────────────────────────────────────────────── ▶│ app::runtime   │
                                                                │ (状态, 输入)   │
@@ -217,14 +232,14 @@ fn main() -> color_eyre::Result<()> {
 
 ## 运行时层
 
-| 层           | 模块 (s)                                                                   | 责任                                                           |
-| ------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| 摄取         | `io::input`, `schema::loader`, `schema::resolver`                          | 解析 JSON/TOML/YAML，解析`$ref`，并规范化元数据。              |
-| 布局类型     | `schema::layout`                                                           | 从解析后的模式生成`FormSchema`（根/部分/字段）。               |
-| 表单状态     | `form::state`, `form::section`, `form::field`                              | 跟踪焦点、指针、脏标志、强制转换和错误。                       |
-| 命令与简化器 | `form::actions`, `form::reducers`, `app::validation`                       | 定义`FormCommand`，突变状态，并路由验证结果。                  |
-| 运行时控制器 | `app::runtime`, `app::overlay`, `app::popup`, `app::status`, `app::keymap` | 事件循环，输入路由器分发，覆盖层生命周期，帮助文本，状态更新。 |
-| 呈现         | `presentation::view`, `presentation::components::*`                        | 通过`ratatui`呈现标签、字段列表、弹出窗口、覆盖层和页脚。      |
+| 层           | 模块 (s)                                                  | 责任                                                           |
+| ------------ | --------------------------------------------------------- | -------------------------------------------------------------- |
+| 摄取         | `io::input`, `schema::loader`, `schema::resolver`         | 解析 JSON/TOML/YAML，解析`$ref`，并规范化元数据。              |
+| 布局类型     | `schema::build_form_schema`                               | 从解析后的模式生成 `FormSchema`（根/部分/字段）。              |
+| 表单状态     | `tui::state::{form_state, section, field}`                | 跟踪焦点、指针、脏标志、强制转换和错误。                       |
+| 命令与简化器 | `tui::state::{actions, reducers}`, `tui::app::validation` | 定义 `FormCommand`，突变状态，并路由验证结果。                 |
+| 运行时控制器 | `tui::app::{runtime, overlay, popup, status, keymap}`     | 事件循环，输入路由器分发，覆盖层生命周期，帮助文本，状态更新。 |
+| 呈现         | `tui::view` 和 `tui::view::components::*`                 | 通过 `ratatui` 呈现标签、字段列表、弹出窗口、覆盖层和页脚。    |
 
 每个模块保持在约 600 行代码以下（硬上限 800），以尊重 KISS
 原则并使重构易于管理。
@@ -279,16 +294,16 @@ schemaui \
 
 ## 关键依赖项
 
-| 库                                          | 用途                                        |
-| ------------------------------------------- | ------------------------------------------- |
-| `serde`, `serde_json`, `serde_yaml`, `toml` | 解析和序列化模式/配置数据。                 |
-| `schemars`                                  | 草稿 -07 模式表示，由`schema::layout`使用。 |
-| `jsonschema`                                | 表单和覆盖层的运行时验证。                  |
-| `ratatui`                                   | 渲染小部件、布局、覆盖层和页脚。            |
-| `crossterm`                                 | 输入路由器消耗的终端事件。                  |
-| `indexmap`                                  | 模式遍历的顺序保持映射。                    |
-| `once_cell`                                 | 懒解析快捷键 JSON。                         |
-| `clap`, `color-eyre` (CLI)                  | 参数解析和用户友好的诊断。                  |
+| 库                                          | 用途                                      |
+| ------------------------------------------- | ----------------------------------------- |
+| `serde`, `serde_json`, `serde_yaml`, `toml` | 解析和序列化模式/配置数据。               |
+| `schemars`                                  | draft-07 模式表示，由 `schema` 模块使用。 |
+| `jsonschema`                                | 表单和覆盖层的运行时验证。                |
+| `ratatui`                                   | 渲染小部件、布局、覆盖层和页脚。          |
+| `crossterm`                                 | 输入路由器消耗的终端事件。                |
+| `indexmap`                                  | 模式遍历的顺序保持映射。                  |
+| `once_cell`                                 | 懒解析快捷键 JSON。                       |
+| `clap`, `color-eyre` (CLI)                  | 参数解析和用户友好的诊断。                |
 
 ## 文档映射
 

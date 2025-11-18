@@ -58,9 +58,9 @@ Module: `src/io` (shared by the library and CLI).
 io::input (serde_json::Value)
   → schema::loader::load_root_schema            // deserializes RootSchema
   → schema::resolver::SchemaResolver            // resolves $ref / JSON Pointer
-  → schema::layout::build_form_schema           // builds FormSchema tree
-  → form::state::FormState::from_schema         // materializes FieldState
-  → app::runtime::App                           // drives TUI + validation
+  → schema::build_form_schema                   // builds FormSchema tree
+  → tui::state::FormState::from_schema          // materializes FieldState
+  → tui::app::runtime::App                      // drives TUI + validation
   → io::output::emit (optional)                 // writes final Value
 ```
 
@@ -109,10 +109,11 @@ behaviour.
 
 ## 5. Validation & Error Surfacing
 
-File: `src/app/validation.rs` + `form::reducers`.
+File: `src/tui/app/validation.rs` + `tui::state::reducers`.
 
-1. `SchemaUI::run` compiles a `jsonschema::Validator` up front (panics become
-   `color-eyre` reports with context).
+1. The core pipeline (`SchemaPipeline` + `FrontendContext`) compiles a
+   `jsonschema::Validator` up front (panics become `color-eyre` reports with
+   context).
 2. Each edit emits `FormCommand::FieldEdited { pointer }`. The `FormEngine`
    reconstructs the JSON value via `FormState::try_build_value` and feeds it
    into the validator.
@@ -268,7 +269,8 @@ identically unless explicitly overridden.
 - **`SchemaUI`** (`src/app/schema_ui.rs`) – entry point for library consumers.
   Exposes constructors for raw schema values, schema+data pairs, and inferred
   schemas. Chain `.with_title`, `.with_options`, `.with_output`, or
-  `.with_default_data` before calling `.run()`.
+  `.with_default_data` before passing it to a frontend via
+  `.run_with_frontend(frontend)`.
 - **`UiOptions`** – toggles UI behaviour (tick rate, auto validation, help
   visibility, custom key bindings via `KeyBindingMap`).
 - **`OutputOptions` + `OutputDestination`** – configure format, prettiness, and

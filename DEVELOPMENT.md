@@ -38,9 +38,11 @@ cd web/ui && pnpm build
 schemaui/
 ├── src/                    # Rust 核心库源码
 │   ├── ui_ast/            # UI AST 生成器
-│   ├── app/               # 应用逻辑
-│   ├── form/              # 表单处理
-│   └── domain/            # 领域模型
+│   ├── app/               # TUI / Web 应用逻辑 (runtime, overlay, popup, 等)
+│   ├── core/              # 后端管线 (schema → UI AST → runtime)
+│   ├── domain/            # 领域模型
+│   ├── schema/            # schema 加载/解析 + build_form_schema
+│   └── tui/               # TUI 状态管理、reducers 和视图
 ├── schemaui-cli/          # CLI 应用
 │   ├── src/
 │   │   ├── tui/          # 终端 UI
@@ -65,6 +67,17 @@ schemaui/
 ├── scripts/              # 实用脚本
 └── examples/             # 示例 Schema 文件
 ```
+
+### 公共 API 入口
+
+库对外暴露的主要入口包括：
+
+- **TUI runtime**：`crate::tui::app::{SchemaUI, UiOptions}`（配合
+  `crate::tui::session::TuiFrontend` 使用）
+- **TUI state**：`crate::tui::state::*`（例如 `FormState`, `FormCommand`,
+  `FormEngine`, `SectionState` 等）
+- **Schema backend**：`crate::schema::build_form_schema`（从 JSON Schema 构建
+  `FormSchema`）
 
 ## 🔧 开发工作流
 

@@ -4,7 +4,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState},
 };
 
-use super::super::view::PopupRender;
+use super::super::frame::PopupRender;
 use super::layout::popup_rect;
 
 pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
