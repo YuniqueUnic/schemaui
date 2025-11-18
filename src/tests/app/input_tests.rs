@@ -1,4 +1,4 @@
-use crate::app::{
+use crate::tui::app::{
     input::{InputRouter, KeyAction},
     keymap,
 };

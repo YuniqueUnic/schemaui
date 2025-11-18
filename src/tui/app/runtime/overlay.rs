@@ -4,7 +4,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use jsonschema::{Validator, validator_for};
 
-use crate::app::keymap::KeymapContext;
+use crate::tui::app::keymap::KeymapContext;
 use crate::tui::model::{CompositeMode, FieldKind};
 use crate::tui::state::field::components::{CompositeSelectorView, helpers::OverlayContext};
 use crate::tui::state::{
@@ -1718,8 +1718,8 @@ impl App {
 mod tests {
     use super::*;
     use crate::{
-        app::options::UiOptions,
         form::{FieldState, FormState, SectionState},
+        tui::app::options::UiOptions,
         tui::model::{FieldKind, FieldSchema},
     };
     use serde_json::json;

@@ -1,11 +1,10 @@
 #![allow(clippy::doc_overindented_list_items)]
 #![doc = include_str!("../README.md")]
 
-mod app;
 mod core;
 mod form;
 pub mod io;
-mod presentation;
+// mod presentation;
 mod schema;
 mod tui;
 pub mod ui_ast;
@@ -15,7 +14,7 @@ pub mod web;
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use app::{SchemaUI, UiOptions};
+// pub use app::{SchemaUI, UiOptions};
 pub use io::{
     DocumentFormat,
     input::{
@@ -23,12 +22,20 @@ pub use io::{
     },
     output::{OutputDestination, OutputOptions},
 };
-pub use tui::session::TuiFrontend;
+pub use tui::{
+    app::{SchemaUI, options::UiOptions},
+    session::TuiFrontend,
+    view::{CompositeOverlay, PopupRender, UiContext, draw},
+};
 #[cfg(feature = "web")]
 pub use web::frontend::WebFrontend;
-
 pub mod prelude {
+    pub use super::SchemaUI;
+    pub use super::TuiFrontend;
+    pub use super::UiOptions;
+    pub use super::draw;
+    pub use super::tui::view::{CompositeOverlay, PopupRender, UiContext};
+
     #[cfg(feature = "web")]
     pub use super::WebFrontend;
-    pub use super::{SchemaUI, TuiFrontend, UiOptions};
 }

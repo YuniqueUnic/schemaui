@@ -1,8 +1,6 @@
-use crate::{
-    app::{App, UiOptions},
-    form::FormState,
-    schema::build_form_schema,
-};
+use crate::form::FormState;
+use crate::schema::build_form_schema;
+use crate::tui::app::{App, UiOptions};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use jsonschema::validator_for;
 use serde_json::json;

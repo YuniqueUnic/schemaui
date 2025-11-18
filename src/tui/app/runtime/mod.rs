@@ -1,14 +1,11 @@
+use crate::form::{FormCommand, FormEngine, FormState};
+use crate::tui::view::{self, CompositeOverlay, UiContext};
 use anyhow::{Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
 use ratatui::layout::Rect;
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
-
-use crate::{
-    form::{FormCommand, FormEngine, FormState},
-    presentation::{self, UiContext},
-};
 
 use super::{
     input::{AppCommand, CommandDispatch, InputRouter},
@@ -242,7 +239,7 @@ impl App {
                 .map(|field| field.schema.display_label())
                 .unwrap_or_else(|| "<none>".to_string());
             let focus_label = Some(format!("{} › {}", editor.field_label(), child));
-            let overlay_meta = presentation::CompositeOverlay {
+            let overlay_meta = CompositeOverlay {
                 title: editor.title().to_string(),
                 description: editor.description().cloned(),
                 dirty: editor.form_state().is_dirty(),
@@ -253,7 +250,7 @@ impl App {
                 level: editor.level(),
             };
             let overlay_form_state = editor.form_state_mut();
-            presentation::draw(
+            view::draw(
                 frame,
                 &mut self.form_state,
                 Some(overlay_form_state),
@@ -276,7 +273,7 @@ impl App {
             .focused_field()
             .map(|field| field.schema.display_label());
 
-        presentation::draw(
+        view::draw(
             frame,
             &mut self.form_state,
             None,
@@ -435,7 +432,7 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{app::options::UiOptions, schema::build_form_schema};
+    use crate::{schema::build_form_schema, tui::app::options::UiOptions};
     use jsonschema::validator_for;
     use serde_json::json;
 
