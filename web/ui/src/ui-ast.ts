@@ -48,28 +48,37 @@ export function variantDefault(variant: UiVariant): JsonValue {
     }
 
     // Then add defaults for required fields, using unique values when possible
+    // Identify variant type by examining schema properties
+    const schemaProperties =
+      (variant.schema && typeof variant.schema === "object" &&
+          !Array.isArray(variant.schema) && "properties" in variant.schema)
+        ? (variant.schema.properties as Record<string, unknown>)
+        : {};
+
+    // Identify variant types by their property signatures
+    const hasLabel = "label" in schemaProperties;
+    const hasEnabled = "enabled" in schemaProperties;
+    const hasValues = "values" in schemaProperties;
+    const hasUrl = "url" in schemaProperties;
+    const hasPriority = "priority" in schemaProperties;
+    const hasActive = "active" in schemaProperties;
+
+    // simpleItem: {id, label?, enabled?}
+    const isSimpleItem = (hasLabel || hasEnabled) && !hasValues && !hasUrl;
+    // numericItem: {id, values?}
+    const isNumericItem = hasValues && !hasLabel && !hasEnabled;
+    // target: {url, priority?, active?}
+    const isTarget = hasUrl && (hasPriority || hasActive);
+
     for (const child of variant.node.children) {
       const key = child.pointer.split("/").pop() || "";
       if (!(key in result)) {
-        // Special handling for fields that appear in multiple variants
-        // to ensure uniqueness. Check both schema $ref and variant ID
-        const schemaRef =
-          (variant.schema && typeof variant.schema === "object" &&
-              !Array.isArray(variant.schema) && "$ref" in variant.schema)
-            ? (variant.schema["$ref"] as string)
-            : undefined;
-
+        // Special handling for specific variant types to ensure uniqueness
         if (key === "id") {
           // Generate unique IDs based on the schema reference or variant ID
-          if (
-            schemaRef?.includes("simpleItem") ||
-            variant.id?.includes("simpleItem")
-          ) {
+          if (isSimpleItem) {
             result[key] = 1001; // Unique ID for simpleItem
-          } else if (
-            schemaRef?.includes("numericItem") ||
-            variant.id?.includes("numericItem")
-          ) {
+          } else if (isNumericItem) {
             result[key] = 2001; // Unique ID for numericItem
           } else if (variant.id) {
             // Generic hash-based ID for other variants
@@ -81,20 +90,18 @@ export function variantDefault(variant: UiVariant): JsonValue {
           } else {
             result[key] = 0;
           }
-        } else if (
-          key === "label" &&
-          (schemaRef?.includes("simpleItem") ||
-            variant.id?.includes("simpleItem"))
-        ) {
+        } else if (key === "label" && isSimpleItem) {
           // Give simpleItem a default label to distinguish it
           result[key] = "item";
-        } else if (
-          key === "values" &&
-          (schemaRef?.includes("numericItem") ||
-            variant.id?.includes("numericItem"))
-        ) {
+        } else if (key === "values" && isNumericItem) {
           // Give numericItem some default values to distinguish it
           result[key] = [1];
+        } else if (key === "url" && isTarget) {
+          // For target objects with uri format, provide a valid URL
+          result[key] = "https://example.com";
+        } else if (key === "priority" && isTarget) {
+          // For target objects, set priority within valid range (1-10)
+          result[key] = 5;
         } else {
           result[key] = child.default_value ?? defaultForKind(child.kind);
         }

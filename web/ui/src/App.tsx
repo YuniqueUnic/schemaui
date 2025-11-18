@@ -45,7 +45,11 @@ export default function App() {
   const { sizes, startDrag } = useResizableColumns({ nav: 280, preview: 380 });
 
   // localStorage key for persisting data
-  const getStorageKey = () => `schemaui-session-${sessionIdRef.current}`;
+  const getStorageKey = () => {
+    const key = `schemaui-session-${sessionIdRef.current}`;
+    console.log("[localStorage] Using key:", key);
+    return key;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -54,16 +58,28 @@ export default function App() {
         const payload = await fetchSession();
         if (!mounted) return;
 
-        // Generate a session ID based on schema title or timestamp
-        sessionIdRef.current = payload.title || `session-${Date.now()}`;
+        // Generate a stable session ID based on schema title
+        // Replace spaces and special chars to make it a valid storage key
+        const titleKey =
+          payload.title?.replace(/\s+/g, "_").replace(/[^\w-]/g, "") ||
+          "default";
+        sessionIdRef.current = titleKey;
+        console.log("[localStorage] Session ID set to:", sessionIdRef.current);
 
         // Try to restore data from localStorage
         let restoredData: JsonValue | null = null;
         try {
-          const stored = localStorage.getItem(getStorageKey());
+          const storageKey = getStorageKey();
+          const stored = localStorage.getItem(storageKey);
+          console.log(
+            "[localStorage] Attempting restore from key:",
+            storageKey,
+          );
+          console.log("[localStorage] Found data:", stored ? "YES" : "NO");
           if (stored) {
             restoredData = JSON.parse(stored);
             toast.info("Restored previous session data");
+            console.log("[localStorage] Restored data successfully");
           }
         } catch (err) {
           console.error("Failed to restore from localStorage", err);
@@ -138,7 +154,16 @@ export default function App() {
 
       // Persist to localStorage
       try {
-        localStorage.setItem(getStorageKey(), JSON.stringify(next));
+        const key = getStorageKey();
+        const serialized = JSON.stringify(next);
+        localStorage.setItem(key, serialized);
+        console.log(
+          "[localStorage] Saved data to key:",
+          key,
+          "(size:",
+          serialized.length,
+          "bytes)",
+        );
       } catch (err) {
         console.error("Failed to save to localStorage", err);
       }
@@ -172,7 +197,9 @@ export default function App() {
 
       // Clear localStorage after successful save
       try {
-        localStorage.removeItem(getStorageKey());
+        const key = getStorageKey();
+        localStorage.removeItem(key);
+        console.log("[localStorage] Cleared data from key:", key);
       } catch (err) {
         console.error("Failed to clear localStorage", err);
       }
