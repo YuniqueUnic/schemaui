@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use serde_json::json;
 
 use crate::{
-    domain::{CompositeField, CompositeMode, CompositeVariant, FieldKind, FieldSchema},
     form::FieldState,
+    tui::model::{CompositeField, CompositeMode, CompositeVariant, FieldKind, FieldSchema},
 };
 
 fn composite_list_field() -> FieldState {

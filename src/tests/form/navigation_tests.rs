@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    domain::{FieldKind, FieldSchema},
     form::{FieldState, FormState, RootSectionState, SectionState},
+    tui::model::{FieldKind, FieldSchema},
 };
 
 fn text_field(pointer: &str, title: &str) -> FieldState {

@@ -1,6 +1,6 @@
 use crate::{
-    domain::{FieldKind, FieldSchema, KeyValueField},
     form::FieldState,
+    tui::model::{FieldKind, FieldSchema, KeyValueField},
 };
 use serde_json::json;
 use std::collections::HashMap;

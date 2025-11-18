@@ -1,6 +1,6 @@
 use crate::{
-    domain::{FieldKind, FieldSchema, FormSchema, FormSection},
     schema::layout::build_form_schema,
+    tui::model::{FieldKind, FieldSchema, FormSchema, FormSection},
 };
 use serde_json::{Value, json};
 

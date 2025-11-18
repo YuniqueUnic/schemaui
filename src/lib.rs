@@ -3,7 +3,6 @@
 
 mod app;
 mod core;
-mod domain;
 mod form;
 pub mod io;
 mod presentation;

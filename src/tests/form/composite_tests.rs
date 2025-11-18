@@ -3,9 +3,9 @@ use std::sync::Arc;
 use serde_json::json;
 
 use crate::{
-    domain::{CompositeField, CompositeMode, CompositeVariant},
     form::CompositeState,
     form::field::components::ComponentPalette,
+    tui::model::{CompositeField, CompositeMode, CompositeVariant},
 };
 
 #[test]

@@ -1719,8 +1719,8 @@ mod tests {
     use super::*;
     use crate::{
         app::options::UiOptions,
-        domain::{FieldKind, FieldSchema},
         form::{FieldState, FormState, SectionState},
+        tui::model::{FieldKind, FieldSchema},
     };
     use serde_json::json;
     use std::collections::HashMap;

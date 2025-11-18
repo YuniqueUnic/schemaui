@@ -1,6 +1,6 @@
 use crate::{
-    domain::{FieldKind, FieldSchema},
     form::field::components::{ComponentPalette, FieldComponent, TextComponent},
+    tui::model::{FieldKind, FieldSchema},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::sync::Arc;

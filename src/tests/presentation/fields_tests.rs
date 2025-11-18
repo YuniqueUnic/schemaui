@@ -1,7 +1,7 @@
 use crate::{
-    domain::{FieldKind, FieldSchema},
     form::FieldState,
     presentation::components::fields::meta_lines,
+    tui::model::{FieldKind, FieldSchema},
 };
 use ratatui::style::{Color, Modifier};
 
