@@ -1,0 +1,481 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Ultra Complex Nested Schema Test",
+    "type": "object",
+    "properties": {
+        "level1": {
+            "type": "object",
+            "properties": {
+                "mixedArray": {
+                    "type": "array",
+                    "items": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "const": "text"
+                                    },
+                                    "content": {
+                                        "type": "string"
+                                    },
+                                    "style": {
+                                        "type": "object",
+                                        "properties": {
+                                            "bold": {
+                                                "type": "boolean"
+                                            },
+                                            "italic": {
+                                                "type": "boolean"
+                                            },
+                                            "color": {
+                                                "type": "string",
+                                                "pattern": "^#[0-9a-fA-F]{6}$"
+                                            }
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "type",
+                                    "content"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "const": "number"
+                                    },
+                                    "value": {
+                                        "type": "number"
+                                    },
+                                    "unit": {
+                                        "enum": [
+                                            "px",
+                                            "em",
+                                            "rem",
+                                            "%"
+                                        ]
+                                    },
+                                    "min": {
+                                        "type": "number"
+                                    },
+                                    "max": {
+                                        "type": "number"
+                                    }
+                                },
+                                "required": [
+                                    "type",
+                                    "value"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "const": "nested"
+                                    },
+                                    "children": {
+                                        "type": "array",
+                                        "items": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "number"
+                                                },
+                                                {
+                                                    "type": "boolean"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "key": {
+                                                            "type": "string"
+                                                        },
+                                                        "value": {
+                                                            "oneOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "number"
+                                                                },
+                                                                {
+                                                                    "type": "array",
+                                                                    "items": {
+                                                                        "type": "string"
+                                                                    }
+                                                                }
+                                                            ]
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "type",
+                                    "children"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "level2": {
+                    "type": "object",
+                    "properties": {
+                        "config": {
+                            "oneOf": [
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "mode": {
+                                            "const": "simple"
+                                        },
+                                        "value": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "mode",
+                                        "value"
+                                    ]
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "mode": {
+                                            "const": "advanced"
+                                        },
+                                        "settings": {
+                                            "type": "object",
+                                            "properties": {
+                                                "level3": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "deepOptions": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                            "optionType": {
+                                                                                "const": "toggle"
+                                                                            },
+                                                                            "enabled": {
+                                                                                "type": "boolean"
+                                                                            },
+                                                                            "label": {
+                                                                                "type": "string"
+                                                                            }
+                                                                        },
+                                                                        "required": [
+                                                                            "optionType",
+                                                                            "enabled"
+                                                                        ]
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                            "optionType": {
+                                                                                "const": "range"
+                                                                            },
+                                                                            "min": {
+                                                                                "type": "number"
+                                                                            },
+                                                                            "max": {
+                                                                                "type": "number"
+                                                                            },
+                                                                            "current": {
+                                                                                "type": "number"
+                                                                            },
+                                                                            "step": {
+                                                                                "type": "number"
+                                                                            }
+                                                                        },
+                                                                        "required": [
+                                                                            "optionType",
+                                                                            "min",
+                                                                            "max",
+                                                                            "current"
+                                                                        ]
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                            "optionType": {
+                                                                                "const": "select"
+                                                                            },
+                                                                            "choices": {
+                                                                                "type": "array",
+                                                                                "items": {
+                                                                                    "type": "object",
+                                                                                    "properties": {
+                                                                                        "id": {
+                                                                                            "type": "string"
+                                                                                        },
+                                                                                        "label": {
+                                                                                            "type": "string"
+                                                                                        },
+                                                                                        "metadata": {
+                                                                                            "anyOf": [
+                                                                                                {
+                                                                                                    "type": "string"
+                                                                                                },
+                                                                                                {
+                                                                                                    "type": "number"
+                                                                                                },
+                                                                                                {
+                                                                                                    "type": "object",
+                                                                                                    "properties": {
+                                                                                                        "description": {
+                                                                                                            "type": "string"
+                                                                                                        },
+                                                                                                        "tags": {
+                                                                                                            "type": "array",
+                                                                                                            "items": {
+                                                                                                                "type": "string"
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+                                                                                            ]
+                                                                                        }
+                                                                                    },
+                                                                                    "required": [
+                                                                                        "id",
+                                                                                        "label"
+                                                                                    ]
+                                                                                }
+                                                                            },
+                                                                            "selected": {
+                                                                                "type": "string"
+                                                                            }
+                                                                        },
+                                                                        "required": [
+                                                                            "optionType",
+                                                                            "choices"
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            }
+                                                        },
+                                                        "level4": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "matrix": {
+                                                                    "type": "array",
+                                                                    "items": {
+                                                                        "type": "array",
+                                                                        "items": {
+                                                                            "anyOf": [
+                                                                                {
+                                                                                    "type": "null"
+                                                                                },
+                                                                                {
+                                                                                    "type": "boolean"
+                                                                                },
+                                                                                {
+                                                                                    "type": "number"
+                                                                                },
+                                                                                {
+                                                                                    "type": "string"
+                                                                                },
+                                                                                {
+                                                                                    "type": "object",
+                                                                                    "properties": {
+                                                                                        "x": {
+                                                                                            "type": "number"
+                                                                                        },
+                                                                                        "y": {
+                                                                                            "type": "number"
+                                                                                        },
+                                                                                        "data": {
+                                                                                            "oneOf": [
+                                                                                                {
+                                                                                                    "type": "object",
+                                                                                                    "properties": {
+                                                                                                        "type": {
+                                                                                                            "const": "point"
+                                                                                                        },
+                                                                                                        "value": {
+                                                                                                            "type": "number"
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "required": [
+                                                                                                        "type",
+                                                                                                        "value"
+                                                                                                    ]
+                                                                                                },
+                                                                                                {
+                                                                                                    "type": "object",
+                                                                                                    "properties": {
+                                                                                                        "type": {
+                                                                                                            "const": "vector"
+                                                                                                        },
+                                                                                                        "magnitude": {
+                                                                                                            "type": "number"
+                                                                                                        },
+                                                                                                        "direction": {
+                                                                                                            "type": "number"
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "required": [
+                                                                                                        "type",
+                                                                                                        "magnitude",
+                                                                                                        "direction"
+                                                                                                    ]
+                                                                                                }
+                                                                                            ]
+                                                                                        }
+                                                                                    },
+                                                                                    "required": [
+                                                                                        "x",
+                                                                                        "y"
+                                                                                    ]
+                                                                                }
+                                                                            ]
+                                                                        }
+                                                                    }
+                                                                },
+                                                                "level5": {
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                        "ultraDeep": {
+                                                                            "type": "array",
+                                                                            "items": {
+                                                                                "type": "object",
+                                                                                "properties": {
+                                                                                    "id": {
+                                                                                        "type": "integer"
+                                                                                    },
+                                                                                    "variant": {
+                                                                                        "oneOf": [
+                                                                                            {
+                                                                                                "type": "object",
+                                                                                                "properties": {
+                                                                                                    "kind": {
+                                                                                                        "const": "alpha"
+                                                                                                    },
+                                                                                                    "alphaValue": {
+                                                                                                        "type": "string"
+                                                                                                    }
+                                                                                                },
+                                                                                                "required": [
+                                                                                                    "kind",
+                                                                                                    "alphaValue"
+                                                                                                ]
+                                                                                            },
+                                                                                            {
+                                                                                                "type": "object",
+                                                                                                "properties": {
+                                                                                                    "kind": {
+                                                                                                        "const": "beta"
+                                                                                                    },
+                                                                                                    "betaValue": {
+                                                                                                        "type": "number"
+                                                                                                    }
+                                                                                                },
+                                                                                                "required": [
+                                                                                                    "kind",
+                                                                                                    "betaValue"
+                                                                                                ]
+                                                                                            },
+                                                                                            {
+                                                                                                "type": "object",
+                                                                                                "properties": {
+                                                                                                    "kind": {
+                                                                                                        "const": "gamma"
+                                                                                                    },
+                                                                                                    "gammaValue": {
+                                                                                                        "type": "array",
+                                                                                                        "items": {
+                                                                                                            "oneOf": [
+                                                                                                                {
+                                                                                                                    "type": "string"
+                                                                                                                },
+                                                                                                                {
+                                                                                                                    "type": "number"
+                                                                                                                }
+                                                                                                            ]
+                                                                                                        }
+                                                                                                    }
+                                                                                                },
+                                                                                                "required": [
+                                                                                                    "kind",
+                                                                                                    "gammaValue"
+                                                                                                ]
+                                                                                            }
+                                                                                        ]
+                                                                                    }
+                                                                                },
+                                                                                "required": [
+                                                                                    "id",
+                                                                                    "variant"
+                                                                                ]
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "mode",
+                                        "settings"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "recursiveTree": {
+            "$ref": "#/definitions/treeNode"
+        }
+    },
+    "definitions": {
+        "treeNode": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "value": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "type": "boolean"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/treeNode"
+                    }
+                }
+            },
+            "required": [
+                "name"
+            ]
+        }
+    }
+}

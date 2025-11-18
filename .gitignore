@@ -1,5 +1,7 @@
 /target
 instructions.txt
+*.log
+web-server.log
 
 bindings/
 docs/**/*.md

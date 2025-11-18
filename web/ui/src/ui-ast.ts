@@ -47,11 +47,57 @@ export function variantDefault(variant: UiVariant): JsonValue {
       }
     }
 
-    // Then add defaults for other required fields
+    // Then add defaults for required fields, using unique values when possible
     for (const child of variant.node.children) {
       const key = child.pointer.split("/").pop() || "";
       if (!(key in result)) {
-        result[key] = child.default_value ?? defaultForKind(child.kind);
+        // Special handling for fields that appear in multiple variants
+        // to ensure uniqueness. Check both schema $ref and variant ID
+        const schemaRef =
+          (variant.schema && typeof variant.schema === "object" &&
+              !Array.isArray(variant.schema) && "$ref" in variant.schema)
+            ? (variant.schema["$ref"] as string)
+            : undefined;
+
+        if (key === "id") {
+          // Generate unique IDs based on the schema reference or variant ID
+          if (
+            schemaRef?.includes("simpleItem") ||
+            variant.id?.includes("simpleItem")
+          ) {
+            result[key] = 1001; // Unique ID for simpleItem
+          } else if (
+            schemaRef?.includes("numericItem") ||
+            variant.id?.includes("numericItem")
+          ) {
+            result[key] = 2001; // Unique ID for numericItem
+          } else if (variant.id) {
+            // Generic hash-based ID for other variants
+            const hash = variant.id.split("").reduce(
+              (acc, char) => acc + char.charCodeAt(0),
+              0,
+            );
+            result[key] = hash % 1000;
+          } else {
+            result[key] = 0;
+          }
+        } else if (
+          key === "label" &&
+          (schemaRef?.includes("simpleItem") ||
+            variant.id?.includes("simpleItem"))
+        ) {
+          // Give simpleItem a default label to distinguish it
+          result[key] = "item";
+        } else if (
+          key === "values" &&
+          (schemaRef?.includes("numericItem") ||
+            variant.id?.includes("numericItem"))
+        ) {
+          // Give numericItem some default values to distinguish it
+          result[key] = [1];
+        } else {
+          result[key] = child.default_value ?? defaultForKind(child.kind);
+        }
       }
     }
 

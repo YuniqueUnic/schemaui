@@ -1,0 +1,19 @@
+{
+    "name": "schemaui-tests",
+    "version": "1.0.0",
+    "description": "Test suite for SchemaUI Web UI",
+    "scripts": {
+        "test": "npm run test:e2e",
+        "test:e2e": "node e2e/e2e-test-suite.js",
+        "test:e2e:headless": "HEADLESS=true node e2e/e2e-test-suite.js",
+        "test:web-ui": "node web-ui/web-ui-automated-tests.js",
+        "install": "npm install"
+    },
+    "dependencies": {
+        "puppeteer": "^21.0.0",
+        "chalk": "^4.1.2"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0"
+    }
+}

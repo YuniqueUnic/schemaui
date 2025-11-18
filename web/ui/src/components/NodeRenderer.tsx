@@ -289,8 +289,22 @@ function renderFieldControl(
         <Input
           type="number"
           value={typeof resolved === "number" ? resolved : 0}
-          onChange={(event) =>
-            onChange(node.pointer, Number(event.target.value))}
+          onChange={(event) => {
+            const numValue = event.target.value === ""
+              ? 0
+              : Number(event.target.value);
+            if (!isNaN(numValue)) {
+              onChange(node.pointer, numValue);
+            }
+          }}
+          onBlur={(event) => {
+            const numValue = event.target.value === ""
+              ? 0
+              : Number(event.target.value);
+            if (!isNaN(numValue)) {
+              onChange(node.pointer, numValue);
+            }
+          }}
         />
       );
     case "boolean":
@@ -621,37 +635,109 @@ function renderCompositeControl(
           variant="ghost"
           size="sm"
           onClick={() => {
-            const newEntry = variantDefault(variants[0]);
-            const next = [...entries, newEntry];
-            onChange(node.pointer, next);
-            // Open editor for the new entry
-            setTimeout(() => {
-              const entryNode: UiNode = {
-                pointer: `${node.pointer}/${entries.length}`,
-                title: variants[0]?.title ?? `Variant ${entries.length + 1}`,
-                description: variants[0]?.description,
-                required: false,
-                default_value: node.default_value,
-                kind: variants[0].node,
-              };
+            // If there's only one variant, use it directly
+            if (variants.length === 1) {
+              const newEntry = variantDefault(variants[0]);
+              const next = [...entries, newEntry];
+              onChange(node.pointer, next);
+              // Open editor for the new entry
+              setTimeout(() => {
+                const entryNode: UiNode = {
+                  pointer: `${node.pointer}/${entries.length}`,
+                  title: variants[0]?.title ?? `Variant ${entries.length + 1}`,
+                  description: variants[0]?.description,
+                  required: false,
+                  default_value: node.default_value,
+                  kind: variants[0].node,
+                };
+                overlay.open({
+                  title: `${node.title ?? node.pointer} · New variant entry`,
+                  content: (close) => (
+                    <VariantEntryEditor
+                      node={entryNode}
+                      initialValue={newEntry}
+                      errors={errors}
+                      onSave={(updatedValue) => {
+                        const updated = [...next];
+                        updated[entries.length] = updatedValue;
+                        onChange(node.pointer, updated);
+                        close();
+                      }}
+                      onClose={close}
+                    />
+                  ),
+                });
+              }, 0);
+            } else {
+              // Multiple variants - show a selector first
               overlay.open({
-                title: `${node.title ?? node.pointer} · New variant entry`,
+                title: `Select variant type for ${node.title ?? node.pointer}`,
                 content: (close) => (
-                  <VariantEntryEditor
-                    node={entryNode}
-                    initialValue={newEntry}
-                    errors={errors}
-                    onSave={(updatedValue) => {
-                      const updated = [...next];
-                      updated[entries.length] = updatedValue;
-                      onChange(node.pointer, updated);
-                      close();
-                    }}
-                    onClose={close}
-                  />
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Choose which type of item to add:
+                    </p>
+                    <div className="space-y-2">
+                      {variants.map((variant) => (
+                        <Button
+                          key={variant.id}
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            const newEntry = variantDefault(variant);
+                            const next = [...entries, newEntry];
+                            onChange(node.pointer, next);
+                            close();
+
+                            // Open editor for the new entry
+                            setTimeout(() => {
+                              const entryNode: UiNode = {
+                                pointer: `${node.pointer}/${entries.length}`,
+                                title: variant.title ??
+                                  `Variant ${entries.length + 1}`,
+                                description: variant.description,
+                                required: false,
+                                default_value: node.default_value,
+                                kind: variant.node,
+                              };
+                              overlay.open({
+                                title: `${node.title ?? node.pointer} · New ${
+                                  variant.title ?? "variant"
+                                } entry`,
+                                content: (closeEditor) => (
+                                  <VariantEntryEditor
+                                    node={entryNode}
+                                    initialValue={newEntry}
+                                    errors={errors}
+                                    onSave={(updatedValue) => {
+                                      const updated = [...next];
+                                      updated[entries.length] = updatedValue;
+                                      onChange(node.pointer, updated);
+                                      closeEditor();
+                                    }}
+                                    onClose={closeEditor}
+                                  />
+                                ),
+                              });
+                            }, 0);
+                          }}
+                        >
+                          <span className="font-medium">
+                            {variant.title ?? variant.id}
+                          </span>
+                          {variant.description && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              {variant.description}
+                            </span>
+                          )}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 ),
               });
-            }, 0);
+            }
           }}
           className="w-full"
         >
@@ -663,6 +749,17 @@ function renderCompositeControl(
 
   const activeVariant = determineBestVariant(value, variants);
 
+  // Debug logging for variant matching
+  if (
+    typeof window !== "undefined" && window.location.hostname === "localhost"
+  ) {
+    console.log("renderCompositeControl:", {
+      value,
+      activeVariantId: activeVariant.id,
+      activeVariantTitle: activeVariant.title,
+    });
+  }
+
   return (
     <div className="space-y-4">
       {/* Variant Selector (Radio Group) */}
@@ -670,11 +767,15 @@ function renderCompositeControl(
         variants={variants}
         mode={mode}
         activeVariantId={activeVariant.id}
-        onSelect={(variant) => onChange(node.pointer, variantDefault(variant))}
+        onSelect={(variant) => {
+          // Generate a unique default value for the selected variant
+          const newValue = variantDefault(variant);
+          onChange(node.pointer, newValue);
+        }}
       />
 
       {/* Direct rendering of the selected variant's content */}
-      <div className="border-l-2 border-primary/30 pl-4">
+      <div key={activeVariant.id} className="border-l-2 border-primary/30 pl-4">
         <p className="text-xs text-muted-foreground mb-3">
           {activeVariant.title ?? "Selected Variant"} content:
         </p>
@@ -687,9 +788,75 @@ function renderCompositeControl(
             default_value: node.default_value,
             kind: activeVariant.node,
           }}
-          value={value ?? variantDefault(activeVariant)}
+          value={value}
           errors={errors}
-          onChange={onChange}
+          onChange={(changedPointer, newValue) => {
+            // Debug logging
+            console.log("Composite onChange:", {
+              changedPointer,
+              nodePointer: node.pointer,
+              newValue,
+              currentValue: value,
+              variantType: activeVariant.node.type,
+            });
+
+            // For composite types with object values, we need to handle nested updates
+            if (
+              activeVariant.node.type === "object" &&
+              typeof value === "object" && value !== null
+            ) {
+              // Check if the changed pointer is a child of the node pointer
+              // Both absolute and relative paths should be handled
+
+              // Case 1: Absolute path (e.g., /e/e1/e2/e3/e4/logic/value)
+              if (changedPointer.startsWith(node.pointer + "/")) {
+                const fieldPath = changedPointer.substring(node.pointer.length);
+                const fieldName = fieldPath.substring(1).split("/")[0];
+                console.log(
+                  "Absolute path - Updating field:",
+                  fieldName,
+                  "with value:",
+                  newValue,
+                );
+
+                // Update only the specific field in the object
+                const updatedValue = { ...value, [fieldName]: newValue };
+                console.log("Updated object:", updatedValue);
+
+                onChange(node.pointer, updatedValue);
+                return;
+              }
+
+              // Case 2: Relative path (e.g., /value)
+              if (
+                changedPointer.startsWith("/") &&
+                !changedPointer.startsWith(node.pointer)
+              ) {
+                const fieldName = changedPointer.substring(1).split("/")[0];
+                console.log(
+                  "Relative path - Updating field:",
+                  fieldName,
+                  "with value:",
+                  newValue,
+                );
+
+                // Update only the specific field in the object
+                const updatedValue = { ...value, [fieldName]: newValue };
+                console.log("Updated object:", updatedValue);
+
+                onChange(node.pointer, updatedValue);
+                return;
+              }
+
+              // Case 3: Direct replacement
+              console.log("Direct replacement of entire value");
+              onChange(changedPointer, newValue);
+            } else {
+              // For non-object types, pass through as-is
+              console.log("Non-object type, passing through");
+              onChange(changedPointer, newValue);
+            }
+          }}
           renderMode="inline"
         />
       </div>

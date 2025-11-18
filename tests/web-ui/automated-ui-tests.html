@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SchemaUI Automated Test Runner</title>
+        <style>
+            body {
+                font-family: system-ui, -apple-system, sans-serif;
+                max-width: 1200px;
+                margin: 0 auto;
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            h1 {
+                color: #333;
+                border-bottom: 3px solid #007aff;
+                padding-bottom: 10px;
+            }
+            .test-runner {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            .control-panel {
+                margin-bottom: 20px;
+                padding: 15px;
+                background: #f9f9f9;
+                border-radius: 5px;
+            }
+            button {
+                background: #007aff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-size: 16px;
+                cursor: pointer;
+                margin-right: 10px;
+            }
+            button:hover {
+                background: #0051d5;
+            }
+            button:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+            }
+            .test-results {
+                margin-top: 20px;
+            }
+            .test-item {
+                padding: 10px;
+                margin: 5px 0;
+                border-left: 4px solid #ddd;
+                background: #fafafa;
+            }
+            .test-item.pass {
+                border-left-color: #4caf50;
+                background: #f1f8f1;
+            }
+            .test-item.fail {
+                border-left-color: #f44336;
+                background: #fef1f1;
+            }
+            .test-item.running {
+                border-left-color: #2196f3;
+                background: #f1f7ff;
+            }
+            .test-name {
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+            .test-details {
+                font-size: 14px;
+                color: #666;
+            }
+            .summary {
+                margin-top: 20px;
+                padding: 15px;
+                background: #fff;
+                border-radius: 5px;
+                border: 2px solid #ddd;
+            }
+            .summary.success {
+                border-color: #4caf50;
+                background: #f1f8f1;
+            }
+            .summary.failure {
+                border-color: #f44336;
+                background: #fef1f1;
+            }
+            .log-output {
+                background: #1e1e1e;
+                color: #d4d4d4;
+                padding: 10px;
+                border-radius: 5px;
+                font-family: "Courier New", monospace;
+                font-size: 13px;
+                max-height: 400px;
+                overflow-y: auto;
+                margin-top: 20px;
+            }
+            .log-line {
+                margin: 2px 0;
+            }
+            .log-error {
+                color: #f48771;
+            }
+            .log-success {
+                color: #89d185;
+            }
+            .log-info {
+                color: #75beff;
+            }
+            .iframe-container {
+                margin-top: 20px;
+                border: 2px solid #ddd;
+                border-radius: 5px;
+                overflow: hidden;
+            }
+            iframe {
+                width: 100%;
+                height: 600px;
+                border: none;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>🧪 SchemaUI Automated Test Runner</h1>
+
+        <div class="test-runner">
+            <div class="control-panel">
+                <h2>Test Configuration</h2>
+                <label>
+                    Target URL:
+                    <input
+                        type="text"
+                        id="targetUrl"
+                        value="http://localhost:5175"
+                        style="width: 300px; padding: 5px"
+                    >
+                </label>
+                <br><br>
+                <button id="runTests">▶️ Run All Tests</button>
+                <button id="runNumberTest">🔢 Test Number Input Only</button>
+                <button id="clearResults">🗑️ Clear Results</button>
+            </div>
+
+            <div id="testResults" class="test-results"></div>
+
+            <div id="summary" class="summary" style="display: none"></div>
+
+            <div class="log-output" id="logOutput"></div>
+
+            <div class="iframe-container">
+                <iframe id="testFrame" src="about:blank"></iframe>
+            </div>
+        </div>
+
+        <script>
+            class SchemaUITestRunner {
+                constructor() {
+                    this.testFrame = document.getElementById(
+                        "testFrame",
+                    );
+                    this.logOutput = document.getElementById(
+                        "logOutput",
+                    );
+                    this.testResults = document.getElementById(
+                        "testResults",
+                    );
+                    this.summary = document.getElementById(
+                        "summary",
+                    );
+                    this.tests = [];
+                    this.currentTestIndex = 0;
+                }
+
+                log(message, type = "info") {
+                    const line = document.createElement("div");
+                    line.className = `log-line log-${type}`;
+                    const timestamp = new Date()
+                        .toLocaleTimeString();
+                    line.textContent =
+                        `[${timestamp}] ${message}`;
+                    this.logOutput.appendChild(line);
+                    this.logOutput.scrollTop =
+                        this.logOutput.scrollHeight;
+                }
+
+                clearResults() {
+                    this.testResults.innerHTML = "";
+                    this.logOutput.innerHTML = "";
+                    this.summary.style.display = "none";
+                    this.tests = [];
+                    this.currentTestIndex = 0;
+                }
+
+                async loadFrame(url) {
+                    this.log(`Loading ${url}...`);
+                    return new Promise((resolve) => {
+                        this.testFrame.onload = () => {
+                            this.log(
+                                `Frame loaded successfully`,
+                                "success",
+                            );
+                            setTimeout(resolve, 1000); // Give it time to initialize
+                        };
+                        this.testFrame.src = url;
+                    });
+                }
+
+                getFrameDocument() {
+                    try {
+                        return this.testFrame.contentDocument ||
+                            this.testFrame.contentWindow
+                                .document;
+                    } catch (e) {
+                        this.log(
+                            `Cannot access frame: ${e.message}`,
+                            "error",
+                        );
+                        return null;
+                    }
+                }
+
+                async navigateToPath(path) {
+                    const doc = this.getFrameDocument();
+                    if (!doc) return false;
+
+                    const parts = path.split("/").filter((p) =>
+                        p
+                    );
+                    this.log(`Navigating to: ${path}`);
+
+                    for (const part of parts) {
+                        const button = Array.from(
+                            doc.querySelectorAll("button"),
+                        )
+                            .find((b) =>
+                                b.textContent === part
+                            );
+                        if (button) {
+                            button.click();
+                            await this.wait(300);
+                        } else {
+                            this.log(
+                                `Cannot find button: ${part}`,
+                                "error",
+                            );
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+
+                async wait(ms) {
+                    return new Promise((resolve) =>
+                        setTimeout(resolve, ms)
+                    );
+                }
+
+                getJsonFromFrame() {
+                    const doc = this.getFrameDocument();
+                    if (!doc) return null;
+
+                    try {
+                        const bodyText = doc.body.innerText;
+                        const jsonMatch = bodyText.match(
+                            /\{[\s\S]*\}/,
+                        );
+                        if (jsonMatch) {
+                            return JSON.parse(jsonMatch[0]);
+                        }
+                    } catch (e) {
+                        this.log(
+                            `Failed to parse JSON: ${e.message}`,
+                            "error",
+                        );
+                    }
+                    return null;
+                }
+
+                async testNumberInput(path, field) {
+                    const testName =
+                        `Number Input: ${path}/${field}`;
+                    this.log(`Starting test: ${testName}`);
+
+                    const testResult = {
+                        name: testName,
+                        status: "running",
+                        details: {},
+                    };
+
+                    this.updateTestResult(testResult);
+
+                    try {
+                        // Navigate to the path
+                        await this.navigateToPath(path);
+                        await this.wait(500);
+
+                        const doc = this.getFrameDocument();
+                        if (!doc) {
+                            throw new Error(
+                                "Cannot access document",
+                            );
+                        }
+
+                        // Find number input
+                        const numberInputs = doc
+                            .querySelectorAll(
+                                'input[type="number"]',
+                            );
+                        if (numberInputs.length === 0) {
+                            throw new Error(
+                                "No number input found",
+                            );
+                        }
+
+                        const input = numberInputs[0];
+                        const testValue = 12345;
+
+                        // Test different input methods
+                        const methods = [
+                            {
+                                name: "Direct value set",
+                                action: () => {
+                                    input.value = testValue
+                                        .toString();
+                                    input.dispatchEvent(
+                                        new Event("input", {
+                                            bubbles: true,
+                                        }),
+                                    );
+                                    input.dispatchEvent(
+                                        new Event("change", {
+                                            bubbles: true,
+                                        }),
+                                    );
+                                },
+                            },
+                            {
+                                name: "Simulated typing",
+                                action: () => {
+                                    input.focus();
+                                    input.value = "";
+                                    for (
+                                        const digit of testValue
+                                            .toString()
+                                    ) {
+                                        input.value += digit;
+                                        input.dispatchEvent(
+                                            new Event("input", {
+                                                bubbles: true,
+                                            }),
+                                        );
+                                    }
+                                    input.dispatchEvent(
+                                        new Event("change", {
+                                            bubbles: true,
+                                        }),
+                                    );
+                                    input.blur();
+                                },
+                            },
+                            {
+                                name: "React synthetic event",
+                                action: () => {
+                                    const nativeInputValueSetter =
+                                        Object
+                                            .getOwnPropertyDescriptor(
+                                                window
+                                                    .HTMLInputElement
+                                                    .prototype,
+                                                "value",
+                                            ).set;
+                                    nativeInputValueSetter.call(
+                                        input,
+                                        testValue.toString(),
+                                    );
+                                    input.dispatchEvent(
+                                        new Event("input", {
+                                            bubbles: true,
+                                        }),
+                                    );
+                                },
+                            },
+                        ];
+
+                        let success = false;
+                        for (const method of methods) {
+                            this.log(`Trying: ${method.name}`);
+                            method.action();
+                            await this.wait(500);
+
+                            const json = this
+                                .getJsonFromFrame();
+                            let actualValue = json;
+                            const pathParts = path.split("/")
+                                .filter((p) => p);
+                            for (const part of pathParts) {
+                                actualValue = actualValue
+                                    ?.[part];
+                            }
+                            actualValue = actualValue?.[field];
+
+                            if (actualValue === testValue) {
+                                success = true;
+                                testResult.details = {
+                                    method: method.name,
+                                    expected: testValue,
+                                    actual: actualValue,
+                                    inputValue: input.value,
+                                };
+                                break;
+                            } else {
+                                this.log(
+                                    `Failed: Expected ${testValue}, got ${actualValue}`,
+                                    "error",
+                                );
+                            }
+                        }
+
+                        testResult.status = success
+                            ? "pass"
+                            : "fail";
+                        if (!success) {
+                            testResult.details.error =
+                                "No method successfully updated the value";
+                        }
+                    } catch (error) {
+                        testResult.status = "fail";
+                        testResult.details.error =
+                            error.message;
+                        this.log(
+                            `Test failed: ${error.message}`,
+                            "error",
+                        );
+                    }
+
+                    this.updateTestResult(testResult);
+                    return testResult;
+                }
+
+                updateTestResult(result) {
+                    let element = document.getElementById(
+                        `test-${
+                            result.name.replace(
+                                /[^a-zA-Z0-9]/g,
+                                "-",
+                            )
+                        }`,
+                    );
+
+                    if (!element) {
+                        element = document.createElement("div");
+                        element.id = `test-${
+                            result.name.replace(
+                                /[^a-zA-Z0-9]/g,
+                                "-",
+                            )
+                        }`;
+                        element.className = "test-item";
+                        this.testResults.appendChild(element);
+                    }
+
+                    element.className =
+                        `test-item ${result.status}`;
+                    element.innerHTML = `
+                    <div class="test-name">${
+                        result.status === "running"
+                            ? "⏳"
+                            : result.status === "pass"
+                            ? "✅"
+                            : "❌"
+                    } ${result.name}</div>
+                    <div class="test-details">${
+                        JSON.stringify(result.details, null, 2)
+                    }</div>
+                `;
+                }
+
+                async runAllTests() {
+                    this.clearResults();
+
+                    const url =
+                        document.getElementById("targetUrl")
+                            .value;
+                    await this.loadFrame(url);
+
+                    const testCases = [
+                        {
+                            path: "/e/e1/e2/e3/e4/logic",
+                            field: "value",
+                        },
+                        { path: "/a", field: "age" },
+                        { path: "/a", field: "rating" },
+                    ];
+
+                    const results = [];
+                    for (const testCase of testCases) {
+                        const result = await this
+                            .testNumberInput(
+                                testCase.path,
+                                testCase.field,
+                            );
+                        results.push(result);
+                        await this.wait(1000);
+                    }
+
+                    this.showSummary(results);
+                }
+
+                showSummary(results) {
+                    const passed =
+                        results.filter((r) =>
+                            r.status === "pass"
+                        ).length;
+                    const failed =
+                        results.filter((r) =>
+                            r.status === "fail"
+                        ).length;
+                    const total = results.length;
+
+                    const allPassed = failed === 0;
+
+                    this.summary.className = `summary ${
+                        allPassed ? "success" : "failure"
+                    }`;
+                    this.summary.innerHTML = `
+                    <h3>📊 Test Summary</h3>
+                    <p>Total Tests: ${total}</p>
+                    <p>✅ Passed: ${passed}</p>
+                    <p>❌ Failed: ${failed}</p>
+                    <p>Success Rate: ${
+                        ((passed / total) * 100).toFixed(1)
+                    }%</p>
+                    ${
+                        failed > 0
+                            ? "<p><strong>⚠️ Critical: Number input fields are not updating correctly!</strong></p>"
+                            : ""
+                    }
+                `;
+                    this.summary.style.display = "block";
+                }
+            }
+
+            // Initialize test runner
+            const runner = new SchemaUITestRunner();
+
+            // Event listeners
+            document.getElementById("runTests")
+                .addEventListener("click", () => {
+                    runner.runAllTests();
+                });
+
+            document.getElementById("runNumberTest")
+                .addEventListener("click", async () => {
+                    runner.clearResults();
+                    const url =
+                        document.getElementById("targetUrl")
+                            .value;
+                    await runner.loadFrame(url);
+                    await runner.testNumberInput(
+                        "/e/e1/e2/e3/e4/logic",
+                        "value",
+                    );
+                });
+
+            document.getElementById("clearResults")
+                .addEventListener("click", () => {
+                    runner.clearResults();
+                });
+        </script>
+    </body>
+</html>
