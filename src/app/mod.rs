@@ -1,13 +1,8 @@
-pub(crate) mod input;
-pub(crate) mod keymap;
-mod options;
-mod popup;
-mod runtime;
-mod schema_ui;
-mod status;
-mod terminal;
-mod validation;
+// Compatibility shim: `app` now forwards to the TUI app module.
+// New code inside the crate should prefer `crate::tui::app` directly.
 
-pub use options::UiOptions;
-pub(crate) use runtime::App;
-pub use schema_ui::SchemaUI;
+pub(crate) use crate::tui::app::runtime::App;
+pub use crate::tui::app::{
+    SchemaUI, UiOptions, input, keymap, options, popup, runtime, schema_ui, status, terminal,
+    validation,
+};
