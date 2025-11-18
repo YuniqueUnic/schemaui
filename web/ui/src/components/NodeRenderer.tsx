@@ -7,12 +7,8 @@ import {
   determineBestVariant,
   determineVariant,
 } from "../utils/variantHelpers";
-import {
-  extractChildValue,
-  formatValueSummary,
-  inferValueType,
-  isSimpleKind,
-} from "../utils/typeHelpers";
+import { extractChildValue, inferValueType } from "../utils/typeHelpers";
+import { ArrayRenderer } from "./renderers/ArrayRenderer";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,51 +33,6 @@ import {
 // ============================================================================
 // Helper Components
 // ============================================================================
-
-// Helper component for editing array items with local state
-function ArrayItemEditor({
-  node,
-  initialValue,
-  errors,
-  onSave,
-  onClose,
-}: {
-  node: UiNode;
-  initialValue: JsonValue;
-  errors: Map<string, string>;
-  onSave: (value: JsonValue) => void;
-  onClose: () => void;
-}) {
-  const [localValue, setLocalValue] = useState<JsonValue>(initialValue);
-
-  return (
-    <div className="space-y-4">
-      <NodeRenderer
-        node={node}
-        value={localValue}
-        errors={errors}
-        onChange={(changedPointer, newValue) =>
-          setLocalValue((previous) =>
-            applyLocalChangeForEditor(
-              node.pointer,
-              previous,
-              changedPointer,
-              newValue,
-            )
-          )}
-        renderMode="inline"
-      />
-      <div className="flex justify-end gap-2 mt-4">
-        <Button onClick={onClose} variant="ghost" size="sm">
-          Cancel
-        </Button>
-        <Button onClick={() => onSave(localValue)} variant="outline" size="sm">
-          Done
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 // Helper component for editing variant entries with local state
 function VariantEntryEditor({
@@ -190,12 +141,22 @@ function renderBody(
     case "field":
       return renderFieldControl(node as FieldNode, value, onChange);
     case "array":
-      return renderArrayControl(
-        node as ArrayNode,
-        value,
-        errors,
-        onChange,
-        overlay,
+      return (
+        <ArrayRenderer
+          node={node as ArrayNode}
+          value={value}
+          errors={errors}
+          onChange={onChange}
+          renderNode={(n, v, e, oc) => (
+            <NodeRenderer
+              node={n}
+              value={v}
+              errors={e}
+              onChange={oc}
+              renderMode="inline"
+            />
+          )}
+        />
       );
     case "composite":
       return renderCompositeControl(
@@ -305,221 +266,6 @@ function renderFieldControl(
           type="text"
           value={(resolved as string) ?? ""}
           onChange={(event) => onChange(node.pointer, event.target.value)}
-        />
-      );
-  }
-}
-
-function renderArrayControl(
-  node: ArrayNode,
-  value: JsonValue | undefined,
-  errors: Map<string, string>,
-  onChange: (pointer: string, value: JsonValue) => void,
-  overlay: ReturnType<typeof useOverlay>,
-) {
-  const entries = Array.isArray(value) ? (value as JsonValue[]) : [];
-  const itemKind = node.kind.item;
-
-  // Check if array items are simple types that can be rendered inline
-  const isSimpleItemType = isSimpleKind(itemKind);
-
-  const removeEntry = (index: number) => {
-    const next = entries.filter((_, idx) => idx !== index);
-    onChange(node.pointer, next);
-  };
-
-  // -------------------------
-  // Simple Type Array Rendering (Inline)
-  // -------------------------
-  if (isSimpleItemType && itemKind.type === "field") {
-    const addSimpleEntry = () => {
-      const placeholder = defaultForKind(itemKind);
-      const next = [...entries, placeholder];
-      onChange(node.pointer, next);
-    };
-
-    const updateEntry = (index: number, newValue: JsonValue) => {
-      const next = [...entries];
-      next[index] = newValue;
-      onChange(node.pointer, next);
-    };
-
-    return (
-      <div className="space-y-2">
-        {entries.map((entry, index) => (
-          <div
-            key={`${node.pointer}-${index}`}
-            className="flex items-center gap-2"
-          >
-            <Badge variant="secondary" className="shrink-0">
-              {index + 1}
-            </Badge>
-            <div className="flex-1">
-              {renderSimpleFieldInline(
-                itemKind,
-                entry,
-                (newValue) => updateEntry(index, newValue),
-              )}
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => removeEntry(index)}
-              className="text-destructive hover:text-destructive shrink-0"
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={addSimpleEntry}
-          className="w-full"
-        >
-          + Add entry
-        </Button>
-      </div>
-    );
-  }
-
-  // -------------------------
-  // Complex Type Array Rendering (With Dialog)
-  // -------------------------
-  const editEntry = (index: number, initial?: JsonValue) => {
-    const entryNode: UiNode = {
-      pointer: `${node.pointer}/${index}`,
-      title: node.title
-        ? `${node.title} entry ${index + 1}`
-        : `Entry ${index + 1}`,
-      description: node.description,
-      required: false,
-      default_value: node.default_value,
-      kind: itemKind,
-    };
-    overlay.open({
-      title: `${node.title ?? node.pointer} · Item ${index + 1}`,
-      content: (close) => (
-        <ArrayItemEditor
-          node={entryNode}
-          initialValue={initial ?? entries[index]}
-          errors={errors}
-          onSave={(newValue) => {
-            const next = [...entries];
-            next[index] = newValue;
-            onChange(node.pointer, next);
-            close();
-          }}
-          onClose={close}
-        />
-      ),
-    });
-  };
-
-  const addEntry = () => {
-    const placeholder = defaultForKind(itemKind);
-    const next = [...entries, placeholder];
-    onChange(node.pointer, next);
-    editEntry(next.length - 1, placeholder);
-  };
-
-  return (
-    <div className="space-y-2">
-      {entries.map((entry, index) => {
-        const entryType = inferValueType(entry);
-        return (
-          <Card
-            key={`${node.pointer}-${index}`}
-            className="flex items-center justify-between px-3 py-2"
-          >
-            <div className="flex items-center gap-2 truncate flex-1">
-              <Badge variant="secondary">{index + 1}</Badge>
-              <Badge variant="outline" className="font-mono text-xs">
-                {entryType}
-              </Badge>
-              <span className="truncate text-sm">
-                {formatValueSummary(entry)}
-              </span>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => editEntry(index, entry)}
-              >
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => removeEntry(index)}
-                className="text-destructive hover:text-destructive"
-              >
-                Remove
-              </Button>
-            </div>
-          </Card>
-        );
-      })}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={addEntry}
-        className="w-full"
-      >
-        + Add entry
-      </Button>
-    </div>
-  );
-}
-
-/**
- * Renders a simple field control inline (for use in arrays)
- * Returns just the input control without labels or error messages
- */
-function renderSimpleFieldInline(
-  fieldKind: Extract<UiNodeKind, { type: "field" }>,
-  value: JsonValue | undefined,
-  onChange: (value: JsonValue) => void,
-): ReactNode {
-  const resolved = value ?? defaultForKind(fieldKind);
-
-  switch (fieldKind.scalar) {
-    case "integer":
-    case "number":
-      return (
-        <Input
-          type="number"
-          value={typeof resolved === "number" ? resolved : 0}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className="h-9"
-        />
-      );
-    case "boolean":
-      return (
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={Boolean(resolved)}
-            onCheckedChange={(checked) => onChange(checked)}
-          />
-          <span className="text-xs text-muted-foreground">
-            {resolved ? "true" : "false"}
-          </span>
-        </div>
-      );
-    case "string":
-    default:
-      return (
-        <Input
-          type="text"
-          value={(resolved as string) ?? ""}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-9"
         />
       );
   }
