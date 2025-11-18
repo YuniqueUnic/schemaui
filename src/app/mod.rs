@@ -10,4 +10,4 @@ mod validation;
 
 pub use options::UiOptions;
 pub(crate) use runtime::App;
-pub use schema_ui::{SchemaUI, UiFrontend};
+pub use schema_ui::SchemaUI;

@@ -1,5 +1,5 @@
 use color_eyre::eyre::{Result, eyre};
-use schemaui::{DocumentFormat, schema_from_data_value, schema_with_defaults};
+use schemaui::{DocumentFormat, schema_from_data_value};
 use serde_json::Value;
 
 use crate::cli::CommonArgs;
@@ -70,8 +70,7 @@ pub fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
     }
 
     let schema = match (schema_value, config_value.as_ref()) {
-        (Some(schema), Some(defaults)) => schema_with_defaults(&schema, defaults),
-        (Some(schema), None) => schema,
+        (Some(schema), _) => schema,
         (None, Some(defaults)) => schema_from_data_value(defaults),
         (None, None) => unreachable!("validated above"),
     };

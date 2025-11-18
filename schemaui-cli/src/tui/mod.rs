@@ -1,15 +1,15 @@
 use color_eyre::eyre::{Report, Result};
-use schemaui::{SchemaUI, UiFrontend};
+use schemaui::{SchemaUI, TuiFrontend};
 
 use crate::cli::CommonArgs;
 use crate::session::{SessionBundle, prepare_session};
 
 pub fn run_cli(args: &CommonArgs) -> Result<()> {
     let session = prepare_session(args)?;
-    execute_session(session, UiFrontend::Tui)
+    execute_session(session)
 }
 
-pub(crate) fn execute_session(session: SessionBundle, frontend: UiFrontend) -> Result<()> {
+pub(crate) fn execute_session(session: SessionBundle) -> Result<()> {
     let SessionBundle {
         schema,
         defaults,
@@ -26,6 +26,9 @@ pub(crate) fn execute_session(session: SessionBundle, frontend: UiFrontend) -> R
     if let Some(options) = output {
         ui = ui.with_output(options);
     }
-    ui = ui.with_frontend(frontend);
-    ui.run().map_err(Report::msg).map(|_| ())
+    let options = ui.options().clone();
+    let frontend = TuiFrontend { options };
+    ui.run_with_frontend(frontend)
+        .map_err(Report::msg)
+        .map(|_| ())
 }

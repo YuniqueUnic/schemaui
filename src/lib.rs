@@ -2,6 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 mod app;
+mod core;
 mod domain;
 mod form;
 pub mod io;
@@ -15,7 +16,7 @@ pub mod web;
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use app::{SchemaUI, UiFrontend, UiOptions};
+pub use app::{SchemaUI, UiOptions};
 pub use io::{
     DocumentFormat,
     input::{
@@ -23,7 +24,12 @@ pub use io::{
     },
     output::{OutputDestination, OutputOptions},
 };
+pub use tui::session::TuiFrontend;
+#[cfg(feature = "web")]
+pub use web::frontend::WebFrontend;
 
 pub mod prelude {
-    pub use super::{SchemaUI, UiFrontend, UiOptions};
+    #[cfg(feature = "web")]
+    pub use super::WebFrontend;
+    pub use super::{SchemaUI, TuiFrontend, UiOptions};
 }

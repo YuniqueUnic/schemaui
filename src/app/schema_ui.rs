@@ -1,25 +1,16 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde_json::Value;
 use std::{borrow::Cow, sync::Arc, time::Duration};
 
+use crate::core::pipeline::SchemaPipeline;
 use crate::io::{
     self, DocumentFormat,
     output::{self, OutputOptions},
 };
 
 use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions};
+use crate::core::frontend::Frontend;
 use crate::form::field::components::ComponentPalette;
-use crate::tui::session::TuiSessionConfig;
-
-#[cfg(feature = "web")]
-use crate::web::session::ServeOptions as WebServeOptions;
-
-#[derive(Debug, Clone, Copy)]
-pub enum UiFrontend {
-    Tui,
-    #[cfg(feature = "web")]
-    Web(WebServeOptions),
-}
 
 #[derive(Debug)]
 pub struct SchemaUI {
@@ -28,7 +19,6 @@ pub struct SchemaUI {
     options: UiOptions,
     output: Option<OutputOptions>,
     initial_data: Option<Value>,
-    frontend: UiFrontend,
 }
 
 impl SchemaUI {
@@ -39,7 +29,6 @@ impl SchemaUI {
             options: UiOptions::default(),
             output: None,
             initial_data: None,
-            frontend: UiFrontend::Tui,
         }
     }
 
@@ -61,8 +50,7 @@ impl SchemaUI {
     }
 
     pub fn from_schema_and_data(schema: Value, defaults: Value) -> Self {
-        let enriched = io::input::schema_with_defaults(&schema, &defaults);
-        let mut ui = Self::new(enriched);
+        let mut ui = Self::new(schema);
         ui.initial_data = Some(defaults);
         ui
     }
@@ -83,14 +71,14 @@ impl SchemaUI {
     }
 
     pub fn with_default_data(mut self, defaults: &Value) -> Self {
-        self.schema = io::input::schema_with_defaults(&self.schema, defaults);
         self.initial_data = Some(defaults.clone());
         self
     }
 
-    pub fn with_frontend(mut self, frontend: UiFrontend) -> Self {
-        self.frontend = frontend;
-        self
+    /// Expose the current UI options so callers can build a frontend
+    /// (e.g. TuiFrontend) configured consistently with this builder.
+    pub fn options(&self) -> &UiOptions {
+        &self.options
     }
 
     pub fn with_keymap(mut self, keymap: KeyBindingMap) -> Self {
@@ -196,74 +184,25 @@ impl SchemaUI {
         self
     }
 
-    pub fn run(self) -> Result<Value> {
-        match self.frontend {
-            UiFrontend::Tui => self.run_tui(),
-            #[cfg(feature = "web")]
-            UiFrontend::Web(options) => self.run_web(options),
-        }
-    }
-
-    fn run_tui(self) -> Result<Value> {
-        let SchemaUI {
-            schema,
-            title: _,
-            options,
-            output,
-            initial_data: _,
-            frontend: _,
-        } = self;
-
-        let config = TuiSessionConfig::new(schema, options);
-        let session = config.build()?;
-        session.run(output)
-    }
-
-    #[cfg(feature = "web")]
-    fn run_web(self, serve: WebServeOptions) -> Result<Value> {
-        use crate::web::session::{WebSessionBuilder, bind_session};
-
+    pub fn run_with_frontend<F>(self, frontend: F) -> Result<Value>
+    where
+        F: Frontend,
+    {
         let SchemaUI {
             schema,
             title,
             options: _,
             output,
             initial_data,
-            frontend: _,
         } = self;
 
-        let mut builder = WebSessionBuilder::new(schema);
-        if let Some(title) = title {
-            builder = builder.with_title(title);
-        }
-        if let Some(data) = initial_data {
-            builder = builder.with_initial_data(data);
-        }
-        let config = builder.build()?;
-
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .context("failed to initialize tokio runtime")?;
-
-        let _guard = runtime.enter();
-
-        let value = runtime.block_on(async move {
-            let bound = bind_session(config, serve)
-                .await
-                .context("failed to bind web session")?;
-            let addr = bound.local_addr();
-            eprintln!("schemaui web UI available at http://{addr}/");
-            eprintln!("Press Ctrl+C to abort the session.");
-            bound.run().await.context("web UI session failed")
-        })?;
-
-        runtime.shutdown_background();
-
+        let pipeline = SchemaPipeline::new(schema)
+            .with_title(title)
+            .with_defaults(initial_data);
+        let result = pipeline.run_with_frontend(frontend)?;
         if let Some(settings) = output {
-            output::emit(&value, &settings)?;
+            output::emit(&result, &settings)?;
         }
-
-        Ok(value)
+        Ok(result)
     }
 }
