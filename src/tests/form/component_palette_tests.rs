@@ -3,9 +3,9 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 use crate::{
-    app::UiOptions,
-    domain::{FieldKind, FieldSchema, KeyValueField},
-    form::field::FieldState,
+    tui::app::options::UiOptions,
+    tui::model::{FieldKind, FieldSchema, KeyValueField},
+    tui::state::FieldState,
 };
 
 fn integer_field_schema() -> FieldSchema {

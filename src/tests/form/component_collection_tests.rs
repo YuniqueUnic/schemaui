@@ -1,4 +1,4 @@
-use crate::form::field::components::helpers::format_collection_value;
+use crate::tui::state::field::components::helpers::format_collection_value;
 
 #[test]
 fn formats_collection_status_with_selection() {

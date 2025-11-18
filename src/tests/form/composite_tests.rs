@@ -4,8 +4,8 @@ use serde_json::json;
 
 use crate::{
     form::CompositeState,
-    form::field::components::ComponentPalette,
     tui::model::{CompositeField, CompositeMode, CompositeVariant},
+    tui::state::field::components::ComponentPalette,
 };
 
 #[test]

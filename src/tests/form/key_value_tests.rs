@@ -1,4 +1,4 @@
-use crate::form::key_value::summarize_value;
+use crate::tui::state::key_value::summarize_value;
 use serde_json::Value;
 
 #[test]

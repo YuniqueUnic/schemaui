@@ -1,5 +1,3 @@
-use crate::tui::state::form_state::RootSectionState;
-
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RootTabsStore {
     current: usize,
@@ -8,10 +6,6 @@ pub struct RootTabsStore {
 impl RootTabsStore {
     pub fn current(&self) -> usize {
         self.current
-    }
-
-    pub fn reset(&mut self) {
-        self.current = 0;
     }
 
     pub fn clamp(&mut self, len: usize) {
@@ -23,7 +17,11 @@ impl RootTabsStore {
     }
 
     pub fn set(&mut self, index: usize, len: usize) -> bool {
-        let bounded = if len == 0 { 0 } else { index.min(len.saturating_sub(1)) };
+        let bounded = if len == 0 {
+            0
+        } else {
+            index.min(len.saturating_sub(1))
+        };
         if self.current == bounded {
             false
         } else {
@@ -31,7 +29,7 @@ impl RootTabsStore {
             true
         }
     }
-
+    #[allow(dead_code)]
     pub fn advance(&mut self, delta: i32, len: usize) -> bool {
         if len == 0 {
             self.current = 0;
@@ -67,7 +65,11 @@ impl SectionTabsStore {
     }
 
     pub fn set(&mut self, index: usize, len: usize) -> bool {
-        let bounded = if len == 0 { 0 } else { index.min(len.saturating_sub(1)) };
+        let bounded = if len == 0 {
+            0
+        } else {
+            index.min(len.saturating_sub(1))
+        };
         if self.current == bounded {
             false
         } else {
@@ -111,24 +113,17 @@ impl FieldListStore {
     }
 
     pub fn set(&mut self, index: usize, len: usize) -> bool {
-        let bounded = if len == 0 { 0 } else { index.min(len.saturating_sub(1)) };
+        let bounded = if len == 0 {
+            0
+        } else {
+            index.min(len.saturating_sub(1))
+        };
         if self.current == bounded {
             false
         } else {
             self.current = bounded;
             true
         }
-    }
-
-    pub fn advance(&mut self, delta: i32, len: usize) -> bool {
-        if len == 0 {
-            self.current = 0;
-            return false;
-        }
-        let len_i32 = len as i32;
-        let mut next = self.current as i32 + delta;
-        next = ((next % len_i32) + len_i32) % len_i32;
-        self.set(next as usize, len)
     }
 }
 
@@ -142,11 +137,5 @@ pub struct UiStores {
 impl UiStores {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn reset(&mut self) {
-        self.root.reset();
-        self.sections.reset();
-        self.fields.reset();
     }
 }

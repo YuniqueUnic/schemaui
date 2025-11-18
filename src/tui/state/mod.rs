@@ -14,6 +14,7 @@ pub use array::ArrayEditorSession;
 pub use composite::CompositeEditorSession;
 #[cfg(test)]
 pub(crate) use composite::CompositeState;
+#[allow(unused_imports)]
 pub use error::FieldCoercionError;
 pub use field::{CompositePopupData, FieldState};
 pub use form_state::FormState;
