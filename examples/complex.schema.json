@@ -314,7 +314,8 @@
             },
             "required": [
                 "id"
-            ]
+            ],
+            "additionalProperties": false
         },
         "numericItem": {
             "type": "object",
@@ -331,7 +332,8 @@
             },
             "required": [
                 "id"
-            ]
+            ],
+            "additionalProperties": false
         },
         "metadata": {
             "type": "object",
