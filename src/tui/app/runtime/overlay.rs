@@ -12,7 +12,7 @@ use crate::tui::state::{
     KeyValueEditorSession, apply_command,
 };
 
-use super::super::input::{AppCommand, CommandDispatch};
+use crate::tui::app::input::{AppCommand, CommandDispatch};
 use super::{App, PopupOwner};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
