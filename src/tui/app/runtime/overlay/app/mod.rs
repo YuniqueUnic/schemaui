@@ -1,8 +1,5 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use jsonschema::validator_for;
 
 #[cfg(test)]
 use crate::tui::app::runtime::overlay::state::OverlayFocusMode;
@@ -12,12 +9,14 @@ use crate::tui::app::keymap::KeymapContext;
 use crate::tui::app::runtime::{App, PopupOwner};
 use crate::tui::model::{CompositeMode, FieldKind};
 use crate::tui::state::field::components::CompositeSelectorView;
-use crate::tui::state::{FieldState, FormCommand, FormEngine, FormState, apply_command};
+use crate::tui::state::{FieldState, FormCommand, FormState, apply_command};
 
 use super::editor::CompositeEditorOverlay;
 use super::state::{
     CompositeOverlayTarget, EntryAdvance, FocusDirection, FocusOutcome, OverlayHost, OverlaySession,
 };
+
+mod validation;
 
 const MSG_NO_FIELD_SELECTED: &str = "No field selected";
 const MSG_SELECT_VARIANT_BEFORE_EDIT: &str =
@@ -680,19 +679,6 @@ impl App {
         self.validate_overlay_field(pointer);
     }
 
-    fn validate_overlay_field(&mut self, pointer: String) {
-        let Some(editor) = self.active_overlay_mut() else {
-            return;
-        };
-        let Some(validator) = editor.validator_clone() else {
-            return;
-        };
-        let mut engine = FormEngine::new(editor.form_state_mut(), &validator);
-        if let Err(message) = engine.dispatch(FormCommand::FieldEdited { pointer }) {
-            self.status.set_raw(&message);
-        }
-    }
-
     pub(crate) fn apply_popup_selection_data(
         &mut self,
         owner: PopupOwner,
@@ -721,60 +707,6 @@ impl App {
                 // Handle variant selector: add entry with selected variant
                 self.handle_variant_selector_result(&field_pointer, overlay_host, selection);
             }
-        }
-    }
-
-    pub(crate) fn setup_overlay_validator(&mut self) {
-        let Some(cache_key) = self
-            .active_overlay()
-            .map(|editor| editor.validator_cache_key())
-        else {
-            return;
-        };
-        if let Some(cached) = self.overlay_validator_cache.get(&cache_key).cloned() {
-            if let Some(editor) = self.active_overlay_mut() {
-                editor.set_validator(Some(cached));
-            }
-            self.run_overlay_validation();
-            return;
-        }
-        let validator = {
-            let Some(editor) = self.active_overlay() else {
-                return;
-            };
-            match editor.session() {
-                OverlaySession::Composite(session) => {
-                    validator_for(&session.schema).ok().map(Arc::new)
-                }
-                OverlaySession::KeyValue(session) => {
-                    validator_for(&session.schema).ok().map(Arc::new)
-                }
-                OverlaySession::Array(session) => validator_for(&session.schema).ok().map(Arc::new),
-                OverlaySession::Detached => return,
-            }
-        };
-        if let Some(valid) = &validator {
-            self.overlay_validator_cache
-                .insert(cache_key, valid.clone());
-        }
-        if let Some(editor) = self.active_overlay_mut() {
-            editor.set_validator(validator);
-        }
-        self.run_overlay_validation();
-    }
-
-    pub(crate) fn run_overlay_validation(&mut self) {
-        let pointer = {
-            let Some(editor) = self.active_overlay() else {
-                return;
-            };
-            editor
-                .form_state()
-                .focused_field()
-                .map(|field| field.schema.pointer.clone())
-        };
-        if let Some(pointer) = pointer {
-            self.validate_overlay_field(pointer);
         }
     }
 
@@ -899,57 +831,4 @@ impl App {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        tui::app::options::UiOptions,
-        tui::model::{FieldKind, FieldSchema},
-        tui::state::{FieldState, FormState, SectionState},
-    };
-    use serde_json::json;
-    use std::collections::HashMap;
-
-    fn scalar_array_field_state() -> FieldState {
-        let schema = FieldSchema {
-            name: "allowed_methods".to_string(),
-            path: vec!["allowed_methods".to_string()],
-            pointer: "/allowed_methods".to_string(),
-            title: "Allowed Methods".to_string(),
-            description: None,
-            kind: FieldKind::Array(Box::new(FieldKind::String)),
-            required: false,
-            default: Some(json!(["GET"])),
-            metadata: HashMap::new(),
-        };
-        FieldState::from_schema(schema)
-    }
-
-    fn build_app_with_scalar_array() -> App {
-        let section = SectionState {
-            id: "section".to_string(),
-            title: "Section".to_string(),
-            description: None,
-            path: vec!["app".to_string()],
-            depth: 0,
-            fields: vec![scalar_array_field_state()],
-            scroll_offset: 0,
-        };
-        let form_state = FormState::from_sections("app", "App", None, vec![section]);
-        let validator = validator_for(&json!({"type": "object"})).expect("validator");
-        App::new(form_state, validator, UiOptions::default())
-    }
-
-    #[test]
-    fn ctrl_e_opens_scalar_array_overlay() {
-        let mut app = build_app_with_scalar_array();
-        app.try_open_composite_editor();
-        assert!(
-            matches!(
-                app.active_overlay().map(|overlay| overlay.target()),
-                Some(CompositeOverlayTarget::ArrayEntry { .. })
-            ),
-            "scalar arrays should open overlay via Ctrl+E"
-        );
-        assert_eq!(app.overlay_depth(), 1);
-    }
-}
+mod tests;
