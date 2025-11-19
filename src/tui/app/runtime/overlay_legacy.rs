@@ -13,115 +13,29 @@ use crate::tui::state::{
 };
 
 use crate::tui::app::input::{AppCommand, CommandDispatch};
-use super::{App, PopupOwner};
+use crate::tui::app::runtime::{App, PopupOwner};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum EntryTabsKind {
-    Entries,
-    Variants,
-}
+mod state;
+mod editor;
 
-#[derive(Debug, Clone)]
-struct EntryTabsStore {
-    entries: Vec<String>,
-    ids: Vec<usize>,
-    selected: usize,
-    kind: EntryTabsKind,
-}
+pub(super) use state::{
+    EntryAdvance,
+    EntryTabsKind,
+    EntryTabsStore,
+    OverlayFocusMode,
+    OverlayHost,
+    OverlayResult,
+    OverlaySession,
+    OverlayState,
+    OverlayStore,
+    CompositeOverlayTarget,
+    FocusDirection,
+    FocusOutcome,
+};
 
-impl EntryTabsStore {
-    fn new(entries: Vec<String>, selected: usize) -> Self {
-        let ids = (0..entries.len()).collect();
-        Self::with_kind(entries, ids, selected, EntryTabsKind::Entries)
-    }
+pub(super) use editor::CompositeEditorOverlay;
 
-    fn with_kind(
-        entries: Vec<String>,
-        ids: Vec<usize>,
-        selected_id: usize,
-        kind: EntryTabsKind,
-    ) -> Self {
-        let mut store = Self {
-            entries,
-            ids,
-            selected: 0,
-            kind,
-        };
-        store.select_by_id(selected_id);
-        store
-    }
 
-    fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    fn entries(&self) -> &[String] {
-        &self.entries
-    }
-
-    fn selected(&self) -> usize {
-        self.selected
-    }
-
-    fn selected_id(&self) -> Option<usize> {
-        self.ids.get(self.selected).copied()
-    }
-
-    fn kind(&self) -> EntryTabsKind {
-        self.kind
-    }
-
-    fn select(&mut self, index: usize) {
-        if self.entries.is_empty() {
-            self.selected = 0;
-        } else {
-            self.selected = index.min(self.entries.len().saturating_sub(1));
-        }
-    }
-
-    fn set_entries(&mut self, entries: Vec<String>, selected: usize) {
-        self.ids = (0..entries.len()).collect();
-        self.entries = entries;
-        self.kind = EntryTabsKind::Entries;
-        self.select(selected);
-    }
-
-    fn set_entries_with_ids(&mut self, entries: Vec<String>, ids: Vec<usize>, selected_id: usize) {
-        self.entries = entries;
-        self.ids = ids;
-        self.kind = EntryTabsKind::Variants;
-        self.select_by_id(selected_id);
-    }
-
-    fn select_by_id(&mut self, id: usize) {
-        if let Some(pos) = self.ids.iter().position(|candidate| *candidate == id) {
-            self.select(pos);
-        } else {
-            self.select(0);
-        }
-    }
-
-    #[allow(dead_code)]
-    fn advance(&mut self, delta: i32) -> bool {
-        if self.entries.is_empty() {
-            return false;
-        }
-        let len = self.entries.len() as i32;
-        let mut next = self.selected as i32 + delta;
-        next = ((next % len) + len) % len;
-        let next = next as usize;
-        if next == self.selected {
-            false
-        } else {
-            self.selected = next;
-            true
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 struct OverlayStore {
@@ -890,15 +804,15 @@ impl CompositeEditorOverlay {
 }
 
 impl App {
-    pub(super) fn overlay_depth(&self) -> usize {
+    pub(crate) fn overlay_depth(&self) -> usize {
         self.overlay_stack.len()
     }
 
-    pub(super) fn active_overlay(&self) -> Option<&CompositeEditorOverlay> {
+    pub(crate) fn active_overlay(&self) -> Option<&CompositeEditorOverlay> {
         self.overlay_stack.last()
     }
 
-    pub(super) fn active_overlay_mut(&mut self) -> Option<&mut CompositeEditorOverlay> {
+    pub(crate) fn active_overlay_mut(&mut self) -> Option<&mut CompositeEditorOverlay> {
         self.overlay_stack.last_mut()
     }
 
@@ -922,7 +836,7 @@ impl App {
         }
     }
 
-    pub(super) fn host_form_state(&self, host: OverlayHost) -> &FormState {
+    pub(crate) fn host_form_state(&self, host: OverlayHost) -> &FormState {
         match host {
             OverlayHost::RootForm => &self.form_state,
             OverlayHost::Overlay { parent_level } => {
@@ -932,7 +846,7 @@ impl App {
         }
     }
 
-    pub(super) fn host_form_state_mut(&mut self, host: OverlayHost) -> &mut FormState {
+    pub(crate) fn host_form_state_mut(&mut self, host: OverlayHost) -> &mut FormState {
         match host {
             OverlayHost::RootForm => &mut self.form_state,
             OverlayHost::Overlay { parent_level } => {
@@ -961,7 +875,7 @@ impl App {
         }
     }
 
-    pub(super) fn try_open_composite_editor(&mut self) {
+    pub(crate) fn try_open_composite_editor(&mut self) {
         let overlay_help_text = self.overlay_help_text().to_string();
         let level = self.overlay_depth() + 1;
         let host = if level == 1 {
@@ -1182,7 +1096,7 @@ impl App {
         payload.apply(host_state)
     }
 
-    pub(super) fn handle_composite_editor_key(&mut self, key: KeyEvent) -> Result<()> {
+    pub(crate) fn handle_composite_editor_key(&mut self, key: KeyEvent) -> Result<()> {
         if key.code == KeyCode::Esc {
             if !self.request_overlay_exit() {
                 return Ok(());
@@ -1425,7 +1339,7 @@ impl App {
         }
     }
 
-    pub(super) fn request_overlay_exit(&mut self) -> bool {
+    pub(crate) fn request_overlay_exit(&mut self) -> bool {
         if let Some(editor) = self.active_overlay_mut()
             && editor.dirty()
             && !editor.exit_armed()
@@ -1439,7 +1353,7 @@ impl App {
         true
     }
 
-    pub(super) fn save_active_overlay(&mut self) -> bool {
+    pub(crate) fn save_active_overlay(&mut self) -> bool {
         let Some(mut overlay) = self.overlay_stack.pop() else {
             return false;
         };
@@ -1509,7 +1423,7 @@ impl App {
         }
     }
 
-    pub(super) fn apply_popup_selection_data(
+    pub(crate) fn apply_popup_selection_data(
         &mut self,
         owner: PopupOwner,
         pointer: &str,
@@ -1540,7 +1454,7 @@ impl App {
         }
     }
 
-    pub(super) fn setup_overlay_validator(&mut self) {
+    pub(crate) fn setup_overlay_validator(&mut self) {
         let Some(cache_key) = self
             .active_overlay()
             .map(|editor| editor.validator_cache_key())
@@ -1579,7 +1493,7 @@ impl App {
         self.run_overlay_validation();
     }
 
-    pub(super) fn run_overlay_validation(&mut self) {
+    pub(crate) fn run_overlay_validation(&mut self) {
         let pointer = {
             let Some(editor) = self.active_overlay() else {
                 return;
@@ -1594,7 +1508,7 @@ impl App {
         }
     }
 
-    pub(super) fn refresh_list_overlay_panel(&mut self) {
+    pub(crate) fn refresh_list_overlay_panel(&mut self) {
         let Some(mut overlay) = self.overlay_stack.pop() else {
             return;
         };
@@ -1637,7 +1551,7 @@ impl App {
         self.overlay_stack.push(overlay);
     }
 
-    pub(super) fn handle_overlay_app_command(&mut self, command: AppCommand) -> Result<bool> {
+    pub(crate) fn handle_overlay_app_command(&mut self, command: AppCommand) -> Result<bool> {
         match command {
             AppCommand::Save => {
                 self.save_active_overlay();

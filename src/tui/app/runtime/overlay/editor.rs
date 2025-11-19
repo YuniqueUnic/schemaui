@@ -10,8 +10,8 @@ use super::state::{
     OverlayStore, CompositeOverlayTarget,
 };
 
-#[derive(Debug, Clone)]
-pub(super) struct CompositeEditorOverlay {
+#[derive(Clone)]
+pub(crate) struct CompositeEditorOverlay {
     pub(super) state: OverlayState,
     pub(super) store: OverlayStore,
 }
@@ -45,11 +45,11 @@ impl CompositeEditorOverlay {
         )
     }
 
-    pub(super) fn form_state(&self) -> &FormState {
+    pub(crate) fn form_state(&self) -> &FormState {
         self.state.form_state()
     }
 
-    pub(super) fn form_state_mut(&mut self) -> &mut FormState {
+    pub(crate) fn form_state_mut(&mut self) -> &mut FormState {
         self.state.form_state_mut()
     }
 
@@ -103,15 +103,15 @@ impl CompositeEditorOverlay {
         self.store.entry_tabs_len()
     }
 
-    pub(super) fn entry_tabs_selected(&self) -> Option<usize> {
+    pub(crate) fn entry_tabs_selected(&self) -> Option<usize> {
         self.store.entry_tabs_selected()
     }
 
-    pub(super) fn entry_tabs_entries(&self) -> Option<&[String]> {
+    pub(crate) fn entry_tabs_entries(&self) -> Option<&[String]> {
         self.store.entry_tabs_entries()
     }
 
-    pub(super) fn entry_tabs_label(&self) -> Option<&str> {
+    pub(crate) fn entry_tabs_label(&self) -> Option<&str> {
         self.store.entry_tabs_label().map(|label| label.as_str())
     }
 
@@ -131,15 +131,15 @@ impl CompositeEditorOverlay {
         );
     }
 
-    pub(super) fn instructions(&self) -> &str {
+    pub(crate) fn instructions(&self) -> &str {
         self.store.instructions()
     }
 
-    pub(super) fn title(&self) -> &str {
+    pub(crate) fn title(&self) -> &str {
         self.store.title()
     }
 
-    pub(super) fn description(&self) -> Option<&String> {
+    pub(crate) fn description(&self) -> Option<&String> {
         self.store.description()
     }
 
@@ -147,23 +147,23 @@ impl CompositeEditorOverlay {
         self.store.focus()
     }
 
-    pub(super) fn field_label(&self) -> &str {
+    pub(crate) fn field_label(&self) -> &str {
         self.state.field_label()
     }
 
-    pub(super) fn level(&self) -> usize {
+    pub(crate) fn level(&self) -> usize {
         self.state.level()
     }
 
-    pub(super) fn host(&self) -> OverlayHost {
+    pub(crate) fn host(&self) -> OverlayHost {
         self.state.host()
     }
 
-    pub(super) fn field_pointer(&self) -> &str {
+    pub(crate) fn field_pointer(&self) -> &str {
         self.state.field_pointer()
     }
 
-    pub(super) fn target(&self) -> &CompositeOverlayTarget {
+    pub(crate) fn target(&self) -> &CompositeOverlayTarget {
         self.state.target()
     }
 

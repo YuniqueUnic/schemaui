@@ -334,7 +334,7 @@ impl OverlayResult {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(super) struct OverlayState {
     pub(super) field_pointer: String,
     pub(super) field_label: String,
@@ -460,7 +460,7 @@ impl OverlayState {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(super) enum OverlaySession {
     Composite(CompositeEditorSession),
     KeyValue(KeyValueEditorSession),
@@ -511,13 +511,13 @@ impl OverlaySession {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(super) enum OverlayHost {
+pub(crate) enum OverlayHost {
     RootForm,
     Overlay { parent_level: usize },
 }
 
 #[derive(Debug, Clone)]
-pub(super) enum CompositeOverlayTarget {
+pub(crate) enum CompositeOverlayTarget {
     Field,
     ListEntry { entry_index: usize },
     KeyValueEntry { entry_index: usize },
