@@ -2,33 +2,21 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use jsonschema::{Validator, validator_for};
+use jsonschema::validator_for;
 
 use crate::tui::app::input::{AppCommand, CommandDispatch};
 use crate::tui::app::keymap::KeymapContext;
 use crate::tui::app::runtime::{App, PopupOwner};
 use crate::tui::model::{CompositeMode, FieldKind};
-use crate::tui::state::field::components::{CompositeSelectorView, helpers::OverlayContext};
-use crate::tui::state::{
-    FieldState, FormCommand, FormEngine, FormState, apply_command,
-};
+use crate::tui::state::field::components::CompositeSelectorView;
+use crate::tui::state::{FieldState, FormCommand, FormEngine, FormState, apply_command};
 
 use super::editor::CompositeEditorOverlay;
 use super::state::{
-    CompositeOverlayTarget,
-    EntryAdvance,
-    FocusDirection,
-    FocusOutcome,
-    OverlayFocusMode,
-    OverlayHost,
-    OverlaySession,
+    CompositeOverlayTarget, EntryAdvance, FocusDirection, FocusOutcome, OverlayHost, OverlaySession,
 };
 
-fn apply_selection_to_field(
-    field: &mut FieldState,
-    selection: usize,
-    multi: Option<Vec<bool>>,
-) {
+fn apply_selection_to_field(field: &mut FieldState, selection: usize, multi: Option<Vec<bool>>) {
     if let Some(flags) = multi {
         match &field.schema.kind {
             FieldKind::Composite(_) => {
@@ -534,8 +522,7 @@ impl App {
                 let view = field.composite_selector_view()?;
                 Self::variant_entries_from_view(&view)
             }
-            (CompositeOverlayTarget::ListEntry { .. }, FieldKind::Array(inner))
-                if matches!(inner.as_ref(), FieldKind::Composite(meta) if matches!(meta.mode, CompositeMode::AnyOf)) =>
+            (CompositeOverlayTarget::ListEntry { .. }, FieldKind::Array(inner)) if matches!(inner.as_ref(), FieldKind::Composite(meta) if matches!(meta.mode, CompositeMode::AnyOf)) =>
             {
                 let view = field.composite_entry_selector_view()?;
                 Self::variant_entries_from_view(&view)

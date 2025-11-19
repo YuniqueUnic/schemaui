@@ -23,7 +23,7 @@ mod overlay;
 use overlay::CompositeEditorOverlay;
 
 #[derive(Clone)]
-enum PopupOwner {
+pub(crate) enum PopupOwner {
     Root,
     Composite,
     /// Variant selector for composite list add_entry

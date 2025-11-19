@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::collections::HashSet;
-
 use anyhow::{Context, Result, anyhow, bail};
 use indexmap::IndexMap;
 use schemars::schema::{
@@ -25,7 +23,6 @@ use crate::tui::model::form_schema::{
 use super::types::RootBuilder;
 
 use super::helpers::{
-    describe_array_items, describe_object_shape, describe_schema_from_single,
     describe_schema_shape, ensure_object_schema, has_composite_subschemas, instance_type,
     is_object_schema, key_value_entry_schema, required_set, schema_object_to_value, schema_titles,
     to_pointer,

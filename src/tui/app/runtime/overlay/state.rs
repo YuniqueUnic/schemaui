@@ -221,12 +221,6 @@ impl OverlayStore {
         self.entry_label = Some(label);
     }
 
-    pub(super) fn select_entry_by_id(&mut self, selected_id: usize) {
-        if let Some(store) = self.entry_tabs.as_mut() {
-            store.select_by_id(selected_id);
-        }
-    }
-
     pub(super) fn update_title(&mut self, field_label: &str, title: &str) {
         self.display_title = format!("Edit {} – {}", field_label, title);
     }
