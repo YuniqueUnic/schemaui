@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use schemars::schema::{
     ArrayValidation, InstanceType, ObjectValidation, Schema, SchemaObject, SingleOrVec,
 };
@@ -8,9 +8,7 @@ use serde_json::{Map, Value};
 
 use crate::schema::{loader::load_root_schema, resolver::SchemaResolver};
 
-use super::types::{
-    CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant,
-};
+use super::types::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
 
 pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
     let root_schema = load_root_schema(raw)?;
@@ -110,8 +108,7 @@ fn visit_schema(
         for (name, child_schema) in &obj.properties {
             let resolved = resolver.resolve_schema(child_schema)?;
             let child_ptr = append_pointer(&pointer, name);
-            let child =
-                visit_schema(resolver, &resolved, child_ptr, required_set.contains(name))?;
+            let child = visit_schema(resolver, &resolved, child_ptr, required_set.contains(name))?;
             children.push(child);
         }
         let default_value = schema_default(schema).or(Some(Value::Object(Map::new())));
@@ -416,8 +413,7 @@ fn merge_all_of(resolver: &SchemaResolver<'_>, all_of: &[Schema]) -> Result<Sche
         let value = schema_to_value(&resolved)?;
         acc = deep_merge(acc, value);
     }
-    serde_json::from_value::<SchemaObject>(acc)
-        .context("failed to deserialize merged allOf schema")
+    serde_json::from_value::<SchemaObject>(acc).context("failed to deserialize merged allOf schema")
 }
 
 fn resolve_array_items(

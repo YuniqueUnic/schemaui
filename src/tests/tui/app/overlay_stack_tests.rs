@@ -1,5 +1,5 @@
-use crate::schema::build_form_schema;
 use crate::tui::app::{App, UiOptions};
+use crate::tui::model::build_form_schema;
 use crate::tui::state::FormState;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use jsonschema::validator_for;
@@ -53,6 +53,23 @@ fn build_nested_overlay_app() -> App {
                         }
                     }
                 ]
+            }
+        }
+    });
+    let form_schema = build_form_schema(&schema).expect("schema");
+    let form_state = FormState::from_schema(&form_schema);
+    let validator = validator_for(&schema).expect("validator");
+    App::new(form_state, validator, UiOptions::default())
+}
+
+fn build_scalar_array_overlay_app() -> App {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "tags": {
+                "type": "array",
+                "default": ["a", "b"],
+                "items": {"type": "string"}
             }
         }
     });
@@ -119,7 +136,7 @@ fn esc_pops_only_top_overlay() {
     assert_eq!(
         app.overlay_depth_for_test(),
         1,
-        "esc closes only top overlay"
+        "esc closes only top overlay",
     );
 
     app.handle_key_for_test(key(KeyCode::Esc, KeyModifiers::NONE))
@@ -162,7 +179,7 @@ fn ctrl_arrows_manage_entries_without_closing_overlay() {
     assert_eq!(
         app.overlay_selected_entry_for_test(),
         Some(1),
-        "entry should move to index 1 after reorder"
+        "entry should move to index 1 after reorder",
     );
 
     app.handle_key_for_test(key(KeyCode::Up, KeyModifiers::CONTROL))
@@ -196,6 +213,28 @@ fn entry_focus_respects_arrow_keys() {
     assert_eq!(
         app.overlay_selected_entry_for_test(),
         Some(1),
-        "up from first field should cycle to previous entry"
+        "up from first field should cycle to previous entry",
+    );
+}
+
+#[test]
+fn scalar_array_overlay_opens_for_primitive_array_field() {
+    let mut app = build_scalar_array_overlay_app();
+    {
+        let form_state = app.form_state_mut_for_test();
+        focus_field(form_state, "/tags");
+    }
+
+    app.open_overlay_for_test();
+
+    assert_eq!(
+        app.overlay_depth_for_test(),
+        1,
+        "scalar array overlay should open"
+    );
+    assert_eq!(
+        app.overlay_selected_entry_for_test(),
+        Some(0),
+        "first scalar array entry should be selected by default",
     );
 }

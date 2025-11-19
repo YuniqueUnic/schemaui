@@ -6,8 +6,8 @@ use crate::tui::state::FormState;
 use crate::tui::state::field::components::helpers::OverlayContext;
 
 use super::state::{
-    EntryAdvance, EntryTabsKind, OverlayFocusMode, OverlayHost, OverlaySession, OverlayState,
-    OverlayStore, CompositeOverlayTarget,
+    CompositeOverlayTarget, EntryAdvance, EntryTabsKind, OverlayFocusMode, OverlayHost,
+    OverlaySession, OverlayState, OverlayStore,
 };
 
 #[derive(Clone)]
@@ -123,7 +123,12 @@ impl CompositeEditorOverlay {
         self.store.set_entry_tabs("Entries", entries, selected);
     }
 
-    pub(super) fn set_variant_tabs(&mut self, entries: Vec<String>, ids: Vec<usize>, selected: usize) {
+    pub(super) fn set_variant_tabs(
+        &mut self,
+        entries: Vec<String>,
+        ids: Vec<usize>,
+        selected: usize,
+    ) {
         self.store
             .set_variant_tabs("Variants", entries, ids, selected);
         self.store.append_instructions(
@@ -199,11 +204,16 @@ impl CompositeEditorOverlay {
         self.state.current_variant_index()
     }
 
-    pub(super) fn take_composite_session(&mut self) -> Option<crate::tui::state::CompositeEditorSession> {
+    pub(super) fn take_composite_session(
+        &mut self,
+    ) -> Option<crate::tui::state::CompositeEditorSession> {
         self.state.take_composite_session()
     }
 
-    pub(super) fn replace_composite_session(&mut self, session: crate::tui::state::CompositeEditorSession) {
+    pub(super) fn replace_composite_session(
+        &mut self,
+        session: crate::tui::state::CompositeEditorSession,
+    ) {
         self.state.replace_composite_session(session);
     }
 
@@ -252,7 +262,10 @@ impl CompositeEditorOverlay {
         )
     }
 
-    pub(super) fn advance_focus(&mut self, direction: super::state::FocusDirection) -> super::state::FocusOutcome {
+    pub(super) fn advance_focus(
+        &mut self,
+        direction: super::state::FocusDirection,
+    ) -> super::state::FocusOutcome {
         use super::state::{FocusOutcome, OverlayFocusMode};
 
         let has_fields = self.form_state().has_focusable_fields();

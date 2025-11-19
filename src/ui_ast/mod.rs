@@ -1,5 +1,5 @@
-mod types;
 mod builder;
+mod types;
 
-pub use types::{UiAst, UiNode, UiNodeKind, ScalarKind, CompositeMode, UiVariant};
 pub use builder::build_ui_ast;
+pub use types::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};

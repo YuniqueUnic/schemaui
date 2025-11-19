@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use jsonschema::Validator;
 
+use crate::tui::state::field::components::helpers::OverlayContext;
 use crate::tui::state::{
     ArrayEditorSession, CompositeEditorSession, FormState, KeyValueEditorSession,
 };
-use crate::tui::state::field::components::helpers::OverlayContext;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum EntryTabsKind {
