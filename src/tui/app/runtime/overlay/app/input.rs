@@ -2,6 +2,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::tui::app::input::{AppCommand, CommandDispatch};
+use crate::tui::app::runtime::overlay::app::open::overlay_field_input_result;
 use crate::tui::app::runtime::{App, PopupOwner};
 use crate::tui::state::apply_command;
 
@@ -50,7 +51,7 @@ impl App {
                 None => return,
             };
             editor.set_exit_armed(false);
-            crate::tui::app::runtime::overlay::app::overlay_field_input_result(editor, event)
+            overlay_field_input_result(editor, event)
         }) else {
             return;
         };

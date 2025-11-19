@@ -1,6 +1,7 @@
 use super::*;
 use crate::{
     tui::app::options::UiOptions,
+    tui::app::runtime::overlay::CompositeOverlayTarget,
     tui::model::{FieldKind, FieldSchema},
     tui::state::{FieldState, FormState, SectionState},
 };
