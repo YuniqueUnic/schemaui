@@ -5,7 +5,9 @@ use ratatui::{
 
 use crate::tui::state::FormState;
 
-use super::components::{render_body, render_composite_overlay, render_footer, render_popup};
+use super::components::{
+    render_body, render_composite_overlay, render_footer, render_help_overlay, render_popup,
+};
 
 pub struct UiContext<'a> {
     pub status_message: &'a str,
@@ -16,6 +18,7 @@ pub struct UiContext<'a> {
     pub focus_label: Option<String>,
     pub popup: Option<PopupRender<'a>>,
     pub composite_overlay: Option<CompositeOverlay>,
+    pub help_overlay: Option<HelpOverlayRender<'a>>,
 }
 
 pub struct PopupRender<'a> {
@@ -24,6 +27,11 @@ pub struct PopupRender<'a> {
     pub selected: usize,
     pub multi: bool,
     pub active: Option<&'a [bool]>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HelpOverlayRender<'a> {
+    pub lines: &'a [String],
 }
 
 #[derive(Debug, Clone)]
@@ -62,5 +70,9 @@ pub fn draw(
 
     if let Some(popup) = ctx.popup {
         render_popup(frame, popup);
+    }
+
+    if let Some(help) = ctx.help_overlay {
+        render_help_overlay(frame, help);
     }
 }

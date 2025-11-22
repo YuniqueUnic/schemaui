@@ -1,5 +1,5 @@
 use crate::tui::state::{FormCommand, FormEngine, FormState};
-use crate::tui::view::{self, CompositeOverlay, UiContext};
+use crate::tui::view::{self, CompositeOverlay, HelpOverlayRender, UiContext};
 use anyhow::{Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
@@ -53,6 +53,12 @@ pub(crate) struct App {
     overlay_validator_cache: HashMap<String, Arc<Validator>>,
     input_router: InputRouter,
     keymap_store: Arc<KeymapStore>,
+    help_overlay: Option<HelpOverlayState>,
+}
+
+struct HelpOverlayState {
+    pages: Vec<Vec<String>>,
+    page: usize,
 }
 
 impl App {
@@ -137,6 +143,10 @@ impl App {
                 self.exit_armed = false;
                 self.status.ready();
             }
+            AppCommand::ShowHelp => {
+                self.toggle_help_overlay();
+                return true;
+            }
             AppCommand::TogglePopup => {
                 if self.try_open_popup(PopupOwner::Root) {
                     return true;
@@ -169,6 +179,127 @@ impl App {
         false
     }
 
+    fn toggle_help_overlay(&mut self) {
+        if self.help_overlay.is_some() {
+            self.help_overlay = None;
+            return;
+        }
+
+        let pages = self.build_help_overlay_pages();
+        if pages.is_empty() {
+            return;
+        }
+
+        // Help overlay is global and should not compete with other popups.
+        self.popup = None;
+        self.help_overlay = Some(HelpOverlayState { pages, page: 0 });
+    }
+
+    fn handle_help_overlay_key(&mut self, key: &KeyEvent) -> bool {
+        let Some(state) = self.help_overlay.as_mut() else {
+            return false;
+        };
+
+        match key.code {
+            KeyCode::Esc => {
+                self.help_overlay = None;
+                true
+            }
+            KeyCode::Tab => {
+                let total = state.pages.len();
+                if total > 0 {
+                    state.page = (state.page + 1) % total;
+                }
+                true
+            }
+            KeyCode::BackTab => {
+                let total = state.pages.len();
+                if total > 0 {
+                    if state.page == 0 {
+                        state.page = total - 1;
+                    } else {
+                        state.page -= 1;
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn build_help_overlay_pages(&self) -> Vec<Vec<String>> {
+        const MAX_ERROR_MSG_CHARS: usize = 80;
+        const LINES_PER_PAGE: usize = 20;
+
+        let mut lines: Vec<String> = Vec::new();
+
+        // Shortcuts section
+        lines.push("Keyboard shortcuts".to_string());
+        lines.push(String::new());
+
+        use crate::tui::app::keymap::KeymapContext;
+        let sections = [
+            ("Default", KeymapContext::Default),
+            ("Collection", KeymapContext::Collection),
+            ("Overlay", KeymapContext::Overlay),
+        ];
+
+        for (label, ctx) in sections {
+            if let Some(text) = self.keymap_store.help_text(ctx) {
+                lines.push(format!("[{} context]", label));
+                for snippet in text.split('•') {
+                    let s = snippet.trim();
+                    if !s.is_empty() {
+                        lines.push(format!("  {}", s));
+                    }
+                }
+                lines.push(String::new());
+            }
+        }
+
+        // Errors section
+        lines.push(format!("Errors ({} issues)", self.validation_errors));
+        lines.push(String::new());
+
+        let mut any_error = false;
+        for (pointer, message) in self.form_state.error_entries() {
+            any_error = true;
+            let short = truncate_with_ellipsis(&message, MAX_ERROR_MSG_CHARS);
+            lines.push(format!("{}: {}", pointer, short));
+        }
+
+        if !self.global_errors.is_empty() {
+            any_error = true;
+            for msg in &self.global_errors {
+                let short = truncate_with_ellipsis(msg, MAX_ERROR_MSG_CHARS);
+                lines.push(short);
+            }
+        }
+
+        if !any_error {
+            lines.push("No field errors.".to_string());
+        }
+
+        if lines.is_empty() {
+            return Vec::new();
+        }
+
+        let total_pages = lines.len().div_ceil(LINES_PER_PAGE);
+        let mut pages = Vec::with_capacity(total_pages);
+
+        for (idx, chunk) in lines.chunks(LINES_PER_PAGE).enumerate() {
+            let mut page_lines: Vec<String> = chunk.to_vec();
+            page_lines.push(format!(
+                "-- Page {}/{} (Tab next, Shift+Tab previous, Esc to close) --",
+                idx + 1,
+                total_pages
+            ));
+            pages.push(page_lines);
+        }
+
+        pages
+    }
+
     fn handle_field_input(&mut self, event: &KeyEvent) {
         if let Some(field) = self.form_state.focused_field_mut()
             && field.handle_key(event)
@@ -199,6 +330,7 @@ impl App {
             overlay_validator_cache: HashMap::new(),
             input_router: InputRouter::new(keymap_store.clone()),
             keymap_store,
+            help_overlay: None,
         }
     }
 
@@ -232,6 +364,16 @@ impl App {
         let help = self.current_help_text();
         let form_dirty = self.form_state.is_dirty();
 
+        let help_overlay_render = self.help_overlay.as_ref().and_then(|state| {
+            if state.pages.is_empty() {
+                return None;
+            }
+            let total = state.pages.len();
+            let idx = state.page.min(total.saturating_sub(1));
+            let lines = &state.pages[idx];
+            Some(HelpOverlayRender { lines })
+        });
+
         if let Some(editor) = self.overlay_stack.last_mut() {
             let child = editor
                 .form_state()
@@ -263,6 +405,7 @@ impl App {
                     focus_label,
                     popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
                     composite_overlay: Some(overlay_meta),
+                    help_overlay: help_overlay_render,
                 },
             );
             return;
@@ -286,12 +429,17 @@ impl App {
                 focus_label,
                 popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
                 composite_overlay: None,
+                help_overlay: help_overlay_render,
             },
         );
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> Result<()> {
         if key.kind != KeyEventKind::Press {
+            return Ok(());
+        }
+
+        if self.handle_help_overlay_key(&key) {
             return Ok(());
         }
 
@@ -453,6 +601,25 @@ impl App {
             }
         }
     }
+}
+
+fn truncate_with_ellipsis(s: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let mut result = String::new();
+    let mut count = 0usize;
+    for ch in s.chars() {
+        if count + 1 >= max_chars {
+            break;
+        }
+        result.push(ch);
+        count += 1;
+    }
+    if s.chars().count() > count {
+        result.push('…');
+    }
+    result
 }
 
 #[cfg(test)]

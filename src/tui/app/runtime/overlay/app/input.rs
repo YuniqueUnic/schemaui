@@ -76,6 +76,10 @@ impl App {
                 self.try_open_composite_editor();
                 return Ok(true);
             }
+            AppCommand::ShowHelp => {
+                self.toggle_help_overlay();
+                return Ok(true);
+            }
             AppCommand::TogglePopup => {
                 if self.try_open_popup(PopupOwner::Composite) {
                     return Ok(true);

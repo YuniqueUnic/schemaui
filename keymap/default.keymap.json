@@ -2,120 +2,262 @@
   {
     "id": "field.next",
     "description": "Next field",
-    "contexts": ["default", "overlay"],
-    "action": { "kind": "fieldStep", "delta": 1 },
-    "combos": ["Tab", "Down"]
+    "contexts": [
+      "default",
+      "overlay"
+    ],
+    "action": {
+      "kind": "fieldStep",
+      "delta": 1
+    },
+    "combos": [
+      "Tab",
+      "Down"
+    ]
   },
   {
     "id": "field.prev",
     "description": "Previous field",
-    "contexts": ["default", "overlay"],
-    "action": { "kind": "fieldStep", "delta": -1 },
-    "combos": ["BackTab", "Up"]
+    "contexts": [
+      "default",
+      "overlay"
+    ],
+    "action": {
+      "kind": "fieldStep",
+      "delta": -1
+    },
+    "combos": [
+      "BackTab",
+      "Up"
+    ]
   },
   {
     "id": "section.next",
     "description": "Next section",
-    "contexts": ["default"],
-    "action": { "kind": "sectionStep", "delta": 1 },
-    "combos": ["Ctrl+Tab"]
+    "contexts": [
+      "default"
+    ],
+    "action": {
+      "kind": "sectionStep",
+      "delta": 1
+    },
+    "combos": [
+      "Ctrl+Tab"
+    ]
   },
   {
     "id": "section.prev",
     "description": "Previous section",
-    "contexts": ["default"],
-    "action": { "kind": "sectionStep", "delta": -1 },
-    "combos": ["Ctrl+Shift+Tab"]
+    "contexts": [
+      "default"
+    ],
+    "action": {
+      "kind": "sectionStep",
+      "delta": -1
+    },
+    "combos": [
+      "Ctrl+Shift+Tab"
+    ]
   },
   {
     "id": "root.next",
     "description": "Next root tab",
-    "contexts": ["default"],
-    "action": { "kind": "rootStep", "delta": 1 },
-    "combos": ["Ctrl+L"]
+    "contexts": [
+      "default"
+    ],
+    "action": {
+      "kind": "rootStep",
+      "delta": 1
+    },
+    "combos": [
+      "Ctrl+L"
+    ]
   },
   {
     "id": "root.prev",
     "description": "Previous root tab",
-    "contexts": ["default"],
-    "action": { "kind": "rootStep", "delta": -1 },
-    "combos": ["Ctrl+J"]
+    "contexts": [
+      "default"
+    ],
+    "action": {
+      "kind": "rootStep",
+      "delta": -1
+    },
+    "combos": [
+      "Ctrl+J"
+    ]
   },
   {
     "id": "popup.toggle",
     "description": "Open popup / apply selection",
-    "contexts": ["default"],
-    "action": { "kind": "togglePopup" },
-    "combos": ["Enter"]
+    "contexts": [
+      "default"
+    ],
+    "action": {
+      "kind": "togglePopup"
+    },
+    "combos": [
+      "Enter"
+    ]
   },
   {
     "id": "composite.edit",
     "description": "Open composite editor",
-    "contexts": ["default", "collection"],
-    "action": { "kind": "editComposite" },
-    "combos": ["Ctrl+E"]
+    "contexts": [
+      "default",
+      "collection"
+    ],
+    "action": {
+      "kind": "editComposite"
+    },
+    "combos": [
+      "Ctrl+E"
+    ]
   },
   {
     "id": "list.add",
     "description": "Add entry",
-    "contexts": ["collection", "overlay"],
-    "action": { "kind": "listAddEntry" },
-    "combos": ["Ctrl+N"]
+    "contexts": [
+      "collection",
+      "overlay"
+    ],
+    "action": {
+      "kind": "listAddEntry"
+    },
+    "combos": [
+      "Ctrl+N"
+    ]
   },
   {
     "id": "list.remove",
     "description": "Remove entry",
-    "contexts": ["collection", "overlay"],
-    "action": { "kind": "listRemoveEntry" },
-    "combos": ["Ctrl+D"]
+    "contexts": [
+      "collection",
+      "overlay"
+    ],
+    "action": {
+      "kind": "listRemoveEntry"
+    },
+    "combos": [
+      "Ctrl+D"
+    ]
   },
   {
     "id": "list.select.prev",
     "description": "Select previous entry",
-    "contexts": ["collection", "overlay"],
-    "action": { "kind": "listSelect", "delta": -1 },
-    "combos": ["Ctrl+Left"]
+    "contexts": [
+      "collection",
+      "overlay"
+    ],
+    "action": {
+      "kind": "listSelect",
+      "delta": -1
+    },
+    "combos": [
+      "Ctrl+Left"
+    ]
   },
   {
     "id": "list.select.next",
     "description": "Select next entry",
-    "contexts": ["collection", "overlay"],
-    "action": { "kind": "listSelect", "delta": 1 },
-    "combos": ["Ctrl+Right"]
+    "contexts": [
+      "collection",
+      "overlay"
+    ],
+    "action": {
+      "kind": "listSelect",
+      "delta": 1
+    },
+    "combos": [
+      "Ctrl+Right"
+    ]
   },
   {
     "id": "list.move.up",
     "description": "Move entry up",
-    "contexts": ["collection", "overlay"],
-    "action": { "kind": "listMove", "delta": -1 },
-    "combos": ["Ctrl+Up"]
+    "contexts": [
+      "collection",
+      "overlay"
+    ],
+    "action": {
+      "kind": "listMove",
+      "delta": -1
+    },
+    "combos": [
+      "Ctrl+Up"
+    ]
   },
   {
     "id": "list.move.down",
     "description": "Move entry down",
-    "contexts": ["collection", "overlay"],
-    "action": { "kind": "listMove", "delta": 1 },
-    "combos": ["Ctrl+Down"]
+    "contexts": [
+      "collection",
+      "overlay"
+    ],
+    "action": {
+      "kind": "listMove",
+      "delta": 1
+    },
+    "combos": [
+      "Ctrl+Down"
+    ]
   },
   {
     "id": "app.save",
     "description": "Save & validate (overlays stay open)",
-    "contexts": ["default", "overlay"],
-    "action": { "kind": "save" },
-    "combos": ["Ctrl+S"]
+    "contexts": [
+      "default",
+      "overlay"
+    ],
+    "action": {
+      "kind": "save"
+    },
+    "combos": [
+      "Ctrl+S"
+    ]
   },
   {
     "id": "app.quit",
     "description": "Quit (confirm if dirty)",
-    "contexts": ["default"],
-    "action": { "kind": "quit" },
-    "combos": ["Ctrl+Q", "Ctrl+C"]
+    "contexts": [
+      "default"
+    ],
+    "action": {
+      "kind": "quit"
+    },
+    "combos": [
+      "Ctrl+Q",
+      "Ctrl+C"
+    ]
   },
   {
     "id": "status.reset",
     "description": "Cancel / clear status (overlays: pop current level)",
-    "contexts": ["default", "overlay"],
-    "action": { "kind": "resetStatus" },
-    "combos": ["Esc"]
+    "contexts": [
+      "default",
+      "overlay"
+    ],
+    "action": {
+      "kind": "resetStatus"
+    },
+    "combos": [
+      "Esc"
+    ]
+  },
+  {
+    "id": "help.show",
+    "description": "Show help and error summary",
+    "contexts": [
+      "default",
+      "collection",
+      "overlay"
+    ],
+    "action": {
+      "kind": "showHelp"
+    },
+    "combos": [
+      "Ctrl+?",
+      "Ctrl+H"
+    ]
   }
 ]

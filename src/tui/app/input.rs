@@ -14,6 +14,7 @@ pub enum KeyAction {
     ResetStatus,
     TogglePopup,
     EditComposite,
+    ShowHelp,
     FieldStep(i32),
     SectionStep(i32),
     RootStep(i32),
@@ -32,6 +33,7 @@ pub enum AppCommand {
     ResetStatus,
     TogglePopup,
     EditComposite,
+    ShowHelp,
     ListAddEntry,
     ListRemoveEntry,
     ListMove(i32),
@@ -58,6 +60,7 @@ enum KeyActionDiscriminant {
     ResetStatus,
     TogglePopup,
     EditComposite,
+    ShowHelp,
     FieldStepPos,
     FieldStepNeg,
     SectionStepPos,
@@ -105,6 +108,7 @@ impl KeyBindingMap {
             KeyActionDiscriminant::EditComposite,
             App(AppCommand::EditComposite),
         );
+        bindings.insert(KeyActionDiscriminant::ShowHelp, App(AppCommand::ShowHelp));
         bindings.insert(
             KeyActionDiscriminant::ResetStatus,
             App(AppCommand::ResetStatus),
@@ -153,6 +157,11 @@ impl KeyBindingMap {
                 .get(&KeyActionDiscriminant::ResetStatus)
                 .cloned()
                 .unwrap_or(CommandDispatch::App(AppCommand::ResetStatus)),
+            KeyAction::ShowHelp => self
+                .bindings
+                .get(&KeyActionDiscriminant::ShowHelp)
+                .cloned()
+                .unwrap_or(CommandDispatch::App(AppCommand::ShowHelp)),
             KeyAction::TogglePopup => self
                 .bindings
                 .get(&KeyActionDiscriminant::TogglePopup)

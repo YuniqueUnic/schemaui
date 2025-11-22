@@ -374,6 +374,18 @@ impl FormState {
             .sum()
     }
 
+    pub fn error_entries(&self) -> Vec<(String, String)> {
+        let mut entries = Vec::new();
+        for section in self.iter_sections() {
+            for field in &section.fields {
+                if let Some(err) = &field.error {
+                    entries.push((field.schema.pointer.clone(), err.clone()));
+                }
+            }
+        }
+        entries
+    }
+
     fn advance_section(&mut self, delta: i32) {
         let positions = self.section_positions();
         if positions.is_empty() {
