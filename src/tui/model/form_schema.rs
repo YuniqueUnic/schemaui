@@ -102,6 +102,11 @@ pub struct FieldSchema {
 
 impl FieldSchema {
     pub fn display_label(&self) -> String {
+        // Field names starting with "__" are reserved for internal plumbing
+        // (e.g. composite wrappers) and should not surface their raw name.
+        if self.name.starts_with("__") {
+            return self.title.clone();
+        }
         if self.title.eq_ignore_ascii_case(&self.name) {
             self.title.clone()
         } else {

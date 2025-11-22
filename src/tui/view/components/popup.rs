@@ -3,6 +3,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, Clear, List, ListItem, ListState},
 };
+use unicode_width::UnicodeWidthStr;
 
 use super::super::frame::PopupRender;
 use super::layout::popup_rect;
@@ -11,28 +12,13 @@ pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
     if popup.options.is_empty() {
         return;
     }
-    let max_width = popup
-        .options
-        .iter()
-        .map(|option| option.chars().count())
-        .max()
-        .unwrap_or(10) as u16;
-    let width_limit = frame.area().width.saturating_sub(2).max(1);
-    let width = (max_width.saturating_add(6)).min(width_limit);
-    let height = popup
-        .options
-        .len()
-        .saturating_add(4)
-        .min(frame.area().height as usize) as u16;
-    let area = popup_rect(frame.area(), width, height.max(3));
-    frame.render_widget(Clear, area);
-
-    let items: Vec<ListItem<'static>> = popup
+    // Precompute rendered labels so width calculation matches actual content
+    let rendered_labels: Vec<String> = popup
         .options
         .iter()
         .enumerate()
         .map(|(index, option)| {
-            let label = if popup.multi {
+            if popup.multi {
                 let mark = popup
                     .active
                     .and_then(|flags| flags.get(index))
@@ -41,10 +27,27 @@ pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
                 format!("[{}] {}", if mark { "x" } else { " " }, option)
             } else {
                 option.clone()
-            };
-            ListItem::new(label)
+            }
         })
         .collect();
+
+    let max_width = rendered_labels
+        .iter()
+        .map(|label| UnicodeWidthStr::width(label.as_str()))
+        .max()
+        .unwrap_or(10) as u16;
+    let width_limit = frame.area().width.saturating_sub(2).max(1);
+    // Extra padding for borders and highlight symbol
+    let width = (max_width.saturating_add(8)).min(width_limit);
+    let height = popup
+        .options
+        .len()
+        .saturating_add(4)
+        .min(frame.area().height as usize) as u16;
+    let area = popup_rect(frame.area(), width, height.max(3));
+    frame.render_widget(Clear, area);
+
+    let items: Vec<ListItem<'static>> = rendered_labels.into_iter().map(ListItem::new).collect();
     let mut state = ListState::default();
     let selected = popup.selected.min(popup.options.len().saturating_sub(1));
     state.select(Some(selected));

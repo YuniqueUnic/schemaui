@@ -284,12 +284,42 @@ impl CompositeListState {
         let Some(entry) = self.selected_entry_mut() else {
             return false;
         };
+
         if entry.state.is_multi() {
-            if let Some(flags) = flags {
-                entry.state.apply_multi(&flags)
-            } else {
-                false
+            let Some(flags) = flags else {
+                return false;
+            };
+
+            // Multi-choice semantics for arrays of composites (e.g. deepItems):
+            // treat each active variant as its own list entry instead of storing
+            // multiple active variants on a single entry.
+            let active_indices: Vec<usize> = flags
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, flag)| if *flag { Some(idx) } else { None })
+                .collect();
+
+            if active_indices.is_empty() {
+                // No variants selected: clear entries.
+                self.entries.clear();
+                self.selected = 0;
+                self.counter = 0;
+                return true;
             }
+
+            // Rebuild the entries collection: one entry per active variant.
+            self.entries.clear();
+            self.counter = 0;
+            for (index, variant_index) in active_indices.iter().copied().enumerate() {
+                let pointer = format!("{}/entry_{}", self.pointer, index);
+                let mut state =
+                    CompositeState::new(&pointer, &self.template, Arc::clone(&self.palette));
+                // Ensure only this variant is active for the new entry.
+                state.ensure_editable_variant_with_index(Some(variant_index));
+                self.entries.push(CompositeListEntry { pointer, state });
+            }
+            self.selected = 0;
+            true
         } else {
             entry.state.apply_single(selection)
         }
