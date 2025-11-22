@@ -82,7 +82,20 @@ fn visit_schema(
             .as_ref()
             .context("array schema must define array metadata")?;
         let items_schema = resolve_array_items(resolver, array)?;
-        let item_node = visit_kind(resolver, &items_schema)?;
+        let item_node =
+            if is_object_schema(&items_schema) && !has_composite_subschemas(&items_schema) {
+                // Promote plain object[] arrays (without their own oneOf/anyOf)
+                // to arrays of single-variant composites so that frontends can
+                // treat them uniformly as composite lists rather than raw
+                // JSON object arrays.
+                build_composite_kind(
+                    resolver,
+                    &[Schema::Object(items_schema.clone())],
+                    CompositeMode::OneOf,
+                )?
+            } else {
+                visit_kind(resolver, &items_schema)?
+            };
         let default_value = schema_default(schema).or_else(|| Some(Value::Array(Vec::new())));
         return Ok(UiNode {
             pointer,
@@ -211,6 +224,23 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
             .as_ref()
             .context("array schema must define array metadata")?;
         let items_schema = resolve_array_items(resolver, array)?;
+
+        // Treat arrays of plain objects (without their own oneOf/anyOf) as
+        // single-variant composites so that frontends can render them as
+        // composite lists instead of raw JSON buffers.
+        if is_object_schema(&items_schema) && !has_composite_subschemas(&items_schema) {
+            let composite_kind = build_composite_kind(
+                resolver,
+                &[Schema::Object(items_schema.clone())],
+                CompositeMode::OneOf,
+            )?;
+            return Ok(UiNodeKind::Array {
+                item: Box::new(composite_kind),
+                min_items: array.min_items.map(|v| v as u64),
+                max_items: array.max_items.map(|v| v as u64),
+            });
+        }
+
         let item_node = visit_kind(resolver, &items_schema)?;
         return Ok(UiNodeKind::Array {
             item: Box::new(item_node),
@@ -451,6 +481,13 @@ fn is_object_schema(schema: &SchemaObject) -> bool {
     }
 }
 
+fn has_composite_subschemas(schema: &SchemaObject) -> bool {
+    schema.subschemas.as_ref().is_some_and(|subs| {
+        subs.one_of.as_ref().is_some_and(|list| !list.is_empty())
+            || subs.any_of.as_ref().is_some_and(|list| !list.is_empty())
+    })
+}
+
 fn is_array_schema(schema: &SchemaObject) -> bool {
     match instance_type(schema) {
         Some(InstanceType::Array) => true,
@@ -493,6 +530,16 @@ fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
             return s.to_string();
         }
 
+        // NEW: also check for a 'kind' const field, which we use as a
+        // discriminant in many schemas (e.g. simple vs numeric item).
+        if let Some(kind_prop) = obj.properties.get("kind")
+            && let Some(const_val) = get_const_value(kind_prop)
+            && let Some(s) = const_val.as_str()
+        {
+            // Use humanized form, e.g. "simple" -> "Simple".
+            return humanize_identifier(s);
+        }
+
         // Check for 'id' or 'name' fields which might identify the variant
         for key in ["id", "name", "key"] {
             if obj.properties.contains_key(key) {
@@ -511,11 +558,27 @@ fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
         match items {
             SingleOrVec::Single(item_schema) => {
                 // Try to get a meaningful name for the item type
-                if let Schema::Object(item_obj) = item_schema.as_ref()
-                    && let Some(item_ref) = item_obj.reference.as_ref()
-                    && let Some(name) = item_ref.split('/').next_back()
-                {
-                    return format!("{} array", humanize_identifier(name));
+                if let Schema::Object(item_obj) = item_schema.as_ref() {
+                    if let Some(item_ref) = item_obj.reference.as_ref()
+                        && let Some(name) = item_ref.split('/').next_back()
+                    {
+                        return format!("{} array", humanize_identifier(name));
+                    }
+
+                    // NEW: for scalar arrays (string/integer/number/boolean),
+                    // produce names like `List<string>` or `List<integer>`.
+                    if let Some(item_instance) = instance_type(item_obj) {
+                        let kind = match item_instance {
+                            InstanceType::String => Some("string"),
+                            InstanceType::Integer => Some("integer"),
+                            InstanceType::Number => Some("number"),
+                            InstanceType::Boolean => Some("boolean"),
+                            _ => None,
+                        };
+                        if let Some(kind) = kind {
+                            return format!("List<{}>", kind);
+                        }
+                    }
                 }
             }
             SingleOrVec::Vec(_) => {
@@ -623,5 +686,65 @@ fn append_pointer(base: &str, segment: &str) -> String {
         format!("{base}{encoded}")
     } else {
         format!("{base}/{encoded}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use schemars::schema::SubschemaValidation;
+
+    #[test]
+    fn variant_title_uses_kind_const() {
+        // Build a simple object schema with a `kind` const discriminator.
+        let mut kind_schema = SchemaObject::default();
+        kind_schema.const_value = Some(Value::String("simple".to_string()));
+
+        let mut obj = ObjectValidation::default();
+        obj.properties
+            .insert("kind".to_string(), Schema::Object(kind_schema));
+
+        let mut schema = SchemaObject::default();
+        schema.object = Some(Box::new(obj));
+
+        let title = default_variant_title(0, &schema);
+        assert_eq!(title, "Simple");
+    }
+
+    #[test]
+    fn variant_title_for_scalar_array_is_list_of_type() {
+        // Build an array schema whose items are scalar strings.
+        let mut item_schema = SchemaObject::default();
+        item_schema.instance_type = Some(SingleOrVec::Single(Box::new(InstanceType::String)));
+
+        let mut array = ArrayValidation::default();
+        array.items = Some(SingleOrVec::Single(Box::new(Schema::Object(item_schema))));
+
+        let mut schema = SchemaObject::default();
+        schema.array = Some(Box::new(array));
+
+        let title = default_variant_title(0, &schema);
+        assert_eq!(title, "List<string>");
+    }
+
+    #[test]
+    fn has_composite_subschemas_detects_one_of_and_any_of() {
+        // oneOf present
+        let mut with_one_of = SchemaObject::default();
+        let mut subs_one = SubschemaValidation::default();
+        subs_one.one_of = Some(vec![Schema::Bool(true)]);
+        with_one_of.subschemas = Some(Box::new(subs_one));
+        assert!(has_composite_subschemas(&with_one_of));
+
+        // anyOf present
+        let mut with_any_of = SchemaObject::default();
+        let mut subs_any = SubschemaValidation::default();
+        subs_any.any_of = Some(vec![Schema::Bool(true)]);
+        with_any_of.subschemas = Some(Box::new(subs_any));
+        assert!(has_composite_subschemas(&with_any_of));
+
+        // neither oneOf nor anyOf
+        let plain = SchemaObject::default();
+        assert!(!has_composite_subschemas(&plain));
     }
 }
