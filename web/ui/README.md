@@ -9,8 +9,8 @@ This package hosts the offline React single-page application that ships with the
 
 ```bash
 cd web/ui
-npm install          # once
-npm run dev          # launches Vite on http://127.0.0.1:5173
+pnpm install         # once
+pnpm dev             # launches Vite on http://127.0.0.1:5173
 ```
 
 The layout mirrors the TUI: fixed header/footer, draggable tree/editor/preview
@@ -20,11 +20,11 @@ toggle.
 ## Production build
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 This runs `tsc -b` followed by `vite build`, emitting `../dist/index.html`.
-Cargo’s `build.rs` automatically triggers `npm run build` unless
+Cargo’s `build.rs` automatically triggers `pnpm run build` unless
 `SCHEMAUI_WEB_SKIP_BUILD=1`. Set `SCHEMAUI_WEB_FORCE_BUILD=1` to rebuild
 unconditionally.
 

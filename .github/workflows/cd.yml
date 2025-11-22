@@ -66,16 +66,22 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-          cache-dependency-path: web/ui/package-lock.json
+          cache: "pnpm"
+          cache-dependency-path: web/ui/pnpm-lock.yaml
 
       - name: Build web UI bundle
         working-directory: web/ui
-        run: npm ci && npm run build
+        run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1.15.2
