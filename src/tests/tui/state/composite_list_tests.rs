@@ -79,10 +79,16 @@ fn composite_list_selection_updates_summary() {
     let (entries, selected) = field
         .composite_list_panel()
         .expect("panel state must exist");
-    assert_eq!(selected, 0);
+    assert_eq!(selected, 0, "first entry should be selected");
+    assert_eq!(entries.len(), 2, "one entry per selected variant");
     assert!(
-        entries[0].contains("Target object") && entries[0].contains("Integer entry"),
-        "summary should mention active variants: {:?}",
+        entries[0].contains("Target object"),
+        "first entry should summarize the 'Target object' variant: {:?}",
         entries[0]
+    );
+    assert!(
+        entries[1].contains("Integer entry"),
+        "second entry should summarize the 'Integer entry' variant: {:?}",
+        entries[1]
     );
 }

@@ -58,6 +58,43 @@ impl CompositeField {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn internal_names_use_title_only() {
+        let schema = FieldSchema {
+            name: "__value".to_string(),
+            path: vec!["__value".to_string()],
+            pointer: "/root/__value".to_string(),
+            title: "String List".to_string(),
+            description: None,
+            kind: FieldKind::String,
+            required: false,
+            default: None,
+            metadata: HashMap::new(),
+        };
+        assert_eq!(schema.display_label(), "String List");
+    }
+
+    #[test]
+    fn external_names_show_title_and_name() {
+        let schema = FieldSchema {
+            name: "deepItems".to_string(),
+            path: vec!["deepItems".to_string()],
+            pointer: "/deepItems".to_string(),
+            title: "Deep Items".to_string(),
+            description: None,
+            kind: FieldKind::String,
+            required: false,
+            default: None,
+            metadata: HashMap::new(),
+        };
+        assert_eq!(schema.display_label(), "Deep Items (deepItems)");
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeyValueField {
     pub key_title: String,
