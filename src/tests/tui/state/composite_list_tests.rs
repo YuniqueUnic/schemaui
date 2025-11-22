@@ -92,3 +92,38 @@ fn composite_list_selection_updates_summary() {
         entries[1]
     );
 }
+
+#[test]
+fn composite_list_adds_entries_with_selected_variants() {
+    let mut field = composite_list_field();
+
+    // Add an entry explicitly as the target object variant
+    assert!(
+        field.composite_list_add_entry_with_variant(0),
+        "should add entry for 'Target object' variant"
+    );
+
+    // Add another entry explicitly as the integer variant
+    assert!(
+        field.composite_list_add_entry_with_variant(2),
+        "should add entry for 'Integer entry' variant"
+    );
+
+    let (entries, selected) = field
+        .composite_list_panel()
+        .expect("panel state must exist after adding entries");
+
+    assert_eq!(entries.len(), 2, "expected two entries after explicit adds");
+    assert_eq!(selected, 1, "last added entry should be selected");
+
+    assert!(
+        entries[0].contains("Target object"),
+        "first entry should summarize the 'Target object' variant: {:?}",
+        entries[0]
+    );
+    assert!(
+        entries[1].contains("Integer entry"),
+        "second entry should summarize the 'Integer entry' variant: {:?}",
+        entries[1]
+    );
+}

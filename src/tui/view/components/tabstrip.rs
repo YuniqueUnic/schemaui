@@ -69,12 +69,21 @@ struct TabLabel {
 
 impl TabLabel {
     fn new(text: String) -> Self {
+        // Width includes the label text plus padding and room for potential
+        // overflow chevrons that are rendered at the tab edges. Using a
+        // slightly conservative estimate here avoids packing more tabs into
+        // the window than can actually be displayed, which previously caused
+        // rightmost entries to be truncated.
         let width = UnicodeWidthStr::width(text.as_str()) + TAB_EXTRA_PADDING;
         Self { text, width }
     }
 }
 
-const TAB_EXTRA_PADDING: usize = 2;
+// Base padding for each tab label. This is intentionally a bit larger than
+// the raw text padding to account for the leading/trailing spaces and
+// overflow chevrons ("<<"/">>") that may be rendered for the first/last
+// visible tabs.
+const TAB_EXTRA_PADDING: usize = 4;
 const LEFT_CHEVRON: &str = "<<";
 const RIGHT_CHEVRON: &str = ">>";
 

@@ -65,7 +65,7 @@ impl App {
     pub(crate) fn handle_overlay_app_command(&mut self, command: AppCommand) -> Result<bool> {
         match command {
             AppCommand::Save => {
-                self.save_active_overlay();
+                self.save_overlay_stack_to_root();
                 return Ok(true);
             }
             AppCommand::Quit => {

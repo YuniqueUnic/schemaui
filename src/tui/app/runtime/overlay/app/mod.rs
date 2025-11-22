@@ -136,6 +136,50 @@ impl App {
             }
         }
     }
+
+    /// Save the entire overlay stack into the root form state.
+    ///
+    /// This is used for user-initiated saves (Ctrl+S) while editing inside
+    /// one or more overlays. It walks from the deepest overlay up to the
+    /// top-level overlay, committing each overlay's session into its host
+    /// form state. This ensures that changes made in nested overlays are
+    /// persisted even if intermediate overlays are later closed without an
+    /// additional save.
+    pub(crate) fn save_overlay_stack_to_root(&mut self) -> bool {
+        let depth = self.overlay_stack.len();
+        if depth == 0 {
+            return true;
+        }
+
+        // Commit overlays from deepest (highest level) back towards the root.
+        for idx in (0..depth).rev() {
+            // Build commit payload without borrowing the overlay mutably while
+            // we also mutate the host form state.
+            let payload = {
+                let overlay = &self.overlay_stack[idx];
+                overlay.build_commit_payload()
+            };
+
+            let host = payload.host();
+            if let Err(message) = payload.apply(self.host_form_state_mut(host)) {
+                self.status.set_raw(&message);
+                return false;
+            }
+
+            // Mark the overlay itself as clean so that subsequent exits do
+            // not discard already-committed changes.
+            let overlay = &mut self.overlay_stack[idx];
+            overlay.form_state_mut().mark_clean();
+            overlay.set_exit_armed(false);
+        }
+
+        // After committing, keep using overlay-scoped validation so we don't
+        // surprise the user with full-form validation on every overlay save.
+        self.run_overlay_validation();
+        self.set_overlay_status_message();
+        self.refresh_list_overlay_panel();
+        true
+    }
 }
 
 #[cfg(test)]

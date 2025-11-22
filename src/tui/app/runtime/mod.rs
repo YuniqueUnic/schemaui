@@ -390,11 +390,37 @@ impl App {
     }
 
     fn on_exit(&mut self) {
-        if self.options.confirm_exit && self.form_state.is_dirty() && !self.exit_armed {
-            self.exit_armed = true;
-            self.status.pending_exit();
+        // First attempt: validate the full form. If it passes, treat Ctrl+Q
+        // as a final save-and-exit, even if the user never pressed Ctrl+S.
+        if !self.exit_armed {
+            if let Some(value) = self.run_validation(true) {
+                self.result = Some(value);
+                self.form_state.mark_clean();
+                self.should_quit = true;
+                self.exit_armed = false;
+                return;
+            }
+
+            // Validation failed. When confirm_exit is enabled, require a
+            // second Ctrl+Q to force exit without saving the current
+            // (invalid) state. The last successfully validated result, if
+            // any, is preserved.
+            if self.options.confirm_exit {
+                self.exit_armed = true;
+                self.status.pending_exit();
+                return;
+            }
+
+            // confirm_exit disabled: exit immediately without updating
+            // result; callers will see "user exited without saving" unless a
+            // previous successful save populated result.
+            self.should_quit = true;
             return;
         }
+
+        // Second Ctrl+Q after a failed validation: force exit without
+        // changing result. This mirrors the behavior of quitting without a
+        // successful save.
         self.should_quit = true;
     }
 
@@ -469,10 +495,13 @@ mod tests {
     }
 
     #[test]
-    fn exit_without_save_leaves_result_empty() {
+    fn exit_without_explicit_save_validates_and_sets_result() {
         let mut app = app_with_single_field();
         app.on_exit();
-        assert!(app.result.is_none(), "no save means no result");
+        assert!(
+            app.result.is_some(),
+            "Ctrl+Q should validate and produce a result for a valid form"
+        );
     }
 }
 
