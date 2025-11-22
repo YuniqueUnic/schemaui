@@ -310,10 +310,15 @@
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "kind": {
+                    "type": "string",
+                    "const": "simple"
                 }
             },
             "required": [
-                "id"
+                "id",
+                "kind"
             ],
             "additionalProperties": false
         },
@@ -328,10 +333,15 @@
                     "items": {
                         "type": "number"
                     }
+                },
+                "kind": {
+                    "type": "string",
+                    "const": "numeric"
                 }
             },
             "required": [
-                "id"
+                "id",
+                "kind"
             ],
             "additionalProperties": false
         },
