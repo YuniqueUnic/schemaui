@@ -53,11 +53,14 @@ pub fn draw(
     render_body(frame, chunks[0], form_state, cursor_enabled);
     render_footer(frame, chunks[1], &ctx);
 
-    if let Some(popup) = ctx.popup {
-        render_popup(frame, popup);
-    }
-
+    // When both an overlay and a popup are present, render the overlay first
+    // and the popup last so that the popup always appears on top. Drawing the
+    // overlay after the popup would clear and cover the popup contents.
     if let (Some(meta), Some(overlay_state)) = (ctx.composite_overlay.as_ref(), overlay_form) {
         render_composite_overlay(frame, meta, overlay_state);
+    }
+
+    if let Some(popup) = ctx.popup {
+        render_popup(frame, popup);
     }
 }
