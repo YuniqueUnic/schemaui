@@ -7,6 +7,7 @@ bindings/
 docs/**/*.md
 docs/**/*.txt
 docs/**/*.gif
+docs/**/*.cast
 !docs/**/cli_usage*.md
 !docs/**/structure_design*.md
 !docs/**/tui-architecture-overview.md

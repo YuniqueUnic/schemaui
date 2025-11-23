@@ -1,13 +1,20 @@
-# schemaui
+<div align="center">
+  <a href="https://signature4u.vercel.app/schemaui?font=satisfy&fontSize=153&speed=2.8&charSpacing=0&borderRadius=0&cardPadding=24&fill=multi&fill1=001bb7&fill2=ec4899&stroke=001bb7&stroke2=ec4899&strokeMode=multi&strokeEnabled=1&bg=transparent&bgMode=solid&bg2=1e3a8a&texture=cross&texColor=566486&texSize=30&texThickness=1&texOpacity=0.4&colors=001bb7-001bb7-001bb7-001bb7-001bb7-001bb7-ff8040-fcb53b&linkFillStroke=1" target="_blank">
+    <img src="https://signature4u.vercel.app/api/sign?text=schemaui&font=satisfy&fontSize=153&speed=2.8&charSpacing=0&borderRadius=0&cardPadding=24&fill=multi&fill1=001bb7&fill2=ec4899&stroke=001bb7&stroke2=ec4899&strokeMode=multi&strokeEnabled=1&bg=transparent&bgMode=solid&bg2=1e3a8a&texture=cross&texColor=566486&texSize=30&texThickness=1&texOpacity=0.4&colors=001bb7-001bb7-001bb7-001bb7-001bb7-001bb7-ff8040-fcb53b&linkFillStroke=1" align="center"  alt="schemaui signature"/>
+  </a>
+</div>
 
 [![Crates.io](https://img.shields.io/crates/v/schemaui.svg)](https://crates.io/crates/schemaui)
 [![Documentation](https://docs.rs/schemaui/badge.svg)](https://docs.rs/schemaui)
 [![License](https://img.shields.io/crates/l/schemaui)](https://github.com/yuniqueunic/schemaui#license)
 ![Crates.io Total Downloads](https://img.shields.io/crates/d/schemaui)
-![Deps.rs Crate Dependencies (latest)](https://img.shields.io/deps-rs/schemaui/latest)
+
+<!-- ![Deps.rs Crate Dependencies (latest)](https://img.shields.io/deps-rs/schemaui/latest) -->
 
 <div align="center">
-<img src="https://github.com/YuniqueUnic/schemaui/blob/master/docs/schemaui-demo.gif?raw=true" width="500">
+  <a href="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE" target="_blank">
+    <img src="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE.svg" width="500" />
+  </a>
 
 [English](./README.md) | [中文文档](./README.ZH.md)
 
