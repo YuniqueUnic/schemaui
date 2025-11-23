@@ -381,7 +381,7 @@ async fn post_validate(
     let mut errors = Vec::new();
     for error in state.validator.iter_errors(&req.data) {
         errors.push(FieldError {
-            pointer: error.instance_path.to_string(),
+            pointer: error.instance_path().to_string(),
             message: error.to_string(),
         });
     }

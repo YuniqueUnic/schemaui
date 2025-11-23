@@ -38,7 +38,7 @@ impl<'a> FormEngine<'a> {
                 self.state.clear_error(pointer);
                 let mut matched = false;
                 for error in self.validator.iter_errors(&value) {
-                    let err_pointer = error.instance_path.to_string();
+                    let err_pointer = error.instance_path().to_string();
                     if err_pointer == pointer {
                         matched = true;
                         self.state.set_error(&err_pointer, error.to_string());

@@ -51,7 +51,7 @@ debug = []
 [dependencies]
 anyhow = "1"
 crossterm = "0.29.0"
-jsonschema = "0.33.0"
+jsonschema = "0.37"
 ratatui = "0.29.0"
 schemars = { version = "0.8.22", features = ["preserve_order"] }
 serde = { version = "1", features = ["derive"] }

@@ -54,7 +54,7 @@ prek +ARGS="-a":
 
 # run clippy and rustfmt, then run prek
 happy:
-    cargo clippy --fix --allow-dirty -- -D warnings
+    cargo clippy --fix --allow-dirty --tests -- -D warnings
     cargo fmt --all
     just prek
 

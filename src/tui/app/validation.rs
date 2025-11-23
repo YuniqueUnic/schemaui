@@ -27,7 +27,7 @@ pub fn validate_form(form_state: &mut FormState, validator: &Validator) -> Valid
                 let mut global = Vec::new();
                 for error in validator.iter_errors(&value) {
                     issues += 1;
-                    let pointer = error.instance_path.to_string();
+                    let pointer = error.instance_path().to_string();
                     let message = error.to_string();
                     if !form_state.set_error(&pointer, message.clone()) {
                         let prefix = if pointer.is_empty() {
