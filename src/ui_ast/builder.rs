@@ -690,6 +690,7 @@ fn append_pointer(base: &str, segment: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use schemars::schema::SubschemaValidation;

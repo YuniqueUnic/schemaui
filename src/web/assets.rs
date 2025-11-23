@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn loads_index_html() {
-        let assets = EmbeddedAssets::default();
+        let assets = EmbeddedAssets;
         let asset = assets.load("/").expect("index.html embedded");
         assert_eq!(asset.mime, "text/html; charset=utf-8");
         assert!(asset.contents.starts_with(b"<!doctype html>"));
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn normalizes_root_path() {
-        let assets = EmbeddedAssets::default();
+        let assets = EmbeddedAssets;
         let asset = assets.load("").expect("falls back to index");
         assert_eq!(asset.path, "index.html");
     }

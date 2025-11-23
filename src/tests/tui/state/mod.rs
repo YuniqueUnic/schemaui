@@ -1,3 +1,4 @@
+mod collection_remove_tests;
 mod component_overlay_context_tests;
 mod component_palette_tests;
 mod composite_list_tests;

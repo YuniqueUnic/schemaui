@@ -134,6 +134,14 @@ impl App {
                 return false;
             }
         };
+
+        // Determine whether the list is now empty. We treat the absence of a
+        // collection panel as meaning there are no entries left.
+        let list_is_empty_after = self
+            .list_field_ref_for_host(&pointer, overlay_host)
+            .map(|field| field.composite_list_panel().is_none())
+            .unwrap_or(true);
+
         let status_message = removed
             .map(|label| format!("Removed entry • now at {label}"))
             .unwrap_or_else(|| "List is now empty".to_string());
@@ -145,7 +153,12 @@ impl App {
         if targeted_overlay {
             self.close_active_overlay(false);
             self.status.set_raw(status_message);
-            self.try_open_composite_editor();
+            // If there are still entries, reopen the editor on the updated
+            // selection. If the list is empty, stay at the parent level so the
+            // empty state is preserved instead of auto-creating a new entry.
+            if !list_is_empty_after {
+                self.try_open_composite_editor();
+            }
             return true;
         }
         self.status.set_raw(status_message);

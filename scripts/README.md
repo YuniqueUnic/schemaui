@@ -42,69 +42,6 @@
 - 自动更新所有 README 中的版本号
 - 保持文档版本一致性
 
-### 测试脚本
-
-#### start-web-server.sh
-
-启动 Web 服务器进行开发测试。
-
-```bash
-./scripts/start-web-server.sh
-```
-
-默认配置：
-
-- 端口：5175
-- Schema：examples/complex.schema.json
-- 输出：标准输出
-
-#### start-web-test.sh
-
-启动 Web 测试服务器。
-
-```bash
-./scripts/start-web-test.sh
-```
-
-用于运行自动化测试的专用配置。
-
-#### start-ultra-test.sh
-
-启动超级复杂 Schema 测试。
-
-```bash
-./scripts/start-ultra-test.sh
-```
-
-测试配置：
-
-- Schema：examples/ultra-complex.schema.json
-- 用于压力测试和边界情况验证
-
-## 🚀 使用指南
-
-### 开发流程
-
-1. **启动开发服务器**
-
-```bash
-./scripts/start-web-server.sh
-```
-
-2. **修改代码后重新构建**
-
-```bash
-./scripts/build-web.sh
-```
-
-3. **运行测试**
-
-```bash
-./scripts/start-web-test.sh
-# 在另一个终端运行测试
-cd tests && npm test
-```
-
 ### 发布流程
 
 1. **更新版本号**
@@ -116,32 +53,7 @@ cd tests && npm test
 2. **构建生产版本**
 
 ```bash
-just build  # 或 ./scripts/build-web.sh
-```
-
-3. **运行完整测试**
-
-```bash
-./scripts/start-ultra-test.sh
-# 运行所有测试套件
-```
-
-## 🔧 脚本配置
-
-### 环境变量
-
-脚本支持以下环境变量：
-
-| 变量名      | 描述            | 默认值                       |
-| ----------- | --------------- | ---------------------------- |
-| PORT        | Web 服务器端口  | 5175                         |
-| SCHEMA_PATH | Schema 文件路径 | examples/complex.schema.json |
-| LOG_LEVEL   | 日志级别        | info                         |
-
-示例：
-
-```bash
-PORT=8080 SCHEMA_PATH=my-schema.json ./scripts/start-web-server.sh
+just build
 ```
 
 ### 自定义配置

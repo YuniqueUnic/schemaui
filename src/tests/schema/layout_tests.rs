@@ -321,13 +321,9 @@ fn anyof_variant_titles_reflect_shape() {
                 .iter()
                 .map(|variant| variant.title.as_str())
                 .collect();
+            assert!(titles.contains(&"string[]"), "variant titles: {:?}", titles);
             assert!(
-                titles.iter().any(|title| *title == "string[]"),
-                "variant titles: {:?}",
-                titles
-            );
-            assert!(
-                titles.iter().any(|title| *title == "integer[]"),
+                titles.contains(&"integer[]"),
                 "variant titles: {:?}",
                 titles
             );
@@ -372,10 +368,7 @@ fn allof_properties_merge_into_object_section() {
     );
 }
 
-fn find_field<'a>(
-    form: &'a FormSchema,
-    predicate: impl Fn(&FieldSchema) -> bool,
-) -> Option<&'a FieldSchema> {
+fn find_field(form: &FormSchema, predicate: impl Fn(&FieldSchema) -> bool) -> Option<&FieldSchema> {
     for root in &form.roots {
         if let Some(field) = find_in_sections(&root.sections, &predicate) {
             return Some(field);

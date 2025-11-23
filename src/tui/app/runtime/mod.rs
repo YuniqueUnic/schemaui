@@ -681,6 +681,17 @@ fn truncate_with_ellipsis(s: &str, max_chars: usize) -> String {
 }
 
 #[cfg(test)]
+impl App {
+    pub(crate) fn form_state_mut_for_test(&mut self) -> &mut FormState {
+        &mut self.form_state
+    }
+
+    pub(crate) fn handle_key_for_test(&mut self, key: KeyEvent) -> Result<()> {
+        self.handle_key(key)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{schema::build_form_schema, tui::app::options::UiOptions};
@@ -727,16 +738,5 @@ mod tests {
             app.result.is_some(),
             "Ctrl+Q should validate and produce a result for a valid form"
         );
-    }
-}
-
-#[cfg(test)]
-impl App {
-    pub(crate) fn form_state_mut_for_test(&mut self) -> &mut FormState {
-        &mut self.form_state
-    }
-
-    pub(crate) fn handle_key_for_test(&mut self, key: KeyEvent) -> Result<()> {
-        self.handle_key(key)
     }
 }
