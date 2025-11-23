@@ -229,15 +229,18 @@ impl App {
 
     fn build_help_overlay_pages(&self) -> Vec<Vec<String>> {
         const MAX_ERROR_MSG_CHARS: usize = 80;
-        const LINES_PER_PAGE: usize = 20;
-
-        let mut lines: Vec<String> = Vec::new();
-
-        // Shortcuts section
-        lines.push("Keyboard shortcuts".to_string());
-        lines.push(String::new());
+        const ERRORS_PER_PAGE: usize = 10;
 
         use crate::tui::app::keymap::KeymapContext;
+
+        // --- Collect shortcut rows ---------------------------------------------------------
+        struct ShortcutRow {
+            ctx_label: &'static str,
+            key: String,
+            action: String,
+        }
+
+        let mut shortcuts: Vec<ShortcutRow> = Vec::new();
         let sections = [
             ("Default", KeymapContext::Default),
             ("Collection", KeymapContext::Collection),
@@ -246,55 +249,110 @@ impl App {
 
         for (label, ctx) in sections {
             if let Some(text) = self.keymap_store.help_text(ctx) {
-                lines.push(format!("[{} context]", label));
                 for snippet in text.split('•') {
                     let s = snippet.trim();
-                    if !s.is_empty() {
-                        lines.push(format!("  {}", s));
+                    if s.is_empty() {
+                        continue;
                     }
+                    // Snippets are in the form "keys -> description".
+                    let (keys, action) = match s.split_once("->") {
+                        Some((k, a)) => (k.trim().to_string(), a.trim().to_string()),
+                        None => (s.to_string(), String::new()),
+                    };
+                    shortcuts.push(ShortcutRow {
+                        ctx_label: label,
+                        key: keys,
+                        action,
+                    });
                 }
-                lines.push(String::new());
             }
         }
 
-        // Errors section
-        lines.push(format!("Errors ({} issues)", self.validation_errors));
-        lines.push(String::new());
-
-        let mut any_error = false;
+        // --- Collect error rows ------------------------------------------------------------
+        let mut errors: Vec<(String, String)> = Vec::new();
         for (pointer, message) in self.form_state.error_entries() {
-            any_error = true;
             let short = truncate_with_ellipsis(&message, MAX_ERROR_MSG_CHARS);
-            lines.push(format!("{}: {}", pointer, short));
+            errors.push((pointer, short));
+        }
+        for msg in &self.global_errors {
+            let short = truncate_with_ellipsis(msg, MAX_ERROR_MSG_CHARS);
+            errors.push((String::new(), short));
         }
 
-        if !self.global_errors.is_empty() {
-            any_error = true;
-            for msg in &self.global_errors {
-                let short = truncate_with_ellipsis(msg, MAX_ERROR_MSG_CHARS);
-                lines.push(short);
-            }
-        }
-
-        if !any_error {
-            lines.push("No field errors.".to_string());
-        }
-
-        if lines.is_empty() {
+        let total_errors = errors.len();
+        if total_errors == 0 && shortcuts.is_empty() {
             return Vec::new();
         }
 
-        let total_pages = lines.len().div_ceil(LINES_PER_PAGE);
-        let mut pages = Vec::with_capacity(total_pages);
+        let total_pages = if total_errors == 0 {
+            1
+        } else {
+            total_errors.div_ceil(ERRORS_PER_PAGE)
+        };
 
-        for (idx, chunk) in lines.chunks(LINES_PER_PAGE).enumerate() {
-            let mut page_lines: Vec<String> = chunk.to_vec();
-            page_lines.push(format!(
-                "-- Page {}/{} (Tab next, Shift+Tab previous, Esc to close) --",
-                idx + 1,
-                total_pages
-            ));
-            pages.push(page_lines);
+        fn build_pages_header(current: usize, total: usize) -> String {
+            if total <= 1 {
+                return "Pages: [1]".to_string();
+            }
+            let mut parts = Vec::with_capacity(total);
+            for idx in 0..total {
+                let label = idx + 1;
+                if idx == current {
+                    parts.push(format!("[{label}]"));
+                } else {
+                    parts.push(label.to_string());
+                }
+            }
+            format!("Pages: {}", parts.join(" | "))
+        }
+
+        let mut pages: Vec<Vec<String>> = Vec::with_capacity(total_pages.max(1));
+
+        for page_idx in 0..total_pages {
+            let mut lines: Vec<String> = Vec::new();
+
+            // Keymap/table section
+            lines.push("Keymap shortcuts".to_string());
+            lines.push("CTX      | KEY                   | ACTION".to_string());
+            lines.push("-----------------------------------------------".to_string());
+            if shortcuts.is_empty() {
+                lines.push("(no shortcuts available)".to_string());
+            } else {
+                for row in &shortcuts {
+                    lines.push(format!(
+                        "{:<8} | {:<20} | {}",
+                        row.ctx_label, row.key, row.action
+                    ));
+                }
+            }
+            lines.push(String::new());
+
+            // Errors section
+            lines.push(format!("Errors ({} issues)", total_errors));
+            if total_errors == 0 {
+                lines.push("No field errors.".to_string());
+            } else {
+                lines.push(build_pages_header(page_idx, total_pages));
+                lines.push("IDX  | POINTER                       | MESSAGE".to_string());
+                lines.push("-----------------------------------------------------".to_string());
+
+                let start = page_idx * ERRORS_PER_PAGE;
+                let end = (start + ERRORS_PER_PAGE).min(total_errors);
+                for (offset, (pointer, message)) in errors[start..end].iter().enumerate() {
+                    let idx = start + offset + 1;
+                    let ptr_display = if pointer.is_empty() {
+                        "<global>".to_string()
+                    } else {
+                        pointer.clone()
+                    };
+                    lines.push(format!("{:<4} | {:<28} | {}", idx, ptr_display, message));
+                }
+            }
+
+            lines.push(String::new());
+            lines.push("Tab: next page  |  Shift+Tab: previous page  |  Esc: close".to_string());
+
+            pages.push(lines);
         }
 
         pages

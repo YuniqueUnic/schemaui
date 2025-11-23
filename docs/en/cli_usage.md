@@ -3,7 +3,7 @@
 `schemaui-cli` is the official command-line wrapper around the `schemaui`
 library. It accepts JSON Schema + config snapshots, launches the interactive
 TUI, and emits the edited document in any enabled format. This guide mirrors the
-actual code in `schemaui/src/main.rs` so the behaviour stays predictable.
+actual code in `schemaui-cli/src/main.rs` so the behaviour stays predictable.
 
 ## 1. Install & Run
 

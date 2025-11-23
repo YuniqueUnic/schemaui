@@ -146,7 +146,37 @@ GUI），同时重用相同的 I/O 和验证管道。
 `DocumentFormat::available_formats()` 遵循相同的功能矩阵，因此 CLI
 和宿主应用程序都会自动反映构建时的能力。
 
-## 10. 操作提示
+## 10. Web 模式
+
+当在启用 `web` 功能（默认启用）的构建下运行时，`schemaui-cli` 暴露 `web`
+子命令，用于代理库提供的浏览器 UI：
+
+```bash
+schemaui web \
+  --schema ./schema.json \
+  --config ./defaults.json \
+  --host 127.0.0.1 --port 0 \
+  -o -
+```
+
+该命令重用与 TUI 流程相同的 schema/config 管道，然后调用
+`schemaui::web::session::bind_session` 将静态资源和 HTTP API 嵌入到临时 HTTP
+服务中。终端会打印绑定地址（端口为 `0` 时选择一个随机空闲端口）。
+
+- 点击 **Save** 可以在不退出的情况下持久化编辑结果；
+- 点击 **Save & Exit** 会关闭临时服务器，并通过配置好的输出目标 发出最终 JSON。
+
+`web` 子命令特有的参数：
+
+| 标志            | 描述                               |
+| --------------- | ---------------------------------- |
+| `--host <IP>`   | 临时 HTTP 服务器的绑定地址。       |
+| `--port <PORT>` | 绑定端口（`0` 表示请求临时端口）。 |
+
+其他参数（`--schema`、`--config`、`--output` 等）的行为与 TUI 模式完全一致：
+同样支持文件/内联规范、多个输出目标以及汇总诊断。
+
+## 11. 操作提示
 
 - 当 schema 和 config 都需要 stdin
   时，将一个流作为字面文本传递（不存在的路径被视为内联）；可执行文件只读取 stdin

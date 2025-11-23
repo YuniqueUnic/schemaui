@@ -158,8 +158,8 @@ File: `src/tui/app/validation.rs` + `tui::state::reducers`.
   - List helpers (`runtime/list_ops.rs`) for insert/delete/reorder operations
     shared by both the main view and overlays
   - A central draw loop using `TerminalGuard` (restores terminal state on panic)
-- **Presentation** – `presentation::view` splits the screen into body + footer,
-  then calls `components::*` to render:
+- **Presentation** – `tui::view` splits the screen into body + footer, then
+  calls `tui::view::components::*` to render:
   - Root & section tabs with focus markers
   - Field rows (label, value preview, metadata badge, inline error message)
   - Popups (enum/variant pickers) and overlays (full-screen editors with
@@ -285,8 +285,56 @@ identically unless explicitly overridden.
   growing existing ones past ~200 lines.
 - Run `cargo check` or `cargo test -p schemaui-cli` before committing; large
   refactors should cover both the library and CLI crates.
-- Keep documentation bilingual? No—public docs (README/design) must stay in
-  English so downstream users can consume them without translation.
+- Keep README/design documentation in English so downstream users can consume
+  them without translation. Chinese counterparts live under `docs/zh/`.
+
+Related documents:
+
+- `docs/en/structure_design.md` – this file.
+- `docs/en/cli_usage.md` – CLI usage, flags, and examples.
+- `docs/en/tui-architecture-overview.md` – TUI layers, keymap contexts, and help
+  overlay design.
 
 Refer back to this guide whenever you add schema keywords, introduce new
 overlays, or modify CLI semantics.
+
+## 11. Core pipeline pseudocode (SchemaPipeline + TUI frontend)
+
+The production flow is implemented via `core::SchemaPipeline` and frontend
+implementations such as `TuiFrontend`:
+
+```text
+io::input (serde_json::Value)
+  → SchemaPipeline::new(schema)
+        .with_title(title)
+        .with_defaults(defaults)
+  → FrontendContext { ui_ast, validator, initial_data, schema }
+  → TuiFrontend::run(ctx)
+        (form_schema_from_ui_ast → FormSchema → FormState::from_schema_with_palette)
+  → App::run()
+  → io::output::emit (optional)
+```
+
+In heavily simplified Rust-like pseudocode:
+
+```rust
+fn run_tui(schema: Value, defaults: Option<Value>) -> Result<Value> {
+    let pipeline = SchemaPipeline::new(schema)
+        .with_title(Some("Title".into()))
+        .with_defaults(defaults);
+
+    let frontend = TuiFrontend { options: UiOptions::default() };
+    pipeline.run_with_frontend(frontend)
+}
+```
+
+Key refactor points:
+
+- `SchemaPipeline` owns schema enrichment (`schema_with_defaults`), validator
+  compilation (`validator_for`), and UI AST generation (`build_ui_ast`).
+- `Frontend` implementations (TUI, Web, or future GUIs) decide how to interpret
+  the UI AST (e.g. `form_schema_from_ui_ast` for TUIs) and which runtime to
+  drive.
+- The older direct `schema::build_form_schema` path remains available for tests
+  and low-level layout experiments, but library consumers should prefer
+  `SchemaUI`/`SchemaPipeline` and frontends.

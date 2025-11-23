@@ -69,7 +69,7 @@ io::input (serde_json::Value)
    - 顶级属性成为 `RootSection`（每个属性一个）加上用于松散字段的合成 "General"
      根。
    - 嵌套对象成为 `FormSection`。`SectionInfo`
-     使用元数据（`title`、`description` 或自定义 `x-group*` 扩展）命名部分。
+     使用元数据（`title`、`description`、`x-group*` 扩展）命名部分。
    - `detect_kind` 将 `SchemaObject` 映射到 `FieldKind`（基元、枚举、数组、复合
      `oneOf`/`anyOf`、键/值映射），同时防范不支持的形状。
 4. **表单状态** – `FormState::from_schema` 展平每个部分，跟踪
@@ -137,8 +137,8 @@ schema 而不是遇到未定义的行为。
     `runtime/overlay.rs`），用于使用撤销/重做语义和每条目验证器编辑嵌套数据
   - 列表辅助函数（`runtime/list_ops.rs`）用于主视图和覆盖层共享的插入/删除/重新排序操作
   - 使用 `TerminalGuard` 的中央绘制循环（在 panic 时恢复终端状态）
-- **表示** – `presentation::view` 将屏幕分为主体 + 页脚，然后调用
-  `components::*` 来渲染：
+- **表示** – `tui::view` 将屏幕分为主体 + 页脚，然后调用
+  `tui::view::components::*` 来渲染：
   - 带焦点标记的根和部分标签页
   - 字段行（标签、值预览、元数据徽章、内联错误消息）
   - 弹出窗口（枚举/变体选择器）和覆盖层（带可选列表面板的全屏编辑器）
@@ -248,6 +248,46 @@ Form focus ──Ctrl+E──▶ try_open_composite_editor
   API。添加新的测试文件而不是将现有文件扩展到超过 ~200 行。
 - 在提交前运行 `cargo check` 或 `cargo test -p schemaui-cli`；大型重构应涵盖库和
   CLI crate。
-- 保持文档双语？否——公共文档（README/设计）必须保持英文，以便下游用户无需翻译即可使用它们。
+- 公共设计文档以英文为主；本中文文档是英文版的镜像，便于阅读。如有冲突，请以英文文档为准。
 
-每当添加 schema 关键字、引入新覆盖层或修改 CLI 语义时，请回顾本指南。
+每当添加 schema 关键字、引入新覆盖层或修改 CLI
+语义时，请回顾本指南（以及对应的英文版本）。
+
+## 11. 核心管线伪代码（SchemaPipeline + TUI 前端）
+
+生产环境中的流程通过 `core::SchemaPipeline` 和前端实现（如
+`TuiFrontend`）来完成：
+
+```text
+io::input (serde_json::Value)
+  → SchemaPipeline::new(schema)
+        .with_title(title)
+        .with_defaults(defaults)
+  → FrontendContext { ui_ast, validator, initial_data, schema }
+  → TuiFrontend::run(ctx)
+        (form_schema_from_ui_ast → FormSchema → FormState::from_schema_with_palette)
+  → App::run()
+  → io::output::emit (optional)
+```
+
+对应的简化 Rust 风格伪代码：
+
+```rust
+fn run_tui(schema: Value, defaults: Option<Value>) -> Result<Value> {
+    let pipeline = SchemaPipeline::new(schema)
+        .with_title(Some("Title".into()))
+        .with_defaults(defaults);
+
+    let frontend = TuiFrontend { options: UiOptions::default() };
+    pipeline.run_with_frontend(frontend)
+}
+```
+
+关键重构要点：
+
+- `SchemaPipeline` 负责 schema 增强（`schema_with_defaults`）、验证器编译
+  （`validator_for`）以及 UI AST 生成（`build_ui_ast`）。
+- 不同的 `Frontend` 实现（TUI、Web 或未来的 GUI）决定如何解释 UI AST（例如 TUI
+  使用 `form_schema_from_ui_ast`）以及驱动哪个运行时。
+- 旧的直接 `schema::build_form_schema` 路径仍然保留，用于测试和底层布局实验；库
+  使用者应优先选择 `SchemaUI`/`SchemaPipeline` 和前端接口。

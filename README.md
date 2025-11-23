@@ -264,19 +264,20 @@ management and validation can map errors back precisely.
   errors, and context-aware help text. When auto-validate is enabled, each edit
   updates these counters immediately.
 
-| Context     | Shortcut                                                                              | Action                                |
-| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------- |
-| Navigation  | `Tab` / `Shift+Tab`                                                                   | Move between fields                   |
-|             | `Ctrl+Tab` / `Ctrl+Shift+Tab`                                                         | Switch sections                       |
-|             | `Ctrl+J` / `Ctrl+L`                                                                   | Switch root tabs                      |
-| Selection   | `Enter`                                                                               | Open popup / apply choice             |
-| Editing     | `Ctrl+E`                                                                              | Launch composite editor               |
-| Status      | `Esc`                                                                                 | Clear status or close popup           |
-| Persistence | `Ctrl+S`                                                                              | Save + validate                       |
-| Exit        | `Ctrl+Q` / `Ctrl+C`                                                                   | Quit (requires confirmation if dirty) |
-| Collections | `Ctrl+N` / `Ctrl+D`                                                                   | Add / remove entry                    |
-|             | `Ctrl+←/→`, `Ctrl+↑/↓`                                                                | Select / reorder entries              |
-| Overlay     | `Ctrl+E` (open), `Ctrl+S` (save in place), `Esc` / `Ctrl+Q` (pop), `Ctrl+N/D/←/→/↑/↓` | Manage nested overlays & list entries |
+| Context     | Shortcut                                                                              | Action                                         |
+| ----------- | ------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Navigation  | `Tab` / `Shift+Tab`                                                                   | Move between fields                            |
+|             | `Ctrl+Tab` / `Ctrl+Shift+Tab`                                                         | Switch sections                                |
+|             | `Ctrl+J` / `Ctrl+L`                                                                   | Switch root tabs                               |
+| Selection   | `Enter`                                                                               | Open popup / apply choice                      |
+| Editing     | `Ctrl+E`                                                                              | Launch composite editor                        |
+| Status      | `Esc`                                                                                 | Clear status or close popup                    |
+| Help        | `Ctrl+?`                                                                              | Toggle help overlay (shortcuts + errors table) |
+| Persistence | `Ctrl+S`                                                                              | Save + validate                                |
+| Exit        | `Ctrl+Q` / `Ctrl+C`                                                                   | Quit (requires confirmation if dirty)          |
+| Collections | `Ctrl+N` / `Ctrl+D`                                                                   | Add / remove entry                             |
+|             | `Ctrl+←/→`, `Ctrl+↑/↓`                                                                | Select / reorder entries                       |
+| Overlay     | `Ctrl+E` (open), `Ctrl+S` (save in place), `Esc` / `Ctrl+Q` (pop), `Ctrl+N/D/←/→/↑/↓` | Manage nested overlays & list entries          |
 
 ### Keymap system
 
@@ -384,11 +385,14 @@ schemaui \
 
 ## Documentation Map
 
-- `README.md` – overview + architecture snapshot.
+- `README.md` – overview + architecture snapshot (source of truth).
+- `README.ZH.md` – Chinese overview kept in sync with this README.
 - `docs/en/structure_design.md` – detailed schema/layout/runtime design with
   flow diagrams.
+- `docs/zh/structure_design.md` – Chinese mirror of the architecture guide.
 - `docs/en/cli_usage.md` – CLI-specific manual (inputs, outputs, piping,
   samples).
+- `docs/zh/cli_usage.zh.md` – Chinese mirror of the CLI usage guide.
 
 ## Development
 
@@ -409,7 +413,7 @@ schemaui \
 ## Roadmap
 
 - [x] parse json schema at runtime and generate a TUI
-- [ ] parse json schema at runtime and generate a Web UI
+- [x] parse json schema at runtime and generate a Web UI
 - [ ] parse json schema at compile time Then generate the code for TUI, expose
       necessary APIs for runtime.
 - [ ] parse json schema at compile time Then generate the code for Web UI,

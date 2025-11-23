@@ -9,6 +9,7 @@ docs/**/*.txt
 docs/**/*.gif
 !docs/**/cli_usage*.md
 !docs/**/structure_design*.md
+!docs/**/tui-architecture-overview.md
 !docs/**/*demo.gif
 
 
