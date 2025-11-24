@@ -7,6 +7,7 @@ on:
     # 忽略只修改了这些文件的 push（通常是 release-plz 的更改）
     paths-ignore:
       - "CHANGELOG.md"
+      - "schemaui-cli/CHANGELOG.md"
       - "**/Cargo.toml"
       - "Cargo.lock"
       - "README*.md"
@@ -34,6 +35,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run release-plz PR
+        id: release_plz
         uses: release-plz/action@v0.5
         with:
           command: release-pr
@@ -46,14 +48,41 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Update CLI dependency and READMEs
+      - name: Update release PR docs
+        if: ${{ steps.release_plz.outputs.prs_created == 'true' }}
+        env:
+          PR_JSON: ${{ steps.release_plz.outputs.pr }}
+          PUSH_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
         run: |
           set -euo pipefail
+
+          if [[ -z "$PR_JSON" || "$PR_JSON" == "null" ]]; then
+            echo "release-plz did not return PR metadata; skipping doc sync."
+            exit 0
+          fi
+
+          PR_NUMBER="$(echo "$PR_JSON" | jq -r '.number // empty')"
+          HEAD_BRANCH="$(echo "$PR_JSON" | jq -r '.head_branch // empty')"
+          SCHEMAUI_VERSION="$(echo "$PR_JSON" | jq -r '.releases[]? | select(.package_name == "schemaui") | .version' | head -n1)"
+
+          if [[ -z "$PR_NUMBER" || -z "$HEAD_BRANCH" ]]; then
+            echo "Missing PR number or branch; skipping doc sync."
+            exit 0
+          fi
+
+          if [[ -z "$SCHEMAUI_VERSION" || "$SCHEMAUI_VERSION" == "null" ]]; then
+            echo "schemaui not part of this release PR; skipping README sync."
+            exit 0
+          fi
+
+          git fetch origin "$HEAD_BRANCH"
+          git checkout -B "$HEAD_BRANCH" "origin/$HEAD_BRANCH"
 
           ./scripts/update-cli-dependency.sh
           ./scripts/update-readme-version.sh "$PWD"
 
-          mapfile -t DOC_CHANGES < <(git diff --name-only | grep -E '(^|/)(README[^/]*\.md)$|^schemaui-cli/Cargo\.toml$' || true)
+          mapfile -t DOC_CHANGES < <(git diff --name-only -- README*.md schemaui-cli/Cargo.toml || true)
 
           if [[ ${#DOC_CHANGES[@]} -eq 0 ]]; then
             echo "No README/CLI dependency changes; skipping commit."
@@ -62,9 +91,8 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           git add "${DOC_CHANGES[@]}"
-          git commit -m "Update README and CLI dependency"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
+          git commit -m "chore: sync README and CLI dependency to $SCHEMAUI_VERSION"
+          git push origin "$HEAD_BRANCH"

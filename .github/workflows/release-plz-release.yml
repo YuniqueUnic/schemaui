@@ -42,6 +42,11 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: web/ui/pnpm-lock.yaml
 
+      - name: Setup Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
       - name: Build web UI bundle
         working-directory: web/ui
         run: pnpm install --frozen-lockfile && pnpm run build
@@ -69,30 +74,36 @@ jobs:
 
       - name: Sync README versions
         id: sync_readme
+        if: ${{ steps.release_step.outputs.releases_created == 'true' }}
         env:
-          PACKAGE_NAME: ${{ steps.release_step.outputs.package_name }}
-          RELEASE_VERSION: ${{ steps.release_step.outputs.version }}
-        if: ${{ steps.release_step.outputs.version != '' }}
+          RELEASES_JSON: ${{ steps.release_step.outputs.releases }}
+          PUSH_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
-          echo "Package name: $PACKAGE_NAME"
-          echo "Release version: $RELEASE_VERSION"
+          set -euo pipefail
 
-          if [ "$PACKAGE_NAME" != "schemaui" ]; then
-            echo "Skipping README sync because package is $PACKAGE_NAME (not schemaui)"
+          if [[ -z "$RELEASES_JSON" || "$RELEASES_JSON" == "[]" ]]; then
+            echo "Release output is empty; skipping README sync."
             exit 0
           fi
 
-          echo "Syncing README versions to $RELEASE_VERSION"
-          sed -i "s/schemaui = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/schemaui = \"$RELEASE_VERSION\"/" README.md
-          sed -i "s/schemaui = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/schemaui = \"$RELEASE_VERSION\"/" README.ZH.md
+          SCHEMAUI_VERSION="$(echo "$RELEASES_JSON" | jq -r '.[] | select(.package_name == "schemaui") | .version' | head -n1)"
 
-          git config user.name "github‑actions[bot]"
-          git config user.email "41898282+github‑actions[bot]@users.noreply.github.com"
-
-          git add README.md README.ZH.md
-          if git diff --cached --quiet; then
-            echo "No README changes detected, skipping commit."
-          else
-            git commit -m "chore: sync version to $RELEASE_VERSION in README files"
-            git push
+          if [[ -z "$SCHEMAUI_VERSION" || "$SCHEMAUI_VERSION" == "null" ]]; then
+            echo "schemaui not part of this release; skipping README sync."
+            exit 0
           fi
+
+          ./scripts/update-readme-version.sh "$PWD"
+
+          if git diff --quiet -- README*.md; then
+            echo "README files already up to date."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          git add README*.md
+          git commit -m "chore: sync README to $SCHEMAUI_VERSION"
+          git push

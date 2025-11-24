@@ -1,5 +1,4 @@
 [workspace]
-changelog_path = "CHANGELOG.md"
 changelog_update = true
 dependencies_update = true
 
@@ -16,3 +15,11 @@ semver_check = true
 release_commits = "^(release|feat|fix)[(:]"
 pr_branch_prefix = "release-plz-"
 pr_labels = ["release"]
+
+[[package]]
+name = "schemaui"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "schemaui-cli"
+changelog_path = "schemaui-cli/CHANGELOG.md"
