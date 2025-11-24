@@ -30,6 +30,7 @@
 
 - 更新 Cargo.toml 中的依赖版本
 - 确保依赖兼容性
+- 依赖 `python3`（可通过 `PYTHON_BIN` 环境变量覆盖）
 
 #### update-readme-version.sh
 
@@ -41,6 +42,7 @@
 
 - 自动更新所有 README 中的版本号
 - 保持文档版本一致性
+- 依赖 `python3`（可通过 `PYTHON_BIN` 环境变量覆盖）
 
 ### 发布流程
 

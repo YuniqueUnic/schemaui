@@ -41,21 +41,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-      - name: Update README
-        run: |
-          ./scripts/update-readme.sh
+      - name: Setup Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
-          # If README files didn't change, skip commit/push
-          if git diff --quiet -- README*.md; then
-            echo "No README changes; skipping commit."
+      - name: Update CLI dependency and READMEs
+        run: |
+          set -euo pipefail
+
+          ./scripts/update-cli-dependency.sh
+          ./scripts/update-readme-version.sh "$PWD"
+
+          mapfile -t DOC_CHANGES < <(git diff --name-only | grep -E '(^|/)(README[^/]*\.md)$|^schemaui-cli/Cargo\.toml$' || true)
+
+          if [[ ${#DOC_CHANGES[@]} -eq 0 ]]; then
+            echo "No README/CLI dependency changes; skipping commit."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add README*.md
-          git commit -m "Update README.md"
+          git add "${DOC_CHANGES[@]}"
+          git commit -m "Update README and CLI dependency"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}

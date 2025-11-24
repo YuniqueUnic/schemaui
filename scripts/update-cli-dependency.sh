@@ -4,7 +4,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLI_CARGO="$ROOT_DIR/schemaui-cli/Cargo.toml"
 
-python3 - "$ROOT_DIR" "$CLI_CARGO" <<'PY'
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+  if command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python)"
+  else
+    echo "python3 (or override via PYTHON_BIN) is required to run this script." >&2
+    exit 1
+  fi
+fi
+
+"$PYTHON_BIN" - "$ROOT_DIR" "$CLI_CARGO" <<'PY'
 import pathlib
 import re
 import sys

@@ -3,7 +3,17 @@ set -euo pipefail
 
 START_DIR="${1:-$PWD}"
 
-python3 - "$START_DIR" <<'PY'
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+    if command -v python >/dev/null 2>&1; then
+        PYTHON_BIN="$(command -v python)"
+    else
+        echo "python3 (or override via PYTHON_BIN) is required to update README versions." >&2
+        exit 1
+    fi
+fi
+
+"$PYTHON_BIN" - "$START_DIR" <<'PY'
 import pathlib
 import re
 import sys
@@ -52,7 +62,7 @@ if not pkg_name or not pkg_version:
 pattern = re.compile(rf'({re.escape(pkg_name)}\s*=\s*")([^"]+)(")')
 
 changed = []
-for path in pkg_dir.rglob("*.md"):
+for path in pkg_dir.rglob("README*.md"):
     if any(part in IGNORE_DIRS for part in path.parts):
         continue
     try:
