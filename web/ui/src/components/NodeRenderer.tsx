@@ -44,10 +44,10 @@ export function NodeRenderer({
     const error = errors.get(node.pointer);
 
     const chromeClass = renderMode === "inline"
-        ? "space-y-3"
+        ? "space-y-2"
         : node.kind.type === "object"
-        ? "space-y-4"
-        : "space-y-3 border-b border-theme pb-4";
+        ? "space-y-3"
+        : "space-y-2 pb-4";
 
     return (
         <div className={chromeClass}>
@@ -58,7 +58,11 @@ export function NodeRenderer({
                 errors={errors}
                 onChange={onChange}
             />
-            {error && <p className="text-xs text-rose-400">{error}</p>}
+            {error && (
+                <p className="text-xs text-destructive bg-destructive/10 px-2 py-1 rounded-md">
+                    {error}
+                </p>
+            )}
         </div>
     );
 }
@@ -68,20 +72,22 @@ export function NodeRenderer({
  */
 function NodeHeader({ node }: { node: UiNode }) {
     return (
-        <header className="flex items-center justify-between gap-3">
-            <div>
-                <p className="text-sm font-semibold text-primary">
+        <header className="space-y-0.5">
+            <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">
                     {node.title ?? node.pointer}
-                    {node.required && (
-                        <span className="ml-2 text-[10px] uppercase tracking-[0.3em] text-rose-400">
-                            required
-                        </span>
-                    )}
-                </p>
-                {node.description && (
-                    <p className="text-xs text-muted">{node.description}</p>
+                </span>
+                {node.required && (
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-destructive">
+                        required
+                    </span>
                 )}
             </div>
+            {node.description && (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                    {node.description}
+                </p>
+            )}
         </header>
     );
 }
