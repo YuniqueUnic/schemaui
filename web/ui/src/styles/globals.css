@@ -179,3 +179,168 @@
     box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
   }
 }
+
+/* ============================================
+   Prism.js Syntax Highlighting
+   ============================================ */
+code[class*="language-"],
+pre[class*="language-"] {
+  color: var(--color-foreground);
+  background: transparent;
+  text-shadow: none;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  direction: ltr;
+  text-align: left;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  tab-size: 2;
+  hyphens: none;
+}
+
+/* Light mode token colors */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: oklch(55% 0.02 260);
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: oklch(45% 0.02 260);
+}
+
+.token.property,
+.token.tag,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: oklch(50% 0.18 160);
+}
+
+.token.boolean {
+  color: oklch(55% 0.22 330);
+  font-weight: 600;
+}
+
+.token.number {
+  color: oklch(55% 0.2 290);
+  font-weight: 600;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: oklch(55% 0.18 200);
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string,
+.token.variable {
+  color: oklch(55% 0.15 190);
+}
+
+.token.atrule,
+.token.attr-value,
+.token.function,
+.token.class-name {
+  color: oklch(50% 0.2 30);
+}
+
+.token.keyword {
+  color: oklch(50% 0.2 30);
+  font-weight: 600;
+}
+
+.token.regex,
+.token.important {
+  color: oklch(55% 0.2 290);
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+.token.entity {
+  cursor: help;
+}
+
+.token.null {
+  color: oklch(65% 0.18 55);
+  font-weight: 600;
+}
+
+/* Dark mode token colors */
+.dark .token.comment,
+.dark .token.prolog,
+.dark .token.doctype,
+.dark .token.cdata {
+  color: oklch(60% 0.02 260);
+}
+
+.dark .token.punctuation {
+  color: oklch(70% 0.02 260);
+}
+
+.dark .token.property,
+.dark .token.tag,
+.dark .token.constant,
+.dark .token.symbol,
+.dark .token.deleted {
+  color: oklch(70% 0.18 160);
+}
+
+.dark .token.boolean {
+  color: oklch(75% 0.18 330);
+}
+
+.dark .token.number {
+  color: oklch(75% 0.18 290);
+}
+
+.dark .token.selector,
+.dark .token.attr-name,
+.dark .token.string,
+.dark .token.char,
+.dark .token.builtin,
+.dark .token.inserted {
+  color: oklch(75% 0.15 180);
+}
+
+.dark .token.operator,
+.dark .token.entity,
+.dark .token.url,
+.dark .language-css .token.string,
+.dark .style .token.string,
+.dark .token.variable {
+  color: oklch(70% 0.12 190);
+}
+
+.dark .token.atrule,
+.dark .token.attr-value,
+.dark .token.function,
+.dark .token.class-name {
+  color: oklch(75% 0.15 30);
+}
+
+.dark .token.keyword {
+  color: oklch(75% 0.15 30);
+}
+
+.dark .token.null {
+  color: oklch(80% 0.16 55);
+}

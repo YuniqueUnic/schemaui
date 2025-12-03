@@ -212,15 +212,26 @@ export default function App() {
     }
   }, [session, data, errors]);
 
-  const handleExit = async () => {
-    if (dirty) {
-      toast.warning("You have unsaved changes. Please save before exiting.");
+  const handleExit = async (force = false) => {
+    if (dirty && !force) {
+      toast.warning("You have unsaved changes. Please save before exiting.", {
+        duration: 8000,
+        action: {
+          label: "Force Exit",
+          onClick: () => handleExit(true),
+        },
+      });
       return;
     }
     setExiting(true);
     try {
-      await exitSession(data, true);
-      toast.success("Session ended successfully");
+      // commit=true if saved (not dirty), commit=false if force exiting with unsaved changes
+      await exitSession(data, !dirty);
+      toast.success(
+        force
+          ? "Session aborted (changes discarded)"
+          : "Session ended successfully",
+      );
     } catch (error) {
       console.error("Exit failed", error);
       toast.error("Failed to exit session");
@@ -271,8 +282,8 @@ export default function App() {
             className="hidden md:flex app-panel flex-col border-r border-theme text-[var(--app-text)]"
             style={{ width: sizes.nav }}
           >
-            <div className="border-b border-theme px-4 py-3 text-xs uppercase tracking-[0.3em] text-muted">
-              Schema
+            <div className="border-b border-theme px-4 py-3 text-xs uppercase tracking-[0.3em]">
+              Schema TreeView
             </div>
             <TreeView
               ast={session?.ui_ast}
