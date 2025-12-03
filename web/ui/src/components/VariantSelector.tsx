@@ -1,5 +1,4 @@
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CompositeMode, UiVariant } from "../types";
 import { CheckCircle2, Circle } from "lucide-react";
@@ -31,7 +30,7 @@ export function VariantSelector({
         <div className="space-y-2">
             {/* Variant Cards */}
             <div className="space-y-2">
-                {variants.map((variant, index) => {
+                {variants.map((variant) => {
                     const isActive = variant.id === activeVariantId;
 
                     return (
@@ -62,26 +61,12 @@ export function VariantSelector({
 
                                     {/* Variant Info */}
                                     <div className="flex-1 min-w-0 flex items-center gap-2">
-                                        <span className="text-sm font-medium text-foreground">
-                                            #{index + 1}
-                                        </span>
-                                        <Badge
-                                            variant="outline"
-                                            className="text-[10px] font-mono shrink-0"
-                                        >
+                                        <span className="text-xs font-mono text-muted-foreground shrink-0">
                                             {formatTypeInfo(variant)}
-                                        </Badge>
-                                        <span className="text-xs text-muted-foreground truncate">
+                                        </span>
+                                        <span className="text-sm truncate">
                                             {variant.title || variant.id}
                                         </span>
-                                        {isActive && (
-                                            <Badge
-                                                variant="secondary"
-                                                className="text-[10px] px-1.5 py-0 shrink-0"
-                                            >
-                                                Active
-                                            </Badge>
-                                        )}
                                     </div>
                                 </div>
                                 {/* Description */}
@@ -160,7 +145,9 @@ function formatTypeInfo(variant: UiVariant): string {
     }
 }
 
-function formatNodeType(nodeKind: any): string {
+function formatNodeType(
+    nodeKind: import("../types").UiNodeKind | undefined,
+): string {
     if (!nodeKind) return "any";
 
     switch (nodeKind.type) {
@@ -173,6 +160,6 @@ function formatNodeType(nodeKind: any): string {
         case "composite":
             return nodeKind.mode === "one_of" ? "oneOf" : "anyOf";
         default:
-            return nodeKind.type || "unknown";
+            return "unknown";
     }
 }

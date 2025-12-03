@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:embedded": "tsc -b && vite build --mode embedded",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview"

@@ -117,32 +117,43 @@ function SimpleArrayRenderer({
 
     return (
         <div className="space-y-2">
-            {entries.map((entry, index) => (
-                <div
-                    key={`${node.pointer}-${index}`}
-                    className="flex items-center gap-2"
-                >
-                    <Badge variant="secondary" className="shrink-0">
-                        {index + 1}
-                    </Badge>
-                    <div className="flex-1">
-                        {renderSimpleFieldInline(
-                            itemKind,
-                            entry,
-                            (newValue) => updateEntry(index, newValue),
-                        )}
+            {entries.length === 0
+                ? (
+                    <div className="text-center py-4 text-muted-foreground border border-dashed rounded-lg">
+                        <p className="text-sm">No items yet</p>
+                        <p className="text-xs mt-1">
+                            Click below to add your first item
+                        </p>
                     </div>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeEntry(index)}
-                        className="text-destructive hover:text-destructive shrink-0"
-                    >
-                        Remove
-                    </Button>
-                </div>
-            ))}
+                )
+                : (
+                    entries.map((entry, index) => (
+                        <div
+                            key={`${node.pointer}-${index}`}
+                            className="flex items-center gap-2"
+                        >
+                            <Badge variant="secondary" className="shrink-0">
+                                {index + 1}
+                            </Badge>
+                            <div className="flex-1">
+                                {renderSimpleFieldInline(
+                                    itemKind,
+                                    entry,
+                                    (newValue) => updateEntry(index, newValue),
+                                )}
+                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeEntry(index)}
+                                className="text-destructive hover:text-destructive shrink-0"
+                            >
+                                Remove
+                            </Button>
+                        </div>
+                    ))
+                )}
             <Button
                 type="button"
                 variant="ghost"
@@ -226,47 +237,60 @@ function ComplexArrayRenderer({
 
     return (
         <div className="space-y-2">
-            {entries.map((entry, index) => {
-                const entryType = inferValueType(entry);
-                return (
-                    <Card
-                        key={`${node.pointer}-${index}`}
-                        className="flex items-center justify-between px-3 py-2"
-                    >
-                        <div className="flex items-center gap-2 truncate flex-1">
-                            <Badge variant="secondary">{index + 1}</Badge>
-                            <Badge
-                                variant="outline"
-                                className="font-mono text-xs"
+            {entries.length === 0
+                ? (
+                    <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
+                        <p className="text-sm">No items yet</p>
+                        <p className="text-xs mt-1">
+                            Click below to add your first item
+                        </p>
+                    </div>
+                )
+                : (
+                    entries.map((entry, index) => {
+                        const entryType = inferValueType(entry);
+                        return (
+                            <Card
+                                key={`${node.pointer}-${index}`}
+                                className="flex items-center justify-between px-3 py-2"
                             >
-                                {entryType}
-                            </Badge>
-                            <span className="truncate text-sm">
-                                {formatValueSummary(entry)}
-                            </span>
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => editEntry(index)}
-                            >
-                                Edit
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeEntry(index)}
-                                className="text-destructive hover:text-destructive"
-                            >
-                                Remove
-                            </Button>
-                        </div>
-                    </Card>
-                );
-            })}
+                                <div className="flex items-center gap-2 truncate flex-1">
+                                    <Badge variant="secondary">
+                                        {index + 1}
+                                    </Badge>
+                                    <Badge
+                                        variant="outline"
+                                        className="font-mono text-xs"
+                                    >
+                                        {entryType}
+                                    </Badge>
+                                    <span className="truncate text-sm">
+                                        {formatValueSummary(entry)}
+                                    </span>
+                                </div>
+                                <div className="flex gap-1 shrink-0">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => editEntry(index)}
+                                    >
+                                        Edit
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeEntry(index)}
+                                        className="text-destructive hover:text-destructive"
+                                    >
+                                        Remove
+                                    </Button>
+                                </div>
+                            </Card>
+                        );
+                    })
+                )}
             <Button
                 type="button"
                 variant="ghost"

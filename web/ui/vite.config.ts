@@ -7,13 +7,18 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(thisDir, '..');
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Check if building for embedded mode (single-file for Rust embedding)
+  const isEmbedded = mode === 'embedded';
+
+  return {
   plugins: [
     react(),
-    viteSingleFile({
+    // Only use single-file plugin for embedded builds
+    ...(isEmbedded ? [viteSingleFile({
       removeViteModuleLoader: true,
       useRecommendedBuildConfig: true,
-    }),
+    })] : []),
   ],
   resolve: {
     alias: {
@@ -28,14 +33,19 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    assetsInlineLimit: 100_000_000,
-    cssCodeSplit: false,
+    minify: 'esbuild',
+    sourcemap: !isEmbedded,
+    // For embedded: inline everything; for dev: allow code splitting
+    assetsInlineLimit: isEmbedded ? 100_000_000 : 4096,
+    cssCodeSplit: !isEmbedded,
     outDir: '../dist',
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        inlineDynamicImports: true,
+        // Only use inline dynamic imports for embedded builds
+        ...(isEmbedded ? { inlineDynamicImports: true } : {}),
       },
     },
   },
+  };
 });

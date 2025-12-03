@@ -144,20 +144,15 @@ function collectDefaults(
   store: Record<string, JsonValue | undefined>,
 ) {
   if (node.pointer) {
+    // Use backend-provided default_value if available, otherwise use defaultForKind
+    // For arrays: respect backend semantics - empty arrays stay empty unless minItems > 0
     const fallback = node.default_value ?? defaultForKind(node.kind);
     store[node.pointer] = deepClone(fallback);
   }
 
-  if (node.kind.type === "array") {
-    // default entry defaults to item default
-    if (node.kind.item) {
-      const placeholder = defaultForKind(node.kind.item);
-      const defaultValue = node.default_value ?? [];
-      if (Array.isArray(defaultValue) && defaultValue.length === 0) {
-        store[node.pointer] = [placeholder] as JsonValue[];
-      }
-    }
-  }
+  // NOTE: Removed the array-specific block that forced [placeholder] for empty arrays
+  // This was causing [] to become [""] which blurs the semantic difference between
+  // "no items" and "one empty item". User must explicitly click "Add entry" to add items.
 
   if (node.kind.type === "object") {
     node.kind.children.forEach((child) => collectDefaults(child, store));
