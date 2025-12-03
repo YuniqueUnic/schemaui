@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+/* ============================================
+   Tailwind CSS 4 Theme Configuration
+   Using @theme for proper utility class generation
+   ============================================ */
+
+@theme {
+  /* Color palette - using oklch for alpha support */
+  --color-background: oklch(100% 0 0);
+  --color-foreground: oklch(14% 0.02 265);
+  --color-card: oklch(100% 0 0);
+  --color-card-foreground: oklch(14% 0.02 265);
+  --color-popover: oklch(100% 0 0);
+  --color-popover-foreground: oklch(14% 0.02 265);
+  --color-primary: oklch(55% 0.24 262);
+  --color-primary-foreground: oklch(100% 0 0);
+  --color-secondary: oklch(96% 0.01 265);
+  --color-secondary-foreground: oklch(20% 0.02 265);
+  --color-muted: oklch(96% 0.01 265);
+  --color-muted-foreground: oklch(50% 0.02 265);
+  --color-accent: oklch(96% 0.01 265);
+  --color-accent-foreground: oklch(20% 0.02 265);
+  --color-destructive: oklch(55% 0.25 27);
+  --color-destructive-foreground: oklch(100% 0 0);
+  --color-border: oklch(92% 0.01 265);
+  --color-input: oklch(92% 0.01 265);
+  --color-ring: oklch(55% 0.24 262);
+  
+  /* Spacing scale */
+  --spacing-px: 1px;
+  --spacing-0: 0px;
+  --spacing-0_5: 0.125rem;
+  --spacing-1: 0.25rem;
+  --spacing-1_5: 0.375rem;
+  --spacing-2: 0.5rem;
+  --spacing-2_5: 0.625rem;
+  --spacing-3: 0.75rem;
+  --spacing-3_5: 0.875rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-7: 1.75rem;
+  --spacing-8: 2rem;
+  --spacing-9: 2.25rem;
+  --spacing-10: 2.5rem;
+  --spacing-11: 2.75rem;
+  --spacing-12: 3rem;
+  --spacing-14: 3.5rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
+  --spacing-28: 7rem;
+  --spacing-32: 8rem;
+  --spacing-36: 9rem;
+  --spacing-40: 10rem;
+  --spacing-44: 11rem;
+  --spacing-48: 12rem;
+  --spacing-52: 13rem;
+  --spacing-56: 14rem;
+  --spacing-60: 15rem;
+  --spacing-64: 16rem;
+  --spacing-72: 18rem;
+  --spacing-80: 20rem;
+  --spacing-96: 24rem;
+
+  /* Border radius */
+  --radius-none: 0px;
+  --radius-sm: 0.125rem;
+  --radius-default: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Font families */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-default: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.15s ease-out;
+  --animate-fade-out: fade-out 0.15s ease-in;
+  --animate-slide-in-from-top: slide-in-from-top 0.2s ease-out;
+  --animate-slide-out-to-top: slide-out-to-top 0.2s ease-in;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @keyframes slide-in-from-top {
+    from { transform: translateY(-4px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes slide-out-to-top {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(-4px); opacity: 0; }
+  }
+}
+
+/* ============================================
+   Dark Mode Theme Overrides
+   使用橙金色作为 destructive 颜色，避免红黑配色难以辨识
+   ============================================ */
+.dark {
+  --color-background: oklch(12% 0.02 265);
+  --color-foreground: oklch(96% 0.01 265);
+  --color-card: oklch(15% 0.02 265);
+  --color-card-foreground: oklch(96% 0.01 265);
+  --color-popover: oklch(15% 0.02 265);
+  --color-popover-foreground: oklch(96% 0.01 265);
+  --color-primary: oklch(60% 0.22 262);
+  --color-primary-foreground: oklch(100% 0 0);
+  --color-secondary: oklch(22% 0.02 265);
+  --color-secondary-foreground: oklch(96% 0.01 265);
+  --color-muted: oklch(22% 0.02 265);
+  --color-muted-foreground: oklch(65% 0.02 265);
+  --color-accent: oklch(22% 0.02 265);
+  --color-accent-foreground: oklch(96% 0.01 265);
+  /* 橙金色 - 在深色背景上更易辨识 */
+  --color-destructive: oklch(75% 0.18 55);
+  --color-destructive-foreground: oklch(15% 0.02 55);
+  --color-border: oklch(25% 0.02 265);
+  --color-input: oklch(25% 0.02 265);
+  --color-ring: oklch(60% 0.22 262);
+
+  color-scheme: dark;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ============================================
+   Component Styles
+   ============================================ */
+@layer components {
+  /* Focus ring utility */
+  .focus-ring {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
+  }
+}

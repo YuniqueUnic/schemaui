@@ -22,7 +22,6 @@ import {
   setPointerValue,
 } from "./utils/jsonPointer";
 import { useResizableColumns } from "./hooks/useResizableColumns";
-import "./index.css";
 
 export default function App() {
   const [session, setSession] = useState<SessionResponse | null>(null);

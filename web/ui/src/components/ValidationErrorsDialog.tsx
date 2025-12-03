@@ -42,7 +42,7 @@ export function ValidationErrorsDialog({
                         {errorEntries.map(([pointer, message], index) => (
                             <div
                                 key={pointer || index}
-                                className="rounded-lg border border-destructive/50 bg-destructive/10 p-4"
+                                className="rounded-lg border border-destructive/30 bg-destructive/5 p-4"
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 space-y-1">
