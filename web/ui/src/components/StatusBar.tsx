@@ -15,7 +15,7 @@ interface StatusBarProps {
 }
 
 const DEFAULT_SHORTCUTS: ShortcutHint[] = [
-  { combo: "⌘/Ctrl + S", label: "Save" },
+  { combo: "Ctrl + S", label: "Save" },
 ];
 
 export function StatusBar({
@@ -27,7 +27,7 @@ export function StatusBar({
   onErrorsClick,
 }: StatusBarProps) {
   return (
-    <footer className="app-panel flex flex-wrap items-center justify-between gap-2 md:gap-4 border-t border-theme px-4 md:px-6 py-2 md:py-3 text-xs text-muted">
+    <footer className="flex flex-wrap items-center justify-between gap-2 md:gap-4 border-t border-border bg-background px-4 md:px-6 py-2 md:py-3 text-xs">
       <div className="flex items-center gap-2 md:gap-3 flex-wrap">
         <Badge
           variant={dirty ? "default" : "secondary"}
@@ -50,7 +50,7 @@ export function StatusBar({
             ? `${errorCount} error${errorCount > 1 ? "s" : ""}`
             : "Valid"}
         </Badge>
-        <span className="text-[var(--app-text)] hidden md:inline">
+        <span className="text-muted-foreground hidden md:inline">
           {status}
         </span>
       </div>
@@ -58,9 +58,9 @@ export function StatusBar({
         {shortcuts.map((shortcut) => (
           <span
             key={shortcut.combo}
-            className="inline-flex items-center gap-2 text-[var(--app-text)]"
+            className="inline-flex items-center gap-2"
           >
-            <kbd className="rounded-md border border-input bg-muted px-2 py-1 text-[10px] font-semibold">
+            <kbd className="rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-mono">
               {shortcut.combo}
             </kbd>
             <span className="text-muted-foreground">{shortcut.label}</span>
