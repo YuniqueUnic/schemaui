@@ -114,9 +114,13 @@ export default function App() {
           </aside>
           {/* Resizer */}
           <div
-            className="hidden md:block w-1 cursor-col-resize bg-transparent"
+            className="hidden lg:block w-1 cursor-col-resize bg-gray-200/60 relative hover:bg-gray-400/40"
             onPointerDown={(event) => startDrag(event, "nav")}
-          />
+          >
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-px h-4 bg-gray-800"></div>
+            </div>
+          </div>
           {/* Main Editor Panel */}
           <main className="app-panel flex flex-1 flex-col overflow-hidden px-4 md:px-6 py-4">
             <EditorBreadcrumbs node={selectedNode} pointer={selectedPointer} />
@@ -139,9 +143,13 @@ export default function App() {
           </main>
           {/* Resizer */}
           <div
-            className="hidden lg:block w-1 cursor-col-resize bg-transparent"
+            className="hidden lg:block w-1 cursor-col-resize bg-gray-200/60 relative hover:bg-gray-400/40"
             onPointerDown={(event) => startDrag(event, "preview")}
-          />
+          >
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-px h-4 bg-gray-800"></div>
+            </div>
+          </div>
           {/* Preview Panel */}
           <section
             className="hidden lg:flex app-panel h-full flex-col border-l border-theme"

@@ -61,16 +61,18 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
   // Validation & Preview
   // ============================================
 
-  const runValidation = useCallback(async (data: JsonValue) => {
+  const runValidation = useCallback(async (data: JsonValue): Promise<Map<string, string>> => {
     const seq = ++validationSeq.current;
     try {
       const result = await validateData(data);
-      if (seq !== validationSeq.current) return;
+      if (seq !== validationSeq.current) return new Map();
       const errors = new Map<string, string>();
       result.errors?.forEach((err) => errors.set(err.pointer || "", err.message));
       actions.setErrors(errors);
+      return errors;
     } catch (error) {
       console.error("Validation failed", error);
+      return new Map();
     }
   }, [actions]);
 
@@ -186,11 +188,40 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
     // Prevent multiple exit attempts
     if (state.sessionEnded || state.exiting) return;
 
-    // Check dirty state using ref for latest value
-    const isDirty = dirtyRef.current;
+    // Force exit: skip all checks, discard changes
+    if (force) {
+      actions.setExiting(true);
+      try {
+        await exitSession(state.data, false); // commit=false
+        clearLocalStorage();
+        actions.setSessionEnded(true);
+        toast.success("Session aborted (changes discarded)");
+      } catch (error) {
+        console.error("Exit failed", error);
+        toast.error("Failed to exit session");
+        actions.setExiting(false);
+      }
+      return;
+    }
 
-    // If dirty and not forcing, show warning
-    if (isDirty && !force) {
+    // Normal exit: check for validation errors first
+    const validationErrors = await runValidation(state.data);
+    const hasErrors = validationErrors.size > 0;
+
+    if (hasErrors) {
+      toast.warning("Cannot exit: please fix validation errors first.", {
+        duration: 10000,
+        action: {
+          label: "Force Exit",
+          onClick: () => handleExit(true),
+        },
+      });
+      return;
+    }
+
+    // Check for unsaved changes
+    const isDirty = dirtyRef.current;
+    if (isDirty) {
       toast.warning("You have unsaved changes. Please save before exiting.", {
         duration: 10000,
         action: {
@@ -201,20 +232,19 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
       return;
     }
 
+    // Clean exit: no errors, no unsaved changes
     actions.setExiting(true);
     try {
-      // commit=true only if clean exit (not dirty, not forced)
-      const commit = !force && !isDirty;
-      await exitSession(state.data, commit);
+      await exitSession(state.data, true); // commit=true
       clearLocalStorage();
       actions.setSessionEnded(true);
-      toast.success(force ? "Session aborted (changes discarded)" : "Session ended successfully");
+      toast.success("Session ended successfully");
     } catch (error) {
       console.error("Exit failed", error);
       toast.error("Failed to exit session");
       actions.setExiting(false);
     }
-  }, [state.sessionEnded, state.exiting, state.data, dirtyRef, actions, clearLocalStorage]);
+  }, [state.sessionEnded, state.exiting, state.data, dirtyRef, actions, clearLocalStorage, runValidation]);
 
   // ============================================
   // Handle Preview Format/Pretty Change
