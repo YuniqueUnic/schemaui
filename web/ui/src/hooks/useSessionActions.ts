@@ -1,6 +1,6 @@
 /**
  * Session Actions Hook
- * 
+ *
  * Handles save, exit, validation, and preview logic.
  */
 
@@ -34,7 +34,7 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
   // ============================================
   // localStorage Helpers
   // ============================================
-  
+
   const getStorageKey = useCallback(() => {
     return `schemaui-session-${sessionIdRef.current}`;
   }, []);
@@ -94,7 +94,7 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
   const initializeSession = useCallback(async () => {
     try {
       const payload = await fetchSession();
-      
+
       // Generate session ID from title
       const titleKey = payload.title?.replace(/\s+/g, "_").replace(/[^\w-]/g, "") || "default";
       sessionIdRef.current = titleKey;
@@ -151,7 +151,7 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
 
   const handleSave = useCallback(async () => {
     if (!state.session) return;
-    
+
     if (state.errors.size > 0) {
       toast.error(
         `Cannot save: ${state.errors.size} validation error${state.errors.size > 1 ? "s" : ""} found.`,

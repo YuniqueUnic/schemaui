@@ -1,6 +1,6 @@
 /**
  * Centralized exports for all renderer components
- * 
+ *
  * Each renderer handles a specific UiNodeKind:
  * - FieldRenderer: scalar fields (string, number, boolean, enum)
  * - ArrayRenderer: array types with inline or dialog editing

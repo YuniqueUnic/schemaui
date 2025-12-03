@@ -32,13 +32,13 @@ test:
 [unix]
 build-web:
     rm -rf web/dist
-    cd web/ui && pnpm build
+    cd web/ui && pnpm build:embedded
 
 # build the web ui into web/dist (Windows: PowerShell)
 [windows]
 build-web:
     if (Test-Path web/dist) { Remove-Item -Recurse -Force web/dist }
-    cd web/ui; pnpm build
+    cd web/ui; pnpm build:embedded
 
 # build the cli
 build-cli:
