@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useMemo } from "react";
 import { AppHeader } from "./components/AppHeader";
 import { NodeRenderer } from "./components/NodeRenderer";
 import { PreviewPane } from "./components/PreviewPane";
@@ -7,259 +6,80 @@ import { StatusBar } from "./components/StatusBar";
 import { TreeView } from "./components/TreeView";
 import { OverlayProvider } from "./components/Overlay";
 import { ValidationErrorsDialog } from "./components/ValidationErrorsDialog";
-import {
-  exitSession,
-  fetchSession,
-  persistData,
-  renderPreview,
-  validateData,
-} from "./api";
-import type { JsonValue, SessionResponse, UiAst, UiNode } from "./types";
-import { applyUiDefaults } from "./ui-ast";
-import {
-  deepClone,
-  getPointerValue,
-  setPointerValue,
-} from "./utils/jsonPointer";
+import type { JsonValue, UiNode } from "./types";
+import { getPointerValue } from "./utils/jsonPointer";
 import { useResizableColumns } from "./hooks/useResizableColumns";
+import { useSessionState } from "./hooks/useSessionState";
+import { useSessionActions } from "./hooks/useSessionActions";
 
 export default function App() {
-  const [session, setSession] = useState<SessionResponse | null>(null);
-  const [data, setData] = useState<JsonValue>({});
-  const [formats, setFormats] = useState<string[]>(["json"]);
-  const [previewFormat, setPreviewFormat] = useState("json");
-  const [previewPretty, setPreviewPretty] = useState(true);
-  const [previewPayload, setPreviewPayload] = useState("{}");
-  const [errors, setErrors] = useState<Map<string, string>>(new Map());
-  const [dirty, setDirty] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [exiting, setExiting] = useState(false);
-  const [status, setStatus] = useState("Loading schema…");
-  const [selectedPointer, setSelectedPointer] = useState<string>("");
-  const [showErrorsDialog, setShowErrorsDialog] = useState(false);
-  const validationSeq = useRef(0);
-  const previewSeq = useRef(0);
-  const sessionIdRef = useRef<string>("");
+  const { state, actions, dirtyRef } = useSessionState();
   const { sizes, startDrag } = useResizableColumns({ nav: 280, preview: 380 });
 
-  // localStorage key for persisting data
-  const getStorageKey = () => {
-    const key = `schemaui-session-${sessionIdRef.current}`;
-    console.log("[localStorage] Using key:", key);
-    return key;
-  };
+  const {
+    initializeSession,
+    handleChange,
+    handleSave,
+    handleExit,
+    handlePreviewFormatChange,
+    handlePreviewPrettyChange,
+  } = useSessionActions({ state, actions, dirtyRef });
 
+  // Initialize session on mount (empty deps to run only once)
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const payload = await fetchSession();
-        if (!mounted) return;
-
-        // Generate a stable session ID based on schema title
-        // Replace spaces and special chars to make it a valid storage key
-        const titleKey =
-          payload.title?.replace(/\s+/g, "_").replace(/[^\w-]/g, "") ||
-          "default";
-        sessionIdRef.current = titleKey;
-        console.log("[localStorage] Session ID set to:", sessionIdRef.current);
-
-        // Try to restore data from localStorage
-        let restoredData: JsonValue | null = null;
-        try {
-          const storageKey = getStorageKey();
-          const stored = localStorage.getItem(storageKey);
-          console.log(
-            "[localStorage] Attempting restore from key:",
-            storageKey,
-          );
-          console.log("[localStorage] Found data:", stored ? "YES" : "NO");
-          if (stored) {
-            restoredData = JSON.parse(stored);
-            toast.info("Restored previous session data");
-            console.log("[localStorage] Restored data successfully");
-          }
-        } catch (err) {
-          console.error("Failed to restore from localStorage", err);
-        }
-
-        const withDefaults = applyUiDefaults(
-          payload.ui_ast,
-          restoredData || payload.data || {},
-        );
-        setSession(payload);
-        setData(withDefaults);
-        setSelectedPointer(resolveInitialPointer(payload.ui_ast));
-        const availableFormats =
-          payload.formats?.length && payload.formats.length > 0
-            ? payload.formats
-            : ["json"];
-        setFormats(availableFormats);
-        setPreviewFormat(
-          availableFormats.includes("json") ? "json" : availableFormats[0],
-        );
-        setStatus("Ready");
-        await Promise.all([
-          runValidation(withDefaults),
-          updatePreview(withDefaults, previewPretty, availableFormats[0]),
-        ]);
-      } catch (error) {
-        console.error(error);
-        setStatus("Failed to load session");
-      } finally {
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [previewPretty]);
-
-  const runValidation = async (value: JsonValue) => {
-    const seq = ++validationSeq.current;
-    try {
-      const result = await validateData(value);
-      if (seq !== validationSeq.current) return;
-      const next = new Map<string, string>();
-      result.errors?.forEach((err) => next.set(err.pointer || "", err.message));
-      setErrors(next);
-    } catch (error) {
-      console.error("validate failed", error);
-    }
-  };
-
-  const updatePreview = async (
-    value: JsonValue,
-    pretty: boolean,
-    format: string,
-  ) => {
-    const seq = ++previewSeq.current;
-    try {
-      const result = await renderPreview(value, format, pretty);
-      if (seq !== previewSeq.current) return;
-      setPreviewPayload(result.payload);
-    } catch (error) {
-      console.error("preview failed", error);
-    }
-  };
-
-  const handleChange = (pointer: string, value: JsonValue) => {
-    setData((prev) => {
-      const next = setPointerValue(prev, pointer, deepClone(value));
-      runValidation(next);
-      updatePreview(next, previewPretty, previewFormat);
-      setDirty(true);
-
-      // Persist to localStorage
-      try {
-        const key = getStorageKey();
-        const serialized = JSON.stringify(next);
-        localStorage.setItem(key, serialized);
-        console.log(
-          "[localStorage] Saved data to key:",
-          key,
-          "(size:",
-          serialized.length,
-          "bytes)",
-        );
-      } catch (err) {
-        console.error("Failed to save to localStorage", err);
-      }
-
-      return next;
-    });
-  };
-
-  const handleSave = useCallback(async () => {
-    if (!session) return;
-    if (errors.size > 0) {
-      toast.error(
-        `Cannot save: ${errors.size} validation error${
-          errors.size > 1 ? "s" : ""
-        } found. Click to view details.`,
-        {
-          duration: 5000,
-          action: {
-            label: "View Errors",
-            onClick: () => setShowErrorsDialog(true),
-          },
-        },
-      );
-      setShowErrorsDialog(true);
-      return;
-    }
-    setSaving(true);
-    try {
-      await persistData(data);
-      setDirty(false);
-
-      // Clear localStorage after successful save
-      try {
-        const key = getStorageKey();
-        localStorage.removeItem(key);
-        console.log("[localStorage] Cleared data from key:", key);
-      } catch (err) {
-        console.error("Failed to clear localStorage", err);
-      }
-
-      toast.success("Changes saved successfully");
-    } catch (error) {
-      console.error("Save failed", error);
-      toast.error("Failed to save changes");
-    } finally {
-      setSaving(false);
-    }
-  }, [session, data, errors]);
-
-  const handleExit = async (force = false) => {
-    if (dirty && !force) {
-      toast.warning("You have unsaved changes. Please save before exiting.", {
-        duration: 8000,
-        action: {
-          label: "Force Exit",
-          onClick: () => handleExit(true),
-        },
-      });
-      return;
-    }
-    setExiting(true);
-    try {
-      // commit=true if saved (not dirty), commit=false if force exiting with unsaved changes
-      await exitSession(data, !dirty);
-      toast.success(
-        force
-          ? "Session aborted (changes discarded)"
-          : "Session ended successfully",
-      );
-    } catch (error) {
-      console.error("Exit failed", error);
-      toast.error("Failed to exit session");
-    } finally {
-      setExiting(false);
-    }
-  };
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        handleSave();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSave]);
+    initializeSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedNode = useMemo(
-    () => findNodeByPointer(session?.ui_ast?.roots ?? [], selectedPointer),
-    [session, selectedPointer],
+    () =>
+      findNodeByPointer(
+        state.session?.ui_ast?.roots ?? [],
+        state.selectedPointer,
+      ),
+    [state.session, state.selectedPointer],
   );
+
+  // Destructure state for easier access
+  const {
+    session,
+    data,
+    loading,
+    dirty,
+    saving,
+    exiting,
+    sessionEnded,
+    selectedPointer,
+    errors,
+    formats,
+    previewFormat,
+    previewPretty,
+    previewPayload,
+    showErrorsDialog,
+    status,
+  } = state;
 
   if (loading) {
     return (
-      <div className="app-shell flex h-screen items-center justify-center">
-        Loading session…
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <div className="text-center space-y-2">
+          <div className="h-8 w-8 mx-auto animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading session…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionEnded) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <div className="text-center space-y-4">
+          <div className="text-4xl">✓</div>
+          <h1 className="text-xl font-semibold">Session Ended</h1>
+          <p className="text-sm text-muted-foreground">
+            You can close this browser tab.
+          </p>
+        </div>
       </div>
     );
   }
@@ -274,25 +94,25 @@ export default function App() {
           saving={saving}
           exiting={exiting}
           onSave={handleSave}
-          onExit={handleExit}
+          onExit={() => handleExit()}
         />
         <div className="app-panel-muted flex flex-1 overflow-hidden border-y border-theme">
-          {/* Navigation Panel - Hidden on mobile (< md), shown on desktop */}
+          {/* Navigation Panel */}
           <aside
-            className="hidden md:flex app-panel flex-col border-r border-theme text-[var(--app-text)]"
+            className="hidden md:flex app-panel flex-col border-r border-theme"
             style={{ width: sizes.nav }}
           >
-            <div className="border-b border-theme px-4 py-3 text-xs uppercase tracking-[0.3em]">
+            <div className="border-b border-theme px-4 py-3 text-xs uppercase tracking-[0.3em] text-muted-foreground">
               Schema TreeView
             </div>
             <TreeView
               ast={session?.ui_ast}
               selectedPointer={selectedPointer}
               errors={errors}
-              onSelect={(pointer) => setSelectedPointer(pointer)}
+              onSelect={actions.setSelectedPointer}
             />
           </aside>
-          {/* Resizer - Hidden on mobile */}
+          {/* Resizer */}
           <div
             className="hidden md:block w-1 cursor-col-resize bg-transparent"
             onPointerDown={(event) => startDrag(event, "nav")}
@@ -317,12 +137,12 @@ export default function App() {
                 )}
             </div>
           </main>
-          {/* Resizer - Hidden on mobile and tablet (< lg) */}
+          {/* Resizer */}
           <div
             className="hidden lg:block w-1 cursor-col-resize bg-transparent"
             onPointerDown={(event) => startDrag(event, "preview")}
           />
-          {/* Preview Panel - Hidden on tablet (< lg), shown on large screens */}
+          {/* Preview Panel */}
           <section
             className="hidden lg:flex app-panel h-full flex-col border-l border-theme"
             style={{ width: sizes.preview }}
@@ -330,15 +150,9 @@ export default function App() {
             <PreviewPane
               formats={formats}
               format={previewFormat}
-              onFormatChange={(fmt) => {
-                setPreviewFormat(fmt);
-                updatePreview(data, previewPretty, fmt);
-              }}
+              onFormatChange={handlePreviewFormatChange}
               pretty={previewPretty}
-              onPrettyChange={(pretty) => {
-                setPreviewPretty(pretty);
-                updatePreview(data, pretty, previewFormat);
-              }}
+              onPrettyChange={handlePreviewPrettyChange}
               payload={previewPayload}
               loading={false}
             />
@@ -350,14 +164,14 @@ export default function App() {
           validating={false}
           errorCount={errors.size}
           onErrorsClick={errors.size > 0
-            ? () => setShowErrorsDialog(true)
+            ? () => actions.setShowErrorsDialog(true)
             : undefined}
         />
         <ValidationErrorsDialog
           open={showErrorsDialog}
-          onOpenChange={setShowErrorsDialog}
+          onOpenChange={actions.setShowErrorsDialog}
           errors={errors}
-          onNavigateToError={(pointer) => setSelectedPointer(pointer)}
+          onNavigateToError={actions.setSelectedPointer}
         />
       </div>
     </OverlayProvider>
@@ -379,15 +193,6 @@ function findNodeByPointer(
     }
   }
   return undefined;
-}
-
-function resolveInitialPointer(ast?: UiAst | null): string {
-  if (!ast || !ast.roots.length) return "";
-  const root = ast.roots[0];
-  if (root.kind.type === "object" && root.kind.children?.length) {
-    return root.kind.children[0].pointer;
-  }
-  return root.pointer;
 }
 
 function EditorBreadcrumbs(
