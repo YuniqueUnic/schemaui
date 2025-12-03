@@ -1,14 +1,14 @@
 import {
   createContext,
+  type ReactNode,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
-  type ReactNode,
-} from 'react';
+} from "react";
 
-type Theme = 'light' | 'dark';
+type Theme = "light" | "dark";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -16,41 +16,42 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
-const STORAGE_KEY = 'schemaui-theme';
+const STORAGE_KEY = "schemaui-theme";
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') {
-      return 'dark';
+    if (typeof window === "undefined") {
+      return "dark";
     }
     return (
       (localStorage.getItem(STORAGE_KEY) as Theme | null) ||
-      (window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light')
+      (window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light")
     );
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
-    root.classList.toggle('light', theme === 'light');
+    root.classList.toggle("dark", theme === "dark");
+    root.classList.toggle("light", theme === "light");
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
   const toggle = useCallback(() => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   }, []);
 
   const value = useMemo(() => ({ theme, toggle }), [theme, toggle]);
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={value}>{children}
+  </ThemeContext.Provider>;
 }
 
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error('useTheme must be used within ThemeProvider');
+    throw new Error("useTheme must be used within ThemeProvider");
   }
   return context;
 }

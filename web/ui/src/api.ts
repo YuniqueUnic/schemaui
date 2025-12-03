@@ -3,7 +3,7 @@ import type {
   PreviewResponse,
   SessionResponse,
   ValidationResponse,
-} from './types';
+} from "./types";
 
 async function request<T>(
   path: string,
@@ -11,7 +11,7 @@ async function request<T>(
 ): Promise<T> {
   const init: RequestInit = {
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(options?.headers ?? {}),
     },
     ...options,
@@ -33,12 +33,12 @@ async function request<T>(
 }
 
 export function fetchSession(): Promise<SessionResponse> {
-  return request<SessionResponse>('/api/session');
+  return request<SessionResponse>("/api/session");
 }
 
 export function validateData(data: JsonValue): Promise<ValidationResponse> {
-  return request<ValidationResponse>('/api/validate', {
-    method: 'POST',
+  return request<ValidationResponse>("/api/validate", {
+    method: "POST",
     json: { data },
   });
 }
@@ -48,22 +48,22 @@ export function renderPreview(
   format: string,
   pretty: boolean,
 ): Promise<PreviewResponse> {
-  return request<PreviewResponse>('/api/preview', {
-    method: 'POST',
+  return request<PreviewResponse>("/api/preview", {
+    method: "POST",
     json: { data, format, pretty },
   });
 }
 
 export function persistData(data: JsonValue) {
-  return request('/api/save', {
-    method: 'POST',
+  return request("/api/save", {
+    method: "POST",
     json: { data },
   });
 }
 
 export function exitSession(data: JsonValue, commit: boolean) {
-  return request('/api/exit', {
-    method: 'POST',
+  return request("/api/exit", {
+    method: "POST",
     json: { data, commit },
   });
 }

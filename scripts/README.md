@@ -15,7 +15,7 @@
 ```
 
 - 清理旧的构建文件
-- 运行 pnpm build
+- 运行 pnpm build:embedded
 - 生成生产环境的静态文件
 
 ### 更新脚本

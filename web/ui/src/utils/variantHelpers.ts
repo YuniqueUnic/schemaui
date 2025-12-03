@@ -1,7 +1,7 @@
 import type { JsonValue, UiVariant } from "../types";
 import {
-    VARIANT_CONFIGS,
-    type VariantConfig,
+  VARIANT_CONFIGS,
+  type VariantConfig,
 } from "../constants/variantDefaults";
 import { deepEqual } from "./deepEqual";
 import { variantMatches } from "./variantMatch";
@@ -15,47 +15,47 @@ import { variantDefault } from "../ui-ast";
  * Identifies the variant type based on schema properties
  */
 export function identifyVariantType(
-    schemaProperties: Record<string, unknown>,
+  schemaProperties: Record<string, unknown>,
 ): string | null {
-    for (const [typeName, config] of Object.entries(VARIANT_CONFIGS)) {
-        if (matchesVariantConfig(schemaProperties, config)) {
-            return typeName;
-        }
+  for (const [typeName, config] of Object.entries(VARIANT_CONFIGS)) {
+    if (matchesVariantConfig(schemaProperties, config)) {
+      return typeName;
     }
-    return null;
+  }
+  return null;
 }
 
 /**
  * Checks if schema properties match a variant configuration
  */
 function matchesVariantConfig(
-    schemaProperties: Record<string, unknown>,
-    config: VariantConfig,
+  schemaProperties: Record<string, unknown>,
+  config: VariantConfig,
 ): boolean {
-    // Check required properties are present
-    const hasRequired = config.requiredProperties.some(
-        (prop) => prop in schemaProperties,
-    );
-    if (!hasRequired) return false;
+  // Check required properties are present
+  const hasRequired = config.requiredProperties.some(
+    (prop) => prop in schemaProperties,
+  );
+  if (!hasRequired) return false;
 
-    // Check excluded properties are absent
-    const hasExcluded = config.excludedProperties.some(
-        (prop) => prop in schemaProperties,
-    );
-    if (hasExcluded) return false;
+  // Check excluded properties are absent
+  const hasExcluded = config.excludedProperties.some(
+    (prop) => prop in schemaProperties,
+  );
+  if (hasExcluded) return false;
 
-    return true;
+  return true;
 }
 
 /**
  * Determines which variant matches the given value
  */
 export function determineVariant(
-    value: JsonValue | undefined,
-    variants: UiVariant[],
+  value: JsonValue | undefined,
+  variants: UiVariant[],
 ): UiVariant | undefined {
-    return variants.find((variant) => variantMatches(value, variant.schema)) ??
-        variants[0];
+  return variants.find((variant) => variantMatches(value, variant.schema)) ??
+    variants[0];
 }
 
 /**
@@ -63,47 +63,47 @@ export function determineVariant(
  * When multiple variants match, uses exact default value matching to disambiguate
  */
 export function determineBestVariant(
-    value: JsonValue | undefined,
-    variants: UiVariant[],
+  value: JsonValue | undefined,
+  variants: UiVariant[],
 ): UiVariant {
-    const matchingVariants = variants.filter((v) =>
-        variantMatches(value, v.schema)
-    );
+  const matchingVariants = variants.filter((v) =>
+    variantMatches(value, v.schema)
+  );
 
-    // Exactly one match - use it
-    if (matchingVariants.length === 1) {
-        return matchingVariants[0];
+  // Exactly one match - use it
+  if (matchingVariants.length === 1) {
+    return matchingVariants[0];
+  }
+
+  // Multiple matches - try exact default matching
+  if (matchingVariants.length > 1) {
+    const exactMatch = matchingVariants.find((v) => {
+      const defaultVal = variantDefault(v);
+      return deepEqual(value, defaultVal);
+    });
+    if (exactMatch) {
+      return exactMatch;
     }
+    return matchingVariants[0];
+  }
 
-    // Multiple matches - try exact default matching
-    if (matchingVariants.length > 1) {
-        const exactMatch = matchingVariants.find((v) => {
-            const defaultVal = variantDefault(v);
-            return deepEqual(value, defaultVal);
-        });
-        if (exactMatch) {
-            return exactMatch;
-        }
-        return matchingVariants[0];
-    }
-
-    // No matches - fallback to first variant
-    return variants[0];
+  // No matches - fallback to first variant
+  return variants[0];
 }
 
 /**
  * Extracts schema properties from a variant schema
  */
 export function extractSchemaProperties(
-    schema: JsonValue | undefined,
+  schema: JsonValue | undefined,
 ): Record<string, unknown> {
-    if (
-        schema &&
-        typeof schema === "object" &&
-        !Array.isArray(schema) &&
-        "properties" in schema
-    ) {
-        return schema.properties as Record<string, unknown>;
-    }
-    return {};
+  if (
+    schema &&
+    typeof schema === "object" &&
+    !Array.isArray(schema) &&
+    "properties" in schema
+  ) {
+    return schema.properties as Record<string, unknown>;
+  }
+  return {};
 }

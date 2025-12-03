@@ -1,35 +1,35 @@
-import type { JsonValue } from '../types';
+import type { JsonValue } from "../types";
 
 function decode(segment: string): string {
-  return segment.replace(/~1/g, '/').replace(/~0/g, '~');
+  return segment.replace(/~1/g, "/").replace(/~0/g, "~");
 }
 
 function encode(segment: string): string {
-  return segment.replace(/~/g, '~0').replace(/\//g, '~1');
+  return segment.replace(/~/g, "~0").replace(/\//g, "~1");
 }
 
 export function splitPointer(pointer?: string | null): string[] {
-  if (!pointer || pointer === '/' || pointer.length === 0) {
+  if (!pointer || pointer === "/" || pointer.length === 0) {
     return [];
   }
   return pointer
-    .split('/')
+    .split("/")
     .slice(1)
     .map((part) => decode(part));
 }
 
 export function joinPointer(segments: string[]): string {
   if (segments.length === 0) {
-    return '/';
+    return "/";
   }
-  return `/${segments.map((segment) => encode(segment)).join('/')}`;
+  return `/${segments.map((segment) => encode(segment)).join("/")}`;
 }
 
 export function getPointerValue(
   root: JsonValue,
   pointer?: string | null,
 ): JsonValue | undefined {
-  if (!pointer || pointer === '/') {
+  if (!pointer || pointer === "/") {
     return root;
   }
 
@@ -41,7 +41,7 @@ export function getPointerValue(
     if (Array.isArray(current)) {
       const index = Number(segment);
       current = current[index];
-    } else if (typeof current === 'object') {
+    } else if (typeof current === "object") {
       current = (current as Record<string, JsonValue>)[segment];
     } else {
       return undefined;
@@ -55,7 +55,7 @@ export function setPointerValue(
   pointer: string | undefined,
   value: JsonValue,
 ): JsonValue {
-  if (!pointer || pointer === '/') {
+  if (!pointer || pointer === "/") {
     return value;
   }
 
@@ -78,7 +78,7 @@ export function setPointerValue(
       }
       return;
     }
-    if (typeof current === 'object' && current !== null) {
+    if (typeof current === "object" && current !== null) {
       const obj = current as Record<string, JsonValue>;
       if (isLast) {
         obj[segment] = value;
@@ -125,7 +125,7 @@ export function mergeDefaults(
 }
 
 export function deepClone<T extends JsonValue>(value: T): T {
-  return typeof structuredClone === 'function'
+  return typeof structuredClone === "function"
     ? structuredClone(value)
     : (JSON.parse(JSON.stringify(value)) as T);
 }
@@ -133,5 +133,5 @@ export function deepClone<T extends JsonValue>(value: T): T {
 function isContainer(
   value: JsonValue,
 ): value is JsonValue[] | { [key: string]: JsonValue } {
-  return Array.isArray(value) || (typeof value === 'object' && value !== null);
+  return Array.isArray(value) || (typeof value === "object" && value !== null);
 }

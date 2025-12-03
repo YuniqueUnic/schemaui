@@ -4,7 +4,7 @@
  * Centralizes all session-related state using useReducer for predictable updates.
  */
 
-import { useReducer, useCallback, useRef } from "react";
+import { useCallback, useReducer, useRef } from "react";
 import type { JsonValue, SessionResponse } from "../types";
 
 // ============================================
@@ -45,7 +45,15 @@ export interface SessionState {
 // ============================================
 
 type Action =
-  | { type: "INIT_SESSION"; payload: { session: SessionResponse; data: JsonValue; formats: string[]; pointer: string } }
+  | {
+    type: "INIT_SESSION";
+    payload: {
+      session: SessionResponse;
+      data: JsonValue;
+      formats: string[];
+      pointer: string;
+    };
+  }
   | { type: "SET_DATA"; payload: JsonValue }
   | { type: "SET_DIRTY"; payload: boolean }
   | { type: "SET_ERRORS"; payload: Map<string, string> }
@@ -97,7 +105,9 @@ function sessionReducer(state: SessionState, action: Action): SessionState {
         data: action.payload.data,
         formats: action.payload.formats,
         selectedPointer: action.payload.pointer,
-        previewFormat: action.payload.formats.includes("json") ? "json" : action.payload.formats[0],
+        previewFormat: action.payload.formats.includes("json")
+          ? "json"
+          : action.payload.formats[0],
         loading: false,
         status: "Ready",
       };
@@ -167,9 +177,20 @@ export function useSessionState() {
 
   // Action creators
   const actions = {
-    initSession: useCallback((session: SessionResponse, data: JsonValue, formats: string[], pointer: string) => {
-      dispatch({ type: "INIT_SESSION", payload: { session, data, formats, pointer } });
-    }, []),
+    initSession: useCallback(
+      (
+        session: SessionResponse,
+        data: JsonValue,
+        formats: string[],
+        pointer: string,
+      ) => {
+        dispatch({
+          type: "INIT_SESSION",
+          payload: { session, data, formats, pointer },
+        });
+      },
+      [],
+    ),
 
     setData: useCallback((data: JsonValue) => {
       dispatch({ type: "SET_DATA", payload: data });

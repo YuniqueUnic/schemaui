@@ -18,16 +18,16 @@ import { ObjectRenderer } from "./renderers/ObjectRenderer";
 type FieldNode = UiNode & { kind: Extract<UiNodeKind, { type: "field" }> };
 type ArrayNode = UiNode & { kind: Extract<UiNodeKind, { type: "array" }> };
 type CompositeNode = UiNode & {
-    kind: Extract<UiNodeKind, { type: "composite" }>;
+  kind: Extract<UiNodeKind, { type: "composite" }>;
 };
 type ObjectNode = UiNode & { kind: Extract<UiNodeKind, { type: "object" }> };
 
 export interface NodeRendererProps {
-    node: UiNode;
-    value: JsonValue | undefined;
-    errors: Map<string, string>;
-    onChange: (pointer: string, value: JsonValue) => void;
-    renderMode?: "stack" | "inline";
+  node: UiNode;
+  value: JsonValue | undefined;
+  errors: Map<string, string>;
+  onChange: (pointer: string, value: JsonValue) => void;
+  renderMode?: "stack" | "inline";
 }
 
 /**
@@ -35,132 +35,132 @@ export interface NodeRendererProps {
  * Provides chrome (header, error display) and dispatches to specific renderers
  */
 export function NodeRenderer({
-    node,
-    value,
-    errors,
-    onChange,
-    renderMode = "stack",
+  node,
+  value,
+  errors,
+  onChange,
+  renderMode = "stack",
 }: NodeRendererProps) {
-    const error = errors.get(node.pointer);
+  const error = errors.get(node.pointer);
 
-    const chromeClass = renderMode === "inline"
-        ? "space-y-2"
-        : node.kind.type === "object"
-        ? "space-y-3"
-        : "space-y-2 pb-4";
+  const chromeClass = renderMode === "inline"
+    ? "space-y-2"
+    : node.kind.type === "object"
+    ? "space-y-3"
+    : "space-y-2 pb-4";
 
-    return (
-        <div className={chromeClass}>
-            <NodeHeader node={node} />
-            <NodeBody
-                node={node}
-                value={value}
-                errors={errors}
-                onChange={onChange}
-            />
-            {error && (
-                <p className="text-xs text-destructive bg-destructive/10 px-2 py-1 rounded-md">
-                    {error}
-                </p>
-            )}
-        </div>
-    );
+  return (
+    <div className={chromeClass}>
+      <NodeHeader node={node} />
+      <NodeBody
+        node={node}
+        value={value}
+        errors={errors}
+        onChange={onChange}
+      />
+      {error && (
+        <p className="text-xs text-destructive bg-destructive/10 px-2 py-1 rounded-md">
+          {error}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
  * Renders the node header with title, required badge, and description
  */
 function NodeHeader({ node }: { node: UiNode }) {
-    return (
-        <header className="space-y-0.5">
-            <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground">
-                    {node.title ?? node.pointer}
-                </span>
-                {node.required && (
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-destructive">
-                        required
-                    </span>
-                )}
-            </div>
-            {node.description && (
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                    {node.description}
-                </p>
-            )}
-        </header>
-    );
+  return (
+    <header className="space-y-0.5">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-foreground">
+          {node.title ?? node.pointer}
+        </span>
+        {node.required && (
+          <span className="text-[10px] font-medium uppercase tracking-wider text-destructive">
+            required
+          </span>
+        )}
+      </div>
+      {node.description && (
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {node.description}
+        </p>
+      )}
+    </header>
+  );
 }
 
 /**
  * Dispatches rendering to the appropriate component based on node kind
  */
 function NodeBody({
-    node,
-    value,
-    errors,
-    onChange,
+  node,
+  value,
+  errors,
+  onChange,
 }: Omit<NodeRendererProps, "renderMode">): ReactNode {
-    // Recursive renderNode function for nested components
-    const renderNode = (
-        n: UiNode,
-        v: JsonValue | undefined,
-        e: Map<string, string>,
-        oc: (pointer: string, value: JsonValue) => void,
-    ) => (
-        <NodeRenderer
-            node={n}
-            value={v}
-            errors={e}
-            onChange={oc}
-            renderMode="inline"
+  // Recursive renderNode function for nested components
+  const renderNode = (
+    n: UiNode,
+    v: JsonValue | undefined,
+    e: Map<string, string>,
+    oc: (pointer: string, value: JsonValue) => void,
+  ) => (
+    <NodeRenderer
+      node={n}
+      value={v}
+      errors={e}
+      onChange={oc}
+      renderMode="inline"
+    />
+  );
+
+  switch (node.kind.type) {
+    case "field":
+      return (
+        <FieldRenderer
+          node={node as FieldNode}
+          value={value}
+          onChange={onChange}
         />
-    );
+      );
 
-    switch (node.kind.type) {
-        case "field":
-            return (
-                <FieldRenderer
-                    node={node as FieldNode}
-                    value={value}
-                    onChange={onChange}
-                />
-            );
+    case "array":
+      return (
+        <ArrayRenderer
+          node={node as ArrayNode}
+          value={value}
+          errors={errors}
+          onChange={onChange}
+          renderNode={renderNode}
+        />
+      );
 
-        case "array":
-            return (
-                <ArrayRenderer
-                    node={node as ArrayNode}
-                    value={value}
-                    errors={errors}
-                    onChange={onChange}
-                    renderNode={renderNode}
-                />
-            );
+    case "composite":
+      return (
+        <CompositeRenderer
+          node={node as CompositeNode}
+          value={value}
+          errors={errors}
+          onChange={onChange}
+          renderNode={renderNode}
+        />
+      );
 
-        case "composite":
-            return (
-                <CompositeRenderer
-                    node={node as CompositeNode}
-                    value={value}
-                    errors={errors}
-                    onChange={onChange}
-                    renderNode={renderNode}
-                />
-            );
+    case "object":
+      return (
+        <ObjectRenderer
+          node={node as ObjectNode}
+          value={value}
+          errors={errors}
+          onChange={onChange}
+          renderNode={renderNode}
+        />
+      );
 
-        case "object":
-            return (
-                <ObjectRenderer
-                    node={node as ObjectNode}
-                    value={value}
-                    errors={errors}
-                    onChange={onChange}
-                    renderNode={renderNode}
-                />
-            );
-
-        default:
-            return null;
-    }
+    default:
+      return null;
+  }
 }

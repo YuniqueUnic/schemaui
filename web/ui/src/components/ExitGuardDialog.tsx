@@ -36,7 +36,8 @@ export const ExitGuardDialog = memo(function ExitGuardDialog({
               Resolve the remaining schema errors
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              Fix the issues below or force exit to emit only the last saved configuration.
+              Fix the issues below or force exit to emit only the last saved
+              configuration.
             </p>
           </div>
         </div>
@@ -56,7 +57,8 @@ export const ExitGuardDialog = memo(function ExitGuardDialog({
         {remaining > 0
           ? (
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              +{remaining} more issue(s) hidden. Continue editing to see full details.
+              +{remaining}{" "}
+              more issue(s) hidden. Continue editing to see full details.
             </p>
           )
           : null}

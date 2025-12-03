@@ -1,4 +1,4 @@
-import type { Config } from 'tailwindcss';
+import type { Config } from "tailwindcss";
 
 /**
  * Tailwind CSS 4 Configuration
@@ -7,8 +7,8 @@ import type { Config } from 'tailwindcss';
  * This config file is minimal - colors and other design tokens are defined in globals.css
  */
 const config: Partial<Config> = {
-  darkMode: 'class',
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
 };
 
 export default config;

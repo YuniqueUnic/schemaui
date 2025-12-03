@@ -4,7 +4,7 @@
  * Handles save, exit, validation, and preview logic.
  */
 
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   exitSession,
@@ -26,7 +26,9 @@ interface UseSessionActionsOptions {
   dirtyRef: SessionStateHook["dirtyRef"];
 }
 
-export function useSessionActions({ state, actions, dirtyRef }: UseSessionActionsOptions) {
+export function useSessionActions(
+  { state, actions, dirtyRef }: UseSessionActionsOptions,
+) {
   const validationSeq = useRef(0);
   const previewSeq = useRef(0);
   const sessionIdRef = useRef("");
@@ -61,31 +63,39 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
   // Validation & Preview
   // ============================================
 
-  const runValidation = useCallback(async (data: JsonValue): Promise<Map<string, string>> => {
-    const seq = ++validationSeq.current;
-    try {
-      const result = await validateData(data);
-      if (seq !== validationSeq.current) return new Map();
-      const errors = new Map<string, string>();
-      result.errors?.forEach((err) => errors.set(err.pointer || "", err.message));
-      actions.setErrors(errors);
-      return errors;
-    } catch (error) {
-      console.error("Validation failed", error);
-      return new Map();
-    }
-  }, [actions]);
+  const runValidation = useCallback(
+    async (data: JsonValue): Promise<Map<string, string>> => {
+      const seq = ++validationSeq.current;
+      try {
+        const result = await validateData(data);
+        if (seq !== validationSeq.current) return new Map();
+        const errors = new Map<string, string>();
+        result.errors?.forEach((err) =>
+          errors.set(err.pointer || "", err.message)
+        );
+        actions.setErrors(errors);
+        return errors;
+      } catch (error) {
+        console.error("Validation failed", error);
+        return new Map();
+      }
+    },
+    [actions],
+  );
 
-  const updatePreview = useCallback(async (data: JsonValue, pretty: boolean, format: string) => {
-    const seq = ++previewSeq.current;
-    try {
-      const result = await renderPreview(data, format, pretty);
-      if (seq !== previewSeq.current) return;
-      actions.setPreviewPayload(result.payload);
-    } catch (error) {
-      console.error("Preview failed", error);
-    }
-  }, [actions]);
+  const updatePreview = useCallback(
+    async (data: JsonValue, pretty: boolean, format: string) => {
+      const seq = ++previewSeq.current;
+      try {
+        const result = await renderPreview(data, format, pretty);
+        if (seq !== previewSeq.current) return;
+        actions.setPreviewPayload(result.payload);
+      } catch (error) {
+        console.error("Preview failed", error);
+      }
+    },
+    [actions],
+  );
 
   // ============================================
   // Initialize Session
@@ -96,7 +106,8 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
       const payload = await fetchSession();
 
       // Generate session ID from title
-      const titleKey = payload.title?.replace(/\s+/g, "_").replace(/[^\w-]/g, "") || "default";
+      const titleKey =
+        payload.title?.replace(/\s+/g, "_").replace(/[^\w-]/g, "") || "default";
       sessionIdRef.current = titleKey;
 
       // Try to restore from localStorage
@@ -113,7 +124,7 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
 
       const withDefaults = applyUiDefaults(
         payload.ui_ast,
-        restoredData || payload.data || {}
+        restoredData || payload.data || {},
       );
 
       const formats = payload.formats?.length ? payload.formats : ["json"];
@@ -124,7 +135,11 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
       // Run initial validation and preview
       await Promise.all([
         runValidation(withDefaults),
-        updatePreview(withDefaults, true, formats.includes("json") ? "json" : formats[0]),
+        updatePreview(
+          withDefaults,
+          true,
+          formats.includes("json") ? "json" : formats[0],
+        ),
       ]);
     } catch (error) {
       console.error("Failed to load session", error);
@@ -143,7 +158,15 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
     saveToLocalStorage(newData);
     runValidation(newData);
     updatePreview(newData, state.previewPretty, state.previewFormat);
-  }, [state.data, state.previewPretty, state.previewFormat, actions, saveToLocalStorage, runValidation, updatePreview]);
+  }, [
+    state.data,
+    state.previewPretty,
+    state.previewFormat,
+    actions,
+    saveToLocalStorage,
+    runValidation,
+    updatePreview,
+  ]);
 
   // ============================================
   // Handle Save
@@ -154,14 +177,16 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
 
     if (state.errors.size > 0) {
       toast.error(
-        `Cannot save: ${state.errors.size} validation error${state.errors.size > 1 ? "s" : ""} found.`,
+        `Cannot save: ${state.errors.size} validation error${
+          state.errors.size > 1 ? "s" : ""
+        } found.`,
         {
           duration: 5000,
           action: {
             label: "View Errors",
             onClick: () => actions.setShowErrorsDialog(true),
           },
-        }
+        },
       );
       actions.setShowErrorsDialog(true);
       return;
@@ -244,7 +269,15 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
       toast.error("Failed to exit session");
       actions.setExiting(false);
     }
-  }, [state.sessionEnded, state.exiting, state.data, dirtyRef, actions, clearLocalStorage, runValidation]);
+  }, [
+    state.sessionEnded,
+    state.exiting,
+    state.data,
+    dirtyRef,
+    actions,
+    clearLocalStorage,
+    runValidation,
+  ]);
 
   // ============================================
   // Handle Preview Format/Pretty Change
@@ -289,6 +322,8 @@ export function useSessionActions({ state, actions, dirtyRef }: UseSessionAction
 // Helpers
 // ============================================
 
-function resolveInitialPointer(ast: { roots: { pointer: string }[] } | null | undefined): string {
+function resolveInitialPointer(
+  ast: { roots: { pointer: string }[] } | null | undefined,
+): string {
   return ast?.roots?.[0]?.pointer ?? "";
 }
