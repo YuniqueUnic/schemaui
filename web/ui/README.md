@@ -20,11 +20,11 @@ toggle.
 ## Production build
 
 ```bash
-pnpm run build
+pnpm run build:embedded
 ```
 
 This runs `tsc -b` followed by `vite build`, emitting `../dist/index.html`.
-Cargo’s `build.rs` automatically triggers `pnpm run build` unless
+Cargo’s `build.rs` automatically triggers `pnpm run build:embedded` unless
 `SCHEMAUI_WEB_SKIP_BUILD=1`. Set `SCHEMAUI_WEB_FORCE_BUILD=1` to rebuild
 unconditionally.
 

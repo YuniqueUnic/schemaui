@@ -14,7 +14,7 @@ pushd "$UI_DIR" >/dev/null
 # Ensure a clean install each time and avoid leaving node_modules in the repo.
 rm -rf node_modules
 pnpm install --frozen-lockfile --silent
-pnpm run build
+pnpm run build:embedded
 rm -rf node_modules
 
 popd >/dev/null
