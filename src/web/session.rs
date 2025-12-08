@@ -37,6 +37,7 @@ pub struct WebSessionBuilder {
     defaults: Option<Value>,
     title: Option<String>,
     asset_provider: Arc<dyn WebAssetProvider>,
+    precompiled_ui_ast: Option<UiAst>,
 }
 
 impl WebSessionBuilder {
@@ -47,6 +48,7 @@ impl WebSessionBuilder {
             title: None,
             #[allow(clippy::default_constructed_unit_structs)]
             asset_provider: Arc::new(EmbeddedAssets::default()),
+            precompiled_ui_ast: None,
         }
     }
 
@@ -70,13 +72,23 @@ impl WebSessionBuilder {
         self
     }
 
+    /// Provide a precompiled UiAst built at compile-time for this schema.
+    pub fn with_precompiled_ui_ast(mut self, ast: UiAst) -> Self {
+        self.precompiled_ui_ast = Some(ast);
+        self
+    }
+
     pub fn build(mut self) -> Result<WebSessionConfig> {
         let data = self
             .defaults
             .take()
             .unwrap_or_else(|| Value::Object(Map::new()));
         let schema = schema_with_defaults(&self.schema, &data);
-        let ui_ast = build_ui_ast(&schema)?;
+        let ui_ast = if let Some(ast) = self.precompiled_ui_ast.take() {
+            ast
+        } else {
+            build_ui_ast(&schema)?
+        };
         Ok(WebSessionConfig {
             title: self.title,
             ui_ast,

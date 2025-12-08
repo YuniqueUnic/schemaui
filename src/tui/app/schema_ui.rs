@@ -12,6 +12,7 @@ use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions};
 use crate::core::frontend::Frontend;
 use crate::tui::session::TuiFrontend;
 use crate::tui::state::field::components::ComponentPalette;
+use crate::ui_ast::UiAst;
 #[cfg(feature = "web")]
 use crate::web::{frontend::WebFrontend, session::ServeOptions as WebServeOptions};
 
@@ -22,6 +23,7 @@ pub struct SchemaUI {
     options: UiOptions,
     output: Option<OutputOptions>,
     initial_data: Option<Value>,
+    precompiled_ui_ast: Option<UiAst>,
 }
 
 impl SchemaUI {
@@ -32,6 +34,7 @@ impl SchemaUI {
             options: UiOptions::default(),
             output: None,
             initial_data: None,
+            precompiled_ui_ast: None,
         }
     }
 
@@ -56,6 +59,13 @@ impl SchemaUI {
         let mut ui = Self::new(schema);
         ui.initial_data = Some(defaults);
         ui
+    }
+
+    /// Provide a precompiled UiAst built at compile-time, so the runtime
+    /// pipeline can skip building UiAst from the schema.
+    pub fn with_precompiled_ui_ast(mut self, ast: UiAst) -> Self {
+        self.precompiled_ui_ast = Some(ast);
+        self
     }
 
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
@@ -219,11 +229,13 @@ impl SchemaUI {
             options: _,
             output,
             initial_data,
+            precompiled_ui_ast,
         } = self;
 
         let pipeline = SchemaPipeline::new(schema)
             .with_title(title)
-            .with_defaults(initial_data);
+            .with_defaults(initial_data)
+            .with_precompiled_ui_ast(precompiled_ui_ast);
         let result = pipeline.run_with_frontend(frontend)?;
         if let Some(settings) = output {
             output::emit(&result, &settings)?;
