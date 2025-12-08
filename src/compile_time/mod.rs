@@ -7,6 +7,9 @@ use crate::io::DocumentFormat;
 use crate::io::input::parse_document_str;
 use crate::ui_ast::{UiAst, build_ui_ast};
 
+#[cfg(feature = "tui")]
+pub mod tui;
+
 /// Read a schema file, parse it as JSON/YAML/TOML, and build a UiAst.
 pub fn build_ui_ast_from_file(path: &Path, format: DocumentFormat) -> Result<UiAst> {
     let contents = fs::read_to_string(path)?;

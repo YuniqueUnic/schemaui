@@ -10,6 +10,7 @@ use crate::io::{
 
 use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions};
 use crate::core::frontend::Frontend;
+use crate::tui::model::FormSchema;
 use crate::tui::session::TuiFrontend;
 use crate::tui::state::field::components::ComponentPalette;
 use crate::ui_ast::UiAst;
@@ -24,6 +25,7 @@ pub struct SchemaUI {
     output: Option<OutputOptions>,
     initial_data: Option<Value>,
     precompiled_ui_ast: Option<UiAst>,
+    precompiled_form_schema: Option<FormSchema>,
 }
 
 impl SchemaUI {
@@ -35,6 +37,7 @@ impl SchemaUI {
             output: None,
             initial_data: None,
             precompiled_ui_ast: None,
+            precompiled_form_schema: None,
         }
     }
 
@@ -65,6 +68,14 @@ impl SchemaUI {
     /// pipeline can skip building UiAst from the schema.
     pub fn with_precompiled_ui_ast(mut self, ast: UiAst) -> Self {
         self.precompiled_ui_ast = Some(ast);
+        self
+    }
+
+    /// Provide a precompiled TUI FormSchema built at compile-time. When set,
+    /// the TUI frontend will use this instead of deriving a FormSchema from
+    /// the UiAst at runtime.
+    pub fn with_precompiled_form_schema(mut self, form: FormSchema) -> Self {
+        self.precompiled_form_schema = Some(form);
         self
     }
 
@@ -209,7 +220,11 @@ impl SchemaUI {
     /// `SchemaUI` builder.
     pub fn run_tui(self) -> Result<Value> {
         let options = self.options.clone();
-        self.run_with_frontend(TuiFrontend { options })
+        let precompiled_form_schema = self.precompiled_form_schema.clone();
+        self.run_with_frontend(TuiFrontend {
+            options,
+            precompiled_form_schema,
+        })
     }
 
     /// Run in Web mode, using the given serve options to configure the
@@ -230,6 +245,7 @@ impl SchemaUI {
             output,
             initial_data,
             precompiled_ui_ast,
+            precompiled_form_schema: _,
         } = self;
 
         let pipeline = SchemaPipeline::new(schema)

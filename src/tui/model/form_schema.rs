@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FormSchema {
     #[allow(dead_code)]
     pub title: Option<String>,
@@ -11,7 +12,7 @@ pub struct FormSchema {
     pub roots: Vec<RootSection>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RootSection {
     pub id: String,
     pub title: String,
@@ -19,7 +20,7 @@ pub struct RootSection {
     pub sections: Vec<FormSection>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FormSection {
     pub id: String,
     pub title: String,
@@ -29,7 +30,7 @@ pub struct FormSection {
     pub children: Vec<FormSection>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FieldKind {
     String,
     Integer,
@@ -45,7 +46,7 @@ pub enum FieldKind {
     KeyValue(Box<KeyValueField>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompositeField {
     pub mode: CompositeMode,
     pub variants: Vec<CompositeVariant>,
@@ -98,7 +99,7 @@ mod tests {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KeyValueField {
     pub key_title: String,
     pub key_description: Option<String>,
@@ -112,13 +113,13 @@ pub struct KeyValueField {
     pub entry_schema: Value,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CompositeMode {
     OneOf,
     AnyOf,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompositeVariant {
     pub id: String,
     pub title: String,
@@ -127,7 +128,7 @@ pub struct CompositeVariant {
     pub is_object: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldSchema {
     pub name: String,
     pub path: Vec<String>,

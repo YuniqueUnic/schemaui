@@ -4,14 +4,14 @@ use serde_json::Value;
 #[cfg(feature = "web")]
 use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "web", derive(TS))]
 #[cfg_attr(feature = "web", ts(export, export_to = "web/types/ui-ast.ts"))]
 pub struct UiAst {
     pub roots: Vec<UiNode>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "web", derive(TS))]
 pub struct UiNode {
     pub pointer: String,
@@ -23,7 +23,7 @@ pub struct UiNode {
     pub kind: UiNodeKind,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "web", derive(TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UiNodeKind {
@@ -59,7 +59,7 @@ pub enum ScalarKind {
     Boolean,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "web", derive(TS))]
 #[serde(rename_all = "snake_case")]
 pub enum CompositeMode {
@@ -67,7 +67,7 @@ pub enum CompositeMode {
     AnyOf,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "web", derive(TS))]
 pub struct UiVariant {
     pub id: String,
