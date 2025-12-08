@@ -49,7 +49,10 @@ fn main() -> anyhow::Result<()> {
 
     let options = schemaui::UiOptions::default();
     let backend = schemaui::SchemaUI::new(schema).with_options(options.clone());
-    let frontend = schemaui::TuiFrontend { options };
+    let frontend = schemaui::TuiFrontend {
+        options,
+        precompiled_form_schema: None,
+    };
     let result = backend.run_with_frontend(frontend)?;
 
     let json = serde_json::to_string_pretty(&result)?;

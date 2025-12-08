@@ -17,6 +17,7 @@ import type { JsonValue } from "../types";
 import { applyUiDefaults } from "../ui-ast";
 import { deepClone, setPointerValue } from "../utils/jsonPointer";
 import type { useSessionState } from "./useSessionState";
+import { staticSession } from "../generated/session";
 
 type SessionStateHook = ReturnType<typeof useSessionState>;
 
@@ -103,7 +104,7 @@ export function useSessionActions(
 
   const initializeSession = useCallback(async () => {
     try {
-      const payload = await fetchSession();
+      const payload = staticSession ?? await fetchSession();
 
       // Generate session ID from title
       const titleKey =

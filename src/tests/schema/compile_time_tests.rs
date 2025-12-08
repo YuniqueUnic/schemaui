@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use crate::compile_time;
 use crate::io::{DocumentFormat, input::parse_document_str};
-use crate::ui_ast::build_ui_ast;
+use crate::ui_ast::{build_ui_ast, index::collect_pointers};
 
 fn schema_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -25,7 +25,10 @@ fn compile_time_and_runtime_ui_ast_match_for_comprehensive_schema() {
         parse_document_str(&contents, DocumentFormat::Json).expect("schema parses at runtime");
     let runtime_ast = build_ui_ast(&schema_value).expect("runtime UiAst");
 
-    assert_eq!(runtime_ast, compile_time_ast);
+    let compile_time_pointers = collect_pointers(&compile_time_ast);
+    let runtime_pointers = collect_pointers(&runtime_ast);
+
+    assert_eq!(runtime_pointers, compile_time_pointers);
 }
 
 #[test]

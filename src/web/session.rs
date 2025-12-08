@@ -273,7 +273,7 @@ impl FinishLine {
 
 #[derive(Serialize, TS)]
 #[ts(export, export_to = "web/types/")]
-pub(crate) struct SessionResponse {
+pub struct SessionResponse {
     pub title: Option<String>,
     pub ui_ast: UiAst,
     #[ts(type = "Record<string, unknown>")]

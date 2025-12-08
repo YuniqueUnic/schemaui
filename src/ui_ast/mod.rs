@@ -1,4 +1,5 @@
 mod builder;
+pub mod index;
 mod types;
 
 pub use builder::build_ui_ast;

@@ -95,12 +95,19 @@ mod tests {
         let assets = EmbeddedAssets;
         let asset = assets.load("/").expect("index.html embedded");
         assert_eq!(asset.mime, "text/html; charset=utf-8");
-        let expected = b"<!doctype html>";
+        // Assert that the embedded asset still contains an HTML DOCTYPE. We
+        // do a case-insensitive search for `<!doctype html>` so the test is
+        // robust across different bundler/minifier behaviors.
+        let bytes = asset.contents.as_ref();
+        let lower = bytes
+            .iter()
+            .map(|b| b.to_ascii_lowercase())
+            .collect::<Vec<u8>>();
+        let needle = b"<!doctype html>";
+        let has_doctype = lower.windows(needle.len()).any(|window| window == needle);
         assert!(
-            asset
-                .contents
-                .get(..expected.len())
-                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(expected))
+            has_doctype,
+            "embedded index.html must contain <!doctype html> (case-insensitive) DOCTYPE",
         );
     }
 
