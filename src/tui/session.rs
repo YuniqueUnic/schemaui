@@ -4,7 +4,8 @@ use serde_json::Value;
 use crate::core::frontend::{Frontend, FrontendContext};
 use crate::tui::app::{App, UiOptions};
 use crate::tui::model::{FormSchema, form_schema_from_ui_ast};
-use crate::tui::state::FormState;
+use crate::tui::state::{FormState, LayoutNavModel};
+use crate::ui_ast::layout::build_ui_layout;
 
 /// TUI frontend implementation that consumes a prepared `FrontendContext`
 /// and runs the interactive terminal UI.
@@ -34,8 +35,13 @@ impl Frontend for TuiFrontend {
         } else {
             form_schema_from_ui_ast(&ui_ast)
         };
+
+        let layout = build_ui_layout(&ui_ast);
+        let layout_nav = LayoutNavModel::from_uilayout(&layout);
+
         let palette = options.component_palette();
-        let form_state = FormState::from_schema_with_palette(&form_schema, palette);
+        let mut form_state = FormState::from_schema_with_palette(&form_schema, palette);
+        form_state.set_layout_nav(layout_nav);
 
         let mut app = App::new(form_state, validator, options);
         let result = app.run()?;

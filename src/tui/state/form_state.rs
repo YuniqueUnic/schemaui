@@ -3,6 +3,7 @@ use std::sync::Arc;
 use serde_json::{Map, Value};
 
 use crate::tui::model::FormSchema;
+use crate::tui::state::LayoutNavModel;
 
 use super::{
     error::FieldCoercionError,
@@ -25,6 +26,7 @@ pub struct RootSectionState {
 pub struct FormState {
     pub roots: Vec<RootSectionState>,
     ui: UiStores,
+    layout_nav: Option<LayoutNavModel>,
 }
 
 impl FormState {
@@ -57,6 +59,7 @@ impl FormState {
         let mut state = Self {
             roots,
             ui: UiStores::new(),
+            layout_nav: None,
         };
         state.normalize_focus();
         state
@@ -76,6 +79,7 @@ impl FormState {
                 sections,
             }],
             ui: UiStores::new(),
+            layout_nav: None,
         };
         state.normalize_focus();
         state
@@ -86,9 +90,23 @@ impl FormState {
         let mut state = Self {
             roots,
             ui: UiStores::new(),
+            layout_nav: None,
         };
         state.normalize_focus();
         state
+    }
+
+    pub fn with_layout_nav(mut self, layout_nav: LayoutNavModel) -> Self {
+        self.layout_nav = Some(layout_nav);
+        self
+    }
+
+    pub fn set_layout_nav(&mut self, layout_nav: LayoutNavModel) {
+        self.layout_nav = Some(layout_nav);
+    }
+
+    pub fn layout_nav(&self) -> Option<&LayoutNavModel> {
+        self.layout_nav.as_ref()
     }
 
     pub fn root_index(&self) -> usize {
@@ -259,20 +277,24 @@ impl FormState {
     }
 
     pub fn focus_next_section(&mut self, delta: i32) {
-        self.normalize_focus();
-        self.advance_section(delta);
-        self.normalize_focus();
+        if !self.focus_next_section_with_layout(delta) {
+            self.normalize_focus();
+            self.advance_section(delta);
+            self.normalize_focus();
+        }
     }
 
     pub fn focus_next_root(&mut self, delta: i32) {
-        if self.roots.is_empty() {
-            return;
+        if !self.focus_next_root_with_layout(delta) {
+            if self.roots.is_empty() {
+                return;
+            }
+            if self.ui.root.advance(delta, self.roots.len()) {
+                self.ui.sections.reset();
+                self.ui.fields.reset();
+            }
+            self.normalize_focus();
         }
-        if self.ui.root.advance(delta, self.roots.len()) {
-            self.ui.sections.reset();
-            self.ui.fields.reset();
-        }
-        self.normalize_focus();
     }
 
     pub fn try_build_value(&self) -> Result<Value, FieldCoercionError> {
@@ -344,6 +366,22 @@ impl FormState {
             }
         }
         None
+    }
+
+    fn focus_field_by_pointer(&mut self, pointer: &str) -> bool {
+        for (root_idx, root) in self.roots.iter().enumerate() {
+            for (section_idx, section) in root.sections.iter().enumerate() {
+                for (field_idx, field) in section.fields.iter().enumerate() {
+                    if field.schema.pointer == pointer {
+                        self.set_root_index(root_idx);
+                        self.set_section_index(section_idx);
+                        self.set_field_index(field_idx);
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     pub fn field_by_pointer(&self, pointer: &str) -> Option<&FieldState> {
@@ -550,6 +588,118 @@ impl FormState {
                 .find(|(_, section)| !section.fields.is_empty())
                 .map(|(idx, _)| idx)
         })
+    }
+
+    fn focus_next_section_with_layout(&mut self, delta: i32) -> bool {
+        let nav = match &self.layout_nav {
+            Some(nav) => nav,
+            None => return false,
+        };
+
+        let current_pointer = match self.focused_field() {
+            Some(field) => field.schema.pointer.clone(),
+            None => return false,
+        };
+
+        let mut sections = Vec::new();
+        for root in &nav.roots {
+            for section in &root.sections {
+                sections.push(section);
+            }
+        }
+
+        if sections.is_empty() {
+            return false;
+        }
+
+        let current_idx = match sections
+            .iter()
+            .position(|s| s.pointers.iter().any(|p| p == &current_pointer))
+        {
+            Some(idx) => idx,
+            None => return false,
+        };
+
+        let len = sections.len() as i32;
+        if len == 0 {
+            return false;
+        }
+
+        let mut next = current_idx as i32 + delta;
+        next = ((next % len) + len) % len;
+        let target = sections[next as usize];
+
+        let target_pointer = target
+            .first_pointer
+            .as_ref()
+            .or_else(|| target.pointers.first())
+            .cloned();
+
+        match target_pointer {
+            Some(ptr) => self.focus_field_by_pointer(&ptr),
+            None => false,
+        }
+    }
+
+    fn focus_next_root_with_layout(&mut self, delta: i32) -> bool {
+        let nav = match &self.layout_nav {
+            Some(nav) => nav,
+            None => return false,
+        };
+
+        let current_pointer = match self.focused_field() {
+            Some(field) => field.schema.pointer.clone(),
+            None => return false,
+        };
+
+        if nav.roots.is_empty() {
+            return false;
+        }
+
+        let mut current_root_idx = None;
+        for (idx, root) in nav.roots.iter().enumerate() {
+            if root
+                .sections
+                .iter()
+                .any(|section| section.pointers.iter().any(|p| p == &current_pointer))
+            {
+                current_root_idx = Some(idx);
+                break;
+            }
+        }
+
+        let current_root_idx = match current_root_idx {
+            Some(idx) => idx,
+            None => return false,
+        };
+
+        let len = nav.roots.len() as i32;
+        if len == 0 {
+            return false;
+        }
+
+        let mut next = current_root_idx as i32 + delta;
+        next = ((next % len) + len) % len;
+        let target_root = &nav.roots[next as usize];
+
+        let target_section = target_root
+            .sections
+            .iter()
+            .find(|section| section.first_pointer.is_some() || !section.pointers.is_empty());
+
+        let target_pointer = match target_section {
+            Some(section) => section
+                .first_pointer
+                .as_ref()
+                .or_else(|| section.pointers.first())
+                .cloned(),
+            None => None,
+        };
+
+        match target_pointer {
+            Some(ptr) => self.focus_field_by_pointer(&ptr),
+            None => false,
+        }
     }
 }
 
