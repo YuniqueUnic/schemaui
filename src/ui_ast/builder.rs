@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use anyhow::{Context, Result, anyhow, bail};
 use schemars::schema::{
     ArrayValidation, InstanceType, ObjectValidation, Schema, SchemaObject, SingleOrVec,
@@ -26,7 +24,7 @@ pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
         .object
         .as_ref()
         .context("root schema must define properties")?;
-    let required = required_set(object);
+    let required = required_list(object);
 
     let mut roots = Vec::new();
     for (name, schema) in &object.properties {
@@ -117,11 +115,16 @@ fn visit_schema(
             .as_ref()
             .context("object schema missing properties")?;
         let mut children = Vec::new();
-        let required_set = required_set(obj);
+        let required_fields = required_list(obj);
         for (name, child_schema) in &obj.properties {
             let resolved = resolver.resolve_schema(child_schema)?;
             let child_ptr = append_pointer(&pointer, name);
-            let child = visit_schema(resolver, &resolved, child_ptr, required_set.contains(name))?;
+            let child = visit_schema(
+                resolver,
+                &resolved,
+                child_ptr,
+                required_fields.contains(name),
+            )?;
             children.push(child);
         }
         let default_value = schema_default(schema).or(Some(Value::Object(Map::new())));
@@ -133,7 +136,7 @@ fn visit_schema(
             default_value,
             kind: UiNodeKind::Object {
                 children,
-                required: required_set.into_iter().collect(),
+                required: required_fields,
             },
         });
     }
@@ -255,17 +258,17 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
             .object
             .as_ref()
             .context("object schema missing properties")?;
-        let required = required_set(obj);
+        let required_fields = required_list(obj);
         let mut children = Vec::new();
         for (name, schema) in &obj.properties {
             let resolved = resolver.resolve_schema(schema)?;
             let pointer = append_pointer("", name);
-            let node = visit_schema(resolver, &resolved, pointer, required.contains(name))?;
+            let node = visit_schema(resolver, &resolved, pointer, required_fields.contains(name))?;
             children.push(node);
         }
         return Ok(UiNodeKind::Object {
             children,
-            required: required.into_iter().collect(),
+            required: required_fields,
         });
     }
 
@@ -528,7 +531,10 @@ fn is_array_schema(schema: &SchemaObject) -> bool {
     }
 }
 
-fn required_set(object: &ObjectValidation) -> HashSet<String> {
+fn required_list(object: &ObjectValidation) -> Vec<String> {
+    // Preserve the order in which required field names appear in the schema,
+    // so that UI representations match the top-down order in the
+    // config/schema file.
     object.required.iter().cloned().collect()
 }
 
