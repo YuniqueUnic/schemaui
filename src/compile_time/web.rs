@@ -4,6 +4,7 @@ use anyhow::Result;
 use serde_json::Value;
 
 use crate::io::{DocumentFormat, input::parse_document_str, input::schema_with_defaults};
+use crate::ui_ast::layout::build_ui_layout;
 use crate::ui_ast::{UiAst, build_ui_ast};
 use crate::web::session::SessionResponse;
 
@@ -34,11 +35,14 @@ pub fn build_session_snapshot_from_files(
         .map(|f| f.to_string())
         .collect();
 
+    let layout = build_ui_layout(&ui_ast);
+
     Ok(SessionResponse {
         title: None,
         ui_ast,
         data: defaults_value,
         formats,
+        layout: Some(layout),
     })
 }
 

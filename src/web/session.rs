@@ -30,6 +30,7 @@ use ts_rs::TS;
 use crate::io::{DocumentFormat, input::schema_with_defaults};
 
 use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
+use crate::ui_ast::layout::{UiLayout, build_ui_layout};
 use crate::ui_ast::{UiAst, build_ui_ast};
 
 pub struct WebSessionBuilder {
@@ -279,6 +280,7 @@ pub struct SessionResponse {
     #[ts(type = "Record<string, unknown>")]
     pub data: Value,
     pub formats: Vec<String>,
+    pub layout: Option<UiLayout>,
 }
 
 async fn get_session(State(state): State<SharedState>) -> impl IntoResponse {
@@ -298,11 +300,14 @@ async fn get_session_export(State(state): State<SharedState>) -> impl IntoRespon
 
 async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
     const DEFAULT_PATH: &str = "/tmp/schemaui-session.json";
+    let ui_ast = (*state.ui_ast).clone();
+    let layout = build_ui_layout(&ui_ast);
     let payload = SessionResponse {
         title: state.title.clone(),
-        ui_ast: (*state.ui_ast).clone(),
+        ui_ast,
         data: state.data.lock().await.clone(),
         formats: state.formats.iter().map(|f| f.to_string()).collect(),
+        layout: Some(layout),
     };
     if let Ok(serialized) = serde_json::to_vec_pretty(&payload) {
         let path = std::env::var("SCHEMAUI_SESSION_DUMP").unwrap_or_else(|_| DEFAULT_PATH.into());
