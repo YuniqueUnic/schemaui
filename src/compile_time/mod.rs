@@ -7,6 +7,9 @@ use crate::io::DocumentFormat;
 use crate::io::input::parse_document_str;
 use crate::ui_ast::{UiAst, build_ui_ast};
 
+pub mod defaults;
+pub mod layout;
+
 #[cfg(feature = "tui")]
 pub mod tui;
 
