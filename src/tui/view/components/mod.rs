@@ -3,7 +3,7 @@ pub(crate) mod fields;
 mod footer;
 mod help;
 mod layout;
-mod overlay;
+pub(crate) mod overlay;
 mod popup;
 mod sections;
 mod tabstrip;

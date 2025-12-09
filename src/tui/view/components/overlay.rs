@@ -62,12 +62,29 @@ pub fn render_composite_overlay(
     }
 
     let body_area = layout[next];
-    if let Some(description) = &overlay.description {
+    let layout_desc = layout_section_description(overlay_form);
+    let combined_description = if overlay.description.is_some() || layout_desc.is_some() {
+        let mut text = String::new();
+        if let Some(desc) = &overlay.description {
+            text.push_str(desc);
+        }
+        if let Some(layout) = layout_desc {
+            if !text.is_empty() {
+                text.push_str("\n\n");
+            }
+            text.push_str(&layout);
+        }
+        Some(text)
+    } else {
+        None
+    };
+
+    if let Some(description) = combined_description {
         let sub = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(4), Constraint::Min(1)])
             .split(body_area);
-        let desc = Paragraph::new(description.to_string())
+        let desc = Paragraph::new(description)
             .wrap(Wrap { trim: true })
             .style(Style::default().fg(Color::Gray));
         frame.render_widget(desc, sub[0]);
@@ -86,4 +103,21 @@ pub fn render_composite_overlay(
                 .title("Overlay Controls"),
         );
     frame.render_widget(footer, footer_area);
+}
+
+pub(crate) fn layout_section_description(form: &FormState) -> Option<String> {
+    let nav = form.layout_nav()?;
+    let pointer = form
+        .focused_field()
+        .map(|field| field.schema.pointer.clone())?;
+
+    for root in &nav.roots {
+        for section in &root.sections {
+            if section.pointers.iter().any(|p| p == &pointer) {
+                return Some(format!("Section: {} - {}", root.title, section.title));
+            }
+        }
+    }
+
+    None
 }
