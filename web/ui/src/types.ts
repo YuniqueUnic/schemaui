@@ -21,10 +21,16 @@ export type ValidationResponse = Omit<ServerValidationResponse, "errors"> & {
   errors: FieldError[];
 };
 
-export type SessionResponse = Omit<ServerSessionResponse, "data" | "ui_ast"> & {
-  data: JsonValue;
-  ui_ast: UiAst;
-};
+export type SessionResponse =
+  & Omit<
+    ServerSessionResponse,
+    "data" | "ui_ast" | "layout" | "blueprint"
+  >
+  & {
+    data: JsonValue;
+    ui_ast: UiAst;
+    layout?: UiLayout | null;
+  };
 
 export type SaveRequest = Omit<ServerSaveRequest, "data"> & {
   data: JsonValue;
@@ -88,4 +94,25 @@ export interface UiVariant {
 
 export interface UiAst {
   roots: UiNode[];
+}
+
+export interface UiLayout {
+  roots: LayoutRoot[];
+}
+
+export interface LayoutRoot {
+  id: string;
+  title: string | null;
+  description: string | null;
+  sections: LayoutSection[];
+}
+
+export interface LayoutSection {
+  id: string;
+  title: string;
+  description: string | null;
+  pointer: string;
+  path: string[];
+  field_pointers: string[];
+  children: LayoutSection[];
 }
