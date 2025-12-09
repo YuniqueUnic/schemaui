@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use crate::compile_time::web;
 use crate::io::DocumentFormat;
+use crate::precompile::web;
 
 fn schema_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

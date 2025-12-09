@@ -1,4 +1,4 @@
-// #[cfg(feature = "compile_time")]
-mod compile_time_tests;
+// #[cfg(feature = "precompile")]
 mod layout_tests;
+mod precompile_tests;
 mod resolver_tests;

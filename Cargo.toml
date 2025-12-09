@@ -42,7 +42,7 @@ json = []
 yaml = ["dep:serde_yaml"]
 toml = ["dep:toml"]
 
-compile_time = []
+precompile = []
 
 # use debug features for debugging which is more flexible than debug_assertions
 debug = []

@@ -2,9 +2,9 @@ use std::{fs, path::PathBuf};
 
 use serde_json::Value;
 
-use crate::compile_time;
-use crate::compile_time::tui as ct_tui;
 use crate::io::{DocumentFormat, input::parse_document_str};
+use crate::precompile;
+use crate::precompile::tui as ct_tui;
 use crate::tui::model::form_schema_from_ui_ast;
 use crate::tui::state::LayoutNavModel;
 use crate::ui_ast::{build_ui_ast, index::collect_pointers, layout::build_ui_layout};
@@ -17,31 +17,31 @@ fn schema_path() -> PathBuf {
 }
 
 #[test]
-fn compile_time_and_runtime_ui_ast_match_for_comprehensive_schema() {
+fn precompile_and_runtime_ui_ast_match_for_comprehensive_schema() {
     let path = schema_path();
 
-    let compile_time_ast = compile_time::build_ui_ast_from_file(&path, DocumentFormat::Json)
-        .expect("compile_time UiAst");
+    let precompile_ast =
+        precompile::build_ui_ast_from_file(&path, DocumentFormat::Json).expect("precompile UiAst");
 
     let contents = std::fs::read_to_string(&path).expect("schema file readable");
     let schema_value: Value =
         parse_document_str(&contents, DocumentFormat::Json).expect("schema parses at runtime");
     let runtime_ast = build_ui_ast(&schema_value).expect("runtime UiAst");
 
-    let compile_time_pointers = collect_pointers(&compile_time_ast);
+    let precompile_pointers = collect_pointers(&precompile_ast);
     let runtime_pointers = collect_pointers(&runtime_ast);
 
-    assert_eq!(runtime_pointers, compile_time_pointers);
+    assert_eq!(runtime_pointers, precompile_pointers);
 }
 
 #[test]
 fn ui_ast_json_roundtrip_preserves_structure() {
     let path = schema_path();
 
-    let original = compile_time::build_ui_ast_from_file(&path, DocumentFormat::Json)
-        .expect("compile_time UiAst");
-    let json = compile_time::ui_ast_to_json(&original).expect("UiAst to JSON");
-    let decoded = compile_time::decode_ui_ast(&json).expect("decode UiAst from JSON");
+    let original =
+        precompile::build_ui_ast_from_file(&path, DocumentFormat::Json).expect("precompile UiAst");
+    let json = precompile::ui_ast_to_json(&original).expect("UiAst to JSON");
+    let decoded = precompile::decode_ui_ast(&json).expect("decode UiAst from JSON");
 
     assert_eq!(original, decoded);
 }
@@ -50,9 +50,9 @@ fn ui_ast_json_roundtrip_preserves_structure() {
 fn precompiled_form_schema_matches_runtime_form_schema() {
     let path = schema_path();
 
-    // 1) Precompiled-style build via compile_time::tui helper.
+    // 1) Precompiled-style build via precompile::tui helper.
     let (ct_ast, ct_form) = ct_tui::build_tui_form_schema_from_file(&path, DocumentFormat::Json)
-        .expect("compile_time FormSchema");
+        .expect("precompile FormSchema");
 
     // 2) Runtime-style build from the same schema file.
     let contents = fs::read_to_string(&path).expect("schema file readable");
@@ -130,10 +130,10 @@ fn precompiled_form_schema_matches_runtime_form_schema() {
 fn precompiled_layout_nav_matches_runtime_layout_nav() {
     let path = schema_path();
 
-    // 1) Precompiled-style build via compile_time::tui helper.
+    // 1) Precompiled-style build via precompile::tui helper.
     let (ct_ast, ct_nav): (_, LayoutNavModel) =
         ct_tui::build_tui_layout_nav_from_file(&path, DocumentFormat::Json)
-            .expect("compile_time LayoutNavModel");
+            .expect("precompile LayoutNavModel");
 
     // 2) Runtime-style build from the same schema file.
     let contents = fs::read_to_string(&path).expect("schema file readable");

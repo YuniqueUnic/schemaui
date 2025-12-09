@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::{Result, bail};
 use schemaui::DocumentFormat;
-use schemaui::compile_time::layout::build_ui_layout_from_file;
+use schemaui::precompile::layout::build_ui_layout_from_file;
 
 fn main() -> Result<()> {
     let args = env::args().skip(1).collect::<Vec<_>>();

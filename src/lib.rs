@@ -3,9 +3,8 @@
 
 mod core;
 pub mod io;
-// mod presentation;
-// #[cfg(feature = "compile_time")]
-pub mod compile_time;
+// #[cfg(feature = "precompile")]
+pub mod precompile;
 mod schema;
 mod tui;
 pub mod ui_ast;
