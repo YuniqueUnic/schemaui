@@ -82,7 +82,9 @@ impl CompositeEditorOverlay {
         if !self.focus_form_default() {
             return false;
         }
-        self.form_state_mut().focus_first_field();
+        if !self.form_state_mut().focus_first_field_with_layout() {
+            self.form_state_mut().focus_first_field();
+        }
         true
     }
 

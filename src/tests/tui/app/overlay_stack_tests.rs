@@ -238,6 +238,44 @@ fn entry_focus_respects_arrow_keys() {
 }
 
 #[test]
+fn composite_overlay_uses_layout_nav_for_default_focus() {
+    let mut app = build_nested_overlay_app();
+    activate_service_variant(&mut app);
+
+    // Focus the top-level /service field to open its composite overlay.
+    {
+        let form_state = app.form_state_mut_for_test();
+        focus_field(form_state, "/service");
+    }
+
+    app.open_overlay_for_test();
+    assert_eq!(app.overlay_depth_for_test(), 1);
+
+    let overlay_form = app
+        .active_overlay_form_state_for_test()
+        .expect("overlay form level1");
+
+    // The overlay FormState should carry a LayoutNavModel derived from UiLayout.
+    assert!(overlay_form.layout_nav().is_some());
+
+    let pointer = overlay_form
+        .focused_field()
+        .map(|field| field.schema.pointer.clone())
+        .unwrap_or_else(|| "<none>".to_string());
+
+    // For the `service` variant schema, the first layout field is `/routes`.
+    assert_eq!(pointer, "/routes");
+
+    // layout-driven first-field focus should be idempotent and succeed.
+    assert!(overlay_form.focus_first_field_with_layout());
+    let pointer_after = overlay_form
+        .focused_field()
+        .map(|field| field.schema.pointer.clone())
+        .unwrap_or_else(|| "<none>".to_string());
+    assert_eq!(pointer_after, "/routes");
+}
+
+#[test]
 fn scalar_array_overlay_opens_for_primitive_array_field() {
     let mut app = build_scalar_array_overlay_app();
     {

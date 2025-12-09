@@ -7,11 +7,12 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     tui::model::{CompositeField, CompositeMode, form_schema_from_ui_ast},
-    ui_ast::build_ui_ast,
+    ui_ast::{build_ui_ast, layout::build_ui_layout},
 };
 
 use super::{
-    error::FieldCoercionError, field::components::ComponentPalette, form_state::FormState,
+    LayoutNavModel, error::FieldCoercionError, field::components::ComponentPalette,
+    form_state::FormState,
 };
 
 mod composite_list;
@@ -446,10 +447,14 @@ impl CompositeVariantState {
             message: format!("failed to parse composite variant '{}': {err}", self.title),
         })?;
         let schema = form_schema_from_ui_ast(&ui_ast);
-        *self.form.borrow_mut() = Some(FormState::from_schema_with_palette(
-            &schema,
-            Arc::clone(&self.palette),
-        ));
+
+        let layout = build_ui_layout(&ui_ast);
+        let layout_nav = LayoutNavModel::from_uilayout(&layout);
+
+        let mut form_state =
+            FormState::from_schema_with_palette(&schema, Arc::clone(&self.palette));
+        form_state.set_layout_nav(layout_nav);
+        *self.form.borrow_mut() = Some(form_state);
         Ok(())
     }
 

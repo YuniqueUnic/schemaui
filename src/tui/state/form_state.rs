@@ -347,6 +347,30 @@ impl FormState {
         false
     }
 
+    pub fn focus_first_field_with_layout(&mut self) -> bool {
+        let nav = match self.layout_nav.clone() {
+            Some(nav) => nav,
+            None => return false,
+        };
+
+        for root in &nav.roots {
+            for section in &root.sections {
+                let target_pointer = section
+                    .first_pointer
+                    .as_ref()
+                    .or_else(|| section.pointers.first())
+                    .cloned();
+                if let Some(ptr) = target_pointer
+                    && self.focus_field_by_pointer(&ptr)
+                {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
     pub fn clear_error(&mut self, pointer: &str) {
         for section in self.iter_sections_mut() {
             for field in &mut section.fields {
