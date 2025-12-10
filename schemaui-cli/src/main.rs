@@ -17,5 +17,7 @@ fn main() -> Result<()> {
         Some(Commands::Tui) | None => tui::run_cli(&cli.common),
         #[cfg(feature = "web")]
         Some(Commands::Web(args)) => web::run_cli(args),
+        #[cfg(feature = "web")]
+        Some(Commands::WebSnapshot(args)) => web::run_snapshot_cli(args),
     }
 }

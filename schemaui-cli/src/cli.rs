@@ -27,6 +27,10 @@ pub enum Commands {
     #[cfg(feature = "web")]
     /// Launch the interactive web UI instead of the terminal UI
     Web(WebCommand),
+
+    #[cfg(feature = "web")]
+    /// Precompute Web session snapshots instead of launching the UI
+    WebSnapshot(WebSnapshotCommand),
 }
 
 #[cfg(feature = "web")]
@@ -44,6 +48,25 @@ pub struct WebCommand {
     /// Bind port for the temporary HTTP server (0 picks a random free port)
     #[arg(short = 'p', long = "port", value_name = "PORT", default_value_t = 0)]
     pub port: u16,
+}
+
+#[cfg(feature = "web")]
+#[derive(Debug, Parser, Clone)]
+pub struct WebSnapshotCommand {
+    #[command(flatten)]
+    pub common: CommonArgs,
+
+    /// Output directory for generated Web snapshots (JSON + TS)
+    #[arg(long = "out-dir", value_name = "DIR", default_value = "web_snapshots")]
+    pub out_dir: PathBuf,
+
+    /// Name of the exported constant in the generated TS module
+    #[arg(
+        long = "ts-export",
+        value_name = "NAME",
+        default_value = "PrecompiledSession"
+    )]
+    pub ts_export: String,
 }
 
 #[derive(Debug, Parser, Clone)]
