@@ -31,6 +31,9 @@ pub enum Commands {
     #[cfg(feature = "web")]
     /// Precompute Web session snapshots instead of launching the UI
     WebSnapshot(WebSnapshotCommand),
+
+    /// Precompute TUI FormSchema/LayoutNavModel modules instead of launching the UI
+    TuiSnapshot(TuiSnapshotCommand),
 }
 
 #[cfg(feature = "web")]
@@ -67,6 +70,36 @@ pub struct WebSnapshotCommand {
         default_value = "PrecompiledSession"
     )]
     pub ts_export: String,
+}
+
+#[derive(Debug, Parser, Clone)]
+pub struct TuiSnapshotCommand {
+    #[command(flatten)]
+    pub common: CommonArgs,
+
+    /// Output directory for generated TUI precompiled modules (Rust source)
+    #[arg(
+        long = "out-dir",
+        value_name = "DIR",
+        default_value = "tui_precompiled"
+    )]
+    pub out_dir: PathBuf,
+
+    /// Name of the generated FormSchema constructor function
+    #[arg(
+        long = "form-fn",
+        value_name = "NAME",
+        default_value = "precompiled_form_schema"
+    )]
+    pub form_fn: String,
+
+    /// Name of the generated LayoutNavModel constructor function
+    #[arg(
+        long = "layout-fn",
+        value_name = "NAME",
+        default_value = "precompiled_layout_nav"
+    )]
+    pub layout_fn: String,
 }
 
 #[derive(Debug, Parser, Clone)]

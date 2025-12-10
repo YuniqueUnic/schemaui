@@ -110,7 +110,7 @@ fn precompiled_form_schema_matches_runtime_form_schema() {
             ct_form.roots.len(),
             rt_form.roots.len()
         );
-        if let (Some(ct_root), Some(rt_root)) = (ct_form.roots.get(0), rt_form.roots.get(0)) {
+        if let (Some(ct_root), Some(rt_root)) = (ct_form.roots.first(), rt_form.roots.first()) {
             eprintln!(
                 " root[0]: ct_id={} ct_sections={} rt_id={} rt_sections={}",
                 ct_root.id,
@@ -167,7 +167,7 @@ fn precompiled_layout_nav_matches_runtime_layout_nav() {
             ct_nav.roots.len(),
             rt_nav.roots.len()
         );
-        if let (Some(ct_root), Some(rt_root)) = (ct_nav.roots.get(0), rt_nav.roots.get(0)) {
+        if let (Some(ct_root), Some(rt_root)) = (ct_nav.roots.first(), rt_nav.roots.first()) {
             eprintln!(
                 " root[0]: ct_id={} ct_sections={} rt_id={} rt_sections={}",
                 ct_root.id,
@@ -176,7 +176,7 @@ fn precompiled_layout_nav_matches_runtime_layout_nav() {
                 rt_root.sections.len()
             );
             if let (Some(ct_section), Some(rt_section)) =
-                (ct_root.sections.get(0), rt_root.sections.get(0))
+                (ct_root.sections.first(), rt_root.sections.first())
             {
                 eprintln!(
                     " section[0]: ct_id={} ct_pointers_len={} rt_id={} rt_pointers_len={}",

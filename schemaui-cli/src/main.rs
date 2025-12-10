@@ -15,6 +15,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Some(Commands::Tui) | None => tui::run_cli(&cli.common),
+        Some(Commands::TuiSnapshot(args)) => tui::run_snapshot_cli(args),
         #[cfg(feature = "web")]
         Some(Commands::Web(args)) => web::run_cli(args),
         #[cfg(feature = "web")]
