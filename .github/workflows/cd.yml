@@ -99,7 +99,7 @@ jobs:
       - run: echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
         if: endsWith(matrix.target, 'windows-msvc')
 
-      - uses: taiki-e/upload-rust-binary-action@v1.27.0
+      - uses: taiki-e/upload-rust-binary-action@v1.28.0
         with:
           package: schemaui-cli
           bin: schemaui
