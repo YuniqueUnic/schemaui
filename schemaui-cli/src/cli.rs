@@ -85,6 +85,10 @@ pub struct TuiSnapshotCommand {
     )]
     pub out_dir: PathBuf,
 
+    /// Name of the generated TuiArtifacts constructor function
+    #[arg(long = "tui-fn", value_name = "NAME", default_value = "tui_artifacts")]
+    pub tui_fn: String,
+
     /// Name of the generated FormSchema constructor function
     #[arg(
         long = "form-fn",

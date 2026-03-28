@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use serde_json::{Value, json};
 
 use crate::io::{DocumentFormat, input::parse_document_str};
-use crate::precompile::build_precompiled_ui_bundle;
+use crate::precompile::build_ui_artifact_bundle;
 use crate::tui::session::resolve_tui_artifacts;
 
 fn schema_path() -> PathBuf {
@@ -32,15 +32,10 @@ fn resolve_tui_artifacts_matches_runtime_when_bundle_supplies_tui_derivatives() 
     });
 
     let bundle =
-        build_precompiled_ui_bundle(&schema, Some(&defaults)).expect("build precompiled UI bundle");
+        build_ui_artifact_bundle(&schema, Some(&defaults)).expect("build UI artifact bundle");
 
-    let runtime = resolve_tui_artifacts(&bundle.ui.ui_ast, &bundle.ui.layout, None, None);
-    let precompiled = resolve_tui_artifacts(
-        &bundle.ui.ui_ast,
-        &bundle.ui.layout,
-        Some(bundle.tui.form_schema.clone()),
-        Some(bundle.tui.layout_nav.clone()),
-    );
+    let runtime = resolve_tui_artifacts(&bundle.ui.ui_ast, &bundle.ui.layout, None);
+    let precompiled = resolve_tui_artifacts(&bundle.ui.ui_ast, &bundle.ui.layout, Some(bundle.tui));
 
     assert_eq!(runtime, precompiled);
 }

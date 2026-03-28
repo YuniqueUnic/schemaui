@@ -28,7 +28,7 @@ use tokio::{
 use ts_rs::TS;
 
 use crate::io::{DocumentFormat, input::schema_with_defaults};
-use crate::precompile::PrecompiledUiBundle;
+use crate::precompile::UiArtifactBundle;
 
 use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
 use crate::ui_ast::{UiAst, UiAstBundle, UiLayout, build_ui_ast_bundle};
@@ -38,8 +38,8 @@ pub struct WebSessionBuilder {
     defaults: Option<Value>,
     title: Option<String>,
     asset_provider: Arc<dyn WebAssetProvider>,
-    precompiled_ui_bundle: Option<UiAstBundle>,
-    precompiled_artifacts: Option<PrecompiledUiBundle>,
+    ui_bundle: Option<UiAstBundle>,
+    ui_artifact_bundle: Option<UiArtifactBundle>,
 }
 
 impl WebSessionBuilder {
@@ -50,8 +50,8 @@ impl WebSessionBuilder {
             title: None,
             #[allow(clippy::default_constructed_unit_structs)]
             asset_provider: Arc::new(EmbeddedAssets::default()),
-            precompiled_ui_bundle: None,
-            precompiled_artifacts: None,
+            ui_bundle: None,
+            ui_artifact_bundle: None,
         }
     }
 
@@ -75,21 +75,21 @@ impl WebSessionBuilder {
         self
     }
 
-    /// Provide a precompiled UiAst built at compile-time for this schema.
-    pub fn with_precompiled_ui_ast(mut self, ast: UiAst) -> Self {
-        self.precompiled_ui_bundle = Some(UiAstBundle::from_ui_ast(ast));
+    /// Provide a prepared UiAst for this schema.
+    pub fn with_ui_ast(mut self, ast: UiAst) -> Self {
+        self.ui_bundle = Some(UiAstBundle::from_ui_ast(ast));
         self
     }
 
-    /// Provide a precompiled bundle of shared UI artifacts for this schema.
-    pub fn with_precompiled_ui_bundle(mut self, bundle: UiAstBundle) -> Self {
-        self.precompiled_ui_bundle = Some(bundle);
+    /// Provide a prepared bundle of shared UI artifacts for this schema.
+    pub fn with_ui_bundle(mut self, bundle: UiAstBundle) -> Self {
+        self.ui_bundle = Some(bundle);
         self
     }
 
-    /// Provide a fully precompiled artifact bundle.
-    pub fn with_precompiled_artifacts(mut self, bundle: PrecompiledUiBundle) -> Self {
-        self.precompiled_artifacts = Some(bundle);
+    /// Provide a prepared UI artifact bundle.
+    pub fn with_ui_artifact_bundle(mut self, bundle: UiArtifactBundle) -> Self {
+        self.ui_artifact_bundle = Some(bundle);
         self
     }
 
@@ -99,9 +99,9 @@ impl WebSessionBuilder {
             .take()
             .unwrap_or_else(|| Value::Object(Map::new()));
         let schema = schema_with_defaults(&self.schema, &data);
-        let bundle = if let Some(bundle) = self.precompiled_artifacts.take() {
+        let bundle = if let Some(bundle) = self.ui_artifact_bundle.take() {
             bundle.ui
-        } else if let Some(bundle) = self.precompiled_ui_bundle.take() {
+        } else if let Some(bundle) = self.ui_bundle.take() {
             bundle
         } else {
             build_ui_ast_bundle(&schema)?

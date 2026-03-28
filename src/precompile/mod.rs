@@ -20,39 +20,39 @@ pub mod tui;
 #[cfg(feature = "web")]
 pub mod web;
 
-pub const PRECOMPILED_UI_BUNDLE_VERSION: u32 = 1;
+pub const UI_ARTIFACT_BUNDLE_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PrecompiledUiFingerprint {
+pub struct UiArtifactFingerprint {
     pub schema_sha256: String,
     pub defaults_sha256: String,
     pub input_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TuiPrecompiledArtifacts {
+pub struct TuiArtifacts {
     pub form_schema: FormSchema,
     pub layout_nav: LayoutNavModel,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PrecompiledUiBundle {
+pub struct UiArtifactBundle {
     pub artifact_version: u32,
-    pub fingerprint: PrecompiledUiFingerprint,
+    pub fingerprint: UiArtifactFingerprint,
     pub ui: UiAstBundle,
-    pub tui: TuiPrecompiledArtifacts,
+    pub tui: TuiArtifacts,
 }
 
-pub fn build_precompiled_ui_bundle(
+pub fn build_ui_artifact_bundle(
     schema: &Value,
     defaults: Option<&Value>,
-) -> Result<PrecompiledUiBundle> {
+) -> Result<UiArtifactBundle> {
     let defaults = defaults
         .cloned()
         .unwrap_or_else(|| Value::Object(Map::new()));
     let enriched = schema_with_defaults(schema, &defaults);
     let ui = build_ui_ast_bundle(&enriched)?;
-    let fingerprint = PrecompiledUiFingerprint {
+    let fingerprint = UiArtifactFingerprint {
         schema_sha256: sha256_hex(&stable_value_bytes(schema)?),
         defaults_sha256: sha256_hex(&stable_value_bytes(&defaults)?),
         input_sha256: sha256_hex(&stable_value_bytes(&Value::Object(Map::from_iter([
@@ -61,10 +61,10 @@ pub fn build_precompiled_ui_bundle(
         ])))?),
     };
 
-    Ok(PrecompiledUiBundle {
-        artifact_version: PRECOMPILED_UI_BUNDLE_VERSION,
+    Ok(UiArtifactBundle {
+        artifact_version: UI_ARTIFACT_BUNDLE_VERSION,
         fingerprint,
-        tui: TuiPrecompiledArtifacts {
+        tui: TuiArtifacts {
             form_schema: form_schema_from_ui_ast(&ui.ui_ast),
             layout_nav: LayoutNavModel::from_uilayout(&ui.layout),
         },
@@ -72,18 +72,18 @@ pub fn build_precompiled_ui_bundle(
     })
 }
 
-pub fn build_precompiled_ui_bundle_from_file(
+pub fn build_ui_artifact_bundle_from_file(
     schema_path: &Path,
     schema_format: DocumentFormat,
     defaults_path: Option<&Path>,
-) -> Result<PrecompiledUiBundle> {
+) -> Result<UiArtifactBundle> {
     let schema = read_document_file(schema_path, schema_format)?;
     let defaults = if let Some(path) = defaults_path {
         Some(read_document_file(path, schema_format)?)
     } else {
         None
     };
-    build_precompiled_ui_bundle(&schema, defaults.as_ref())
+    build_ui_artifact_bundle(&schema, defaults.as_ref())
 }
 
 /// Read a schema file, parse it as JSON/YAML/TOML, and build a UiAst.
@@ -138,27 +138,27 @@ pub fn decode_ui_ast_bundle(json: &str) -> Result<UiAstBundle> {
     Ok(serde_json::from_str(json)?)
 }
 
-pub fn precompiled_ui_bundle_to_json(bundle: &PrecompiledUiBundle) -> Result<String> {
+pub fn ui_artifact_bundle_to_json(bundle: &UiArtifactBundle) -> Result<String> {
     Ok(serde_json::to_string_pretty(bundle)?)
 }
 
-pub fn decode_precompiled_ui_bundle(json: &str) -> Result<PrecompiledUiBundle> {
+pub fn decode_ui_artifact_bundle(json: &str) -> Result<UiArtifactBundle> {
     Ok(serde_json::from_str(json)?)
 }
 
 /// Generate a Rust module under OUT_DIR that exposes a constructor for
-/// `PrecompiledUiBundle` built from the given schema and optional defaults.
-pub fn generate_precompiled_ui_bundle_module(
+/// `UiArtifactBundle` built from the given schema and optional defaults.
+pub fn generate_ui_artifact_bundle_module(
     schema_path: &Path,
     format: DocumentFormat,
     defaults_path: Option<&Path>,
     out_module_path: &Path,
     fn_name: &str,
 ) -> Result<()> {
-    let bundle = build_precompiled_ui_bundle_from_file(schema_path, format, defaults_path)?;
-    let json = precompiled_ui_bundle_to_json(&bundle)?;
+    let bundle = build_ui_artifact_bundle_from_file(schema_path, format, defaults_path)?;
+    let json = ui_artifact_bundle_to_json(&bundle)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::precompile::PrecompiledUiBundle {{\n    serde_json::from_str::<schemaui::precompile::PrecompiledUiBundle>(r#\"{json}\"#).expect(\"invalid precompiled UI bundle JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::precompile::UiArtifactBundle {{\n    serde_json::from_str::<schemaui::precompile::UiArtifactBundle>(r#\"{json}\"#).expect(\"invalid UI artifact bundle JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())

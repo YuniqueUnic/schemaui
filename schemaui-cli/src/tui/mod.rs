@@ -54,18 +54,57 @@ pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {
         )));
     }
 
+    let config_spec = cmd.common.config.as_deref();
+    if config_spec == Some("-") {
+        return Err(Report::msg(
+            "tui-snapshot does not support --config - (stdin); please pass a file path",
+        ));
+    }
+
+    let defaults_path = config_spec.map(PathBuf::from);
+    if let Some(ref path) = defaults_path
+        && !path.exists()
+    {
+        return Err(Report::msg(format!(
+            "config path {:?} does not exist",
+            path
+        )));
+    }
+
     let format = DocumentFormat::from_extension(&schema_path).unwrap_or(DocumentFormat::Json);
 
     fs::create_dir_all(&cmd.out_dir)?;
+    let tui_module = cmd.out_dir.join("tui_artifacts.rs");
     let form_module = cmd.out_dir.join("precompiled_form_schema.rs");
     let layout_module = cmd.out_dir.join("precompiled_layout_nav.rs");
 
-    pre_tui::generate_tui_form_schema_module(&schema_path, format, &form_module, &cmd.form_fn)
-        .map_err(Report::msg)?;
-    pre_tui::generate_tui_layout_nav_module(&schema_path, format, &layout_module, &cmd.layout_fn)
-        .map_err(Report::msg)?;
+    pre_tui::generate_tui_artifacts_module(
+        &schema_path,
+        format,
+        defaults_path.as_deref(),
+        &tui_module,
+        &cmd.tui_fn,
+    )
+    .map_err(Report::msg)?;
+    pre_tui::generate_tui_form_schema_module(
+        &schema_path,
+        format,
+        defaults_path.as_deref(),
+        &form_module,
+        &cmd.form_fn,
+    )
+    .map_err(Report::msg)?;
+    pre_tui::generate_tui_layout_nav_module(
+        &schema_path,
+        format,
+        defaults_path.as_deref(),
+        &layout_module,
+        &cmd.layout_fn,
+    )
+    .map_err(Report::msg)?;
 
     eprintln!("Generated TUI precompiled modules:");
+    eprintln!("  TuiArtifacts module:    {:?}", tui_module);
     eprintln!("  FormSchema module:      {:?}", form_module);
     eprintln!("  LayoutNavModel module:  {:?}", layout_module);
 

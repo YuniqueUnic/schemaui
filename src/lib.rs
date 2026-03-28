@@ -22,6 +22,7 @@ pub use io::{
     },
     output::{OutputDestination, OutputOptions},
 };
+pub use precompile::{TuiArtifacts, UiArtifactBundle};
 pub use tui::{
     app::{SchemaUI, options::UiOptions},
     model::FormSchema,

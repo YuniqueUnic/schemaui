@@ -7,7 +7,7 @@ use std::{
 
 use serde_json::{Value, json};
 
-use crate::io::{DocumentFormat, input::parse_document_str};
+use crate::io::{DocumentFormat, input::parse_document_str, input::schema_with_defaults};
 use crate::precompile;
 use crate::precompile::tui as ct_tui;
 use crate::tui::model::form_schema_from_ui_ast;
@@ -42,6 +42,18 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         std::process::id(),
         stamp
     ))
+}
+
+fn write_defaults_file(prefix: &str, defaults: &Value) -> (PathBuf, PathBuf) {
+    let out_dir = unique_temp_dir(prefix);
+    fs::create_dir_all(&out_dir).expect("tmp dir creatable");
+    let defaults_path = out_dir.join("defaults.json");
+    fs::write(
+        &defaults_path,
+        serde_json::to_vec_pretty(defaults).expect("serialize defaults"),
+    )
+    .expect("write defaults file");
+    (out_dir, defaults_path)
 }
 
 #[test]
@@ -90,25 +102,18 @@ fn ui_ast_bundle_json_roundtrip_preserves_structure() {
 fn precompiled_ui_bundle_roundtrip_preserves_structure() {
     let path = schema_path();
     let defaults = defaults_value();
-    let out_dir = unique_temp_dir("precompiled_bundle_roundtrip");
-    fs::create_dir_all(&out_dir).expect("tmp dir creatable");
-    let defaults_path = out_dir.join("defaults.json");
-    fs::write(
-        &defaults_path,
-        serde_json::to_vec_pretty(&defaults).expect("serialize defaults"),
-    )
-    .expect("write defaults file");
+    let (out_dir, defaults_path) = write_defaults_file("precompiled_bundle_roundtrip", &defaults);
 
-    let original = precompile::build_precompiled_ui_bundle_from_file(
+    let original = precompile::build_ui_artifact_bundle_from_file(
         &path,
         DocumentFormat::Json,
         Some(&defaults_path),
     )
-    .expect("precompile UI bundle");
-    let json = precompile::precompiled_ui_bundle_to_json(&original)
-        .expect("precompiled UI bundle to JSON");
-    let decoded = precompile::decode_precompiled_ui_bundle(&json)
-        .expect("decode precompiled UI bundle from JSON");
+    .expect("build UI artifact bundle");
+    let json =
+        precompile::ui_artifact_bundle_to_json(&original).expect("UI artifact bundle to JSON");
+    let decoded =
+        precompile::decode_ui_artifact_bundle(&json).expect("decode UI artifact bundle from JSON");
 
     assert_eq!(original, decoded);
 
@@ -126,16 +131,16 @@ fn precompiled_ui_bundle_version_and_fingerprint_track_schema_and_defaults() {
     let schema_value: Value =
         parse_document_str(&contents, DocumentFormat::Json).expect("schema parses at runtime");
 
-    let bundle_a = precompile::build_precompiled_ui_bundle(&schema_value, Some(&defaults_a))
+    let bundle_a = precompile::build_ui_artifact_bundle(&schema_value, Some(&defaults_a))
         .expect("build bundle a");
-    let bundle_a_again = precompile::build_precompiled_ui_bundle(&schema_value, Some(&defaults_a))
+    let bundle_a_again = precompile::build_ui_artifact_bundle(&schema_value, Some(&defaults_a))
         .expect("build bundle a again");
-    let bundle_b = precompile::build_precompiled_ui_bundle(&schema_value, Some(&defaults_b))
+    let bundle_b = precompile::build_ui_artifact_bundle(&schema_value, Some(&defaults_b))
         .expect("build bundle b");
 
     assert_eq!(
         bundle_a.artifact_version,
-        precompile::PRECOMPILED_UI_BUNDLE_VERSION
+        precompile::UI_ARTIFACT_BUNDLE_VERSION
     );
     assert_eq!(bundle_a.fingerprint, bundle_a_again.fingerprint);
     assert_eq!(
@@ -155,16 +160,20 @@ fn precompiled_ui_bundle_version_and_fingerprint_track_schema_and_defaults() {
 #[test]
 fn precompiled_form_schema_matches_runtime_form_schema() {
     let path = schema_path();
+    let defaults = defaults_value();
+    let (out_dir, defaults_path) = write_defaults_file("precompiled_form_schema", &defaults);
 
     // 1) Precompiled-style build via precompile::tui helper.
-    let (ct_ast, ct_form) = ct_tui::build_tui_form_schema_from_file(&path, DocumentFormat::Json)
-        .expect("precompile FormSchema");
+    let (ct_ast, ct_form) =
+        ct_tui::build_tui_form_schema_from_file(&path, DocumentFormat::Json, Some(&defaults_path))
+            .expect("precompile FormSchema");
 
     // 2) Runtime-style build from the same schema file.
     let contents = fs::read_to_string(&path).expect("schema file readable");
     let schema_value: Value =
         parse_document_str(&contents, DocumentFormat::Json).expect("schema parses at runtime");
-    let rt_ast = build_ui_ast(&schema_value).expect("runtime UiAst");
+    let enriched = schema_with_defaults(&schema_value, &defaults);
+    let rt_ast = build_ui_ast(&enriched).expect("runtime UiAst");
     let rt_form = form_schema_from_ui_ast(&rt_ast);
 
     // 3) Assert UiAst and FormSchema equivalence (via JSON for FormSchema).
@@ -230,22 +239,28 @@ fn precompiled_form_schema_matches_runtime_form_schema() {
         ct_form_json, rt_form_json,
         "precompiled and runtime FormSchema JSON must match"
     );
+
+    let _ = fs::remove_file(&defaults_path);
+    let _ = fs::remove_dir_all(&out_dir);
 }
 
 #[test]
 fn precompiled_layout_nav_matches_runtime_layout_nav() {
     let path = schema_path();
+    let defaults = defaults_value();
+    let (out_dir, defaults_path) = write_defaults_file("precompiled_layout_nav", &defaults);
 
     // 1) Precompiled-style build via precompile::tui helper.
     let (ct_ast, ct_nav): (_, LayoutNavModel) =
-        ct_tui::build_tui_layout_nav_from_file(&path, DocumentFormat::Json)
+        ct_tui::build_tui_layout_nav_from_file(&path, DocumentFormat::Json, Some(&defaults_path))
             .expect("precompile LayoutNavModel");
 
     // 2) Runtime-style build from the same schema file.
     let contents = fs::read_to_string(&path).expect("schema file readable");
     let schema_value: Value =
         parse_document_str(&contents, DocumentFormat::Json).expect("schema parses at runtime");
-    let rt_ast = build_ui_ast(&schema_value).expect("runtime UiAst");
+    let enriched = schema_with_defaults(&schema_value, &defaults);
+    let rt_ast = build_ui_ast(&enriched).expect("runtime UiAst");
     let rt_layout = build_ui_layout(&rt_ast);
     let rt_nav = LayoutNavModel::from_uilayout(&rt_layout);
 
@@ -302,23 +317,36 @@ fn precompiled_layout_nav_matches_runtime_layout_nav() {
         ct_nav_json, rt_nav_json,
         "precompiled and runtime LayoutNavModel JSON must match"
     );
+
+    let _ = fs::remove_file(&defaults_path);
+    let _ = fs::remove_dir_all(&out_dir);
 }
 
 #[test]
 fn generated_precompile_modules_compile_and_construct_artifacts() {
     let path = schema_path();
+    let defaults = defaults_value();
 
     // 1) Generate modules into a temporary directory under target/.
-    let out_dir = unique_temp_dir("precompiled_compile_smoke");
-    fs::create_dir_all(&out_dir).expect("tmp dir creatable");
+    let (out_dir, defaults_path) = write_defaults_file("precompiled_compile_smoke", &defaults);
 
+    let tui_module = out_dir.join("tui_artifacts.rs");
     let form_module = out_dir.join("precompiled_form_schema.rs");
     let nav_module = out_dir.join("precompiled_layout_nav.rs");
     let bundle_module = out_dir.join("precompiled_ui_bundle.rs");
 
+    ct_tui::generate_tui_artifacts_module(
+        &path,
+        DocumentFormat::Json,
+        Some(&defaults_path),
+        &tui_module,
+        "tui_artifacts",
+    )
+    .expect("generate TuiArtifacts module");
     ct_tui::generate_tui_form_schema_module(
         &path,
         DocumentFormat::Json,
+        Some(&defaults_path),
         &form_module,
         "precompiled_form_schema",
     )
@@ -326,14 +354,15 @@ fn generated_precompile_modules_compile_and_construct_artifacts() {
     ct_tui::generate_tui_layout_nav_module(
         &path,
         DocumentFormat::Json,
+        Some(&defaults_path),
         &nav_module,
         "precompiled_layout_nav",
     )
     .expect("generate LayoutNavModel module");
-    precompile::generate_precompiled_ui_bundle_module(
+    precompile::generate_ui_artifact_bundle_module(
         &path,
         DocumentFormat::Json,
-        None,
+        Some(&defaults_path),
         &bundle_module,
         "precompiled_ui_bundle",
     )
@@ -341,6 +370,9 @@ fn generated_precompile_modules_compile_and_construct_artifacts() {
 
     // 2) Sanity-check that the generated files exist and contain the expected
     // function names.
+    let tui_src = fs::read_to_string(&tui_module).expect("tui module readable");
+    assert!(tui_src.contains("fn tui_artifacts"));
+
     let form_src = fs::read_to_string(&form_module).expect("form module readable");
     assert!(form_src.contains("fn precompiled_form_schema"));
 
@@ -361,7 +393,7 @@ fn generated_precompile_modules_compile_and_construct_artifacts() {
     .expect("write smoke crate manifest");
     fs::write(
         smoke_crate_dir.join("src/main.rs"),
-        smoke_crate_main(&form_module, &nav_module, &bundle_module),
+        smoke_crate_main(&tui_module, &form_module, &nav_module, &bundle_module),
     )
     .expect("write smoke crate main");
 
@@ -398,28 +430,39 @@ serde_json = "1"
     )
 }
 
-fn smoke_crate_main(form_module: &Path, nav_module: &Path, bundle_module: &Path) -> String {
+fn smoke_crate_main(
+    tui_module: &Path,
+    form_module: &Path,
+    nav_module: &Path,
+    bundle_module: &Path,
+) -> String {
     format!(
-        r##"include!(r#"{form}"#);
+        r##"include!(r#"{tui}"#);
+include!(r#"{form}"#);
 include!(r#"{nav}"#);
 include!(r#"{bundle}"#);
 
 fn main() {{
+    let tui = tui_artifacts();
     let form = precompiled_form_schema();
     let nav = precompiled_layout_nav();
     let bundle = precompiled_ui_bundle();
 
+    assert!(!tui.form_schema.roots.is_empty());
+    assert!(!tui.layout_nav.roots.is_empty());
     assert!(!form.roots.is_empty());
     assert!(!nav.roots.is_empty());
     assert!(!bundle.ui.ui_ast.roots.is_empty());
-    assert_eq!(bundle.tui.form_schema, form);
-    assert_eq!(bundle.tui.layout_nav, nav);
+    assert_eq!(tui.form_schema, form);
+    assert_eq!(tui.layout_nav, nav);
+    assert_eq!(bundle.tui, tui);
     assert_eq!(
         bundle.artifact_version,
-        schemaui::precompile::PRECOMPILED_UI_BUNDLE_VERSION
+        schemaui::precompile::UI_ARTIFACT_BUNDLE_VERSION
     );
 }}
 "##,
+        tui = tui_module.display(),
         form = form_module.display(),
         nav = nav_module.display(),
         bundle = bundle_module.display(),

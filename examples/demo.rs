@@ -51,8 +51,7 @@ fn main() -> anyhow::Result<()> {
     let backend = schemaui::SchemaUI::new(schema).with_options(options.clone());
     let frontend = schemaui::TuiFrontend {
         options,
-        precompiled_form_schema: None,
-        precompiled_layout_nav: None,
+        tui_artifacts: None,
     };
     let result = backend.run_with_frontend(frontend)?;
 

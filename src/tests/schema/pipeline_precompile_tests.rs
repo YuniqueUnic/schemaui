@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use crate::core::frontend::{Frontend, FrontendContext};
 use crate::core::pipeline::SchemaPipeline;
 use crate::io::{DocumentFormat, input::parse_document_str};
-use crate::precompile::build_precompiled_ui_bundle;
+use crate::precompile::build_ui_artifact_bundle;
 use crate::ui_ast::{UiAst, UiAstBundle, UiLayout};
 
 fn schema_path() -> PathBuf {
@@ -69,7 +69,7 @@ fn capture_pipeline_output(schema: Value, defaults: Value, bundle: Option<UiAstB
 fn schema_pipeline_with_precompiled_ui_bundle_matches_runtime_context() {
     let schema = schema_value();
     let defaults = defaults_value();
-    let bundle = build_precompiled_ui_bundle(&schema, Some(&defaults))
+    let bundle = build_ui_artifact_bundle(&schema, Some(&defaults))
         .expect("build precompiled bundle")
         .ui;
 

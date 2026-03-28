@@ -3,14 +3,14 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{Result, bail};
-use schemaui::precompile::build_precompiled_ui_bundle_from_file;
+use schemaui::precompile::build_ui_artifact_bundle_from_file;
 use schemaui::{DocumentFormat, SchemaUI, TuiFrontend, UiOptions, parse_document_str};
 
 /// Run the TUI using a fully precompiled UI bundle.
 ///
 /// This example:
 /// - reads a JSON Schema from disk
-/// - uses `build_precompiled_ui_bundle_from_file` to build UiAst + FormSchema + LayoutNav
+/// - uses `build_ui_artifact_bundle_from_file` to build UiAst + FormSchema + LayoutNav
 /// - feeds those precompiled artifacts into `SchemaUI` + `TuiFrontend`
 ///
 /// You can run it with:
@@ -34,7 +34,7 @@ fn main() -> Result<()> {
     let format = DocumentFormat::from_extension(&schema_path).unwrap_or(DocumentFormat::Json);
 
     // 2) Precompile the shared UI bundle plus TUI-specific derivatives.
-    let precompiled_bundle = build_precompiled_ui_bundle_from_file(&schema_path, format, None)?;
+    let artifact_bundle = build_ui_artifact_bundle_from_file(&schema_path, format, None)?;
 
     // 3) Load the raw schema value for SchemaUI.
     let contents = fs::read_to_string(&schema_path)?;
@@ -52,13 +52,12 @@ fn main() -> Result<()> {
             schema_path.file_name().unwrap_or_default()
         ))
         .with_options(options.clone())
-        .with_precompiled_artifacts(precompiled_bundle.clone());
+        .with_ui_artifact_bundle(artifact_bundle.clone());
 
     // 6) Run the TUI using the fully precompiled TUI artifacts.
     let frontend = TuiFrontend {
         options,
-        precompiled_form_schema: Some(precompiled_bundle.tui.form_schema.clone()),
-        precompiled_layout_nav: Some(precompiled_bundle.tui.layout_nav.clone()),
+        tui_artifacts: Some(artifact_bundle.tui.clone()),
     };
 
     let result = ui.run_with_frontend(frontend)?;
