@@ -67,7 +67,7 @@ pub struct WebSnapshotCommand {
     #[arg(
         long = "ts-export",
         value_name = "NAME",
-        default_value = "PrecompiledSession"
+        default_value = "SessionSnapshot"
     )]
     pub ts_export: String,
 }
@@ -77,12 +77,8 @@ pub struct TuiSnapshotCommand {
     #[command(flatten)]
     pub common: CommonArgs,
 
-    /// Output directory for generated TUI precompiled modules (Rust source)
-    #[arg(
-        long = "out-dir",
-        value_name = "DIR",
-        default_value = "tui_precompiled"
-    )]
+    /// Output directory for generated TUI artifact modules (Rust source)
+    #[arg(long = "out-dir", value_name = "DIR", default_value = "tui_artifacts")]
     pub out_dir: PathBuf,
 
     /// Name of the generated TuiArtifacts constructor function
@@ -93,7 +89,7 @@ pub struct TuiSnapshotCommand {
     #[arg(
         long = "form-fn",
         value_name = "NAME",
-        default_value = "precompiled_form_schema"
+        default_value = "tui_form_schema"
     )]
     pub form_fn: String,
 
@@ -101,7 +97,7 @@ pub struct TuiSnapshotCommand {
     #[arg(
         long = "layout-fn",
         value_name = "NAME",
-        default_value = "precompiled_layout_nav"
+        default_value = "tui_layout_nav"
     )]
     pub layout_fn: String,
 }

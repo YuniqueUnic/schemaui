@@ -75,8 +75,8 @@ pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {
 
     fs::create_dir_all(&cmd.out_dir)?;
     let tui_module = cmd.out_dir.join("tui_artifacts.rs");
-    let form_module = cmd.out_dir.join("precompiled_form_schema.rs");
-    let layout_module = cmd.out_dir.join("precompiled_layout_nav.rs");
+    let form_module = cmd.out_dir.join("tui_form_schema.rs");
+    let layout_module = cmd.out_dir.join("tui_layout_nav.rs");
 
     pre_tui::generate_tui_artifacts_module(
         &schema_path,
@@ -103,7 +103,7 @@ pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {
     )
     .map_err(Report::msg)?;
 
-    eprintln!("Generated TUI precompiled modules:");
+    eprintln!("Generated TUI artifact modules:");
     eprintln!("  TuiArtifacts module:    {:?}", tui_module);
     eprintln!("  FormSchema module:      {:?}", form_module);
     eprintln!("  LayoutNavModel module:  {:?}", layout_module);

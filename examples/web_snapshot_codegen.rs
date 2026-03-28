@@ -21,10 +21,10 @@ use schemaui::precompile::web::{
 ///
 /// ```bash
 /// # Use defaults: schema=examples/config-schema.json, out-dir=target/web_snapshots
-/// cargo run --example web_precompile_snapshot --features web,precompile
+/// cargo run --example web_snapshot_codegen --features web,precompile
 ///
 /// # Or specify schema, defaults, and output directory explicitly
-/// cargo run --example web_precompile_snapshot --features web,precompile -- \
+/// cargo run --example web_snapshot_codegen --features web,precompile -- \
 ///   examples/config-schema.json \
 ///   examples/config-defaults.json \
 ///   target/web_snapshots
@@ -65,15 +65,15 @@ fn main() -> Result<()> {
     let ts_out = out_dir.join("session_snapshot.ts");
 
     write_session_snapshot_json(&snapshot, &json_out)?;
-    write_session_snapshot_ts_module(&snapshot, &ts_out, "PrecompiledSession")?;
+    write_session_snapshot_ts_module(&snapshot, &ts_out, "SessionSnapshot")?;
 
-    println!("Generated Web precompile snapshots:\n");
+    println!("Generated Web snapshot artifacts:\n");
     println!("  JSON:      {:?}", json_out);
     println!("  TypeScript: {:?}\n", ts_out);
 
     println!("You can serve the JSON snapshot as /api/session in a static setup,\n");
     println!("or import the TS module directly in your SPA bundle, e.g.:\n");
-    println!("  import {{ PrecompiledSession }} from './session_snapshot';");
+    println!("  import {{ SessionSnapshot }} from './session_snapshot';");
 
     Ok(())
 }

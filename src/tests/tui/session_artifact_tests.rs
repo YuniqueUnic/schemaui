@@ -35,7 +35,7 @@ fn resolve_tui_artifacts_matches_runtime_when_bundle_supplies_tui_derivatives() 
         build_ui_artifact_bundle(&schema, Some(&defaults)).expect("build UI artifact bundle");
 
     let runtime = resolve_tui_artifacts(&bundle.ui.ui_ast, &bundle.ui.layout, None);
-    let precompiled = resolve_tui_artifacts(&bundle.ui.ui_ast, &bundle.ui.layout, Some(bundle.tui));
+    let provided = resolve_tui_artifacts(&bundle.ui.ui_ast, &bundle.ui.layout, Some(bundle.tui));
 
-    assert_eq!(runtime, precompiled);
+    assert_eq!(runtime, provided);
 }

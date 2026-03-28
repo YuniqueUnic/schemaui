@@ -57,21 +57,21 @@ fn write_defaults_file(prefix: &str, defaults: &Value) -> (PathBuf, PathBuf) {
 }
 
 #[test]
-fn precompile_and_runtime_ui_ast_match_for_comprehensive_schema() {
+fn generated_ui_ast_matches_runtime_for_comprehensive_schema() {
     let path = schema_path();
 
-    let precompile_ast =
-        precompile::build_ui_ast_from_file(&path, DocumentFormat::Json).expect("precompile UiAst");
+    let generated_ast =
+        precompile::build_ui_ast_from_file(&path, DocumentFormat::Json).expect("build UiAst");
 
     let contents = std::fs::read_to_string(&path).expect("schema file readable");
     let schema_value: Value =
         parse_document_str(&contents, DocumentFormat::Json).expect("schema parses at runtime");
     let runtime_ast = build_ui_ast(&schema_value).expect("runtime UiAst");
 
-    let precompile_pointers = collect_pointers(&precompile_ast);
+    let generated_pointers = collect_pointers(&generated_ast);
     let runtime_pointers = collect_pointers(&runtime_ast);
 
-    assert_eq!(runtime_pointers, precompile_pointers);
+    assert_eq!(runtime_pointers, generated_pointers);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn ui_ast_json_roundtrip_preserves_structure() {
     let path = schema_path();
 
     let original =
-        precompile::build_ui_ast_from_file(&path, DocumentFormat::Json).expect("precompile UiAst");
+        precompile::build_ui_ast_from_file(&path, DocumentFormat::Json).expect("build UiAst");
     let json = precompile::ui_ast_to_json(&original).expect("UiAst to JSON");
     let decoded = precompile::decode_ui_ast(&json).expect("decode UiAst from JSON");
 
@@ -91,7 +91,7 @@ fn ui_ast_bundle_json_roundtrip_preserves_structure() {
     let path = schema_path();
 
     let original = precompile::build_ui_ast_bundle_from_file(&path, DocumentFormat::Json)
-        .expect("precompile UiAst bundle");
+        .expect("build UiAst bundle");
     let json = precompile::ui_ast_bundle_to_json(&original).expect("UiAst bundle to JSON");
     let decoded = precompile::decode_ui_ast_bundle(&json).expect("decode UiAst bundle from JSON");
 
@@ -99,10 +99,10 @@ fn ui_ast_bundle_json_roundtrip_preserves_structure() {
 }
 
 #[test]
-fn precompiled_ui_bundle_roundtrip_preserves_structure() {
+fn ui_artifact_bundle_roundtrip_preserves_structure() {
     let path = schema_path();
     let defaults = defaults_value();
-    let (out_dir, defaults_path) = write_defaults_file("precompiled_bundle_roundtrip", &defaults);
+    let (out_dir, defaults_path) = write_defaults_file("ui_artifact_bundle_roundtrip", &defaults);
 
     let original = precompile::build_ui_artifact_bundle_from_file(
         &path,
@@ -122,7 +122,7 @@ fn precompiled_ui_bundle_roundtrip_preserves_structure() {
 }
 
 #[test]
-fn precompiled_ui_bundle_version_and_fingerprint_track_schema_and_defaults() {
+fn ui_artifact_bundle_version_and_fingerprint_track_schema_and_defaults() {
     let path = schema_path();
     let defaults_a = json!({"simpleTypes": {"text": "a", "dropdown": "option1"}});
     let defaults_b = json!({"simpleTypes": {"text": "b", "dropdown": "option2"}});
@@ -158,15 +158,15 @@ fn precompiled_ui_bundle_version_and_fingerprint_track_schema_and_defaults() {
 }
 
 #[test]
-fn precompiled_form_schema_matches_runtime_form_schema() {
+fn generated_form_schema_matches_runtime_form_schema() {
     let path = schema_path();
     let defaults = defaults_value();
-    let (out_dir, defaults_path) = write_defaults_file("precompiled_form_schema", &defaults);
+    let (out_dir, defaults_path) = write_defaults_file("tui_form_schema", &defaults);
 
-    // 1) Precompiled-style build via precompile::tui helper.
+    // 1) Generated-artifact build via precompile::tui helper.
     let (ct_ast, ct_form) =
         ct_tui::build_tui_form_schema_from_file(&path, DocumentFormat::Json, Some(&defaults_path))
-            .expect("precompile FormSchema");
+            .expect("build FormSchema artifact");
 
     // 2) Runtime-style build from the same schema file.
     let contents = fs::read_to_string(&path).expect("schema file readable");
@@ -197,7 +197,7 @@ fn precompiled_form_schema_matches_runtime_form_schema() {
                 PathBuf::from(
                     std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string()),
                 )
-                .join("tmp_precompiled_tui")
+                .join("tmp_tui_artifacts")
             });
         if let Err(err) = fs::create_dir_all(&out_dir) {
             eprintln!("  failed to create UiAst debug dir {:?}: {err}", out_dir);
@@ -215,7 +215,7 @@ fn precompiled_form_schema_matches_runtime_form_schema() {
             eprintln!("  wrote UiAst JSON to {:?}", out_dir);
         }
     }
-    assert_eq!(ct_ast, rt_ast, "precompiled and runtime UiAst must match");
+    assert_eq!(ct_ast, rt_ast, "generated and runtime UiAst must match");
 
     let ct_form_json = serde_json::to_value(&ct_form).expect("serialize ct FormSchema");
     let rt_form_json = serde_json::to_value(&rt_form).expect("serialize rt FormSchema");
@@ -237,7 +237,7 @@ fn precompiled_form_schema_matches_runtime_form_schema() {
     }
     assert_eq!(
         ct_form_json, rt_form_json,
-        "precompiled and runtime FormSchema JSON must match"
+        "generated and runtime FormSchema JSON must match"
     );
 
     let _ = fs::remove_file(&defaults_path);
@@ -245,15 +245,15 @@ fn precompiled_form_schema_matches_runtime_form_schema() {
 }
 
 #[test]
-fn precompiled_layout_nav_matches_runtime_layout_nav() {
+fn generated_layout_nav_matches_runtime_layout_nav() {
     let path = schema_path();
     let defaults = defaults_value();
-    let (out_dir, defaults_path) = write_defaults_file("precompiled_layout_nav", &defaults);
+    let (out_dir, defaults_path) = write_defaults_file("tui_layout_nav", &defaults);
 
-    // 1) Precompiled-style build via precompile::tui helper.
+    // 1) Generated-artifact build via precompile::tui helper.
     let (ct_ast, ct_nav): (_, LayoutNavModel) =
         ct_tui::build_tui_layout_nav_from_file(&path, DocumentFormat::Json, Some(&defaults_path))
-            .expect("precompile LayoutNavModel");
+            .expect("build LayoutNavModel artifact");
 
     // 2) Runtime-style build from the same schema file.
     let contents = fs::read_to_string(&path).expect("schema file readable");
@@ -278,7 +278,7 @@ fn precompiled_layout_nav_matches_runtime_layout_nav() {
         eprintln!("  ct_pointers_sample={:?}", ct_sample);
         eprintln!("  rt_pointers_sample={:?}", rt_sample);
     }
-    assert_eq!(ct_ast, rt_ast, "precompiled and runtime UiAst must match");
+    assert_eq!(ct_ast, rt_ast, "generated and runtime UiAst must match");
 
     let ct_nav_json = serde_json::to_value(&ct_nav).expect("serialize ct LayoutNavModel");
     let rt_nav_json = serde_json::to_value(&rt_nav).expect("serialize rt LayoutNavModel");
@@ -315,7 +315,7 @@ fn precompiled_layout_nav_matches_runtime_layout_nav() {
     }
     assert_eq!(
         ct_nav_json, rt_nav_json,
-        "precompiled and runtime LayoutNavModel JSON must match"
+        "generated and runtime LayoutNavModel JSON must match"
     );
 
     let _ = fs::remove_file(&defaults_path);
@@ -323,17 +323,17 @@ fn precompiled_layout_nav_matches_runtime_layout_nav() {
 }
 
 #[test]
-fn generated_precompile_modules_compile_and_construct_artifacts() {
+fn generated_artifact_modules_compile_and_construct_artifacts() {
     let path = schema_path();
     let defaults = defaults_value();
 
     // 1) Generate modules into a temporary directory under target/.
-    let (out_dir, defaults_path) = write_defaults_file("precompiled_compile_smoke", &defaults);
+    let (out_dir, defaults_path) = write_defaults_file("artifact_compile_smoke", &defaults);
 
     let tui_module = out_dir.join("tui_artifacts.rs");
-    let form_module = out_dir.join("precompiled_form_schema.rs");
-    let nav_module = out_dir.join("precompiled_layout_nav.rs");
-    let bundle_module = out_dir.join("precompiled_ui_bundle.rs");
+    let form_module = out_dir.join("tui_form_schema.rs");
+    let nav_module = out_dir.join("tui_layout_nav.rs");
+    let bundle_module = out_dir.join("ui_artifact_bundle.rs");
 
     ct_tui::generate_tui_artifacts_module(
         &path,
@@ -348,7 +348,7 @@ fn generated_precompile_modules_compile_and_construct_artifacts() {
         DocumentFormat::Json,
         Some(&defaults_path),
         &form_module,
-        "precompiled_form_schema",
+        "tui_form_schema",
     )
     .expect("generate FormSchema module");
     ct_tui::generate_tui_layout_nav_module(
@@ -356,7 +356,7 @@ fn generated_precompile_modules_compile_and_construct_artifacts() {
         DocumentFormat::Json,
         Some(&defaults_path),
         &nav_module,
-        "precompiled_layout_nav",
+        "tui_layout_nav",
     )
     .expect("generate LayoutNavModel module");
     precompile::generate_ui_artifact_bundle_module(
@@ -364,9 +364,9 @@ fn generated_precompile_modules_compile_and_construct_artifacts() {
         DocumentFormat::Json,
         Some(&defaults_path),
         &bundle_module,
-        "precompiled_ui_bundle",
+        "ui_artifact_bundle",
     )
-    .expect("generate precompiled UI bundle module");
+    .expect("generate UI artifact bundle module");
 
     // 2) Sanity-check that the generated files exist and contain the expected
     // function names.
@@ -374,13 +374,13 @@ fn generated_precompile_modules_compile_and_construct_artifacts() {
     assert!(tui_src.contains("fn tui_artifacts"));
 
     let form_src = fs::read_to_string(&form_module).expect("form module readable");
-    assert!(form_src.contains("fn precompiled_form_schema"));
+    assert!(form_src.contains("fn tui_form_schema"));
 
     let nav_src = fs::read_to_string(&nav_module).expect("nav module readable");
-    assert!(nav_src.contains("fn precompiled_layout_nav"));
+    assert!(nav_src.contains("fn tui_layout_nav"));
 
     let bundle_src = fs::read_to_string(&bundle_module).expect("bundle module readable");
-    assert!(bundle_src.contains("fn precompiled_ui_bundle"));
+    assert!(bundle_src.contains("fn ui_artifact_bundle"));
 
     // 3) Compile the generated modules inside a temporary crate and construct
     // the generated artifacts at runtime.
@@ -444,9 +444,9 @@ include!(r#"{bundle}"#);
 
 fn main() {{
     let tui = tui_artifacts();
-    let form = precompiled_form_schema();
-    let nav = precompiled_layout_nav();
-    let bundle = precompiled_ui_bundle();
+    let form = tui_form_schema();
+    let nav = tui_layout_nav();
+    let bundle = ui_artifact_bundle();
 
     assert!(!tui.form_schema.roots.is_empty());
     assert!(!tui.layout_nav.roots.is_empty());

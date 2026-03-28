@@ -22,16 +22,16 @@ use schemaui::precompile::tui::{
 ///
 /// ```bash
 /// # From the schemaui crate root
-/// cargo run --example precompile_codegen --features tui,precompile -- \
+/// cargo run --example tui_artifact_codegen --features tui,precompile -- \
 ///   examples/config-schema.json \
-///   target/precompiled_modules \
+///   target/tui_artifacts \
 ///   examples/config-defaults.json
 /// ```
 ///
 /// If you omit arguments, it defaults to:
 ///
 /// - schema: `examples/config-schema.json`
-/// - out-dir: `target/precompiled_modules`
+/// - out-dir: `target/tui_artifacts`
 /// - defaults: none
 fn main() -> Result<()> {
     // 1) Parse CLI arguments or fall back to sensible defaults.
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
         .unwrap_or_else(|| "examples/config-schema.json".to_string());
     let out_dir_arg = env::args()
         .nth(2)
-        .unwrap_or_else(|| "target/precompiled_modules".to_string());
+        .unwrap_or_else(|| "target/tui_artifacts".to_string());
     let defaults_arg = env::args().nth(3);
 
     let schema_path = PathBuf::from(&schema_arg);
@@ -61,12 +61,12 @@ fn main() -> Result<()> {
 
     // 2) Decide output module paths and function names.
     let tui_module_path = out_dir.join("tui_artifacts.rs");
-    let form_module_path = out_dir.join("precompiled_form_schema.rs");
-    let layout_module_path = out_dir.join("precompiled_layout_nav.rs");
+    let form_module_path = out_dir.join("tui_form_schema.rs");
+    let layout_module_path = out_dir.join("tui_layout_nav.rs");
 
     let tui_fn_name = "tui_artifacts";
-    let form_fn_name = "precompiled_form_schema";
-    let layout_fn_name = "precompiled_layout_nav";
+    let form_fn_name = "tui_form_schema";
+    let layout_fn_name = "tui_layout_nav";
 
     // 3) Generate the Rust modules using the precompile helpers.
     generate_tui_artifacts_module(
@@ -93,7 +93,7 @@ fn main() -> Result<()> {
     )?;
 
     // 4) Print a short usage guide for the generated modules.
-    println!("Generated precompiled modules:\n");
+    println!("Generated artifact modules:\n");
     println!("  TuiArtifacts:   {:?}", tui_module_path);
     println!("  FormSchema:      {:?}", form_module_path);
     println!("  LayoutNavModel:  {:?}\n", layout_module_path);
@@ -113,18 +113,18 @@ fn main() -> Result<()> {
         out_dir.display()
     );
     println!(
-        "  include!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{}/precompiled_form_schema.rs\"));",
+        "  include!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{}/tui_form_schema.rs\"));",
         out_dir.display()
     );
     println!(
-        "  include!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{}/precompiled_layout_nav.rs\"));\n",
+        "  include!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/{}/tui_layout_nav.rs\"));\n",
         out_dir.display()
     );
 
     println!("Then you can call the generated functions, for example:\n");
     println!("  let tui = tui_artifacts();");
-    println!("  let form = precompiled_form_schema();");
-    println!("  let layout_nav = precompiled_layout_nav();\n");
+    println!("  let form = tui_form_schema();");
+    println!("  let layout_nav = tui_layout_nav();\n");
 
     Ok(())
 }

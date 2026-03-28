@@ -1,2 +1,2 @@
 #[cfg(feature = "precompile")]
-mod precompile_web_tests;
+mod web_snapshot_tests;

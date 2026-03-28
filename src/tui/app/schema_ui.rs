@@ -275,8 +275,8 @@ impl SchemaUI {
         let pipeline = SchemaPipeline::new(schema)
             .with_title(title)
             .with_defaults(initial_data)
-            .with_precompiled_ui_ast(ui_ast)
-            .with_precompiled_ui_bundle(ui_bundle);
+            .with_prepared_ui_ast(ui_ast)
+            .with_prepared_ui_bundle(ui_bundle);
         let result = pipeline.run_with_frontend(frontend)?;
         if let Some(settings) = output {
             output::emit(&result, &settings)?;

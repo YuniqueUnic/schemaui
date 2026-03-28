@@ -47,7 +47,7 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
 pub fn run_snapshot_cli(cmd: WebSnapshotCommand) -> Result<()> {
     // For snapshots we intentionally use a simpler pipeline that only supports
     // file-based schema/config. This keeps behaviour predictable and mirrors
-    // the `web_precompile_snapshot` example.
+    // the `web_snapshot_codegen` example.
 
     let schema_spec = cmd
         .common

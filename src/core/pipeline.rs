@@ -17,7 +17,7 @@ use crate::core::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
 #[derive(Debug)]
 enum UiAstSource {
     Runtime,
-    Precompiled(UiAstBundle),
+    Prepared(UiAstBundle),
 }
 
 #[derive(Debug)]
@@ -48,22 +48,22 @@ impl SchemaPipeline {
         self
     }
 
-    /// Provide a precompiled UiAst to be used instead of building one at runtime.
+    /// Provide a prepared UiAst to be used instead of building one at runtime.
     /// If `ast` is None, the pipeline falls back to runtime UiAst building.
-    pub fn with_precompiled_ui_ast(mut self, ast: Option<UiAst>) -> Self {
+    pub fn with_prepared_ui_ast(mut self, ast: Option<UiAst>) -> Self {
         if let Some(ast) = ast {
-            self.ui_ast_source = UiAstSource::Precompiled(UiAstBundle::from_ui_ast(ast));
+            self.ui_ast_source = UiAstSource::Prepared(UiAstBundle::from_ui_ast(ast));
         }
         self
     }
 
-    /// Provide a precompiled bundle of shared UI artifacts.
+    /// Provide a prepared bundle of shared UI artifacts.
     ///
     /// This lets the runtime reuse both `UiAst` and `UiLayout`, instead of
     /// rebuilding layout-oriented structures from the schema again.
-    pub fn with_precompiled_ui_bundle(mut self, bundle: Option<UiAstBundle>) -> Self {
+    pub fn with_prepared_ui_bundle(mut self, bundle: Option<UiAstBundle>) -> Self {
         if let Some(bundle) = bundle {
-            self.ui_ast_source = UiAstSource::Precompiled(bundle);
+            self.ui_ast_source = UiAstSource::Prepared(bundle);
         }
         self
     }
@@ -82,7 +82,7 @@ impl SchemaPipeline {
         let validator = validator_for(&enriched)?;
         let bundle = match ui_ast_source {
             UiAstSource::Runtime => build_ui_ast_bundle(&enriched)?,
-            UiAstSource::Precompiled(bundle) => bundle,
+            UiAstSource::Prepared(bundle) => bundle,
         };
         let (ui_ast, layout) = bundle.into_parts();
 

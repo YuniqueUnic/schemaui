@@ -81,7 +81,7 @@ pub fn generate_tui_form_schema_module(
     let (_ast, form_schema) = build_tui_form_schema_from_file(schema_path, format, defaults_path)?;
     let json = serde_json::to_string_pretty(&form_schema)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::FormSchema {{\n    serde_json::from_str::<schemaui::FormSchema>(r#\"{json}\"#).expect(\"invalid precompiled FormSchema JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::FormSchema {{\n    serde_json::from_str::<schemaui::FormSchema>(r#\"{json}\"#).expect(\"invalid generated FormSchema JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())
@@ -108,7 +108,7 @@ pub fn generate_tui_layout_nav_module(
     let (_ast, layout_nav) = build_tui_layout_nav_from_file(schema_path, format, defaults_path)?;
     let json = serde_json::to_string_pretty(&layout_nav)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::LayoutNavModel {{\n    serde_json::from_str::<schemaui::LayoutNavModel>(r#\"{json}\"#).expect(\"invalid precompiled LayoutNavModel JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::LayoutNavModel {{\n    serde_json::from_str::<schemaui::LayoutNavModel>(r#\"{json}\"#).expect(\"invalid generated LayoutNavModel JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())

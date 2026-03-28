@@ -80,7 +80,7 @@ fn ts_snapshot_module_has_expected_export_shape() {
         std::process::id()
     ));
 
-    let export_name = "PrecompiledSession";
+    let export_name = "SessionSnapshot";
     web::write_session_snapshot_ts_module(&snapshot, &out_path, export_name)
         .expect("write TS snapshot module");
 
@@ -91,20 +91,20 @@ fn ts_snapshot_module_has_expected_export_shape() {
     assert!(
         src.contains("import type { SessionResponse } from '@schemaui/types/SessionResponse';",)
     );
-    assert!(src.contains("export const PrecompiledSession: SessionResponse ="));
+    assert!(src.contains("export const SessionSnapshot: SessionResponse ="));
 
     let _ = std::fs::remove_file(&out_path);
 }
 
 #[test]
-fn web_session_builder_with_precompiled_bundle_matches_precompiled_snapshot() {
+fn web_session_builder_with_ui_artifact_bundle_matches_snapshot_builder() {
     let path = schema_path();
     let schema_raw = fs::read_to_string(&path).expect("schema file readable");
     let schema_value: Value =
         parse_document_str(&schema_raw, DocumentFormat::Json).expect("schema parses");
     let defaults = defaults_value();
     let bundle =
-        build_ui_artifact_bundle(&schema_value, Some(&defaults)).expect("build precompiled bundle");
+        build_ui_artifact_bundle(&schema_value, Some(&defaults)).expect("build UI artifact bundle");
 
     let config = WebSessionBuilder::new(schema_value)
         .with_initial_data(defaults.clone())
@@ -124,11 +124,11 @@ fn web_session_builder_with_precompiled_bundle_matches_precompiled_snapshot() {
     )
     .expect("write defaults file");
 
-    let precompiled_snapshot =
+    let snapshot_from_builder =
         web::build_session_snapshot_from_files(&path, DocumentFormat::Json, Some(&defaults_path))
-            .expect("precompiled web snapshot");
+            .expect("build web snapshot from files");
 
-    assert_eq!(runtime_snapshot, precompiled_snapshot);
+    assert_eq!(runtime_snapshot, snapshot_from_builder);
 
     let _ = fs::remove_file(&defaults_path);
 }

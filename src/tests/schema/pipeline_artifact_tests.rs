@@ -59,22 +59,22 @@ impl Frontend for CaptureFrontend {
 fn capture_pipeline_output(schema: Value, defaults: Value, bundle: Option<UiAstBundle>) -> Value {
     let pipeline = SchemaPipeline::new(schema)
         .with_defaults(Some(defaults))
-        .with_precompiled_ui_bundle(bundle);
+        .with_prepared_ui_bundle(bundle);
     pipeline
         .run_with_frontend(CaptureFrontend)
         .expect("pipeline capture succeeds")
 }
 
 #[test]
-fn schema_pipeline_with_precompiled_ui_bundle_matches_runtime_context() {
+fn schema_pipeline_with_prepared_ui_bundle_matches_runtime_context() {
     let schema = schema_value();
     let defaults = defaults_value();
     let bundle = build_ui_artifact_bundle(&schema, Some(&defaults))
-        .expect("build precompiled bundle")
+        .expect("build UI artifact bundle")
         .ui;
 
     let runtime = capture_pipeline_output(schema.clone(), defaults.clone(), None);
-    let precompiled = capture_pipeline_output(schema, defaults, Some(bundle));
+    let prepared = capture_pipeline_output(schema, defaults, Some(bundle));
 
-    assert_eq!(runtime, precompiled);
+    assert_eq!(runtime, prepared);
 }
