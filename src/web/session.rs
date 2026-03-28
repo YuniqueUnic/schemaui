@@ -272,7 +272,7 @@ impl FinishLine {
     }
 }
 
-#[derive(Serialize, TS)]
+#[derive(Serialize, Deserialize, TS)]
 #[ts(export, export_to = "web/types/")]
 pub struct SessionResponse {
     pub title: Option<String>,
