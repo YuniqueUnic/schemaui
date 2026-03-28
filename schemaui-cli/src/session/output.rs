@@ -59,7 +59,7 @@ pub fn build_output_options(
         infer_format_from_files(&file_paths, diagnostics)
             .or(config_hint)
             .or(schema_hint)
-            .unwrap_or_else(DocumentFormat::default)
+            .unwrap_or_default()
     };
 
     if diagnostics.len() > start {
@@ -97,9 +97,7 @@ fn determine_stdout_format(
     config_hint: Option<DocumentFormat>,
     schema_hint: Option<DocumentFormat>,
 ) -> DocumentFormat {
-    config_hint
-        .or(schema_hint)
-        .unwrap_or_else(DocumentFormat::default)
+    config_hint.or(schema_hint).unwrap_or_default()
 }
 
 fn infer_format_from_files(

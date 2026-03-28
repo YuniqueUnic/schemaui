@@ -35,12 +35,16 @@ fn build_component(
             Box::new(TextComponent::new(schema, Arc::clone(&palette)))
         }
         FieldKind::Boolean => Box::new(BoolComponent::new(schema, Arc::clone(&palette))),
-        FieldKind::Enum(options) => {
-            Box::new(EnumComponent::new(options, schema, Arc::clone(&palette)))
-        }
+        FieldKind::Enum { labels, values } => Box::new(EnumComponent::new(
+            labels,
+            values,
+            schema,
+            Arc::clone(&palette),
+        )),
         FieldKind::Array(inner) => match inner.as_ref() {
-            FieldKind::Enum(options) => Box::new(MultiSelectComponent::new(
-                options,
+            FieldKind::Enum { labels, values } => Box::new(MultiSelectComponent::new(
+                labels,
+                values,
                 schema.default.as_ref(),
                 Arc::clone(&palette),
             )),

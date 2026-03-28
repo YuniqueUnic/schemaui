@@ -35,7 +35,10 @@ pub enum FieldKind {
     Integer,
     Number,
     Boolean,
-    Enum(Vec<String>),
+    Enum {
+        labels: Vec<String>,
+        values: Vec<Value>,
+    },
     Array(Box<FieldKind>),
     Json,
     Composite(Box<CompositeField>),

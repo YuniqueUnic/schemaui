@@ -334,3 +334,4 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+.ace-tool/

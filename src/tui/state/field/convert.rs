@@ -118,13 +118,13 @@ pub(super) fn array_value(
                     });
                 }
             },
-            FieldKind::Enum(options) => {
-                if options.iter().any(|opt| opt == item) {
-                    Value::String(item.to_string())
+            FieldKind::Enum { labels, values } => {
+                if let Some(index) = labels.iter().position(|label| label == item) {
+                    values[index].clone()
                 } else {
                     return Err(FieldCoercionError {
                         pointer: schema.pointer.clone(),
-                        message: format!("value '{item}' is not one of: {}", options.join(", ")),
+                        message: format!("value '{item}' is not one of: {}", labels.join(", ")),
                     });
                 }
             }

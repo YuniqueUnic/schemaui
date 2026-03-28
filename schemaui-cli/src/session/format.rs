@@ -4,19 +4,10 @@ use schemaui::DocumentFormat;
 
 use super::diagnostics::DiagnosticCollector;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct FormatHint {
     pub format: DocumentFormat,
     pub from_extension: bool,
-}
-
-impl Default for FormatHint {
-    fn default() -> Self {
-        Self {
-            format: DocumentFormat::default(),
-            from_extension: false,
-        }
-    }
 }
 
 impl FormatHint {
@@ -36,35 +27,35 @@ pub fn resolve_format_hint(
     label: &str,
     diagnostics: &mut DiagnosticCollector,
 ) -> FormatResolution {
-    if let Some(path) = path_hint {
-        if path != "-" {
-            match probe_format_from_extension(Path::new(path)) {
-                ExtensionFormat::Known(format) => {
-                    return FormatResolution {
-                        hint: FormatHint {
-                            format,
-                            from_extension: true,
-                        },
-                        blocked: false,
-                    };
-                }
-                ExtensionFormat::UnsupportedFeature {
-                    format_name,
-                    feature_flag,
-                } => {
-                    diagnostics.push_input(
-                        label,
-                        format!(
-                            "{label} '{path}' requires {format_name} support, but this build lacks the '{feature_flag}' feature"
-                        ),
-                    );
-                    return FormatResolution {
-                        hint: FormatHint::default(),
-                        blocked: true,
-                    };
-                }
-                ExtensionFormat::Unknown => {}
+    if let Some(path) = path_hint
+        && path != "-"
+    {
+        match probe_format_from_extension(Path::new(path)) {
+            ExtensionFormat::Known(format) => {
+                return FormatResolution {
+                    hint: FormatHint {
+                        format,
+                        from_extension: true,
+                    },
+                    blocked: false,
+                };
             }
+            ExtensionFormat::UnsupportedFeature {
+                format_name,
+                feature_flag,
+            } => {
+                diagnostics.push_input(
+                    label,
+                    format!(
+                        "{label} '{path}' requires {format_name} support, but this build lacks the '{feature_flag}' feature"
+                    ),
+                );
+                return FormatResolution {
+                    hint: FormatHint::default(),
+                    blocked: true,
+                };
+            }
+            ExtensionFormat::Unknown => {}
         }
     }
 

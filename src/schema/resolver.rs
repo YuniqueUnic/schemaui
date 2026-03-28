@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use percent_encoding::percent_decode_str;
-use schemars::schema::{RootSchema, Schema, SchemaObject};
+use schemars::schema::{Metadata, RootSchema, Schema, SchemaObject};
 use serde_json::Value;
 
 #[derive(Debug)]
@@ -23,7 +23,8 @@ impl<'a> SchemaResolver<'a> {
             Schema::Bool(value) => Ok(Schema::Bool(*value).into_object()),
             Schema::Object(object) => {
                 if let Some(reference) = &object.reference {
-                    self.follow_reference(reference)
+                    let resolved = self.follow_reference(reference)?;
+                    Ok(overlay_reference_annotations(resolved, object))
                 } else {
                     Ok(object.clone())
                 }
@@ -68,4 +69,54 @@ impl<'a> SchemaResolver<'a> {
 
         bail!("unsupported reference {reference}")
     }
+}
+
+fn overlay_reference_annotations(mut target: SchemaObject, source: &SchemaObject) -> SchemaObject {
+    if source.metadata.is_some() {
+        target.metadata = Some(Box::new(merge_metadata(
+            target.metadata.as_deref(),
+            source.metadata.as_deref(),
+        )));
+    }
+
+    if !source.extensions.is_empty() {
+        for (key, value) in &source.extensions {
+            if key.starts_with("x-") {
+                target.extensions.insert(key.clone(), value.clone());
+            }
+        }
+    }
+
+    target
+}
+
+fn merge_metadata(target: Option<&Metadata>, source: Option<&Metadata>) -> Metadata {
+    let mut merged = target.cloned().unwrap_or_default();
+    let Some(source) = source else {
+        return merged;
+    };
+
+    if let Some(title) = source.title.clone() {
+        merged.title = Some(title);
+    }
+    if let Some(description) = source.description.clone() {
+        merged.description = Some(description);
+    }
+    if source.default.is_some() {
+        merged.default = source.default.clone();
+    }
+    if source.deprecated {
+        merged.deprecated = true;
+    }
+    if source.read_only {
+        merged.read_only = true;
+    }
+    if source.write_only {
+        merged.write_only = true;
+    }
+    if !source.examples.is_empty() {
+        merged.examples = source.examples.clone();
+    }
+
+    merged
 }

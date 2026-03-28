@@ -1,0 +1,13 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "EnumInteger": {
+        "description": "Select one of a few integers",
+                "enum": [2,5,42]
+        }
+    },
+    "propertyNames": true,
+    "required": [],
+    "additionalProperties": false
+}

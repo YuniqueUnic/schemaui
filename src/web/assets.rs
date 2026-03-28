@@ -95,7 +95,13 @@ mod tests {
         let assets = EmbeddedAssets;
         let asset = assets.load("/").expect("index.html embedded");
         assert_eq!(asset.mime, "text/html; charset=utf-8");
-        assert!(asset.contents.starts_with(b"<!doctype html>"));
+        let expected = b"<!doctype html>";
+        assert!(
+            asset
+                .contents
+                .get(..expected.len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(expected))
+        );
     }
 
     #[test]

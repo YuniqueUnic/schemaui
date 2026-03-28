@@ -12,7 +12,7 @@ fn apply_selection_to_field(field: &mut FieldState, selection: usize, multi: Opt
                 // Array of composite: delegate to composite list state
                 field.apply_composite_selection(selection, Some(flags));
             }
-            FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Enum(_)) => {
+            FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Enum { .. }) => {
                 field.set_multi_selection(&flags);
             }
             _ => {}
@@ -29,7 +29,7 @@ fn apply_selection_to_field(field: &mut FieldState, selection: usize, multi: Opt
             field.apply_composite_selection(selection, None);
         }
         FieldKind::Boolean => field.set_bool(selection == 0),
-        FieldKind::Enum(_) => field.set_enum_selected(selection),
+        FieldKind::Enum { .. } => field.set_enum_selected(selection),
         _ => {}
     }
 }

@@ -48,7 +48,12 @@ export type ScalarKind = "string" | "integer" | "number" | "boolean";
 export type CompositeMode = "one_of" | "any_of";
 
 export type UiNodeKind =
-  | { type: "field"; scalar: ScalarKind; enum_options?: string[] | null }
+  | {
+    type: "field";
+    scalar: ScalarKind;
+    enum_options?: string[] | null;
+    enum_values?: JsonValue[] | null;
+  }
   | {
     type: "array";
     item: UiNodeKind;

@@ -30,6 +30,8 @@ pub enum UiNodeKind {
     Field {
         scalar: ScalarKind,
         enum_options: Option<Vec<String>>,
+        #[cfg_attr(feature = "web", ts(type = "unknown[] | null"))]
+        enum_values: Option<Vec<Value>>,
     },
     Array {
         item: Box<UiNodeKind>,
@@ -47,7 +49,7 @@ pub enum UiNodeKind {
     },
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "web", derive(TS))]
 #[serde(rename_all = "snake_case")]
 pub enum ScalarKind {

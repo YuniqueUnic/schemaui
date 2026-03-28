@@ -294,7 +294,7 @@ fn kind_to_schema_fragment(kind: &FieldKind) -> Value {
         FieldKind::Integer => json!({"type": "integer"}),
         FieldKind::Number => json!({"type": "number"}),
         FieldKind::Boolean => json!({"type": "boolean"}),
-        FieldKind::Enum(options) => json!({"type": "string", "enum": options}),
+        FieldKind::Enum { values, .. } => json!({"enum": values}),
         FieldKind::Json => json!({"type": "object"}),
         _ => json!({"type": "string"}),
     }
@@ -306,10 +306,9 @@ fn default_value(kind: &FieldKind) -> Value {
         FieldKind::Integer => Value::Number(0.into()),
         FieldKind::Number => Value::Number(Number::from_f64(0.0).unwrap()),
         FieldKind::Boolean => Value::Bool(false),
-        FieldKind::Enum(options) => options
+        FieldKind::Enum { values, .. } => values
             .first()
             .cloned()
-            .map(Value::String)
             .unwrap_or_else(|| Value::String(String::new())),
         _ => Value::String(String::new()),
     }

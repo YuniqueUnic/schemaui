@@ -21,6 +21,14 @@ interface FieldRendererProps {
   onChange: (pointer: string, value: JsonValue) => void;
 }
 
+function sameJsonValue(left: JsonValue | undefined, right: JsonValue | undefined) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function cloneJsonValue<T extends JsonValue>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 /**
  * Renders field controls (string, number, boolean, enum)
  */
@@ -28,17 +36,26 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
   const resolved = value ?? node.default_value ?? defaultForKind(node.kind);
 
   if (node.kind.enum_options?.length) {
+    const enumValues = node.kind.enum_values ?? node.kind.enum_options;
+    const selectedIndex = enumValues.findIndex((option) =>
+      sameJsonValue(option as JsonValue, resolved)
+    );
     return (
       <Select
-        value={(resolved as string) ?? ""}
-        onValueChange={(newValue) => onChange(node.pointer, newValue)}
+        value={selectedIndex >= 0 ? String(selectedIndex) : ""}
+        onValueChange={(newValue) => {
+          const next = enumValues[Number(newValue)];
+          if (next !== undefined) {
+            onChange(node.pointer, cloneJsonValue(next as JsonValue));
+          }
+        }}
       >
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Select an option" />
         </SelectTrigger>
         <SelectContent>
-          {node.kind.enum_options.map((option) => (
-            <SelectItem key={option} value={option}>
+          {node.kind.enum_options.map((option, index) => (
+            <SelectItem key={`${option}-${index}`} value={String(index)}>
               {option}
             </SelectItem>
           ))}
@@ -106,6 +123,35 @@ export function renderSimpleFieldInline(
   onChange: (value: JsonValue) => void,
 ): React.ReactNode {
   const resolved = value ?? defaultForKind(fieldKind);
+
+  if (fieldKind.enum_options?.length) {
+    const enumValues = fieldKind.enum_values ?? fieldKind.enum_options;
+    const selectedIndex = enumValues.findIndex((option) =>
+      sameJsonValue(option as JsonValue, resolved)
+    );
+    return (
+      <Select
+        value={selectedIndex >= 0 ? String(selectedIndex) : ""}
+        onValueChange={(newValue) => {
+          const next = enumValues[Number(newValue)];
+          if (next !== undefined) {
+            onChange(cloneJsonValue(next as JsonValue));
+          }
+        }}
+      >
+        <SelectTrigger className="h-9 w-full">
+          <SelectValue placeholder="Select an option" />
+        </SelectTrigger>
+        <SelectContent>
+          {fieldKind.enum_options.map((option, index) => (
+            <SelectItem key={`${option}-${index}`} value={String(index)}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
 
   switch (fieldKind.scalar) {
     case "integer":

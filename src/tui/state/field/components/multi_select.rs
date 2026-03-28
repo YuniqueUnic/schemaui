@@ -9,27 +9,30 @@ use super::{ComponentKind, FieldComponent, MultiSelectStateRef, palette::Compone
 
 #[derive(Debug, Clone)]
 pub struct MultiSelectComponent {
-    options: Vec<String>,
+    labels: Vec<String>,
+    values: Vec<Value>,
     selected: Vec<bool>,
     palette: Arc<ComponentPalette>,
 }
 
 impl MultiSelectComponent {
     pub fn new(
-        options: &[String],
+        labels: &[String],
+        values: &[Value],
         default: Option<&Value>,
         palette: Arc<ComponentPalette>,
     ) -> Self {
-        let mut selected = vec![false; options.len()];
+        let mut selected = vec![false; labels.len()];
         if let Some(Value::Array(items)) = default {
-            for item in items.iter().filter_map(Value::as_str) {
-                if let Some(idx) = options.iter().position(|opt| opt == item) {
+            for item in items {
+                if let Some(idx) = values.iter().position(|candidate| candidate == item) {
                     selected[idx] = true;
                 }
             }
         }
         Self {
-            options: options.to_vec(),
+            labels: labels.to_vec(),
+            values: values.to_vec(),
             selected,
             palette,
         }
@@ -43,7 +46,7 @@ impl FieldComponent for MultiSelectComponent {
 
     fn display_value(&self, _schema: &FieldSchema) -> String {
         let values = self
-            .options
+            .labels
             .iter()
             .zip(self.selected.iter())
             .filter_map(|(option, flag)| if *flag { Some(option.clone()) } else { None })
@@ -57,9 +60,9 @@ impl FieldComponent for MultiSelectComponent {
 
     fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {
         if let Value::Array(items) = value {
-            let mut flags = vec![false; self.options.len()];
-            for item in items.iter().filter_map(Value::as_str) {
-                if let Some(idx) = self.options.iter().position(|opt| opt == item) {
+            let mut flags = vec![false; self.labels.len()];
+            for item in items {
+                if let Some(idx) = self.values.iter().position(|candidate| candidate == item) {
                     flags[idx] = true;
                 }
             }
@@ -71,23 +74,21 @@ impl FieldComponent for MultiSelectComponent {
 
     fn current_value(&self, _schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
         let values = self
-            .options
+            .values
             .iter()
             .zip(self.selected.iter())
-            .filter_map(|(option, flag)| {
-                if *flag {
-                    Some(Value::String(option.clone()))
-                } else {
-                    None
-                }
-            })
+            .filter_map(
+                |(option, flag)| {
+                    if *flag { Some(option.clone()) } else { None }
+                },
+            )
             .collect();
         Ok(Some(Value::Array(values)))
     }
 
     fn multi_state(&self) -> Option<MultiSelectStateRef<'_>> {
         Some(MultiSelectStateRef {
-            options: &self.options,
+            options: &self.labels,
             selected: &self.selected,
         })
     }

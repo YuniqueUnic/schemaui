@@ -132,8 +132,18 @@ fn field_kind_from_node_kind(kind: &UiNodeKind) -> FieldKind {
         UiNodeKind::Field {
             scalar,
             enum_options,
+            enum_values,
         } => match enum_options {
-            Some(options) if !options.is_empty() => FieldKind::Enum(options.clone()),
+            Some(options) if !options.is_empty() => FieldKind::Enum {
+                labels: options.clone(),
+                values: enum_values.clone().unwrap_or_else(|| {
+                    options
+                        .iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect()
+                }),
+            },
             _ => match scalar {
                 ScalarKind::String => FieldKind::String,
                 ScalarKind::Integer => FieldKind::Integer,

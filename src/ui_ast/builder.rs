@@ -138,9 +138,9 @@ fn visit_schema(
         });
     }
 
-    let (scalar, enum_options) = detect_scalar(schema)?;
+    let (scalar, enum_options, enum_values) = detect_scalar(schema)?;
     let default_value =
-        schema_default(schema).or_else(|| infer_default_scalar(scalar, enum_options.as_ref()));
+        schema_default(schema).or_else(|| infer_default_scalar(scalar, enum_values.as_ref()));
     Ok(UiNode {
         pointer,
         title: schema_title(schema),
@@ -150,6 +150,7 @@ fn visit_schema(
         kind: UiNodeKind::Field {
             scalar,
             enum_options,
+            enum_values,
         },
     })
 }
@@ -268,10 +269,11 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
         });
     }
 
-    let (scalar, enum_options) = detect_scalar(schema)?;
+    let (scalar, enum_options, enum_values) = detect_scalar(schema)?;
     Ok(UiNodeKind::Field {
         scalar,
         enum_options,
+        enum_values,
     })
 }
 
@@ -312,18 +314,19 @@ fn schema_default(schema: &SchemaObject) -> Option<Value> {
     schema.metadata.as_ref().and_then(|m| m.default.clone())
 }
 
-fn infer_default_scalar(scalar: ScalarKind, opts: Option<&Vec<String>>) -> Option<Value> {
+fn infer_default_scalar(scalar: ScalarKind, opts: Option<&Vec<Value>>) -> Option<Value> {
+    if let Some(options) = opts
+        && let Some(first) = options.first()
+    {
+        return Some(first.clone());
+    }
+
     let val = match scalar {
         ScalarKind::String => Value::String(String::new()),
         ScalarKind::Integer => Value::Number(0.into()),
         ScalarKind::Number => Value::Number(0.into()),
         ScalarKind::Boolean => Value::Bool(false),
     };
-    if let Some(options) = opts
-        && let Some(first) = options.first()
-    {
-        return Some(Value::String(first.clone()));
-    }
     Some(val)
 }
 
@@ -393,8 +396,9 @@ fn default_for_kind(kind: &UiNodeKind) -> Option<Value> {
     match kind {
         UiNodeKind::Field {
             scalar,
-            enum_options,
-        } => infer_default_scalar(*scalar, enum_options.as_ref()),
+            enum_values,
+            ..
+        } => infer_default_scalar(*scalar, enum_values.as_ref()),
         UiNodeKind::Array { .. } => Some(Value::Array(Vec::new())),
         UiNodeKind::Composite {
             variants,
@@ -405,18 +409,18 @@ fn default_for_kind(kind: &UiNodeKind) -> Option<Value> {
     }
 }
 
-fn detect_scalar(schema: &SchemaObject) -> Result<(ScalarKind, Option<Vec<String>>)> {
+type DetectedScalar = (ScalarKind, Option<Vec<String>>, Option<Vec<Value>>);
+
+fn detect_scalar(schema: &SchemaObject) -> Result<DetectedScalar> {
     if let Some(enum_values) = schema.enum_values.as_ref()
         && !enum_values.is_empty()
     {
-        let options = enum_values
-            .iter()
-            .map(|v| match v {
-                Value::String(s) => Ok(s.clone()),
-                other => Ok(other.to_string()),
-            })
-            .collect::<Result<Vec<_>, anyhow::Error>>()?;
-        return Ok((ScalarKind::String, Some(options)));
+        let labels = enum_values.iter().map(enum_label).collect::<Vec<_>>();
+        return Ok((
+            infer_enum_scalar(enum_values),
+            Some(labels),
+            Some(enum_values.clone()),
+        ));
     }
 
     let instance = instance_type(schema);
@@ -430,7 +434,36 @@ fn detect_scalar(schema: &SchemaObject) -> Result<(ScalarKind, Option<Vec<String
             bail!("composite types should be handled earlier")
         }
     };
-    Ok((scalar, None))
+    Ok((scalar, None, None))
+}
+
+fn enum_label(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Number(num) => num.to_string(),
+        Value::Bool(flag) => flag.to_string(),
+        Value::Array(items) => items.iter().map(enum_label).collect::<Vec<_>>().join(", "),
+        other => other.to_string(),
+    }
+}
+
+fn infer_enum_scalar(values: &[Value]) -> ScalarKind {
+    let mut inferred = None;
+    for value in values {
+        let current = match value {
+            Value::Number(num) if num.is_i64() || num.is_u64() => ScalarKind::Integer,
+            Value::Number(_) => ScalarKind::Number,
+            Value::Bool(_) => ScalarKind::Boolean,
+            Value::String(_) => ScalarKind::String,
+            _ => return ScalarKind::String,
+        };
+        match inferred {
+            Some(existing) if existing != current => return ScalarKind::String,
+            Some(_) => {}
+            None => inferred = Some(current),
+        }
+    }
+    inferred.unwrap_or(ScalarKind::String)
 }
 
 fn merge_all_of(resolver: &SchemaResolver<'_>, all_of: &[Schema]) -> Result<SchemaObject> {

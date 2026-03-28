@@ -54,15 +54,12 @@ pub fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
 
     let mut schema_value = schema_value;
     let mut config_value = config_value;
-    if schema_value.is_none() {
-        if let Some(config_doc) = config_value.as_ref()
-            && looks_like_json_schema(config_doc)
-        {
-            eprintln!(
-                "detected JSON Schema provided via --config; treating it as the active schema"
-            );
-            schema_value = config_value.take();
-        }
+    if schema_value.is_none()
+        && let Some(config_doc) = config_value.as_ref()
+        && looks_like_json_schema(config_doc)
+    {
+        eprintln!("detected JSON Schema provided via --config; treating it as the active schema");
+        schema_value = config_value.take();
     }
 
     if schema_value.is_none() && config_value.is_none() {
@@ -93,9 +90,7 @@ fn load_optional_value(
     if skip {
         return None;
     }
-    let Some(raw) = spec else {
-        return None;
-    };
+    let raw = spec?;
     match load_value(raw, format, label) {
         Ok(value) => Some(value),
         Err(err) => {

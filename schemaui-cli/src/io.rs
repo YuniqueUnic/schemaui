@@ -67,7 +67,7 @@ fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result
 
 pub fn is_not_found(err: &Report) -> bool {
     err.downcast_ref::<io::Error>()
-        .map_or(false, |io_err| io_err.kind() == io::ErrorKind::NotFound)
+        .is_some_and(|io_err| io_err.kind() == io::ErrorKind::NotFound)
 }
 
 fn format_list() -> &'static str {

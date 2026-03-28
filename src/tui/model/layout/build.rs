@@ -371,14 +371,11 @@ fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<F
         return Ok(FieldKind::Composite(Box::new(composite)));
     }
     if let Some(options) = &schema.enum_values {
-        let enum_values = options
-            .iter()
-            .map(|value| match value {
-                Value::String(s) => Ok(s.clone()),
-                other => Ok(other.to_string()),
-            })
-            .collect::<Result<Vec<_>, anyhow::Error>>()?;
-        return Ok(FieldKind::Enum(enum_values));
+        let labels = options.iter().map(enum_label).collect::<Vec<_>>();
+        return Ok(FieldKind::Enum {
+            labels,
+            values: options.clone(),
+        });
     }
 
     match instance_type(schema) {
@@ -396,7 +393,7 @@ fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<F
                     | FieldKind::Integer
                     | FieldKind::Number
                     | FieldKind::Boolean
-                    | FieldKind::Enum(_)
+                    | FieldKind::Enum { .. }
                     | FieldKind::Composite(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
                     FieldKind::Json => {
                         if let Some(composite) = inline_object_composite(&inner)? {
@@ -414,6 +411,16 @@ fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<F
             _ => Ok(FieldKind::Array(Box::new(FieldKind::Json))),
         },
         Some(other) => bail!("unsupported field type {other:?}"),
+    }
+}
+
+fn enum_label(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.clone(),
+        Value::Number(num) => num.to_string(),
+        Value::Bool(flag) => flag.to_string(),
+        Value::Array(items) => items.iter().map(enum_label).collect::<Vec<_>>().join(", "),
+        other => other.to_string(),
     }
 }
 

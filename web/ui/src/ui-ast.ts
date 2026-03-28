@@ -108,6 +108,9 @@ export function variantDefault(variant: UiVariant): JsonValue {
 export function defaultForKind(kind: UiNodeKind): JsonValue {
   switch (kind.type) {
     case "field": {
+      if (kind.enum_values?.length) {
+        return deepClone(kind.enum_values[0] as JsonValue);
+      }
       if (kind.enum_options?.length) {
         return kind.enum_options[0] as JsonValue;
       }

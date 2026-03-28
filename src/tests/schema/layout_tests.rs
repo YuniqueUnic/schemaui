@@ -368,6 +368,35 @@ fn allof_properties_merge_into_object_section() {
     );
 }
 
+#[test]
+fn referenced_field_keeps_instance_metadata() {
+    let schema = json!({
+        "definitions": {
+            "duration_ms": {
+                "title": "Definition Title",
+                "description": "Definition description",
+                "type": "integer"
+            }
+        },
+        "type": "object",
+        "properties": {
+            "timeout": {
+                "$ref": "#/definitions/duration_ms",
+                "title": "Request Timeout",
+                "description": "Per-request timeout",
+                "default": 5
+            }
+        }
+    });
+
+    let form = build_form_schema(&schema).expect("schema parsed");
+    let field = find_field(&form, |field| field.pointer == "/timeout").expect("timeout field");
+    assert_eq!(field.title, "Request Timeout");
+    assert_eq!(field.description.as_deref(), Some("Per-request timeout"));
+    assert_eq!(field.default, Some(json!(5)));
+    assert!(matches!(field.kind, FieldKind::Integer));
+}
+
 fn find_field(form: &FormSchema, predicate: impl Fn(&FieldSchema) -> bool) -> Option<&FieldSchema> {
     for root in &form.roots {
         if let Some(field) = find_in_sections(&root.sections, &predicate) {

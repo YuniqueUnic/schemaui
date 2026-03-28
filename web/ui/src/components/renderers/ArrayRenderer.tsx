@@ -10,6 +10,13 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
 import { Input } from "../ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { Switch } from "../ui/switch";
 import { useOverlay } from "../Overlay";
 import {
@@ -404,6 +411,35 @@ function renderSimpleFieldInline(
   onChange: (value: JsonValue) => void,
 ): React.ReactNode {
   const resolved = value ?? defaultForKind(fieldKind);
+
+  if (fieldKind.enum_options?.length) {
+    const enumValues = fieldKind.enum_values ?? fieldKind.enum_options;
+    const selectedIndex = enumValues.findIndex((option) =>
+      JSON.stringify(option) === JSON.stringify(resolved)
+    );
+    return (
+      <Select
+        value={selectedIndex >= 0 ? String(selectedIndex) : ""}
+        onValueChange={(newValue) => {
+          const next = enumValues[Number(newValue)];
+          if (next !== undefined) {
+            onChange(JSON.parse(JSON.stringify(next)) as JsonValue);
+          }
+        }}
+      >
+        <SelectTrigger className="h-9 w-full">
+          <SelectValue placeholder="Select an option" />
+        </SelectTrigger>
+        <SelectContent>
+          {fieldKind.enum_options.map((option, index) => (
+            <SelectItem key={`${option}-${index}`} value={String(index)}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
 
   switch (fieldKind.scalar) {
     case "integer":

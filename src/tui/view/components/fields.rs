@@ -359,7 +359,7 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Integer => "integer".to_string(),
         FieldKind::Number => "number".to_string(),
         FieldKind::Boolean => "boolean".to_string(),
-        FieldKind::Enum(_) => "enum".to_string(),
+        FieldKind::Enum { .. } => "enum".to_string(),
         FieldKind::Array(inner) => match inner.as_ref() {
             FieldKind::Json => "object[]".to_string(),
             FieldKind::Composite(comp) => {
