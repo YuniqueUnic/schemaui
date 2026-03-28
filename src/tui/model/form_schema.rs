@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormSchema {
     #[allow(dead_code)]
     pub title: Option<String>,
@@ -12,7 +12,7 @@ pub struct FormSchema {
     pub roots: Vec<RootSection>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RootSection {
     pub id: String,
     pub title: String,
@@ -20,7 +20,7 @@ pub struct RootSection {
     pub sections: Vec<FormSection>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormSection {
     pub id: String,
     pub title: String,
@@ -128,7 +128,7 @@ pub struct CompositeVariant {
     pub is_object: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FieldSchema {
     pub name: String,
     pub path: Vec<String>,

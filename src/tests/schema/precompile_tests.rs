@@ -1,6 +1,11 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::io::{DocumentFormat, input::parse_document_str};
 use crate::precompile;
@@ -14,6 +19,29 @@ fn schema_path() -> PathBuf {
         .join("tests")
         .join("schemas")
         .join("test-comprehensive.schema.json")
+}
+
+fn defaults_value() -> Value {
+    json!({
+        "simpleTypes": {
+            "text": "hello from defaults",
+            "number": 7,
+            "toggle": true,
+            "dropdown": "option2"
+        }
+    })
+}
+
+fn unique_temp_dir(prefix: &str) -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock should be after unix epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "schemaui_{prefix}_{}_{}",
+        std::process::id(),
+        stamp
+    ))
 }
 
 #[test]
@@ -56,6 +84,72 @@ fn ui_ast_bundle_json_roundtrip_preserves_structure() {
     let decoded = precompile::decode_ui_ast_bundle(&json).expect("decode UiAst bundle from JSON");
 
     assert_eq!(original, decoded);
+}
+
+#[test]
+fn precompiled_ui_bundle_roundtrip_preserves_structure() {
+    let path = schema_path();
+    let defaults = defaults_value();
+    let out_dir = unique_temp_dir("precompiled_bundle_roundtrip");
+    fs::create_dir_all(&out_dir).expect("tmp dir creatable");
+    let defaults_path = out_dir.join("defaults.json");
+    fs::write(
+        &defaults_path,
+        serde_json::to_vec_pretty(&defaults).expect("serialize defaults"),
+    )
+    .expect("write defaults file");
+
+    let original = precompile::build_precompiled_ui_bundle_from_file(
+        &path,
+        DocumentFormat::Json,
+        Some(&defaults_path),
+    )
+    .expect("precompile UI bundle");
+    let json = precompile::precompiled_ui_bundle_to_json(&original)
+        .expect("precompiled UI bundle to JSON");
+    let decoded = precompile::decode_precompiled_ui_bundle(&json)
+        .expect("decode precompiled UI bundle from JSON");
+
+    assert_eq!(original, decoded);
+
+    let _ = fs::remove_file(&defaults_path);
+    let _ = fs::remove_dir_all(&out_dir);
+}
+
+#[test]
+fn precompiled_ui_bundle_version_and_fingerprint_track_schema_and_defaults() {
+    let path = schema_path();
+    let defaults_a = json!({"simpleTypes": {"text": "a", "dropdown": "option1"}});
+    let defaults_b = json!({"simpleTypes": {"text": "b", "dropdown": "option2"}});
+
+    let contents = fs::read_to_string(&path).expect("schema file readable");
+    let schema_value: Value =
+        parse_document_str(&contents, DocumentFormat::Json).expect("schema parses at runtime");
+
+    let bundle_a = precompile::build_precompiled_ui_bundle(&schema_value, Some(&defaults_a))
+        .expect("build bundle a");
+    let bundle_a_again = precompile::build_precompiled_ui_bundle(&schema_value, Some(&defaults_a))
+        .expect("build bundle a again");
+    let bundle_b = precompile::build_precompiled_ui_bundle(&schema_value, Some(&defaults_b))
+        .expect("build bundle b");
+
+    assert_eq!(
+        bundle_a.artifact_version,
+        precompile::PRECOMPILED_UI_BUNDLE_VERSION
+    );
+    assert_eq!(bundle_a.fingerprint, bundle_a_again.fingerprint);
+    assert_eq!(
+        bundle_a.fingerprint.schema_sha256,
+        bundle_b.fingerprint.schema_sha256
+    );
+    assert_ne!(
+        bundle_a.fingerprint.defaults_sha256,
+        bundle_b.fingerprint.defaults_sha256
+    );
+    assert_ne!(
+        bundle_a.fingerprint.input_sha256,
+        bundle_b.fingerprint.input_sha256
+    );
 }
 
 #[test]
@@ -211,22 +305,16 @@ fn precompiled_layout_nav_matches_runtime_layout_nav() {
 }
 
 #[test]
-fn generated_tui_modules_produce_expected_artifacts() {
+fn generated_precompile_modules_compile_and_construct_artifacts() {
     let path = schema_path();
 
     // 1) Generate modules into a temporary directory under target/.
-    let out_dir = std::env::var("CARGO_TARGET_TMPDIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            PathBuf::from(
-                std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string()),
-            )
-            .join("tmp_precompiled_tui")
-        });
+    let out_dir = unique_temp_dir("precompiled_compile_smoke");
     fs::create_dir_all(&out_dir).expect("tmp dir creatable");
 
     let form_module = out_dir.join("precompiled_form_schema.rs");
     let nav_module = out_dir.join("precompiled_layout_nav.rs");
+    let bundle_module = out_dir.join("precompiled_ui_bundle.rs");
 
     ct_tui::generate_tui_form_schema_module(
         &path,
@@ -242,13 +330,98 @@ fn generated_tui_modules_produce_expected_artifacts() {
         "precompiled_layout_nav",
     )
     .expect("generate LayoutNavModel module");
+    precompile::generate_precompiled_ui_bundle_module(
+        &path,
+        DocumentFormat::Json,
+        None,
+        &bundle_module,
+        "precompiled_ui_bundle",
+    )
+    .expect("generate precompiled UI bundle module");
 
     // 2) Sanity-check that the generated files exist and contain the expected
-    // function names. We do not compile/include them here to keep this test
-    // fast and independent from include! paths.
+    // function names.
     let form_src = fs::read_to_string(&form_module).expect("form module readable");
     assert!(form_src.contains("fn precompiled_form_schema"));
 
     let nav_src = fs::read_to_string(&nav_module).expect("nav module readable");
     assert!(nav_src.contains("fn precompiled_layout_nav"));
+
+    let bundle_src = fs::read_to_string(&bundle_module).expect("bundle module readable");
+    assert!(bundle_src.contains("fn precompiled_ui_bundle"));
+
+    // 3) Compile the generated modules inside a temporary crate and construct
+    // the generated artifacts at runtime.
+    let smoke_crate_dir = out_dir.join("compile_smoke");
+    fs::create_dir_all(smoke_crate_dir.join("src")).expect("smoke crate src creatable");
+    fs::write(
+        smoke_crate_dir.join("Cargo.toml"),
+        smoke_crate_manifest(env!("CARGO_MANIFEST_DIR")),
+    )
+    .expect("write smoke crate manifest");
+    fs::write(
+        smoke_crate_dir.join("src/main.rs"),
+        smoke_crate_main(&form_module, &nav_module, &bundle_module),
+    )
+    .expect("write smoke crate main");
+
+    let target_dir = smoke_crate_dir.join("target");
+    let output = Command::new("cargo")
+        .args(["run", "--quiet"])
+        .current_dir(&smoke_crate_dir)
+        .env("CARGO_TARGET_DIR", &target_dir)
+        .output()
+        .expect("run smoke crate");
+    if !output.status.success() {
+        eprintln!("stdout:\n{}", String::from_utf8_lossy(&output.stdout));
+        eprintln!("stderr:\n{}", String::from_utf8_lossy(&output.stderr));
+    }
+    assert!(
+        output.status.success(),
+        "smoke crate should compile and run"
+    );
+
+    let _ = fs::remove_dir_all(&out_dir);
+}
+
+fn smoke_crate_manifest(manifest_dir: &str) -> String {
+    format!(
+        r#"[package]
+name = "schemaui-precompile-smoke"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+schemaui = {{ path = "{manifest_dir}", default-features = false, features = ["json", "tui", "precompile"] }}
+serde_json = "1"
+"#
+    )
+}
+
+fn smoke_crate_main(form_module: &Path, nav_module: &Path, bundle_module: &Path) -> String {
+    format!(
+        r##"include!(r#"{form}"#);
+include!(r#"{nav}"#);
+include!(r#"{bundle}"#);
+
+fn main() {{
+    let form = precompiled_form_schema();
+    let nav = precompiled_layout_nav();
+    let bundle = precompiled_ui_bundle();
+
+    assert!(!form.roots.is_empty());
+    assert!(!nav.roots.is_empty());
+    assert!(!bundle.ui.ui_ast.roots.is_empty());
+    assert_eq!(bundle.tui.form_schema, form);
+    assert_eq!(bundle.tui.layout_nav, nav);
+    assert_eq!(
+        bundle.artifact_version,
+        schemaui::precompile::PRECOMPILED_UI_BUNDLE_VERSION
+    );
+}}
+"##,
+        form = form_module.display(),
+        nav = nav_module.display(),
+        bundle = bundle_module.display(),
+    )
 }

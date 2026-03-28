@@ -3,8 +3,8 @@ use std::{fs, path::Path};
 use anyhow::Result;
 
 use crate::io::DocumentFormat;
-use crate::precompile::build_ui_ast_bundle_from_file;
-use crate::tui::model::{FormSchema, form_schema_from_ui_ast};
+use crate::precompile::build_precompiled_ui_bundle_from_file;
+use crate::tui::model::FormSchema;
 use crate::tui::state::LayoutNavModel;
 use crate::ui_ast::UiAst;
 
@@ -16,9 +16,8 @@ pub fn build_tui_form_schema_from_file(
     path: &Path,
     format: DocumentFormat,
 ) -> Result<(UiAst, FormSchema)> {
-    let bundle = build_ui_ast_bundle_from_file(path, format)?;
-    let form = form_schema_from_ui_ast(&bundle.ui_ast);
-    Ok((bundle.ui_ast, form))
+    let bundle = build_precompiled_ui_bundle_from_file(path, format, None)?;
+    Ok((bundle.ui.ui_ast, bundle.tui.form_schema))
 }
 
 /// Build UiAst and a TUI LayoutNavModel from a schema file.
@@ -31,9 +30,8 @@ pub fn build_tui_layout_nav_from_file(
     path: &Path,
     format: DocumentFormat,
 ) -> Result<(UiAst, LayoutNavModel)> {
-    let bundle = build_ui_ast_bundle_from_file(path, format)?;
-    let nav = LayoutNavModel::from_uilayout(&bundle.layout);
-    Ok((bundle.ui_ast, nav))
+    let bundle = build_precompiled_ui_bundle_from_file(path, format, None)?;
+    Ok((bundle.ui.ui_ast, bundle.tui.layout_nav))
 }
 
 /// Generate a Rust module under OUT_DIR that exposes a constructor for
@@ -56,7 +54,7 @@ pub fn generate_tui_form_schema_module(
     let (_ast, form_schema) = build_tui_form_schema_from_file(schema_path, format)?;
     let json = serde_json::to_string_pretty(&form_schema)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::tui::model::FormSchema {{\n    serde_json::from_str::<schemaui::tui::model::FormSchema>(r#\"{json}\"#).expect(\"invalid precompiled FormSchema JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::FormSchema {{\n    serde_json::from_str::<schemaui::FormSchema>(r#\"{json}\"#).expect(\"invalid precompiled FormSchema JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())
@@ -82,7 +80,7 @@ pub fn generate_tui_layout_nav_module(
     let (_ast, layout_nav) = build_tui_layout_nav_from_file(schema_path, format)?;
     let json = serde_json::to_string_pretty(&layout_nav)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::tui::state::LayoutNavModel {{\n    serde_json::from_str::<schemaui::tui::state::LayoutNavModel>(r#\"{json}\"#).expect(\"invalid precompiled LayoutNavModel JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::LayoutNavModel {{\n    serde_json::from_str::<schemaui::LayoutNavModel>(r#\"{json}\"#).expect(\"invalid precompiled LayoutNavModel JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())

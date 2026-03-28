@@ -51,13 +51,14 @@ debug = []
 [dependencies]
 anyhow = "1"
 crossterm = "0.29.0"
-jsonschema = "0.37"
-ratatui = "0.29.0"
+jsonschema = "0.45"
+ratatui = "0.30"
 schemars = { version = "0.8.22", features = ["preserve_order"] }
 serde = { version = "1", features = ["derive"] }
 indexmap = "2"
 percent-encoding = "2"
-unicode-width = "=0.2.0"
+sha2 = "0.11"
+unicode-width = "=0.2"
 textwrap = "0.16"
 regex = "1"
 include_dir = { version = "0.7", optional = true }
@@ -69,12 +70,12 @@ tokio = { version = "1", features = [
     "net",
     "fs",
 ], optional = true }
-ts-rs = { version = "11", optional = true, features = ["serde-compat"] }
+ts-rs = { version = "12", optional = true, features = ["serde-compat"] }
 
 # For serialization formats
 serde_json = "1"
 serde_yaml = { version = "0.9", optional = true }
-toml = { version = "0.9", optional = true }
+toml = { version = "1.1.0", optional = true }
 
 [[example]]
 name = "demo"

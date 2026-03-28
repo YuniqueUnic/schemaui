@@ -1,9 +1,9 @@
 use std::{fs, path::PathBuf};
 
 use crate::io::DocumentFormat;
-use crate::io::input::{parse_document_str, schema_with_defaults};
+use crate::io::input::parse_document_str;
+use crate::precompile::build_precompiled_ui_bundle;
 use crate::precompile::web;
-use crate::ui_ast::build_ui_ast_bundle;
 use crate::web::session::SessionResponse;
 use crate::web::session::WebSessionBuilder;
 use serde_json::{Value, json};
@@ -103,12 +103,12 @@ fn web_session_builder_with_precompiled_bundle_matches_precompiled_snapshot() {
     let schema_value: Value =
         parse_document_str(&schema_raw, DocumentFormat::Json).expect("schema parses");
     let defaults = defaults_value();
-    let enriched = schema_with_defaults(&schema_value, &defaults);
-    let bundle = build_ui_ast_bundle(&enriched).expect("build precompiled bundle");
+    let bundle = build_precompiled_ui_bundle(&schema_value, Some(&defaults))
+        .expect("build precompiled bundle");
 
     let config = WebSessionBuilder::new(schema_value)
         .with_initial_data(defaults.clone())
-        .with_precompiled_ui_bundle(bundle)
+        .with_precompiled_artifacts(bundle)
         .build()
         .expect("web session config");
     let runtime_snapshot = config.session_response();

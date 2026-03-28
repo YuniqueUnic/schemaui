@@ -28,6 +28,7 @@ use tokio::{
 use ts_rs::TS;
 
 use crate::io::{DocumentFormat, input::schema_with_defaults};
+use crate::precompile::PrecompiledUiBundle;
 
 use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
 use crate::ui_ast::{UiAst, UiAstBundle, UiLayout, build_ui_ast_bundle};
@@ -38,6 +39,7 @@ pub struct WebSessionBuilder {
     title: Option<String>,
     asset_provider: Arc<dyn WebAssetProvider>,
     precompiled_ui_bundle: Option<UiAstBundle>,
+    precompiled_artifacts: Option<PrecompiledUiBundle>,
 }
 
 impl WebSessionBuilder {
@@ -49,6 +51,7 @@ impl WebSessionBuilder {
             #[allow(clippy::default_constructed_unit_structs)]
             asset_provider: Arc::new(EmbeddedAssets::default()),
             precompiled_ui_bundle: None,
+            precompiled_artifacts: None,
         }
     }
 
@@ -84,13 +87,21 @@ impl WebSessionBuilder {
         self
     }
 
+    /// Provide a fully precompiled artifact bundle.
+    pub fn with_precompiled_artifacts(mut self, bundle: PrecompiledUiBundle) -> Self {
+        self.precompiled_artifacts = Some(bundle);
+        self
+    }
+
     pub fn build(mut self) -> Result<WebSessionConfig> {
         let data = self
             .defaults
             .take()
             .unwrap_or_else(|| Value::Object(Map::new()));
         let schema = schema_with_defaults(&self.schema, &data);
-        let bundle = if let Some(bundle) = self.precompiled_ui_bundle.take() {
+        let bundle = if let Some(bundle) = self.precompiled_artifacts.take() {
+            bundle.ui
+        } else if let Some(bundle) = self.precompiled_ui_bundle.take() {
             bundle
         } else {
             build_ui_ast_bundle(&schema)?

@@ -3,8 +3,8 @@ use std::{fs, path::Path};
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::io::{DocumentFormat, input::parse_document_str, input::schema_with_defaults};
-use crate::ui_ast::build_ui_ast_bundle;
+use crate::io::{DocumentFormat, input::parse_document_str};
+use crate::precompile::build_precompiled_ui_bundle;
 use crate::web::session::SessionResponse;
 
 /// Build a minimal Web session snapshot (SessionResponse) from a schema file
@@ -26,9 +26,8 @@ pub fn build_session_snapshot_from_files(
         Value::Object(Default::default())
     };
 
-    let enriched = schema_with_defaults(&schema_value, &defaults_value);
-    let bundle = build_ui_ast_bundle(&enriched)?;
-    let (ui_ast, layout) = bundle.into_parts();
+    let bundle = build_precompiled_ui_bundle(&schema_value, Some(&defaults_value))?;
+    let (ui_ast, layout) = bundle.ui.into_parts();
 
     let formats: Vec<String> = DocumentFormat::available_formats()
         .into_iter()

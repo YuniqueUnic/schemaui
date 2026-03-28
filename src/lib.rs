@@ -24,7 +24,9 @@ pub use io::{
 };
 pub use tui::{
     app::{SchemaUI, options::UiOptions},
+    model::FormSchema,
     session::TuiFrontend,
+    state::LayoutNavModel,
     view::{CompositeOverlay, PopupRender, UiContext, draw},
 };
 #[cfg(feature = "web")]

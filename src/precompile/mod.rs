@@ -1,10 +1,14 @@
 use std::{fs, path::Path};
 
 use anyhow::Result;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use sha2::{Digest, Sha256};
 
 use crate::io::DocumentFormat;
-use crate::io::input::parse_document_str;
+use crate::io::input::{parse_document_str, schema_with_defaults};
+use crate::tui::model::{FormSchema, form_schema_from_ui_ast};
+use crate::tui::state::LayoutNavModel;
 use crate::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
 
 pub mod defaults;
@@ -16,6 +20,72 @@ pub mod tui;
 #[cfg(feature = "web")]
 pub mod web;
 
+pub const PRECOMPILED_UI_BUNDLE_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrecompiledUiFingerprint {
+    pub schema_sha256: String,
+    pub defaults_sha256: String,
+    pub input_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TuiPrecompiledArtifacts {
+    pub form_schema: FormSchema,
+    pub layout_nav: LayoutNavModel,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PrecompiledUiBundle {
+    pub artifact_version: u32,
+    pub fingerprint: PrecompiledUiFingerprint,
+    pub ui: UiAstBundle,
+    pub tui: TuiPrecompiledArtifacts,
+}
+
+pub fn build_precompiled_ui_bundle(
+    schema: &Value,
+    defaults: Option<&Value>,
+) -> Result<PrecompiledUiBundle> {
+    let defaults = defaults
+        .cloned()
+        .unwrap_or_else(|| Value::Object(Map::new()));
+    let enriched = schema_with_defaults(schema, &defaults);
+    let ui = build_ui_ast_bundle(&enriched)?;
+    let fingerprint = PrecompiledUiFingerprint {
+        schema_sha256: sha256_hex(&stable_value_bytes(schema)?),
+        defaults_sha256: sha256_hex(&stable_value_bytes(&defaults)?),
+        input_sha256: sha256_hex(&stable_value_bytes(&Value::Object(Map::from_iter([
+            ("schema".to_string(), stable_value(schema)),
+            ("defaults".to_string(), stable_value(&defaults)),
+        ])))?),
+    };
+
+    Ok(PrecompiledUiBundle {
+        artifact_version: PRECOMPILED_UI_BUNDLE_VERSION,
+        fingerprint,
+        tui: TuiPrecompiledArtifacts {
+            form_schema: form_schema_from_ui_ast(&ui.ui_ast),
+            layout_nav: LayoutNavModel::from_uilayout(&ui.layout),
+        },
+        ui,
+    })
+}
+
+pub fn build_precompiled_ui_bundle_from_file(
+    schema_path: &Path,
+    schema_format: DocumentFormat,
+    defaults_path: Option<&Path>,
+) -> Result<PrecompiledUiBundle> {
+    let schema = read_document_file(schema_path, schema_format)?;
+    let defaults = if let Some(path) = defaults_path {
+        Some(read_document_file(path, schema_format)?)
+    } else {
+        None
+    };
+    build_precompiled_ui_bundle(&schema, defaults.as_ref())
+}
+
 /// Read a schema file, parse it as JSON/YAML/TOML, and build a UiAst.
 pub fn build_ui_ast_from_file(path: &Path, format: DocumentFormat) -> Result<UiAst> {
     Ok(build_ui_ast_bundle_from_file(path, format)?.ui_ast)
@@ -24,8 +94,7 @@ pub fn build_ui_ast_from_file(path: &Path, format: DocumentFormat) -> Result<UiA
 /// Read a schema file, parse it as JSON/YAML/TOML, and build a shared UI
 /// artifact bundle.
 pub fn build_ui_ast_bundle_from_file(path: &Path, format: DocumentFormat) -> Result<UiAstBundle> {
-    let contents = fs::read_to_string(path)?;
-    let schema: Value = parse_document_str(&contents, format)?;
+    let schema = read_document_file(path, format)?;
     // For compile-time we typically do not apply data-driven defaults.
     build_ui_ast_bundle(&schema)
 }
@@ -67,4 +136,67 @@ pub fn ui_ast_bundle_to_json(bundle: &UiAstBundle) -> Result<String> {
 
 pub fn decode_ui_ast_bundle(json: &str) -> Result<UiAstBundle> {
     Ok(serde_json::from_str(json)?)
+}
+
+pub fn precompiled_ui_bundle_to_json(bundle: &PrecompiledUiBundle) -> Result<String> {
+    Ok(serde_json::to_string_pretty(bundle)?)
+}
+
+pub fn decode_precompiled_ui_bundle(json: &str) -> Result<PrecompiledUiBundle> {
+    Ok(serde_json::from_str(json)?)
+}
+
+/// Generate a Rust module under OUT_DIR that exposes a constructor for
+/// `PrecompiledUiBundle` built from the given schema and optional defaults.
+pub fn generate_precompiled_ui_bundle_module(
+    schema_path: &Path,
+    format: DocumentFormat,
+    defaults_path: Option<&Path>,
+    out_module_path: &Path,
+    fn_name: &str,
+) -> Result<()> {
+    let bundle = build_precompiled_ui_bundle_from_file(schema_path, format, defaults_path)?;
+    let json = precompiled_ui_bundle_to_json(&bundle)?;
+    let src = format!(
+        "pub fn {fn_name}() -> schemaui::precompile::PrecompiledUiBundle {{\n    serde_json::from_str::<schemaui::precompile::PrecompiledUiBundle>(r#\"{json}\"#).expect(\"invalid precompiled UI bundle JSON\")\n}}\n",
+    );
+    fs::write(out_module_path, src)?;
+    Ok(())
+}
+
+fn read_document_file(path: &Path, format: DocumentFormat) -> Result<Value> {
+    let contents = fs::read_to_string(path)?;
+    let schema: Value = parse_document_str(&contents, format)?;
+    Ok(schema)
+}
+
+fn stable_value_bytes(value: &Value) -> Result<Vec<u8>> {
+    Ok(serde_json::to_vec(&stable_value(value))?)
+}
+
+fn stable_value(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let mut entries = map.iter().collect::<Vec<_>>();
+            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+
+            let mut normalized = Map::new();
+            for (key, value) in entries {
+                normalized.insert(key.clone(), stable_value(value));
+            }
+            Value::Object(normalized)
+        }
+        Value::Array(values) => Value::Array(values.iter().map(stable_value).collect()),
+        _ => value.clone(),
+    }
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut out = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        use std::fmt::Write as _;
+        let _ = write!(&mut out, "{byte:02x}");
+    }
+    out
 }

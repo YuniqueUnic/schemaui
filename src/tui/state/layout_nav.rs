@@ -2,19 +2,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::ui_ast::layout::{LayoutSection, UiLayout};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LayoutNavModel {
     pub roots: Vec<NavRoot>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NavRoot {
     pub id: String,
     pub title: String,
     pub sections: Vec<NavSection>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NavSection {
     pub id: String,
     pub title: String,

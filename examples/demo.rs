@@ -52,6 +52,7 @@ fn main() -> anyhow::Result<()> {
     let frontend = schemaui::TuiFrontend {
         options,
         precompiled_form_schema: None,
+        precompiled_layout_nav: None,
     };
     let result = backend.run_with_frontend(frontend)?;
 

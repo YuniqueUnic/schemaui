@@ -10,8 +10,10 @@ use crate::io::{
 
 use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions};
 use crate::core::frontend::Frontend;
+use crate::precompile::PrecompiledUiBundle;
 use crate::tui::model::FormSchema;
 use crate::tui::session::TuiFrontend;
+use crate::tui::state::LayoutNavModel;
 use crate::tui::state::field::components::ComponentPalette;
 use crate::ui_ast::{UiAst, UiAstBundle};
 #[cfg(feature = "web")]
@@ -26,7 +28,9 @@ pub struct SchemaUI {
     initial_data: Option<Value>,
     precompiled_ui_ast: Option<UiAst>,
     precompiled_ui_bundle: Option<UiAstBundle>,
+    precompiled_artifacts: Option<PrecompiledUiBundle>,
     precompiled_form_schema: Option<FormSchema>,
+    precompiled_layout_nav: Option<LayoutNavModel>,
 }
 
 impl SchemaUI {
@@ -39,7 +43,9 @@ impl SchemaUI {
             initial_data: None,
             precompiled_ui_ast: None,
             precompiled_ui_bundle: None,
+            precompiled_artifacts: None,
             precompiled_form_schema: None,
+            precompiled_layout_nav: None,
         }
     }
 
@@ -79,11 +85,24 @@ impl SchemaUI {
         self
     }
 
+    /// Provide a fully precompiled artifact bundle, including shared UI and
+    /// TUI-specific derived structures.
+    pub fn with_precompiled_artifacts(mut self, bundle: PrecompiledUiBundle) -> Self {
+        self.precompiled_artifacts = Some(bundle);
+        self
+    }
+
     /// Provide a precompiled TUI FormSchema built at compile-time. When set,
     /// the TUI frontend will use this instead of deriving a FormSchema from
     /// the UiAst at runtime.
     pub fn with_precompiled_form_schema(mut self, form: FormSchema) -> Self {
         self.precompiled_form_schema = Some(form);
+        self
+    }
+
+    /// Provide a precompiled TUI LayoutNavModel built at compile-time.
+    pub fn with_precompiled_layout_nav(mut self, layout_nav: LayoutNavModel) -> Self {
+        self.precompiled_layout_nav = Some(layout_nav);
         self
     }
 
@@ -228,10 +247,20 @@ impl SchemaUI {
     /// `SchemaUI` builder.
     pub fn run_tui(self) -> Result<Value> {
         let options = self.options.clone();
-        let precompiled_form_schema = self.precompiled_form_schema.clone();
+        let precompiled_form_schema = self.precompiled_form_schema.clone().or_else(|| {
+            self.precompiled_artifacts
+                .as_ref()
+                .map(|bundle| bundle.tui.form_schema.clone())
+        });
+        let precompiled_layout_nav = self.precompiled_layout_nav.clone().or_else(|| {
+            self.precompiled_artifacts
+                .as_ref()
+                .map(|bundle| bundle.tui.layout_nav.clone())
+        });
         self.run_with_frontend(TuiFrontend {
             options,
             precompiled_form_schema,
+            precompiled_layout_nav,
         })
     }
 
@@ -254,9 +283,14 @@ impl SchemaUI {
             initial_data,
             precompiled_ui_ast,
             precompiled_ui_bundle,
+            precompiled_artifacts,
             precompiled_form_schema: _,
+            precompiled_layout_nav: _,
         } = self;
 
+        let precompiled_ui_bundle = precompiled_artifacts
+            .map(|bundle| bundle.ui)
+            .or(precompiled_ui_bundle);
         let pipeline = SchemaPipeline::new(schema)
             .with_title(title)
             .with_defaults(initial_data)

@@ -6,8 +6,9 @@ use serde_json::{Value, json};
 
 use crate::core::frontend::{Frontend, FrontendContext};
 use crate::core::pipeline::SchemaPipeline;
-use crate::io::{DocumentFormat, input::parse_document_str, input::schema_with_defaults};
-use crate::ui_ast::{UiAst, UiAstBundle, UiLayout, build_ui_ast_bundle};
+use crate::io::{DocumentFormat, input::parse_document_str};
+use crate::precompile::build_precompiled_ui_bundle;
+use crate::ui_ast::{UiAst, UiAstBundle, UiLayout};
 
 fn schema_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -68,8 +69,9 @@ fn capture_pipeline_output(schema: Value, defaults: Value, bundle: Option<UiAstB
 fn schema_pipeline_with_precompiled_ui_bundle_matches_runtime_context() {
     let schema = schema_value();
     let defaults = defaults_value();
-    let enriched = schema_with_defaults(&schema, &defaults);
-    let bundle = build_ui_ast_bundle(&enriched).expect("build precompiled bundle");
+    let bundle = build_precompiled_ui_bundle(&schema, Some(&defaults))
+        .expect("build precompiled bundle")
+        .ui;
 
     let runtime = capture_pipeline_output(schema.clone(), defaults.clone(), None);
     let precompiled = capture_pipeline_output(schema, defaults, Some(bundle));
