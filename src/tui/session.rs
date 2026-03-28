@@ -5,7 +5,6 @@ use crate::core::frontend::{Frontend, FrontendContext};
 use crate::tui::app::{App, UiOptions};
 use crate::tui::model::{FormSchema, form_schema_from_ui_ast};
 use crate::tui::state::{FormState, LayoutNavModel};
-use crate::ui_ast::layout::build_ui_layout;
 
 /// TUI frontend implementation that consumes a prepared `FrontendContext`
 /// and runs the interactive terminal UI.
@@ -25,6 +24,7 @@ impl Frontend for TuiFrontend {
         let FrontendContext {
             title: _,
             ui_ast,
+            layout,
             initial_data: _,
             schema: _,
             validator,
@@ -36,7 +36,6 @@ impl Frontend for TuiFrontend {
             form_schema_from_ui_ast(&ui_ast)
         };
 
-        let layout = build_ui_layout(&ui_ast);
         let layout_nav = LayoutNavModel::from_uilayout(&layout);
 
         let palette = options.component_palette();

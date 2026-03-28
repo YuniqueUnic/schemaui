@@ -13,7 +13,7 @@ use crate::core::frontend::Frontend;
 use crate::tui::model::FormSchema;
 use crate::tui::session::TuiFrontend;
 use crate::tui::state::field::components::ComponentPalette;
-use crate::ui_ast::UiAst;
+use crate::ui_ast::{UiAst, UiAstBundle};
 #[cfg(feature = "web")]
 use crate::web::{frontend::WebFrontend, session::ServeOptions as WebServeOptions};
 
@@ -25,6 +25,7 @@ pub struct SchemaUI {
     output: Option<OutputOptions>,
     initial_data: Option<Value>,
     precompiled_ui_ast: Option<UiAst>,
+    precompiled_ui_bundle: Option<UiAstBundle>,
     precompiled_form_schema: Option<FormSchema>,
 }
 
@@ -37,6 +38,7 @@ impl SchemaUI {
             output: None,
             initial_data: None,
             precompiled_ui_ast: None,
+            precompiled_ui_bundle: None,
             precompiled_form_schema: None,
         }
     }
@@ -68,6 +70,12 @@ impl SchemaUI {
     /// pipeline can skip building UiAst from the schema.
     pub fn with_precompiled_ui_ast(mut self, ast: UiAst) -> Self {
         self.precompiled_ui_ast = Some(ast);
+        self
+    }
+
+    /// Provide a precompiled bundle containing shared UI artifacts.
+    pub fn with_precompiled_ui_bundle(mut self, bundle: UiAstBundle) -> Self {
+        self.precompiled_ui_bundle = Some(bundle);
         self
     }
 
@@ -245,13 +253,15 @@ impl SchemaUI {
             output,
             initial_data,
             precompiled_ui_ast,
+            precompiled_ui_bundle,
             precompiled_form_schema: _,
         } = self;
 
         let pipeline = SchemaPipeline::new(schema)
             .with_title(title)
             .with_defaults(initial_data)
-            .with_precompiled_ui_ast(precompiled_ui_ast);
+            .with_precompiled_ui_ast(precompiled_ui_ast)
+            .with_precompiled_ui_bundle(precompiled_ui_bundle);
         let result = pipeline.run_with_frontend(frontend)?;
         if let Some(settings) = output {
             output::emit(&result, &settings)?;

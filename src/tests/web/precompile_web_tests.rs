@@ -1,14 +1,29 @@
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use crate::io::DocumentFormat;
+use crate::io::input::{parse_document_str, schema_with_defaults};
 use crate::precompile::web;
+use crate::ui_ast::build_ui_ast_bundle;
 use crate::web::session::SessionResponse;
+use crate::web::session::WebSessionBuilder;
+use serde_json::{Value, json};
 
 fn schema_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("schemas")
         .join("test-comprehensive.schema.json")
+}
+
+fn defaults_value() -> Value {
+    json!({
+        "simpleTypes": {
+            "text": "hello from defaults",
+            "number": 7,
+            "toggle": true,
+            "dropdown": "option2"
+        }
+    })
 }
 
 #[test]
@@ -79,4 +94,41 @@ fn ts_snapshot_module_has_expected_export_shape() {
     assert!(src.contains("export const PrecompiledSession: SessionResponse ="));
 
     let _ = std::fs::remove_file(&out_path);
+}
+
+#[test]
+fn web_session_builder_with_precompiled_bundle_matches_precompiled_snapshot() {
+    let path = schema_path();
+    let schema_raw = fs::read_to_string(&path).expect("schema file readable");
+    let schema_value: Value =
+        parse_document_str(&schema_raw, DocumentFormat::Json).expect("schema parses");
+    let defaults = defaults_value();
+    let enriched = schema_with_defaults(&schema_value, &defaults);
+    let bundle = build_ui_ast_bundle(&enriched).expect("build precompiled bundle");
+
+    let config = WebSessionBuilder::new(schema_value)
+        .with_initial_data(defaults.clone())
+        .with_precompiled_ui_bundle(bundle)
+        .build()
+        .expect("web session config");
+    let runtime_snapshot = config.session_response();
+
+    let mut defaults_path = std::env::temp_dir();
+    defaults_path.push(format!(
+        "schemaui_web_defaults_{}_snapshot.json",
+        std::process::id()
+    ));
+    fs::write(
+        &defaults_path,
+        serde_json::to_vec_pretty(&defaults).expect("serialize defaults"),
+    )
+    .expect("write defaults file");
+
+    let precompiled_snapshot =
+        web::build_session_snapshot_from_files(&path, DocumentFormat::Json, Some(&defaults_path))
+            .expect("precompiled web snapshot");
+
+    assert_eq!(runtime_snapshot, precompiled_snapshot);
+
+    let _ = fs::remove_file(&defaults_path);
 }

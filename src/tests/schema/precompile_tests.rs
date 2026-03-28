@@ -47,6 +47,18 @@ fn ui_ast_json_roundtrip_preserves_structure() {
 }
 
 #[test]
+fn ui_ast_bundle_json_roundtrip_preserves_structure() {
+    let path = schema_path();
+
+    let original = precompile::build_ui_ast_bundle_from_file(&path, DocumentFormat::Json)
+        .expect("precompile UiAst bundle");
+    let json = precompile::ui_ast_bundle_to_json(&original).expect("UiAst bundle to JSON");
+    let decoded = precompile::decode_ui_ast_bundle(&json).expect("decode UiAst bundle from JSON");
+
+    assert_eq!(original, decoded);
+}
+
+#[test]
 fn precompiled_form_schema_matches_runtime_form_schema() {
     let path = schema_path();
 

@@ -4,7 +4,7 @@ use serde_json::{Map, Value};
 
 use crate::core::frontend::{Frontend, FrontendContext};
 use crate::core::io::input::schema_with_defaults;
-use crate::core::ui_ast::{UiAst, build_ui_ast};
+use crate::core::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
 
 /// Core pipeline for preparing a `FrontendContext` from a base JSON Schema,
 /// optional title, and optional default data.
@@ -17,7 +17,7 @@ use crate::core::ui_ast::{UiAst, build_ui_ast};
 #[derive(Debug)]
 enum UiAstSource {
     Runtime,
-    Precompiled(UiAst),
+    Precompiled(UiAstBundle),
 }
 
 #[derive(Debug)]
@@ -52,7 +52,18 @@ impl SchemaPipeline {
     /// If `ast` is None, the pipeline falls back to runtime UiAst building.
     pub fn with_precompiled_ui_ast(mut self, ast: Option<UiAst>) -> Self {
         if let Some(ast) = ast {
-            self.ui_ast_source = UiAstSource::Precompiled(ast);
+            self.ui_ast_source = UiAstSource::Precompiled(UiAstBundle::from_ui_ast(ast));
+        }
+        self
+    }
+
+    /// Provide a precompiled bundle of shared UI artifacts.
+    ///
+    /// This lets the runtime reuse both `UiAst` and `UiLayout`, instead of
+    /// rebuilding layout-oriented structures from the schema again.
+    pub fn with_precompiled_ui_bundle(mut self, bundle: Option<UiAstBundle>) -> Self {
+        if let Some(bundle) = bundle {
+            self.ui_ast_source = UiAstSource::Precompiled(bundle);
         }
         self
     }
@@ -69,14 +80,16 @@ impl SchemaPipeline {
         let enriched = schema_with_defaults(&schema, &data);
 
         let validator = validator_for(&enriched)?;
-        let ui_ast = match ui_ast_source {
-            UiAstSource::Runtime => build_ui_ast(&enriched)?,
-            UiAstSource::Precompiled(ast) => ast,
+        let bundle = match ui_ast_source {
+            UiAstSource::Runtime => build_ui_ast_bundle(&enriched)?,
+            UiAstSource::Precompiled(bundle) => bundle,
         };
+        let (ui_ast, layout) = bundle.into_parts();
 
         Ok(FrontendContext {
             title,
             ui_ast,
+            layout,
             initial_data: data,
             schema: enriched,
             validator,

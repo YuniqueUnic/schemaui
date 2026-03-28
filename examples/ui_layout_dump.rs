@@ -1,5 +1,5 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use schemaui::DocumentFormat;
@@ -30,6 +30,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn infer_format(path: &PathBuf) -> DocumentFormat {
+fn infer_format(path: &Path) -> DocumentFormat {
     DocumentFormat::from_extension(path).unwrap_or(DocumentFormat::Json)
 }

@@ -19,6 +19,7 @@ impl Frontend for WebFrontend {
         let FrontendContext {
             title,
             ui_ast,
+            layout,
             initial_data,
             schema,
             validator: _,
@@ -29,6 +30,7 @@ impl Frontend for WebFrontend {
         let config = WebSessionConfig {
             title,
             ui_ast,
+            layout,
             data: initial_data,
             schema,
             asset_provider,

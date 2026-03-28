@@ -76,10 +76,10 @@ pub fn run_snapshot_cli(cmd: WebSnapshotCommand) -> Result<()> {
     }
 
     let defaults_path = config_spec.map(PathBuf::from);
-    if let Some(ref p) = defaults_path {
-        if !p.exists() {
-            return Err(Report::msg(format!("config path {:?} does not exist", p)));
-        }
+    if let Some(ref p) = defaults_path
+        && !p.exists()
+    {
+        return Err(Report::msg(format!("config path {:?} does not exist", p)));
     }
 
     let format = DocumentFormat::from_extension(&schema_path).unwrap_or(DocumentFormat::Json);

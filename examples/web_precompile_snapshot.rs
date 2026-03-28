@@ -45,10 +45,10 @@ fn main() -> Result<()> {
     }
 
     let defaults_path = defaults_arg.map(PathBuf::from);
-    if let Some(ref defaults) = defaults_path {
-        if !defaults.exists() {
-            bail!("defaults path {:?} does not exist", defaults);
-        }
+    if let Some(ref defaults) = defaults_path
+        && !defaults.exists()
+    {
+        bail!("defaults path {:?} does not exist", defaults);
     }
 
     let out_dir = PathBuf::from(&out_dir_arg);

@@ -30,15 +30,14 @@ use ts_rs::TS;
 use crate::io::{DocumentFormat, input::schema_with_defaults};
 
 use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
-use crate::ui_ast::layout::{UiLayout, build_ui_layout};
-use crate::ui_ast::{UiAst, build_ui_ast};
+use crate::ui_ast::{UiAst, UiAstBundle, UiLayout, build_ui_ast_bundle};
 
 pub struct WebSessionBuilder {
     schema: Value,
     defaults: Option<Value>,
     title: Option<String>,
     asset_provider: Arc<dyn WebAssetProvider>,
-    precompiled_ui_ast: Option<UiAst>,
+    precompiled_ui_bundle: Option<UiAstBundle>,
 }
 
 impl WebSessionBuilder {
@@ -49,7 +48,7 @@ impl WebSessionBuilder {
             title: None,
             #[allow(clippy::default_constructed_unit_structs)]
             asset_provider: Arc::new(EmbeddedAssets::default()),
-            precompiled_ui_ast: None,
+            precompiled_ui_bundle: None,
         }
     }
 
@@ -75,7 +74,13 @@ impl WebSessionBuilder {
 
     /// Provide a precompiled UiAst built at compile-time for this schema.
     pub fn with_precompiled_ui_ast(mut self, ast: UiAst) -> Self {
-        self.precompiled_ui_ast = Some(ast);
+        self.precompiled_ui_bundle = Some(UiAstBundle::from_ui_ast(ast));
+        self
+    }
+
+    /// Provide a precompiled bundle of shared UI artifacts for this schema.
+    pub fn with_precompiled_ui_bundle(mut self, bundle: UiAstBundle) -> Self {
+        self.precompiled_ui_bundle = Some(bundle);
         self
     }
 
@@ -85,14 +90,16 @@ impl WebSessionBuilder {
             .take()
             .unwrap_or_else(|| Value::Object(Map::new()));
         let schema = schema_with_defaults(&self.schema, &data);
-        let ui_ast = if let Some(ast) = self.precompiled_ui_ast.take() {
-            ast
+        let bundle = if let Some(bundle) = self.precompiled_ui_bundle.take() {
+            bundle
         } else {
-            build_ui_ast(&schema)?
+            build_ui_ast_bundle(&schema)?
         };
+        let (ui_ast, layout) = bundle.into_parts();
         Ok(WebSessionConfig {
             title: self.title,
             ui_ast,
+            layout,
             data,
             schema,
             asset_provider: self.asset_provider,
@@ -104,9 +111,25 @@ impl WebSessionBuilder {
 pub struct WebSessionConfig {
     pub title: Option<String>,
     pub ui_ast: UiAst,
+    pub layout: UiLayout,
     pub data: Value,
     pub schema: Value,
     pub asset_provider: Arc<dyn WebAssetProvider>,
+}
+
+impl WebSessionConfig {
+    pub fn session_response(&self) -> SessionResponse {
+        SessionResponse {
+            title: self.title.clone(),
+            ui_ast: self.ui_ast.clone(),
+            data: self.data.clone(),
+            formats: DocumentFormat::available_formats()
+                .into_iter()
+                .map(|format| format.to_string())
+                .collect(),
+            layout: Some(self.layout.clone()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -185,6 +208,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
     let WebSessionConfig {
         title,
         ui_ast,
+        layout,
         data,
         schema,
         asset_provider,
@@ -195,6 +219,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
     let shared = SharedState {
         title,
         ui_ast: Arc::new(ui_ast),
+        layout: Arc::new(layout),
         data: Arc::new(Mutex::new(data)),
         formats: DocumentFormat::available_formats(),
         validator,
@@ -248,6 +273,7 @@ impl SessionHandles {
 struct SharedState {
     title: Option<String>,
     ui_ast: Arc<UiAst>,
+    layout: Arc<UiLayout>,
     data: Arc<Mutex<Value>>,
     formats: Vec<DocumentFormat>,
     validator: Arc<Validator>,
@@ -272,7 +298,7 @@ impl FinishLine {
     }
 }
 
-#[derive(Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "web/types/")]
 pub struct SessionResponse {
     pub title: Option<String>,
@@ -301,7 +327,7 @@ async fn get_session_export(State(state): State<SharedState>) -> impl IntoRespon
 async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
     const DEFAULT_PATH: &str = "/tmp/schemaui-session.json";
     let ui_ast = (*state.ui_ast).clone();
-    let layout = build_ui_layout(&ui_ast);
+    let layout = (*state.layout).clone();
     let payload = SessionResponse {
         title: state.title.clone(),
         ui_ast,

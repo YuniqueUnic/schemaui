@@ -2,7 +2,7 @@ use anyhow::Result;
 use jsonschema::Validator;
 use serde_json::Value;
 
-use crate::core::ui_ast::UiAst;
+use crate::core::ui_ast::{UiAst, UiLayout};
 
 /// Shared context prepared by the core pipeline and consumed by frontends
 /// (TUI, Web, or others).
@@ -10,6 +10,7 @@ use crate::core::ui_ast::UiAst;
 pub struct FrontendContext {
     pub title: Option<String>,
     pub ui_ast: UiAst,
+    pub layout: UiLayout,
     pub initial_data: Value,
     pub schema: Value,
     pub validator: Validator,

@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use crate::io::DocumentFormat;
 use crate::io::input::parse_document_str;
-use crate::ui_ast::{UiAst, build_ui_ast};
+use crate::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
 
 pub mod defaults;
 pub mod layout;
@@ -18,11 +18,16 @@ pub mod web;
 
 /// Read a schema file, parse it as JSON/YAML/TOML, and build a UiAst.
 pub fn build_ui_ast_from_file(path: &Path, format: DocumentFormat) -> Result<UiAst> {
+    Ok(build_ui_ast_bundle_from_file(path, format)?.ui_ast)
+}
+
+/// Read a schema file, parse it as JSON/YAML/TOML, and build a shared UI
+/// artifact bundle.
+pub fn build_ui_ast_bundle_from_file(path: &Path, format: DocumentFormat) -> Result<UiAstBundle> {
     let contents = fs::read_to_string(path)?;
     let schema: Value = parse_document_str(&contents, format)?;
     // For compile-time we typically do not apply data-driven defaults.
-    let ui_ast = build_ui_ast(&schema)?;
-    Ok(ui_ast)
+    build_ui_ast_bundle(&schema)
 }
 
 /// Serialize a UiAst value to pretty-printed JSON.
@@ -53,5 +58,13 @@ pub fn generate_ui_ast_rust_module(
 
 /// Decode a UiAst from a JSON string produced by `ui_ast_to_json`.
 pub fn decode_ui_ast(json: &str) -> Result<UiAst> {
+    Ok(serde_json::from_str(json)?)
+}
+
+pub fn ui_ast_bundle_to_json(bundle: &UiAstBundle) -> Result<String> {
+    Ok(serde_json::to_string_pretty(bundle)?)
+}
+
+pub fn decode_ui_ast_bundle(json: &str) -> Result<UiAstBundle> {
     Ok(serde_json::from_str(json)?)
 }

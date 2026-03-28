@@ -2,11 +2,11 @@ use std::{fs, path::Path};
 
 use anyhow::Result;
 
-use crate::io::{DocumentFormat, input::parse_document_str};
+use crate::io::DocumentFormat;
+use crate::precompile::build_ui_ast_bundle_from_file;
 use crate::tui::model::{FormSchema, form_schema_from_ui_ast};
 use crate::tui::state::LayoutNavModel;
-use crate::ui_ast::layout::build_ui_layout;
-use crate::ui_ast::{UiAst, build_ui_ast};
+use crate::ui_ast::UiAst;
 
 /// Build UiAst and TUI FormSchema from a schema file.
 ///
@@ -16,11 +16,9 @@ pub fn build_tui_form_schema_from_file(
     path: &Path,
     format: DocumentFormat,
 ) -> Result<(UiAst, FormSchema)> {
-    let contents = fs::read_to_string(path)?;
-    let schema = parse_document_str(&contents, format)?;
-    let ast = build_ui_ast(&schema)?;
-    let form = form_schema_from_ui_ast(&ast);
-    Ok((ast, form))
+    let bundle = build_ui_ast_bundle_from_file(path, format)?;
+    let form = form_schema_from_ui_ast(&bundle.ui_ast);
+    Ok((bundle.ui_ast, form))
 }
 
 /// Build UiAst and a TUI LayoutNavModel from a schema file.
@@ -33,12 +31,9 @@ pub fn build_tui_layout_nav_from_file(
     path: &Path,
     format: DocumentFormat,
 ) -> Result<(UiAst, LayoutNavModel)> {
-    let contents = fs::read_to_string(path)?;
-    let schema = parse_document_str(&contents, format)?;
-    let ast = build_ui_ast(&schema)?;
-    let layout = build_ui_layout(&ast);
-    let nav = LayoutNavModel::from_uilayout(&layout);
-    Ok((ast, nav))
+    let bundle = build_ui_ast_bundle_from_file(path, format)?;
+    let nav = LayoutNavModel::from_uilayout(&bundle.layout);
+    Ok((bundle.ui_ast, nav))
 }
 
 /// Generate a Rust module under OUT_DIR that exposes a constructor for
