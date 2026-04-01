@@ -9,7 +9,9 @@ use crate::schema::{
     resolver::{SchemaResolver, schema_reference},
 };
 
-use super::types::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
+use super::types::{
+    CompositeMode, ScalarKind, UiAst, UiKeyValueNode, UiNode, UiNodeKind, UiVariant,
+};
 
 pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
     let root_schema = load_root_schema(raw)?;
@@ -111,13 +113,29 @@ fn visit_schema(
         }
     }
 
+    if let Some(template) = build_key_value_template(resolver, schema, active_refs)? {
+        return Ok(UiNode {
+            pointer,
+            title: schema_title(schema),
+            description: schema_description(schema),
+            required,
+            default_value: schema_default_or_const(schema),
+            kind: UiNodeKind::KeyValue {
+                template: Box::new(template),
+            },
+        });
+    }
+
     if is_array_schema(schema) {
-        let array = schema
-            .array
-            .as_ref()
-            .context("array schema must define array metadata")?;
-        let item_node = visit_array_item_kind(resolver, array, active_refs)?;
-        let default_value = schema_default(schema).or_else(|| Some(Value::Array(Vec::new())));
+        let array = schema.array.as_ref();
+        let item_node = match array {
+            Some(array) if array.items.is_some() => {
+                visit_array_item_kind(resolver, array, active_refs)?
+            }
+            _ => array_boundary_item_kind(),
+        };
+        let default_value =
+            schema_default_or_const(schema).or_else(|| Some(Value::Array(Vec::new())));
         return Ok(UiNode {
             pointer,
             title: schema_title(schema),
@@ -126,8 +144,8 @@ fn visit_schema(
             default_value,
             kind: UiNodeKind::Array {
                 item: Box::new(item_node),
-                min_items: array.min_items.map(|v| v as u64),
-                max_items: array.max_items.map(|v| v as u64),
+                min_items: array.and_then(|inner| inner.min_items).map(|v| v as u64),
+                max_items: array.and_then(|inner| inner.max_items).map(|v| v as u64),
             },
         });
     }
@@ -150,7 +168,7 @@ fn visit_schema(
             )?;
             children.push(child);
         }
-        let default_value = schema_default(schema).or(Some(Value::Object(Map::new())));
+        let default_value = schema_default_or_const(schema).or(Some(Value::Object(Map::new())));
         return Ok(UiNode {
             pointer,
             title: schema_title(schema),
@@ -165,8 +183,8 @@ fn visit_schema(
     }
 
     let (scalar, enum_options, enum_values) = detect_scalar(schema)?;
-    let default_value =
-        schema_default(schema).or_else(|| infer_default_scalar(scalar, enum_values.as_ref()));
+    let default_value = schema_default_or_const(schema)
+        .or_else(|| infer_default_scalar(scalar, enum_values.as_ref()));
     Ok(UiNode {
         pointer,
         title: schema_title(schema),
@@ -251,16 +269,24 @@ fn visit_kind(
         }
     }
 
+    if let Some(template) = build_key_value_template(resolver, schema, active_refs)? {
+        return Ok(UiNodeKind::KeyValue {
+            template: Box::new(template),
+        });
+    }
+
     if is_array_schema(schema) {
-        let array = schema
-            .array
-            .as_ref()
-            .context("array schema must define array metadata")?;
-        let item_node = visit_array_item_kind(resolver, array, active_refs)?;
+        let array = schema.array.as_ref();
+        let item_node = match array {
+            Some(array) if array.items.is_some() => {
+                visit_array_item_kind(resolver, array, active_refs)?
+            }
+            _ => array_boundary_item_kind(),
+        };
         return Ok(UiNodeKind::Array {
             item: Box::new(item_node),
-            min_items: array.min_items.map(|v| v as u64),
-            max_items: array.max_items.map(|v| v as u64),
+            min_items: array.and_then(|inner| inner.min_items).map(|v| v as u64),
+            max_items: array.and_then(|inner| inner.max_items).map(|v| v as u64),
         });
     }
 
@@ -310,6 +336,17 @@ fn build_variants(
 
 fn schema_default(schema: &SchemaObject) -> Option<Value> {
     schema.metadata.as_ref().and_then(|m| m.default.clone())
+}
+
+fn schema_const_value(schema: &SchemaObject) -> Option<&Value> {
+    schema
+        .const_value
+        .as_ref()
+        .or_else(|| schema.extensions.get("const"))
+}
+
+fn schema_default_or_const(schema: &SchemaObject) -> Option<Value> {
+    schema_default(schema).or_else(|| schema_const_value(schema).cloned())
 }
 
 fn infer_default_scalar(scalar: ScalarKind, opts: Option<&Vec<Value>>) -> Option<Value> {
@@ -398,6 +435,7 @@ fn default_for_kind(kind: &UiNodeKind) -> Option<Value> {
             ..
         } => infer_default_scalar(*scalar, enum_values.as_ref()),
         UiNodeKind::Array { .. } => Some(Value::Array(Vec::new())),
+        UiNodeKind::KeyValue { .. } => Some(Value::Object(Map::new())),
         UiNodeKind::Composite {
             variants,
             allow_multiple,
@@ -419,6 +457,12 @@ fn detect_scalar(schema: &SchemaObject) -> Result<DetectedScalar> {
             Some(labels),
             Some(enum_values.clone()),
         ));
+    }
+
+    if let Some(const_value) = schema_const_value(schema) {
+        let labels = vec![enum_label(const_value)];
+        let values = vec![const_value.clone()];
+        return Ok((infer_enum_scalar(&values), Some(labels), Some(values)));
     }
 
     let instance = instance_type(schema);
@@ -490,6 +534,13 @@ fn array_item_schema(array: &ArrayValidation) -> Result<&Schema> {
     }
 }
 
+fn array_boundary_item_kind() -> UiNodeKind {
+    UiNodeKind::Object {
+        children: Vec::new(),
+        required: Vec::new(),
+    }
+}
+
 fn visit_array_item_kind(
     resolver: &SchemaResolver<'_>,
     array: &ArrayValidation,
@@ -500,15 +551,29 @@ fn visit_array_item_kind(
         resolver,
         item_schema,
         active_refs,
-        |resolved| Ok(recursive_boundary_kind(&resolved)),
+        |resolved| normalize_embedded_kind(resolver, &resolved, recursive_boundary_kind(&resolved)),
         |resolved, active_refs| {
             if is_object_schema(&resolved) && !has_composite_subschemas(&resolved) {
                 build_single_variant_composite_kind(resolver, &resolved, active_refs)
             } else {
-                visit_kind(resolver, &resolved, active_refs)
+                let kind = visit_kind(resolver, &resolved, active_refs)?;
+                normalize_embedded_kind(resolver, &resolved, kind)
             }
         },
     )
+}
+
+fn normalize_embedded_kind(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+    kind: UiNodeKind,
+) -> Result<UiNodeKind> {
+    match kind {
+        kind @ UiNodeKind::Array { .. } | kind @ UiNodeKind::Object { .. } => {
+            build_single_variant_overlay_kind(resolver, schema, kind)
+        }
+        other => Ok(other),
+    }
 }
 
 fn build_variant(
@@ -542,12 +607,7 @@ fn build_variant_from_resolved_schema(
     schema: &SchemaObject,
     node: UiNodeKind,
 ) -> Result<UiVariant> {
-    let mut schema_value = schema_to_value(schema)?;
-    if let Some(defs) = resolver.definitions_snapshot()
-        && let Value::Object(ref mut map) = schema_value
-    {
-        map.entry("$defs".to_string()).or_insert(defs);
-    }
+    let schema_value = schema_to_value_with_defs(resolver, schema)?;
     let title = schema
         .metadata
         .as_ref()
@@ -570,12 +630,16 @@ fn build_single_variant_composite_kind(
     schema: &SchemaObject,
     active_refs: &mut Vec<String>,
 ) -> Result<UiNodeKind> {
-    let variant = build_variant_from_resolved_schema(
-        resolver,
-        0,
-        schema,
-        visit_kind(resolver, schema, active_refs)?,
-    )?;
+    let node = visit_kind(resolver, schema, active_refs)?;
+    build_single_variant_overlay_kind(resolver, schema, node)
+}
+
+fn build_single_variant_overlay_kind(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+    node: UiNodeKind,
+) -> Result<UiNodeKind> {
+    let variant = build_variant_from_resolved_schema(resolver, 0, schema, node)?;
     Ok(UiNodeKind::Composite {
         mode: CompositeMode::OneOf,
         allow_multiple: false,
@@ -590,13 +654,22 @@ fn recursive_boundary_node(schema: &SchemaObject, pointer: String, required: boo
             scalar,
             enum_values,
             ..
-        } => schema_default(schema).or_else(|| infer_default_scalar(*scalar, enum_values.as_ref())),
+        } => schema_default_or_const(schema)
+            .or_else(|| infer_default_scalar(*scalar, enum_values.as_ref())),
         UiNodeKind::Array { .. } => {
-            schema_default(schema).or_else(|| Some(Value::Array(Vec::new())))
+            schema_default_or_const(schema).or_else(|| Some(Value::Array(Vec::new())))
         }
-        UiNodeKind::Composite { .. } => schema_default(schema),
+        UiNodeKind::KeyValue { .. } => {
+            schema_default_or_const(schema).or_else(|| Some(Value::Object(Map::new())))
+        }
+        UiNodeKind::Composite {
+            variants,
+            allow_multiple,
+            ..
+        } => schema_default_or_const(schema)
+            .or_else(|| infer_default_for_composite(variants, *allow_multiple)),
         UiNodeKind::Object { .. } => {
-            schema_default(schema).or_else(|| Some(Value::Object(Map::new())))
+            schema_default_or_const(schema).or_else(|| Some(Value::Object(Map::new())))
         }
     };
     UiNode {
@@ -613,10 +686,7 @@ fn recursive_boundary_kind(schema: &SchemaObject) -> UiNodeKind {
     if is_array_schema(schema) {
         let array = schema.array.as_ref();
         return UiNodeKind::Array {
-            item: Box::new(UiNodeKind::Object {
-                children: Vec::new(),
-                required: Vec::new(),
-            }),
+            item: Box::new(array_boundary_item_kind()),
             min_items: array.and_then(|inner| inner.min_items).map(|v| v as u64),
             max_items: array.and_then(|inner| inner.max_items).map(|v| v as u64),
         };
@@ -704,12 +774,125 @@ fn schema_to_value(schema: &SchemaObject) -> Result<Value> {
     serde_json::to_value(Schema::Object(schema.clone())).context("failed to serialize schema")
 }
 
+fn schema_to_value_with_defs(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+) -> Result<Value> {
+    let mut value = schema_to_value(schema)?;
+    if let Some(defs) = resolver.definitions_snapshot()
+        && let Value::Object(ref mut map) = value
+    {
+        map.entry("definitions".to_string()).or_insert(defs);
+    }
+    Ok(value)
+}
+
 fn schema_title(schema: &SchemaObject) -> Option<String> {
     schema.metadata.as_ref()?.title.clone()
 }
 
 fn schema_description(schema: &SchemaObject) -> Option<String> {
     schema.metadata.as_ref()?.description.clone()
+}
+
+fn schema_titles(schema: &SchemaObject, fallback: &str) -> (String, Option<String>, Option<Value>) {
+    (
+        schema_title(schema).unwrap_or_else(|| fallback.to_string()),
+        schema_description(schema),
+        schema_default_or_const(schema),
+    )
+}
+
+fn key_value_entry_schema(key_schema: &Value, value_schema: &Value) -> Value {
+    serde_json::json!({
+        "type": "object",
+        "required": ["key", "value"],
+        "properties": {
+            "key": key_schema,
+            "value": value_schema,
+        }
+    })
+}
+
+fn build_key_value_template(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+    active_refs: &mut Vec<String>,
+) -> Result<Option<UiKeyValueNode>> {
+    let Some(object) = schema.object.as_ref() else {
+        return Ok(None);
+    };
+    if !object.properties.is_empty() {
+        return Ok(None);
+    }
+
+    let (value_schema_ref, key_schema_override) =
+        if let Some((pattern, pattern_schema)) = object.pattern_properties.iter().next() {
+            (
+                pattern_schema,
+                Some(serde_json::json!({
+                    "type": "string",
+                    "pattern": pattern,
+                    "title": "Key",
+                })),
+            )
+        } else if let Some(additional) = object.additional_properties.as_ref() {
+            if matches!(&**additional, Schema::Bool(false) | Schema::Bool(true)) {
+                return Ok(None);
+            }
+            (additional.as_ref(), None)
+        } else {
+            return Ok(None);
+        };
+
+    let (value_resolved, value_kind) = with_resolved_schema(
+        resolver,
+        value_schema_ref,
+        active_refs,
+        |resolved| {
+            let kind =
+                normalize_embedded_kind(resolver, &resolved, recursive_boundary_kind(&resolved))?;
+            Ok((resolved, kind))
+        },
+        |resolved, active_refs| {
+            let kind = visit_kind(resolver, &resolved, active_refs)?;
+            let kind = normalize_embedded_kind(resolver, &resolved, kind)?;
+            Ok((resolved, kind))
+        },
+    )?;
+
+    let value_schema = schema_to_value_with_defs(resolver, &value_resolved)?;
+    let (value_title, value_description, value_default) = schema_titles(&value_resolved, "Value");
+
+    let (key_schema, key_title, key_description, key_default) =
+        if let Some(override_schema) = key_schema_override {
+            (override_schema, "Key".to_string(), None, None)
+        } else if let Some(property_names) = object.property_names.as_ref() {
+            let key_resolved = resolver.resolve_schema(property_names)?;
+            let key_schema = schema_to_value_with_defs(resolver, &key_resolved)?;
+            let (title, description, default) = schema_titles(&key_resolved, "Key");
+            (key_schema, title, description, default)
+        } else {
+            (
+                serde_json::json!({"type": "string", "title": "Key"}),
+                "Key".to_string(),
+                None,
+                None,
+            )
+        };
+
+    Ok(Some(UiKeyValueNode {
+        key_title,
+        key_description,
+        key_default,
+        key_schema: key_schema.clone(),
+        value_title,
+        value_description,
+        value_default,
+        value_schema: value_schema.clone(),
+        value_kind: Box::new(value_kind),
+        entry_schema: key_value_entry_schema(&key_schema, &value_schema),
+    }))
 }
 
 fn default_variant_title(index: usize, schema: &SchemaObject) -> String {

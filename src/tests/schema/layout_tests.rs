@@ -1,8 +1,13 @@
 use crate::{
-    schema::build_form_schema,
-    tui::model::{FieldKind, FieldSchema, FormSchema, FormSection},
+    tui::model::{FieldKind, FieldSchema, FormSchema, FormSection, form_schema_from_ui_ast},
+    ui_ast::build_ui_ast,
 };
 use serde_json::{Value, json};
+
+fn runtime_form_schema(schema: &Value) -> FormSchema {
+    let ast = build_ui_ast(schema).expect("ui ast");
+    form_schema_from_ui_ast(&ast)
+}
 
 fn find_field_by_pointer<'a>(
     sections: &'a [FormSection],
@@ -59,7 +64,7 @@ fn builds_nested_sections_and_general_root() {
         }
     });
 
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     assert_eq!(form.roots.len(), 3);
     let runtime = form
         .roots
@@ -106,7 +111,7 @@ fn composite_variants_keep_definitions() {
         }
     });
 
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let notifications = form
         .roots
         .iter()
@@ -124,7 +129,12 @@ fn composite_variants_keep_definitions() {
                 composite
                     .variants
                     .first()
-                    .and_then(|variant| variant.schema.get("definitions"))
+                    .and_then(|variant| {
+                        variant
+                            .schema
+                            .get("definitions")
+                            .or_else(|| variant.schema.get("$defs"))
+                    })
                     .is_some(),
                 "variant schema should embed definitions"
             );
@@ -151,7 +161,7 @@ fn notifications_sections_do_not_duplicate_parent_field() {
             }
         }
     });
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let notifications = form
         .roots
         .iter()
@@ -180,7 +190,7 @@ fn additional_properties_true_does_not_add_phantom_field() {
             }
         }
     });
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let room = form
         .roots
         .iter()
@@ -203,7 +213,7 @@ fn additional_properties_true_does_not_add_phantom_field() {
 fn sample_config_schema_keeps_only_user_fields() {
     let schema: Value = serde_json::from_str(include_str!("../../../examples/config-schema.json"))
         .expect("example schema");
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     assert_eq!(form.roots.len(), 1, "only general root expected");
     let general = form
         .roots
@@ -239,7 +249,7 @@ fn pattern_properties_become_key_value_fields() {
             }
         }
     });
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let field = find_field(&form, |field| field.name == "labels").expect("labels field");
     assert!(matches!(field.kind, FieldKind::KeyValue(_)));
 }
@@ -255,7 +265,7 @@ fn arrays_without_item_schema_fallback_to_json_array() {
             }
         }
     });
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let field =
         find_field(&form, |field| field.name == "expose_headers").expect("expose_headers field");
     match &field.kind {
@@ -293,7 +303,7 @@ fn multi_level_refs_are_resolved() {
             }
         }
     });
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let field = find_field(&form, |field| {
         field
             .pointer
@@ -307,7 +317,7 @@ fn multi_level_refs_are_resolved() {
 fn anyof_variant_titles_reflect_shape() {
     let schema: Value = serde_json::from_str(include_str!("../../../examples/complex.schema.json"))
         .expect("complex schema");
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let pointer = "/c/c1/c2/options";
     let field = form
         .roots
@@ -321,9 +331,13 @@ fn anyof_variant_titles_reflect_shape() {
                 .iter()
                 .map(|variant| variant.title.as_str())
                 .collect();
-            assert!(titles.contains(&"string[]"), "variant titles: {:?}", titles);
             assert!(
-                titles.contains(&"integer[]"),
+                titles.contains(&"List<string>"),
+                "variant titles: {:?}",
+                titles
+            );
+            assert!(
+                titles.contains(&"List<integer>"),
                 "variant titles: {:?}",
                 titles
             );
@@ -346,7 +360,7 @@ fn allof_properties_merge_into_object_section() {
             }
         }
     });
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let settings_root = form
         .roots
         .iter()
@@ -389,7 +403,7 @@ fn referenced_field_keeps_instance_metadata() {
         }
     });
 
-    let form = build_form_schema(&schema).expect("schema parsed");
+    let form = runtime_form_schema(&schema);
     let field = find_field(&form, |field| field.pointer == "/timeout").expect("timeout field");
     assert_eq!(field.title, "Request Timeout");
     assert_eq!(field.description.as_deref(), Some("Per-request timeout"));
@@ -419,7 +433,7 @@ fn recursive_refs_collapse_to_json_array_field_without_overflow() {
         }
     });
 
-    let form = build_form_schema(&schema).expect("recursive schema parsed");
+    let form = runtime_form_schema(&schema);
     let root = form
         .roots
         .iter()
@@ -438,8 +452,8 @@ fn recursive_refs_collapse_to_json_array_field_without_overflow() {
     match &children_field.kind {
         FieldKind::Array(inner) => {
             assert!(
-                matches!(inner.as_ref(), FieldKind::Json),
-                "recursive descendants should collapse to JSON boundary, got {:?}",
+                matches!(inner.as_ref(), FieldKind::Composite(_)),
+                "recursive descendants should stay editable via a lazy composite boundary, got {:?}",
                 inner
             );
         }

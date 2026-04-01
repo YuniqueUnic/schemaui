@@ -141,7 +141,7 @@ pub struct UiStores {
 
 **章节**是根内的逻辑字段组（例如"元数据"、"HTTP"、"TLS"）。**子章节**是章节内的嵌套章节。
 
-在布局时（`tui::model::layout`），会生成`FormSection`的树结构。在运行时，这棵树被扁平化为`SectionState`向量，同时保留`depth`和`path`：
+在 schema 适配阶段（`tui::model::form_schema_from_ui_ast`），会生成`FormSection`的树结构。在运行时，这棵树被扁平化为`SectionState`向量，同时保留`depth`和`path`：
 
 ```rust
 impl SectionState {
@@ -592,9 +592,9 @@ CommandDispatch::{Form(FormCommand), App(AppCommand)}
 
 高层步骤：
 
-1. **在布局中建模字段**：
-   - 如有必要，在`tui::model::layout`中扩展`FieldKind` / `FieldSchema`。
-   - 确保`detect_kind`识别新类型。
+1. **在 TUI schema 适配层中建模字段**：
+   - 如有必要，在`tui::model`中扩展`FieldKind` / `FieldSchema`。
+   - 确保`form_schema_from_ui_ast`将相关`UiNodeKind`映射为新类型。
 
 2. **添加`FieldComponent`**实现于`src/tui/state/field/components`并将其接入`FieldState::from_schema`。
 

@@ -694,7 +694,10 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{schema::build_form_schema, tui::app::options::UiOptions};
+    use crate::{
+        tui::{app::options::UiOptions, model::form_schema_from_ui_ast},
+        ui_ast::build_ui_ast,
+    };
     use jsonschema::validator_for;
     use serde_json::json;
 
@@ -705,7 +708,8 @@ mod tests {
                 "name": {"type": "string"}
             }
         });
-        let form_schema = build_form_schema(&schema).expect("schema");
+        let ast = build_ui_ast(&schema).expect("ui ast");
+        let form_schema = form_schema_from_ui_ast(&ast);
         let form_state = FormState::from_schema(&form_schema);
         let validator = validator_for(&schema).expect("validator");
         App::new(form_state, validator, UiOptions::default())

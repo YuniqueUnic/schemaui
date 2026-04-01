@@ -4,7 +4,7 @@ use crate::ui_ast::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVari
 
 use super::form_schema::{
     CompositeField, CompositeMode as DomainCompositeMode, CompositeVariant, FieldKind, FieldSchema,
-    FormSchema, FormSection, RootSection,
+    FormSchema, FormSection, KeyValueField, RootSection,
 };
 
 /// Build a legacy `FormSchema` tree from the canonical [`UiAst`].
@@ -154,6 +154,18 @@ fn field_kind_from_node_kind(kind: &UiNodeKind) -> FieldKind {
         UiNodeKind::Array { item, .. } => {
             FieldKind::Array(Box::new(field_kind_from_node_kind(item)))
         }
+        UiNodeKind::KeyValue { template } => FieldKind::KeyValue(Box::new(KeyValueField {
+            key_title: template.key_title.clone(),
+            key_description: template.key_description.clone(),
+            key_default: template.key_default.clone(),
+            key_schema: template.key_schema.clone(),
+            value_title: template.value_title.clone(),
+            value_description: template.value_description.clone(),
+            value_default: template.value_default.clone(),
+            value_schema: template.value_schema.clone(),
+            value_kind: Box::new(field_kind_from_node_kind(template.value_kind.as_ref())),
+            entry_schema: template.entry_schema.clone(),
+        })),
         UiNodeKind::Composite { mode, variants, .. } => {
             FieldKind::Composite(Box::new(CompositeField {
                 mode: match mode {

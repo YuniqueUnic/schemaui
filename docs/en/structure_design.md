@@ -58,7 +58,8 @@ Module: `src/io` (shared by the library and CLI).
 io::input (serde_json::Value)
   → schema::loader::load_root_schema            // deserializes RootSchema
   → schema::resolver::SchemaResolver            // resolves $ref / JSON Pointer
-  → schema::build_form_schema                   // builds FormSchema tree
+  → ui_ast::build_ui_ast                        // builds canonical UiAst
+  → tui::model::form_schema_from_ui_ast         // builds FormSchema tree
   → tui::state::FormState::from_schema          // materializes FieldState
   → tui::app::runtime::App                      // drives TUI + validation
   → io::output::emit (optional)                 // writes final Value
@@ -335,6 +336,5 @@ Key refactor points:
 - `Frontend` implementations (TUI, Web, or future GUIs) decide how to interpret
   the UI AST (e.g. `form_schema_from_ui_ast` for TUIs) and which runtime to
   drive.
-- The older direct `schema::build_form_schema` path remains available for tests
-  and low-level layout experiments, but library consumers should prefer
-  `SchemaUI`/`SchemaPipeline` and frontends.
+- The direct `schema::build_form_schema` path has been removed. All TUI schema
+  typing now flows through `UiAst -> form_schema_from_ui_ast`.

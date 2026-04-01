@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::tui::model::build_form_schema;
+use crate::tui::model::form_schema_from_ui_ast;
 use crate::tui::state::LayoutNavModel;
 use crate::tui::view::components::overlay::layout_section_description;
 use crate::ui_ast::{build_ui_ast, layout::build_ui_layout};
@@ -24,10 +24,9 @@ fn layout_section_description_matches_nav_model() {
         }
     });
 
-    let form_schema = build_form_schema(&schema).expect("schema");
-    let mut form_state = crate::tui::state::FormState::from_schema(&form_schema);
-
     let ast = build_ui_ast(&schema).expect("ast");
+    let form_schema = form_schema_from_ui_ast(&ast);
+    let mut form_state = crate::tui::state::FormState::from_schema(&form_schema);
     let layout = build_ui_layout(&ast);
     let layout_nav = LayoutNavModel::from_uilayout(&layout);
     form_state.set_layout_nav(layout_nav.clone());

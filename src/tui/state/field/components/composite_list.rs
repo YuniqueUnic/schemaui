@@ -54,8 +54,8 @@ impl FieldComponent for CompositeListComponent {
         }
     }
 
-    fn current_value(&self, _schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
-        self.state.build_value()
+    fn current_value(&self, schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
+        self.state.build_value(schema.required)
     }
 
     fn collection_panel(&self) -> Option<(Vec<String>, usize)> {

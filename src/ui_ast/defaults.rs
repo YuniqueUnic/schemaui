@@ -30,6 +30,7 @@ fn collect_node_defaults(node: &UiNode, out: &mut DefaultIndex) {
             }
         }
         UiNodeKind::Array { .. } => {}
+        UiNodeKind::KeyValue { .. } => {}
         UiNodeKind::Composite { .. } => {}
         UiNodeKind::Field { .. } => {}
     }

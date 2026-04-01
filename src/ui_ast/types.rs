@@ -38,6 +38,9 @@ pub enum UiNodeKind {
         min_items: Option<u64>,
         max_items: Option<u64>,
     },
+    KeyValue {
+        template: Box<UiKeyValueNode>,
+    },
     Composite {
         mode: CompositeMode,
         allow_multiple: bool,
@@ -47,6 +50,26 @@ pub enum UiNodeKind {
         children: Vec<UiNode>,
         required: Vec<String>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "web", derive(TS))]
+pub struct UiKeyValueNode {
+    pub key_title: String,
+    pub key_description: Option<String>,
+    #[cfg_attr(feature = "web", ts(type = "unknown | null"))]
+    pub key_default: Option<Value>,
+    #[cfg_attr(feature = "web", ts(type = "Record<string, unknown>"))]
+    pub key_schema: Value,
+    pub value_title: String,
+    pub value_description: Option<String>,
+    #[cfg_attr(feature = "web", ts(type = "unknown | null"))]
+    pub value_default: Option<Value>,
+    #[cfg_attr(feature = "web", ts(type = "Record<string, unknown>"))]
+    pub value_schema: Value,
+    pub value_kind: Box<UiNodeKind>,
+    #[cfg_attr(feature = "web", ts(type = "Record<string, unknown>"))]
+    pub entry_schema: Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -112,8 +112,9 @@ For library integrations, the main entry points are:
   `crate::tui::session::TuiFrontend`
 - **TUI state**: `crate::tui::state::*` (for example `FormState`, `FormCommand`,
   `FormEngine`, `SectionState`)
-- **Schema backend**: `crate::schema::build_form_schema` (builds `FormSchema`
-  from a JSON Schema value)
+- **Schema backend**: `crate::ui_ast::build_ui_ast` together with
+  `crate::tui::model::form_schema_from_ui_ast` (builds `FormSchema` from the
+  canonical UI AST)
 
 ## Architecture Snapshot
 
@@ -123,7 +124,7 @@ For library integrations, the main entry points are:
 └─────────────┘                  │ (loader /     │                        │ (FormState,   │
                                  │ resolver /    │                        │ sections,     │
 ┌─────────────┐   emit Value     │ build_form_   │   FormSchema           │ reducers)     │
-│ io::output  ◀──────────────────┴────schema─────┘                        └────────┬──────┘
+│ io::output  ◀──────────────────┴────pipeline───┘                        └────────┬──────┘
 └─────────────┘                                                      focus/edits│
                                                                                 │
                                                                      ┌──────────▼──────────┐
@@ -201,8 +202,9 @@ these APIs.
 
 ## JSON Schema → TUI Mapping
 
-`schema::layout::build_form_schema` walks the fully resolved schema and maps
-each sub-tree to a `FormSection`/`FieldSchema`:
+`build_ui_ast` resolves the schema into the canonical UI AST, and
+`form_schema_from_ui_ast` maps that tree into `FormSection`/`FieldSchema` for
+the TUI runtime:
 
 | Schema feature                                               | Resulting control                                                                |
 | ------------------------------------------------------------ | -------------------------------------------------------------------------------- |
@@ -321,7 +323,7 @@ overlays, and documentation all consume a single source of truth.
 | Layer               | Module(s)                                                 | Responsibilities                                                                |
 | ------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Ingestion           | `io::input`, `schema::loader`, `schema::resolver`         | Parse JSON/TOML/YAML, resolve `$ref`, and normalize metadata.                   |
-| Layout typing       | `schema::build_form_schema`                               | Produce `FormSchema` (roots/sections/fields) from resolved schemas.             |
+| Layout typing       | `ui_ast::build_ui_ast`, `tui::model::form_schema_from_ui_ast` | Produce `FormSchema` (roots/sections/fields) from the canonical UI AST.     |
 | Form state          | `tui::state::{form_state, section, field}`                | Track focus, pointers, dirty flags, coercions, and errors.                      |
 | Commands & reducers | `tui::state::{actions, reducers}`, `tui::app::validation` | Define `FormCommand`, mutate state, and route validation results.               |
 | Runtime controller  | `tui::app::{runtime, overlay, popup, status, keymap}`     | Event loop, InputRouter dispatch, overlay lifecycle, help text, status updates. |

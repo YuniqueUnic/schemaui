@@ -31,6 +31,7 @@ fn collect_node_pointers(node: &UiNode, out: &mut BTreeSet<String>) {
         UiNodeKind::Array { item, .. } => {
             collect_kind_pointers(item, out);
         }
+        UiNodeKind::KeyValue { .. } => {}
         UiNodeKind::Field { .. } => {}
     }
 }
@@ -50,6 +51,7 @@ fn collect_kind_pointers(kind: &UiNodeKind, out: &mut BTreeSet<String>) {
         UiNodeKind::Array { item, .. } => {
             collect_kind_pointers(item, out);
         }
+        UiNodeKind::KeyValue { .. } => {}
         UiNodeKind::Field { .. } => {}
     }
 }
@@ -89,6 +91,7 @@ fn index_node(node: &UiNode, counter: &mut usize, out: &mut PointerIndex) {
         UiNodeKind::Array { item, .. } => {
             index_kind(item, counter, out);
         }
+        UiNodeKind::KeyValue { .. } => {}
         UiNodeKind::Field { .. } => {}
     }
 }
@@ -108,6 +111,7 @@ fn index_kind(kind: &UiNodeKind, counter: &mut usize, out: &mut PointerIndex) {
         UiNodeKind::Array { item, .. } => {
             index_kind(item, counter, out);
         }
+        UiNodeKind::KeyValue { .. } => {}
         UiNodeKind::Field { .. } => {}
     }
 }

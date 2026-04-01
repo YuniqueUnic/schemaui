@@ -1,9 +1,15 @@
 use crate::tui::app::{App, UiOptions};
-use crate::tui::model::build_form_schema;
+use crate::tui::model::form_schema_from_ui_ast;
 use crate::tui::state::FormState;
+use crate::ui_ast::build_ui_ast;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use jsonschema::validator_for;
-use serde_json::json;
+use serde_json::{Value, json};
+
+fn runtime_form_schema(schema: &Value) -> crate::tui::model::FormSchema {
+    let ast = build_ui_ast(schema).expect("ui ast");
+    form_schema_from_ui_ast(&ast)
+}
 
 fn build_nested_overlay_app() -> App {
     let schema = json!({
@@ -56,7 +62,7 @@ fn build_nested_overlay_app() -> App {
             }
         }
     });
-    let form_schema = build_form_schema(&schema).expect("schema");
+    let form_schema = runtime_form_schema(&schema);
     let form_state = FormState::from_schema(&form_schema);
     let validator = validator_for(&schema).expect("validator");
     App::new(form_state, validator, UiOptions::default())
@@ -76,7 +82,7 @@ fn build_key_value_overlay_app() -> App {
             }
         }
     });
-    let form_schema = build_form_schema(&schema).expect("schema");
+    let form_schema = runtime_form_schema(&schema);
     let form_state = FormState::from_schema(&form_schema);
     let validator = validator_for(&schema).expect("validator");
     App::new(form_state, validator, UiOptions::default())
@@ -93,7 +99,7 @@ fn build_scalar_array_overlay_app() -> App {
             }
         }
     });
-    let form_schema = build_form_schema(&schema).expect("schema");
+    let form_schema = runtime_form_schema(&schema);
     let form_state = FormState::from_schema(&form_schema);
     let validator = validator_for(&schema).expect("validator");
     App::new(form_state, validator, UiOptions::default())

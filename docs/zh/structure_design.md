@@ -53,7 +53,8 @@
 io::input (serde_json::Value)
   → schema::loader::load_root_schema            // 反序列化 RootSchema
   → schema::resolver::SchemaResolver            // 解析 $ref / JSON Pointer
-  → schema::build_form_schema                   // 构建 FormSchema 树
+  → ui_ast::build_ui_ast                        // 构建规范 UiAst
+  → tui::model::form_schema_from_ui_ast         // 构建 FormSchema 树
   → tui::state::FormState::from_schema          // 具化 FieldState
   → tui::app::runtime::App                      // 驱动 TUI + 验证
   → io::output::emit (optional)                 // 写入最终 Value
@@ -289,5 +290,5 @@ fn run_tui(schema: Value, defaults: Option<Value>) -> Result<Value> {
   （`validator_for`）以及 UI AST 生成（`build_ui_ast`）。
 - 不同的 `Frontend` 实现（TUI、Web 或未来的 GUI）决定如何解释 UI AST（例如 TUI
   使用 `form_schema_from_ui_ast`）以及驱动哪个运行时。
-- 旧的直接 `schema::build_form_schema` 路径仍然保留，用于测试和底层布局实验；库
-  使用者应优先选择 `SchemaUI`/`SchemaPipeline` 和前端接口。
+- 旧的直接 `schema::build_form_schema` 路径已经移除；TUI 的类型化流程统一为
+  `UiAst -> form_schema_from_ui_ast`。

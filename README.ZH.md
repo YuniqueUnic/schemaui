@@ -104,7 +104,8 @@ fn main() -> color_eyre::Result<()> {
   `crate::tui::session::TuiFrontend` 使用）
 - **TUI 状态**：`crate::tui::state::*`（例如
   `FormState`、`FormCommand`、`FormEngine`、`SectionState` 等）
-- **Schema 后端**：`crate::schema::build_form_schema`（从 JSON Schema 构建
+- **Schema 后端**：`crate::ui_ast::build_ui_ast` 配合
+  `crate::tui::model::form_schema_from_ui_ast`（先生成规范 UI AST，再派生
   `FormSchema`）
 
 ## 架构快照
@@ -115,7 +116,7 @@ fn main() -> color_eyre::Result<()> {
 └─────────────┘                 │ (loader/     │                     │ (FormState,   │
                                 │ resolver/    │                     │ sections,     │
 ┌─────────────┐   输出值        │ build_form_  │   FormSchema        │ reducers)     │
-│ io::output  ◀─────────────────┴────schema────┘                     └────────┬──────┘
+│ io::output  ◀─────────────────┴────pipeline──┘                     └────────┬──────┘
 └─────────────┘                                             焦点/编辑          │
                                                                                │
                                                                         ┌──────▼──────────┐
@@ -144,8 +145,8 @@ fn main() -> color_eyre::Result<()> {
 
 ## JSON Schema → TUI 映射
 
-`schema::build_form_schema` 遍历完全解析的模式，并将每个子树映射为
-`FormSection`/`FieldSchema`：
+`build_ui_ast` 先把解析后的模式规范化为 UI AST，再由
+`form_schema_from_ui_ast` 将每个子树映射为 `FormSection`/`FieldSchema`：
 
 | 模式功能                                                     | 结果控件                                                |
 | ------------------------------------------------------------ | ------------------------------------------------------- |
@@ -168,7 +169,7 @@ fn main() -> color_eyre::Result<()> {
 
 ```
 ┌─────────────┐ 解析模式   ┌───────────────────────────────┐ 膨胀状态        ┌────────────┐
-│ SchemaUI::run├──────────▶│ schema::build_form_schema     ├───────────────▶│ FormState  │
+│ SchemaUI::run├──────────▶│ form_schema_from_ui_ast       ├───────────────▶│ FormState  │
 └─────┬───────┘            │ (tui::model::FormSchema)      │                 └──────┬─────┘
       │ validator_for()    └───────────────────────────────┘           编辑         │
       │                                                        ┌──────▼─────────┐
@@ -243,7 +244,7 @@ fn main() -> color_eyre::Result<()> {
 | 层           | 模块 (s)                                                  | 责任                                                           |
 | ------------ | --------------------------------------------------------- | -------------------------------------------------------------- |
 | 摄取         | `io::input`, `schema::loader`, `schema::resolver`         | 解析 JSON/TOML/YAML，解析`$ref`，并规范化元数据。              |
-| 布局类型     | `schema::build_form_schema`                               | 从解析后的模式生成 `FormSchema`（根/部分/字段）。              |
+| 布局类型     | `ui_ast::build_ui_ast`, `tui::model::form_schema_from_ui_ast` | 从规范 UI AST 生成 `FormSchema`（根/部分/字段）。          |
 | 表单状态     | `tui::state::{form_state, section, field}`                | 跟踪焦点、指针、脏标志、强制转换和错误。                       |
 | 命令与简化器 | `tui::state::{actions, reducers}`, `tui::app::validation` | 定义 `FormCommand`，突变状态，并路由验证结果。                 |
 | 运行时控制器 | `tui::app::{runtime, overlay, popup, status, keymap}`     | 事件循环，输入路由器分发，覆盖层生命周期，帮助文本，状态更新。 |

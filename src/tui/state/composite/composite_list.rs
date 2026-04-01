@@ -204,7 +204,14 @@ impl CompositeListState {
         }
     }
 
-    pub fn build_value(&self) -> Result<Option<Value>, FieldCoercionError> {
+    pub fn build_value(&self, required: bool) -> Result<Option<Value>, FieldCoercionError> {
+        if self.entries.is_empty() {
+            if required {
+                return Ok(Some(Value::Array(Vec::new())));
+            }
+            return Ok(None);
+        }
+
         let mut values = Vec::new();
         for entry in &self.entries {
             match entry.state.build_value(false)? {

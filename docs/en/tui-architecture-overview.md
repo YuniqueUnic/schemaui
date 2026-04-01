@@ -148,9 +148,9 @@ focus to draw the visible part of the main page.
 **Sections** are logical groups of fields within a root (e.g. "Metadata",
 "HTTP", "TLS"). **Child-sections** are nested sections inside a section.
 
-At layout time (`tui::model::layout`), a tree of `FormSection` is produced. At
-runtime, this tree is flattened into a vector of `SectionState` while preserving
-`depth` and `path`:
+At schema-adaptation time (`tui::model::form_schema_from_ui_ast`), a tree of
+`FormSection` is produced. At runtime, this tree is flattened into a vector of
+`SectionState` while preserving `depth` and `path`:
 
 ```rust
 impl SectionState {
@@ -617,9 +617,10 @@ Suppose you want a new overlay type for a complex field.
 
 High-level steps:
 
-1. **Model the field** in layout:
-   - Extend `FieldKind` / `FieldSchema` (if necessary) in `tui::model::layout`.
-   - Ensure the new kind is recognized by `detect_kind`.
+1. **Model the field** in the TUI schema adapter:
+   - Extend `FieldKind` / `FieldSchema` (if necessary) in `tui::model`.
+   - Ensure `form_schema_from_ui_ast` maps the relevant `UiNodeKind` into the
+     new field kind.
 
 2. **Add a `FieldComponent`** implementation in `src/tui/state/field/components`
    and wire it into `FieldState::from_schema`.
