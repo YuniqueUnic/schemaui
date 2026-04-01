@@ -362,13 +362,14 @@ function LayoutSectionNav(
   let activeSection = activeRoot.sections[0] ?? null;
 
   if (selectedPointer) {
-    outer: for (const root of model) {
-      for (const section of root.sections) {
-        if (section.pointers.includes(selectedPointer)) {
-          activeRoot = root;
-          activeSection = section;
-          break outer;
-        }
+    for (const root of model) {
+      const matchingSections = root.sections.filter((section) =>
+        section.pointers.includes(selectedPointer)
+      );
+      if (matchingSections.length > 0) {
+        activeRoot = root;
+        activeSection = matchingSections[matchingSections.length - 1] ?? null;
+        break;
       }
     }
   }

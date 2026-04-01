@@ -638,7 +638,10 @@ impl FormState {
 
         let current_idx = match sections
             .iter()
-            .position(|s| s.pointers.iter().any(|p| p == &current_pointer))
+            .enumerate()
+            .filter(|(_, section)| section.pointers.iter().any(|p| p == &current_pointer))
+            .map(|(idx, _)| idx)
+            .next_back()
         {
             Some(idx) => idx,
             None => return false,

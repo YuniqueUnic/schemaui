@@ -1,10 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    tui::model::{FieldKind, FieldSchema},
+    tui::model::{FieldKind, FieldSchema, form_schema_from_ui_ast},
     tui::state::{FieldState, FormState, LayoutNavModel, RootSectionState, SectionState},
-    ui_ast::layout::{LayoutRoot, LayoutSection, UiLayout},
+    ui_ast::{
+        build_ui_ast,
+        layout::{self, LayoutRoot, LayoutSection, UiLayout},
+    },
 };
+use serde_json::json;
 
 fn text_field(pointer: &str, title: &str) -> FieldState {
     let path: Vec<String> = pointer
@@ -169,4 +173,76 @@ fn layout_nav_first_field_focus_uses_layout() {
     // layout-driven first-field focus should return to the first section.
     assert!(form.focus_first_field_with_layout());
     assert_eq!(focused_pointer(&form), "/auth/user");
+}
+
+#[test]
+fn layout_nav_from_schema_preserves_declared_root_and_section_order() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "zeta": {
+                "type": "object",
+                "title": "Zeta",
+                "properties": {
+                    "name": {"type": "string"},
+                    "network": {
+                        "type": "object",
+                        "title": "Network",
+                        "properties": {
+                            "port": {"type": "integer"}
+                        }
+                    },
+                    "auth": {
+                        "type": "object",
+                        "title": "Auth",
+                        "properties": {
+                            "user": {"type": "string"}
+                        }
+                    }
+                }
+            },
+            "alpha": {
+                "type": "object",
+                "title": "Alpha",
+                "properties": {
+                    "enabled": {"type": "boolean"}
+                }
+            }
+        }
+    });
+
+    let ast = build_ui_ast(&schema).expect("ui ast");
+    let form_schema = form_schema_from_ui_ast(&ast);
+    let layout = layout::build_ui_layout(&ast);
+    let nav = LayoutNavModel::from_uilayout(&layout);
+
+    let root_titles: Vec<_> = nav.roots.iter().map(|root| root.title.as_str()).collect();
+    assert_eq!(
+        root_titles,
+        vec!["Zeta", "Alpha"],
+        "root nav tabs should follow schema declaration order",
+    );
+
+    let zeta_sections: Vec<_> = nav.roots[0]
+        .sections
+        .iter()
+        .map(|section| section.title.as_str())
+        .collect();
+    assert_eq!(
+        zeta_sections,
+        vec!["Zeta", "Network", "Auth"],
+        "nested nav tabs should follow schema declaration order",
+    );
+
+    let mut form = FormState::from_schema(&form_schema).with_layout_nav(nav);
+    assert_eq!(focused_pointer(&form), "/zeta/name");
+
+    form.focus_next_section(1);
+    assert_eq!(focused_pointer(&form), "/zeta/network/port");
+
+    form.focus_next_section(1);
+    assert_eq!(focused_pointer(&form), "/zeta/auth/user");
+
+    form.focus_next_root(1);
+    assert_eq!(focused_pointer(&form), "/alpha/enabled");
 }

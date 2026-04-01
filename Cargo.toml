@@ -73,7 +73,7 @@ tokio = { version = "1", features = [
 ts-rs = { version = "12", optional = true, features = ["serde-compat"] }
 
 # For serialization formats
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml = { version = "0.9", optional = true }
 toml = { version = "1.1.0", optional = true }
 

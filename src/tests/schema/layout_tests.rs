@@ -464,6 +464,80 @@ fn recursive_refs_collapse_to_json_array_field_without_overflow() {
     }
 }
 
+#[test]
+fn form_schema_preserves_declared_root_and_field_order() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "zeta": {
+                "type": "object",
+                "title": "Zeta",
+                "properties": {
+                    "second": {"type": "string"},
+                    "first": {"type": "string"},
+                    "network": {
+                        "type": "object",
+                        "title": "Network",
+                        "properties": {
+                            "port": {"type": "integer"}
+                        }
+                    },
+                    "auth": {
+                        "type": "object",
+                        "title": "Auth",
+                        "properties": {
+                            "user": {"type": "string"}
+                        }
+                    }
+                }
+            },
+            "alpha": {
+                "type": "object",
+                "title": "Alpha",
+                "properties": {
+                    "enabled": {"type": "boolean"}
+                }
+            }
+        }
+    });
+
+    let form = runtime_form_schema(&schema);
+    let root_ids: Vec<_> = form.roots.iter().map(|root| root.id.as_str()).collect();
+    assert_eq!(
+        root_ids,
+        vec!["zeta", "alpha"],
+        "form roots should follow schema declaration order for top-level object sections",
+    );
+
+    let zeta = form
+        .roots
+        .iter()
+        .find(|root| root.id == "zeta")
+        .expect("zeta root");
+    let zeta_section = zeta.sections.first().expect("zeta section");
+    let field_names: Vec<_> = zeta_section
+        .fields
+        .iter()
+        .map(|field| field.name.as_str())
+        .collect();
+    assert_eq!(
+        field_names,
+        vec!["second", "first"],
+        "fields inside a section should preserve schema declaration order",
+    );
+
+    let child_titles: Vec<_> = zeta_section
+        .children
+        .iter()
+        .map(|section| section.title.as_str())
+        .collect();
+    assert_eq!(
+        child_titles,
+        vec!["Network", "Auth"],
+        "nested sections should preserve schema declaration order",
+    );
+}
+
 fn find_field(form: &FormSchema, predicate: impl Fn(&FieldSchema) -> bool) -> Option<&FieldSchema> {
     for root in &form.roots {
         if let Some(field) = find_in_sections(&root.sections, &predicate) {

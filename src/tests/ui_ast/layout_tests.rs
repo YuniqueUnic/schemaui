@@ -95,3 +95,75 @@ fn layout_groups_scalar_roots_into_general_section() {
         "metadata section should include its child field pointer",
     );
 }
+
+#[test]
+fn layout_preserves_declared_root_and_nested_property_order() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "zeta": {
+                "type": "object",
+                "title": "Zeta",
+                "properties": {
+                    "second": {"type": "string"},
+                    "first": {"type": "string"},
+                    "network": {
+                        "type": "object",
+                        "title": "Network",
+                        "properties": {
+                            "port": {"type": "integer"}
+                        }
+                    },
+                    "auth": {
+                        "type": "object",
+                        "title": "Auth",
+                        "properties": {
+                            "user": {"type": "string"}
+                        }
+                    }
+                }
+            },
+            "alpha": {
+                "type": "object",
+                "title": "Alpha",
+                "properties": {
+                    "enabled": {"type": "boolean"}
+                }
+            }
+        }
+    });
+
+    let ast = build_ui_ast(&schema).expect("runtime UiAst");
+    let layout = layout::build_ui_layout(&ast);
+
+    let root_ids: Vec<_> = layout.roots.iter().map(|root| root.id.as_str()).collect();
+    assert_eq!(
+        root_ids,
+        vec!["zeta", "alpha"],
+        "layout roots should follow schema declaration order",
+    );
+
+    let zeta = layout
+        .roots
+        .iter()
+        .find(|root| root.id == "zeta")
+        .expect("zeta root");
+    let zeta_section = zeta.sections.first().expect("zeta section");
+
+    assert_eq!(
+        zeta_section.field_pointers,
+        vec!["/zeta/second", "/zeta/first"],
+        "field list should preserve declared property order within an object section",
+    );
+
+    let child_pointers: Vec<_> = zeta_section
+        .children
+        .iter()
+        .map(|section| section.pointer.as_str())
+        .collect();
+    assert_eq!(
+        child_pointers,
+        vec!["/zeta/network", "/zeta/auth"],
+        "nested section order should follow schema declaration order",
+    );
+}
