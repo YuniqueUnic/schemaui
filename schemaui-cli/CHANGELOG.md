@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.2.8...schemaui-cli-v0.3.0) - 2026-04-01
+
+### Added
+
+- add support for recursive schema references in TUI generation
+- add UiAstBundle for sharing compiled UI artifacts between frontends
+- *(cli)* add TUI snapshot generation command
+- *(cli)* add web-snapshot command to precompute session snapshots
+
+### Other
+
+- [**breaking**] rename precompile terminology to artifact across codebase
+- *(precompile)* rename PrecompiledUiBundle to UiArtifactBundle and add TuiArtifacts
+- *(tui)* add layout navigation support for TUI forms
+
 ## [0.2.8](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.2.7...schemaui-cli-v0.2.8) - 2026-03-28
 
 ### Added

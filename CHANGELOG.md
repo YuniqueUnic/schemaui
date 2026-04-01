@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.6.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.5.0...schemaui-v0.6.0) - 2026-04-01
+
+### Added
+
+- preserve field and root declaration order in form schemas
+- enhance StatusBar component with improved status handling and UI updates
+- *(tui)* add comprehensive footer component with enhanced styling
+- *(tui)* implement paginated help overlay with shortcut scrolling
+- add support for recursive schema references in TUI generation
+- *(precompile)* add PrecompiledUiBundle w/ fingerprint and TUI artifacts
+- add UiAstBundle for sharing compiled UI artifacts between frontends
+- *(cli)* add TUI snapshot generation command
+- *(ui-ast)* add defaults and layout modules with tests
+- *(web)* add compile-time session snapshot generation and embedding support
+- *(tui)* add compile-time TUI form schema generation and precompilation support
+- *(compile-time)* add compile-time UI AST generation and integration
+
+### Other
+
+- *(readme)* fix line wrapping in Chinese README documentation
+- *(tui)* add invalid composite overlay test case
+- *(schema)* [**breaking**] replace direct schema layout with UI AST pipeline
+- [**breaking**] rename precompile terminology to artifact across codebase
+- *(precompile)* rename PrecompiledUiBundle to UiArtifactBundle and add TuiArtifacts
+- *(web)* add Deserialize derive to SessionResponse
+- *(examples)* add precompile codegen and TUI examples
+- *(precompile)* rename `compile_time` feature and module to `precompile`
+- *(schema)* add compile-time TUI tests and refactor required field handling
+- *(tui)* add layout section description to overlays
+- *(tui)* add layout navigation support for TUI forms
+- *(tui)* implement layout navigation support in form state
+- *(web)* add UI layout generation and include in session response
+- *(ui-ast)* add pointer indexing functionality
+- *(web/ui)* update dependencies to latest versions
+- *(web)* update build command to use embedded target
+
 ## [0.5.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.4.3...schemaui-v0.5.0) - 2026-03-28
 
 ### Added
