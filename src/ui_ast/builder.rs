@@ -466,12 +466,20 @@ fn detect_scalar(schema: &SchemaObject) -> Result<DetectedScalar> {
     }
 
     let instance = instance_type(schema);
+    if matches!(instance, Some(InstanceType::Null)) {
+        return Ok((
+            ScalarKind::String,
+            Some(vec!["null".to_string()]),
+            Some(vec![Value::Null]),
+        ));
+    }
+
     let scalar = match instance {
         Some(InstanceType::String) | None => ScalarKind::String,
         Some(InstanceType::Integer) => ScalarKind::Integer,
         Some(InstanceType::Number) => ScalarKind::Number,
         Some(InstanceType::Boolean) => ScalarKind::Boolean,
-        Some(InstanceType::Null) => ScalarKind::String,
+        Some(InstanceType::Null) => unreachable!("null instance is handled as a fixed null enum"),
         Some(InstanceType::Array | InstanceType::Object) => {
             bail!("composite types should be handled earlier")
         }
@@ -980,7 +988,7 @@ fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
             InstanceType::Boolean => "Boolean".to_string(),
             InstanceType::Array => "List".to_string(),
             InstanceType::Object => "Object".to_string(),
-            InstanceType::Null => format!("Option {}", index + 1),
+            InstanceType::Null => "Null".to_string(),
         };
     }
 

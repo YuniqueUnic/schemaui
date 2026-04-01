@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use crate::{
     tui::{
         app::{App, UiOptions},
-        model::form_schema_from_ui_ast,
+        model::{FieldKind, form_schema_from_ui_ast},
         state::FormState,
     },
     ui_ast::build_ui_ast,
@@ -174,5 +174,22 @@ fn ultra_complex_matrix_overlay_opens_for_rows_and_cells() {
         app.overlay_depth_for_test(),
         2,
         "matrix row cells should open a second overlay instead of staying inert"
+    );
+
+    let overlay = app
+        .active_overlay_form_state_for_test()
+        .expect("matrix cell overlay");
+    let field = overlay
+        .field_by_pointer("/__value")
+        .expect("wrapped null cell field");
+    match &field.schema.kind {
+        FieldKind::Enum { values, .. } => {
+            assert_eq!(values, &vec![Value::Null]);
+        }
+        other => panic!("null matrix variant should be a fixed null enum, got {other:?}"),
+    }
+    assert_eq!(
+        field.current_value().expect("null cell current value"),
+        Some(Value::Null)
     );
 }

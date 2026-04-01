@@ -4,6 +4,7 @@ use anyhow::Result;
 use crate::tui::app::runtime::overlay::state::OverlayFocusMode;
 
 use crate::tui::app::runtime::App;
+use crate::tui::app::validation::{ValidationOutcome, validate_form};
 use crate::tui::state::FormCommand;
 
 use super::editor::CompositeEditorOverlay;
@@ -25,6 +26,26 @@ const MSG_FOCUS_COMPOSITE_BEFORE_EDITING: &str =
 const MSG_OVERLAY_DIRTY_CONFIRM_EXIT: &str = "Overlay dirty. Press Esc again to discard changes.";
 
 impl App {
+    fn validate_overlay_before_commit(
+        overlay: &mut CompositeEditorOverlay,
+    ) -> std::result::Result<(), String> {
+        let Some(validator) = overlay.validator_clone() else {
+            return Ok(());
+        };
+
+        match validate_form(overlay.form_state_mut(), &validator) {
+            ValidationOutcome::Valid(_) => Ok(()),
+            ValidationOutcome::Invalid {
+                issues,
+                global_errors,
+            } => Err(global_errors
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| format!("{issues} issue(s) remaining"))),
+            ValidationOutcome::BuildError { message } => Err(message),
+        }
+    }
+
     pub(crate) fn close_active_overlay(&mut self, commit: bool) {
         let Some(mut overlay) = self.overlay_stack.pop() else {
             return;
@@ -113,6 +134,11 @@ impl App {
         let Some(mut overlay) = self.overlay_stack.pop() else {
             return false;
         };
+        if let Err(message) = Self::validate_overlay_before_commit(&mut overlay) {
+            self.status.set_raw(&message);
+            self.overlay_stack.push(overlay);
+            return false;
+        }
         match self.apply_overlay_commit(&overlay) {
             Ok(()) => {
                 overlay.form_state_mut().mark_clean();
@@ -153,6 +179,12 @@ impl App {
 
         // Commit overlays from deepest (highest level) back towards the root.
         for idx in (0..depth).rev() {
+            if let Err(message) = Self::validate_overlay_before_commit(&mut self.overlay_stack[idx])
+            {
+                self.status.set_raw(&message);
+                return false;
+            }
+
             // Build commit payload without borrowing the overlay mutably while
             // we also mutate the host form state.
             let payload = {

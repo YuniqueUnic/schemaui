@@ -105,6 +105,30 @@ fn build_scalar_array_overlay_app() -> App {
     App::new(form_state, validator, UiOptions::default())
 }
 
+fn build_invalid_composite_overlay_app() -> App {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "service": {
+                "oneOf": [
+                    {
+                        "title": "http",
+                        "type": "object",
+                        "properties": {
+                            "port": {"type": "integer"}
+                        },
+                        "required": ["port"]
+                    }
+                ]
+            }
+        }
+    });
+    let form_schema = runtime_form_schema(&schema);
+    let form_state = FormState::from_schema(&form_schema);
+    let validator = validator_for(&schema).expect("validator");
+    App::new(form_state, validator, UiOptions::default())
+}
+
 fn activate_service_variant(app: &mut App) {
     let form_state = app.form_state_mut_for_test();
     let field = form_state
@@ -469,4 +493,46 @@ fn key_value_overlay_can_delete_all_entries_without_recreating_last() {
         0,
         "key/value field should be truly empty after deleting the last entry",
     );
+}
+
+#[test]
+fn save_overlay_stack_rejects_invalid_composite_payloads() {
+    let mut app = build_invalid_composite_overlay_app();
+    activate_service_variant(&mut app);
+
+    {
+        let form_state = app.form_state_mut_for_test();
+        focus_field(form_state, "/service");
+    }
+    let before = app
+        .form_state_mut_for_test()
+        .field_by_pointer("/service")
+        .expect("service field")
+        .current_value()
+        .expect("service value before save");
+
+    app.open_overlay_for_test();
+    {
+        let overlay_form = app
+            .active_overlay_form_state_for_test()
+            .expect("service overlay form");
+        overlay_form
+            .field_mut_by_pointer("/port")
+            .expect("port field")
+            .seed_value(&json!("oops"));
+    }
+
+    assert!(
+        !app.save_overlay_stack_to_root(),
+        "invalid composite overlay should not be committed to the host form"
+    );
+    assert_eq!(app.overlay_depth_for_test(), 1);
+
+    let after = app
+        .form_state_mut_for_test()
+        .field_by_pointer("/service")
+        .expect("service field")
+        .current_value()
+        .expect("service value after rejected save");
+    assert_eq!(after, before);
 }
