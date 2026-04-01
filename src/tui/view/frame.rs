@@ -79,7 +79,7 @@ pub fn draw(
 ) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(7), Constraint::Length(3)])
+        .constraints([Constraint::Min(7), Constraint::Length(4)])
         .split(frame.area());
 
     let cursor_enabled = ctx.popup.is_none() && ctx.composite_overlay.is_none();

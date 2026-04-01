@@ -1,6 +1,6 @@
 mod body;
 pub(crate) mod fields;
-mod footer;
+pub(crate) mod footer;
 mod help;
 mod layout;
 pub(crate) mod overlay;
