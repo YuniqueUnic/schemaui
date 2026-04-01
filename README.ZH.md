@@ -145,8 +145,8 @@ fn main() -> color_eyre::Result<()> {
 
 ## JSON Schema → TUI 映射
 
-`build_ui_ast` 先把解析后的模式规范化为 UI AST，再由
-`form_schema_from_ui_ast` 将每个子树映射为 `FormSection`/`FieldSchema`：
+`build_ui_ast` 先把解析后的模式规范化为 UI AST，再由 `form_schema_from_ui_ast`
+将每个子树映射为 `FormSection`/`FieldSchema`：
 
 | 模式功能                                                     | 结果控件                                                |
 | ------------------------------------------------------------ | ------------------------------------------------------- |
@@ -241,14 +241,14 @@ fn main() -> color_eyre::Result<()> {
 
 ## 运行时层
 
-| 层           | 模块 (s)                                                  | 责任                                                           |
-| ------------ | --------------------------------------------------------- | -------------------------------------------------------------- |
-| 摄取         | `io::input`, `schema::loader`, `schema::resolver`         | 解析 JSON/TOML/YAML，解析`$ref`，并规范化元数据。              |
-| 布局类型     | `ui_ast::build_ui_ast`, `tui::model::form_schema_from_ui_ast` | 从规范 UI AST 生成 `FormSchema`（根/部分/字段）。          |
-| 表单状态     | `tui::state::{form_state, section, field}`                | 跟踪焦点、指针、脏标志、强制转换和错误。                       |
-| 命令与简化器 | `tui::state::{actions, reducers}`, `tui::app::validation` | 定义 `FormCommand`，突变状态，并路由验证结果。                 |
-| 运行时控制器 | `tui::app::{runtime, overlay, popup, status, keymap}`     | 事件循环，输入路由器分发，覆盖层生命周期，帮助文本，状态更新。 |
-| 呈现         | `tui::view` 和 `tui::view::components::*`                 | 通过 `ratatui` 呈现标签、字段列表、弹出窗口、覆盖层和页脚。    |
+| 层           | 模块 (s)                                                      | 责任                                                           |
+| ------------ | ------------------------------------------------------------- | -------------------------------------------------------------- |
+| 摄取         | `io::input`, `schema::loader`, `schema::resolver`             | 解析 JSON/TOML/YAML，解析`$ref`，并规范化元数据。              |
+| 布局类型     | `ui_ast::build_ui_ast`, `tui::model::form_schema_from_ui_ast` | 从规范 UI AST 生成 `FormSchema`（根/部分/字段）。              |
+| 表单状态     | `tui::state::{form_state, section, field}`                    | 跟踪焦点、指针、脏标志、强制转换和错误。                       |
+| 命令与简化器 | `tui::state::{actions, reducers}`, `tui::app::validation`     | 定义 `FormCommand`，突变状态，并路由验证结果。                 |
+| 运行时控制器 | `tui::app::{runtime, overlay, popup, status, keymap}`         | 事件循环，输入路由器分发，覆盖层生命周期，帮助文本，状态更新。 |
+| 呈现         | `tui::view` 和 `tui::view::components::*`                     | 通过 `ratatui` 呈现标签、字段列表、弹出窗口、覆盖层和页脚。    |
 
 每个模块保持在约 600 行代码以下（硬上限 800），以尊重 KISS
 原则并使重构易于管理。

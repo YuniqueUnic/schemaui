@@ -320,14 +320,14 @@ overlays, and documentation all consume a single source of truth.
 
 ## Runtime Layers
 
-| Layer               | Module(s)                                                 | Responsibilities                                                                |
-| ------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Ingestion           | `io::input`, `schema::loader`, `schema::resolver`         | Parse JSON/TOML/YAML, resolve `$ref`, and normalize metadata.                   |
-| Layout typing       | `ui_ast::build_ui_ast`, `tui::model::form_schema_from_ui_ast` | Produce `FormSchema` (roots/sections/fields) from the canonical UI AST.     |
-| Form state          | `tui::state::{form_state, section, field}`                | Track focus, pointers, dirty flags, coercions, and errors.                      |
-| Commands & reducers | `tui::state::{actions, reducers}`, `tui::app::validation` | Define `FormCommand`, mutate state, and route validation results.               |
-| Runtime controller  | `tui::app::{runtime, overlay, popup, status, keymap}`     | Event loop, InputRouter dispatch, overlay lifecycle, help text, status updates. |
-| Presentation        | `tui::view` and `tui::view::components::*`                | Render tabs, field lists, popups, overlays, and footer via `ratatui`.           |
+| Layer               | Module(s)                                                     | Responsibilities                                                                |
+| ------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Ingestion           | `io::input`, `schema::loader`, `schema::resolver`             | Parse JSON/TOML/YAML, resolve `$ref`, and normalize metadata.                   |
+| Layout typing       | `ui_ast::build_ui_ast`, `tui::model::form_schema_from_ui_ast` | Produce `FormSchema` (roots/sections/fields) from the canonical UI AST.         |
+| Form state          | `tui::state::{form_state, section, field}`                    | Track focus, pointers, dirty flags, coercions, and errors.                      |
+| Commands & reducers | `tui::state::{actions, reducers}`, `tui::app::validation`     | Define `FormCommand`, mutate state, and route validation results.               |
+| Runtime controller  | `tui::app::{runtime, overlay, popup, status, keymap}`         | Event loop, InputRouter dispatch, overlay lifecycle, help text, status updates. |
+| Presentation        | `tui::view` and `tui::view::components::*`                    | Render tabs, field lists, popups, overlays, and footer via `ratatui`.           |
 
 Each module is kept under ~600 LOC (hard cap 800) to honor the KISS principle
 and make refactors manageable.

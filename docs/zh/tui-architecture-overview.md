@@ -141,7 +141,8 @@ pub struct UiStores {
 
 **章节**是根内的逻辑字段组（例如"元数据"、"HTTP"、"TLS"）。**子章节**是章节内的嵌套章节。
 
-在 schema 适配阶段（`tui::model::form_schema_from_ui_ast`），会生成`FormSection`的树结构。在运行时，这棵树被扁平化为`SectionState`向量，同时保留`depth`和`path`：
+在 schema
+适配阶段（`tui::model::form_schema_from_ui_ast`），会生成`FormSection`的树结构。在运行时，这棵树被扁平化为`SectionState`向量，同时保留`depth`和`path`：
 
 ```rust
 impl SectionState {
