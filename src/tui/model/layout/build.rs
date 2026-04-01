@@ -9,10 +9,8 @@ use serde_json::Value;
 
 use crate::schema::{
     loader::load_root_schema,
-    metadata::{
-        SectionInfo, general_section_info, metadata_map, prettify_label, section_info_for_object,
-    },
-    resolver::SchemaResolver,
+    metadata::{SectionInfo, metadata_map, prettify_label, section_info_for_object},
+    resolver::{SchemaResolver, schema_reference},
 };
 
 use crate::tui::model::form_schema::{
@@ -28,6 +26,20 @@ use super::helpers::{
     to_pointer,
 };
 
+enum BuiltProperty {
+    Section {
+        section: FormSection,
+        schema: SchemaObject,
+    },
+    Field(FieldSchema),
+}
+
+struct PropertyContext<'a> {
+    name: &'a str,
+    path: Vec<String>,
+    required: bool,
+}
+
 pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
     let root = load_root_schema(schema_value)?;
     let resolver = SchemaResolver::new(schema_value, &root);
@@ -40,6 +52,7 @@ pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
     let mut roots: IndexMap<String, RootBuilder> = IndexMap::new();
     let mut general_fields: Vec<(usize, FieldSchema)> = Vec::new();
     let mut order_counter = 0usize;
+    let mut active_refs = Vec::new();
     let object = root_object
         .object
         .as_ref()
@@ -48,40 +61,41 @@ pub fn build_form_schema(schema_value: &Value) -> Result<FormSchema> {
 
     for (name, property_schema) in &object.properties {
         let path = vec![name.clone()];
-        let resolved = resolver.resolve_schema(property_schema)?;
-        let normalized = normalize_schema(&resolver, &resolved)?;
-        if should_descend(&normalized) {
-            let entry = roots
-                .entry(name.clone())
-                .or_insert_with(|| RootBuilder::new(name, &normalized));
-            let section =
-                build_section_tree(&resolver, &normalized, path, None, &mut order_counter)?;
-            entry.sections.push(section);
-        } else {
-            let field = build_field_schema(
-                &resolver,
-                &normalized,
+        match build_property(
+            &resolver,
+            property_schema,
+            PropertyContext {
                 name,
-                vec![name.clone()],
-                general_section_info(),
-                required.contains(name),
-            )?;
-            general_fields.push((order_counter, field));
-            order_counter += 1;
+                path,
+                required: required.contains(name),
+            },
+            None,
+            &mut order_counter,
+            &mut active_refs,
+        )? {
+            BuiltProperty::Section { section, schema } => {
+                let entry = roots
+                    .entry(name.clone())
+                    .or_insert_with(|| RootBuilder::new(name, &schema));
+                entry.sections.push(section);
+            }
+            BuiltProperty::Field(field) => {
+                general_fields.push((order_counter, field));
+                order_counter += 1;
+            }
         }
     }
 
     if let Some(additional) = object.additional_properties.as_ref()
-        && let Some(resolved) = resolve_additional_properties(&resolver, additional)?
+        && !matches!(&**additional, Schema::Bool(false) | Schema::Bool(true))
     {
-        let normalized = normalize_schema(&resolver, &resolved)?;
-        let field = build_field_schema(
+        let field = build_field_from_schema_entry(
             &resolver,
-            &normalized,
+            additional,
             "additional",
             Vec::new(),
-            general_section_info(),
             false,
+            &mut active_refs,
         )?;
         general_fields.push((order_counter, field));
     }
@@ -227,12 +241,92 @@ fn merge_object_validation(target: &mut ObjectValidation, source: &ObjectValidat
     // ObjectValidation does not track dependencies in this schema version.
 }
 
+fn build_property(
+    resolver: &SchemaResolver<'_>,
+    schema: &Schema,
+    property: PropertyContext<'_>,
+    parent_section: Option<&SectionInfo>,
+    order: &mut usize,
+    active_refs: &mut Vec<String>,
+) -> Result<BuiltProperty> {
+    let PropertyContext {
+        name,
+        path,
+        required,
+    } = property;
+    with_resolved_schema(
+        resolver,
+        schema,
+        active_refs,
+        {
+            let path = path.clone();
+            move |normalized| {
+                Ok(BuiltProperty::Field(field_schema_from_kind(
+                    &normalized,
+                    name,
+                    path,
+                    recursive_boundary_field_kind(&normalized),
+                    required,
+                )))
+            }
+        },
+        move |normalized, active_refs| {
+            if should_descend(&normalized) {
+                let section = build_section_tree(
+                    resolver,
+                    &normalized,
+                    path,
+                    parent_section,
+                    order,
+                    active_refs,
+                )?;
+                Ok(BuiltProperty::Section {
+                    section,
+                    schema: normalized,
+                })
+            } else {
+                build_field_schema(resolver, &normalized, name, path, required, active_refs)
+                    .map(BuiltProperty::Field)
+            }
+        },
+    )
+}
+
+fn build_field_from_schema_entry(
+    resolver: &SchemaResolver<'_>,
+    schema: &Schema,
+    name: &str,
+    path: Vec<String>,
+    required: bool,
+    active_refs: &mut Vec<String>,
+) -> Result<FieldSchema> {
+    let recursive_path = path.clone();
+    with_resolved_schema(
+        resolver,
+        schema,
+        active_refs,
+        move |normalized| {
+            Ok(field_schema_from_kind(
+                &normalized,
+                name,
+                recursive_path,
+                recursive_boundary_field_kind(&normalized),
+                required,
+            ))
+        },
+        move |normalized, active_refs| {
+            build_field_schema(resolver, &normalized, name, path, required, active_refs)
+        },
+    )
+}
+
 fn build_section_tree(
     resolver: &SchemaResolver<'_>,
     schema: &SchemaObject,
     path: Vec<String>,
     parent_section: Option<&SectionInfo>,
     order: &mut usize,
+    active_refs: &mut Vec<String>,
 ) -> Result<FormSection> {
     let name = path
         .last()
@@ -251,41 +345,40 @@ fn build_section_tree(
     for (child_name, child_schema) in &object.properties {
         let mut next_path = path.clone();
         next_path.push(child_name.clone());
-        let resolved = resolver.resolve_schema(child_schema)?;
-        let normalized = normalize_schema(resolver, &resolved)?;
-        if should_descend(&normalized) {
-            let child =
-                build_section_tree(resolver, &normalized, next_path, Some(&section_info), order)?;
-            children.push(child);
-        } else {
-            let field = build_field_schema(
-                resolver,
-                &normalized,
-                child_name,
-                next_path,
-                section_info.clone(),
-                required.contains(child_name),
-            )?;
-            fields.push((*order, field));
-            *order += 1;
+        match build_property(
+            resolver,
+            child_schema,
+            PropertyContext {
+                name: child_name,
+                path: next_path,
+                required: required.contains(child_name),
+            },
+            Some(&section_info),
+            order,
+            active_refs,
+        )? {
+            BuiltProperty::Section { section, .. } => children.push(section),
+            BuiltProperty::Field(field) => {
+                fields.push((*order, field));
+                *order += 1;
+            }
         }
     }
 
     if let Some(additional) = object.additional_properties.as_ref()
-        && let Some(resolved) = resolve_additional_properties(resolver, additional)?
+        && !matches!(&**additional, Schema::Bool(false) | Schema::Bool(true))
     {
-        let normalized = normalize_schema(resolver, &resolved)?;
         let field_name = path
             .last()
             .cloned()
             .unwrap_or_else(|| "additional".to_string());
-        let field = build_field_schema(
+        let field = build_field_from_schema_entry(
             resolver,
-            &normalized,
+            additional,
             &field_name,
             path.clone(),
-            section_info.clone(),
             false,
+            active_refs,
         )?;
         fields.push((*order, field));
         *order += 1;
@@ -303,20 +396,6 @@ fn build_section_tree(
     })
 }
 
-fn resolve_additional_properties(
-    resolver: &SchemaResolver<'_>,
-    schema: &Schema,
-) -> Result<Option<SchemaObject>> {
-    match schema {
-        Schema::Bool(false) => Ok(None),
-        Schema::Bool(true) => Ok(None),
-        other => {
-            let resolved = resolver.resolve_schema(other)?;
-            normalize_schema(resolver, &resolved).map(Some)
-        }
-    }
-}
-
 fn should_descend(schema: &SchemaObject) -> bool {
     is_object_schema(schema)
         && schema
@@ -332,25 +411,38 @@ fn build_field_schema(
     schema: &SchemaObject,
     name: &str,
     path: Vec<String>,
-    _section: SectionInfo,
     required: bool,
+    active_refs: &mut Vec<String>,
 ) -> Result<FieldSchema> {
     let normalized = normalize_schema(resolver, schema)?;
-    let metadata = metadata_map(&normalized);
-    let kind = detect_kind(resolver, &normalized)
+    let kind = detect_kind(resolver, &normalized, active_refs)
         .with_context(|| format!("unsupported schema for field '{name}'"))?;
-    let title = normalized
+    Ok(field_schema_from_kind(
+        &normalized,
+        name,
+        path,
+        kind,
+        required,
+    ))
+}
+
+fn field_schema_from_kind(
+    schema: &SchemaObject,
+    name: &str,
+    path: Vec<String>,
+    kind: FieldKind,
+    required: bool,
+) -> FieldSchema {
+    let metadata = metadata_map(schema);
+    let title = schema
         .metadata
         .as_ref()
         .and_then(|m| m.title.clone())
         .unwrap_or_else(|| prettify_label(name));
-    let default = normalized.metadata.as_ref().and_then(|m| m.default.clone());
-    let description = normalized
-        .metadata
-        .as_ref()
-        .and_then(|m| m.description.clone());
+    let default = schema.metadata.as_ref().and_then(|m| m.default.clone());
+    let description = schema.metadata.as_ref().and_then(|m| m.description.clone());
 
-    Ok(FieldSchema {
+    FieldSchema {
         name: name.to_string(),
         path: path.clone(),
         pointer: to_pointer(&path),
@@ -360,11 +452,33 @@ fn build_field_schema(
         required,
         default,
         metadata,
-    })
+    }
 }
 
-fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<FieldKind> {
-    if let Some(key_value) = key_value_field(resolver, schema)? {
+fn recursive_boundary_field_kind(schema: &SchemaObject) -> FieldKind {
+    if let Some(options) = &schema.enum_values {
+        return FieldKind::Enum {
+            labels: options.iter().map(enum_label).collect(),
+            values: options.clone(),
+        };
+    }
+
+    match instance_type(schema) {
+        Some(InstanceType::String) | None => FieldKind::String,
+        Some(InstanceType::Integer) => FieldKind::Integer,
+        Some(InstanceType::Number) => FieldKind::Number,
+        Some(InstanceType::Boolean) => FieldKind::Boolean,
+        Some(InstanceType::Array) => FieldKind::Array(Box::new(FieldKind::Json)),
+        Some(InstanceType::Object | InstanceType::Null) => FieldKind::Json,
+    }
+}
+
+fn detect_kind(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+    active_refs: &mut Vec<String>,
+) -> Result<FieldKind> {
+    if let Some(key_value) = key_value_field(resolver, schema, active_refs)? {
         return Ok(FieldKind::KeyValue(Box::new(key_value)));
     }
     if let Some(composite) = composite_field(resolver, schema)? {
@@ -386,8 +500,16 @@ fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<F
         Some(InstanceType::Object) => Ok(FieldKind::Json),
         Some(InstanceType::Array) => match schema.array.as_ref() {
             Some(array) if array.items.is_some() => {
-                let inner = resolve_array_items(resolver, array)?;
-                let inner_kind = detect_kind(resolver, &inner)?;
+                let item_schema = array_item_schema(array)?;
+                let recursive_item_ref = schema_reference(item_schema)
+                    .is_some_and(|reference| active_refs.iter().any(|active| active == reference));
+                let inner_kind = with_resolved_schema(
+                    resolver,
+                    item_schema,
+                    active_refs,
+                    |normalized| Ok(recursive_boundary_field_kind(&normalized)),
+                    |normalized, active_refs| detect_kind(resolver, &normalized, active_refs),
+                )?;
                 match inner_kind {
                     FieldKind::String
                     | FieldKind::Integer
@@ -396,6 +518,16 @@ fn detect_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<F
                     | FieldKind::Enum { .. }
                     | FieldKind::Composite(_) => Ok(FieldKind::Array(Box::new(inner_kind))),
                     FieldKind::Json => {
+                        if recursive_item_ref {
+                            return Ok(FieldKind::Array(Box::new(FieldKind::Json)));
+                        }
+                        let inner = with_resolved_schema(
+                            resolver,
+                            item_schema,
+                            active_refs,
+                            Ok,
+                            |normalized, _| Ok(normalized),
+                        )?;
                         if let Some(composite) = inline_object_composite(&inner)? {
                             Ok(FieldKind::Array(Box::new(FieldKind::Composite(Box::new(
                                 composite,
@@ -427,6 +559,7 @@ fn enum_label(value: &Value) -> String {
 fn key_value_field(
     resolver: &SchemaResolver<'_>,
     schema: &SchemaObject,
+    active_refs: &mut Vec<String>,
 ) -> Result<Option<KeyValueField>> {
     let Some(object) = schema.object.as_ref() else {
         return Ok(None);
@@ -436,7 +569,7 @@ fn key_value_field(
     }
 
     if let Some(additional) = object.additional_properties.as_ref() {
-        return build_key_value_from_schema(resolver, schema, additional, None);
+        return build_key_value_from_schema(resolver, schema, additional, None, active_refs);
     }
 
     if let Some((pattern, pattern_schema)) = object.pattern_properties.iter().next() {
@@ -445,7 +578,13 @@ fn key_value_field(
             "pattern": pattern,
             "title": "Key",
         });
-        return build_key_value_from_schema(resolver, schema, pattern_schema, Some(key_schema));
+        return build_key_value_from_schema(
+            resolver,
+            schema,
+            pattern_schema,
+            Some(key_schema),
+            active_refs,
+        );
     }
 
     Ok(None)
@@ -456,10 +595,24 @@ fn build_key_value_from_schema(
     schema: &SchemaObject,
     value_schema: &Schema,
     key_override: Option<Value>,
+    active_refs: &mut Vec<String>,
 ) -> Result<Option<KeyValueField>> {
     let object = schema.object.as_ref().expect("object schema");
-    let value_resolved = resolver.resolve_schema(value_schema)?;
-    let value_kind = detect_kind(resolver, &value_resolved)?;
+    let (value_resolved, value_kind) = with_resolved_schema(
+        resolver,
+        value_schema,
+        active_refs,
+        |normalized| {
+            Ok((
+                normalized.clone(),
+                recursive_boundary_field_kind(&normalized),
+            ))
+        },
+        |normalized, active_refs| {
+            let kind = detect_kind(resolver, &normalized, active_refs)?;
+            Ok((normalized, kind))
+        },
+    )?;
     let value_schema =
         schema_object_to_value(&value_resolved).context("failed to serialize value schema")?;
     let (value_title, value_description, value_default) = schema_titles(&value_resolved, "Value");
@@ -570,26 +723,42 @@ fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
     }
 }
 
-fn resolve_array_items(
-    resolver: &SchemaResolver<'_>,
-    array: &ArrayValidation,
-) -> Result<SchemaObject> {
+fn array_item_schema(array: &ArrayValidation) -> Result<&Schema> {
     let items = array
         .items
         .as_ref()
         .context("array schema must define items")?;
     match items {
-        SingleOrVec::Single(schema) => {
-            let resolved = resolver.resolve_schema(schema)?;
-            normalize_schema(resolver, &resolved)
+        SingleOrVec::Single(schema) => Ok(schema.as_ref()),
+        SingleOrVec::Vec(list) => list
+            .first()
+            .context("tuple arrays without items are not supported"),
+    }
+}
+
+fn with_resolved_schema<T, F, R>(
+    resolver: &SchemaResolver<'_>,
+    schema: &Schema,
+    active_refs: &mut Vec<String>,
+    on_recursive: R,
+    on_resolved: F,
+) -> Result<T>
+where
+    F: FnOnce(SchemaObject, &mut Vec<String>) -> Result<T>,
+    R: FnOnce(SchemaObject) -> Result<T>,
+{
+    let resolved = resolver.resolve_schema(schema)?;
+    let normalized = normalize_schema(resolver, &resolved)?;
+    if let Some(reference) = schema_reference(schema) {
+        if active_refs.iter().any(|active| active == reference) {
+            return on_recursive(normalized);
         }
-        SingleOrVec::Vec(list) => match list.first() {
-            Some(first) => {
-                let resolved = resolver.resolve_schema(first)?;
-                normalize_schema(resolver, &resolved)
-            }
-            None => bail!("tuple arrays without items are not supported"),
-        },
+        active_refs.push(reference.to_string());
+        let result = on_resolved(normalized, active_refs);
+        active_refs.pop();
+        result
+    } else {
+        on_resolved(normalized, active_refs)
     }
 }
 

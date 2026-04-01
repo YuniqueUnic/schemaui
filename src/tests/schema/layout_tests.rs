@@ -397,6 +397,59 @@ fn referenced_field_keeps_instance_metadata() {
     assert!(matches!(field.kind, FieldKind::Integer));
 }
 
+#[test]
+fn recursive_refs_collapse_to_json_array_field_without_overflow() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "tree": {"$ref": "#/definitions/treeNode"}
+        },
+        "definitions": {
+            "treeNode": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "children": {
+                        "type": "array",
+                        "items": {"$ref": "#/definitions/treeNode"}
+                    }
+                },
+                "required": ["name"]
+            }
+        }
+    });
+
+    let form = build_form_schema(&schema).expect("recursive schema parsed");
+    let root = form
+        .roots
+        .iter()
+        .find(|root| root.id == "tree")
+        .expect("tree root section");
+    let section = root.sections.first().expect("tree section");
+
+    let name_field = find_field(&form, |field| field.pointer == "/tree/name").expect("name field");
+    assert!(matches!(name_field.kind, FieldKind::String));
+
+    let children_field = section
+        .fields
+        .iter()
+        .find(|field| field.pointer == "/tree/children")
+        .expect("children field");
+    match &children_field.kind {
+        FieldKind::Array(inner) => {
+            assert!(
+                matches!(inner.as_ref(), FieldKind::Json),
+                "recursive descendants should collapse to JSON boundary, got {:?}",
+                inner
+            );
+        }
+        other => panic!(
+            "expected array field for recursive children, got {:?}",
+            other
+        ),
+    }
+}
+
 fn find_field(form: &FormSchema, predicate: impl Fn(&FieldSchema) -> bool) -> Option<&FieldSchema> {
     for root in &form.roots {
         if let Some(field) = find_in_sections(&root.sections, &predicate) {

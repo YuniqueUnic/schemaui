@@ -34,6 +34,27 @@ fn defaults_value() -> Value {
     })
 }
 
+fn recursive_schema_value() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "tree": {"$ref": "#/definitions/treeNode"}
+        },
+        "definitions": {
+            "treeNode": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "children": {
+                        "type": "array",
+                        "items": {"$ref": "#/definitions/treeNode"}
+                    }
+                }
+            }
+        }
+    })
+}
+
 #[derive(Serialize)]
 struct CapturedFrontendContext {
     ui_ast: UiAst,
@@ -77,4 +98,41 @@ fn schema_pipeline_with_prepared_ui_bundle_matches_runtime_context() {
     let prepared = capture_pipeline_output(schema, defaults, Some(bundle));
 
     assert_eq!(runtime, prepared);
+}
+
+#[test]
+fn schema_pipeline_handles_recursive_schema_without_stack_overflow() {
+    let runtime = capture_pipeline_output(
+        recursive_schema_value(),
+        Value::Object(serde_json::Map::new()),
+        None,
+    );
+
+    let ui_roots = runtime["ui_ast"]["roots"]
+        .as_array()
+        .expect("ui_ast roots array");
+    assert_eq!(ui_roots.len(), 1);
+    assert_eq!(ui_roots[0]["pointer"], json!("/tree"));
+
+    let tree_children = runtime["ui_ast"]["roots"][0]["kind"]["children"]
+        .as_array()
+        .expect("tree child nodes");
+    let child_pointers: Vec<_> = tree_children
+        .iter()
+        .filter_map(|child| child["pointer"].as_str())
+        .collect();
+    assert!(child_pointers.contains(&"/tree/name"));
+    assert!(child_pointers.contains(&"/tree/children"));
+
+    let layout_roots = runtime["layout"]["roots"].as_array().expect("layout roots");
+    assert_eq!(layout_roots.len(), 1);
+    let field_pointers = layout_roots[0]["sections"][0]["field_pointers"]
+        .as_array()
+        .expect("layout field pointers");
+    let field_pointers: Vec<_> = field_pointers
+        .iter()
+        .filter_map(|value| value.as_str())
+        .collect();
+    assert!(field_pointers.contains(&"/tree/name"));
+    assert!(field_pointers.contains(&"/tree/children"));
 }

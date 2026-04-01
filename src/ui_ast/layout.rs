@@ -43,9 +43,10 @@ pub(crate) fn build_ui_layout(ast: &UiAst) -> UiLayout {
     let mut general_fields = Vec::new();
 
     for node in &ast.roots {
-        match &node.kind {
-            UiNodeKind::Object { .. } => object_roots.push(node),
-            _ => general_fields.push(node),
+        if is_section_object(node) {
+            object_roots.push(node);
+        } else {
+            general_fields.push(node);
         }
     }
 
@@ -124,13 +125,10 @@ fn build_section_from_object(node: &UiNode) -> LayoutSection {
     } = &node.kind
     {
         for child in inner {
-            match &child.kind {
-                UiNodeKind::Object { .. } => {
-                    children.push(build_section_from_object(child));
-                }
-                _ => {
-                    field_pointers.push(child.pointer.clone());
-                }
+            if is_section_object(child) {
+                children.push(build_section_from_object(child));
+            } else {
+                field_pointers.push(child.pointer.clone());
             }
         }
     }
@@ -161,4 +159,11 @@ fn pointer_segments(pointer: &str) -> Vec<String> {
 fn last_segment(pointer: &str) -> Option<String> {
     let mut segments = pointer_segments(pointer);
     segments.pop()
+}
+
+fn is_section_object(node: &UiNode) -> bool {
+    matches!(
+        &node.kind,
+        UiNodeKind::Object { children, .. } if !children.is_empty()
+    )
 }

@@ -4,7 +4,10 @@ use schemars::schema::{
 };
 use serde_json::{Map, Value};
 
-use crate::schema::{loader::load_root_schema, resolver::SchemaResolver};
+use crate::schema::{
+    loader::load_root_schema,
+    resolver::{SchemaResolver, schema_reference},
+};
 
 use super::types::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
 
@@ -26,15 +29,46 @@ pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
         .context("root schema must define properties")?;
     let required = required_list(object);
 
+    let mut active_refs = Vec::new();
     let mut roots = Vec::new();
     for (name, schema) in &object.properties {
-        let resolved = resolver.resolve_schema(schema)?;
         let pointer = append_pointer("", name);
-        let node = visit_schema(&resolver, &resolved, pointer, required.contains(name))?;
+        let node = visit_schema_entry(
+            &resolver,
+            schema,
+            pointer,
+            required.contains(name),
+            &mut active_refs,
+        )?;
         roots.push(node);
     }
 
     Ok(UiAst { roots })
+}
+
+fn visit_schema_entry(
+    resolver: &SchemaResolver<'_>,
+    schema: &Schema,
+    pointer: String,
+    required: bool,
+    active_refs: &mut Vec<String>,
+) -> Result<UiNode> {
+    let recursive_pointer = pointer.clone();
+    with_resolved_schema(
+        resolver,
+        schema,
+        active_refs,
+        move |resolved| {
+            Ok(recursive_boundary_node(
+                &resolved,
+                recursive_pointer,
+                required,
+            ))
+        },
+        move |resolved, active_refs| {
+            visit_schema(resolver, &resolved, pointer, required, active_refs)
+        },
+    )
 }
 
 fn visit_schema(
@@ -42,13 +76,14 @@ fn visit_schema(
     schema: &SchemaObject,
     pointer: String,
     required: bool,
+    active_refs: &mut Vec<String>,
 ) -> Result<UiNode> {
     if let Some(subs) = schema.subschemas.as_ref()
         && let Some(all_of) = subs.all_of.as_ref()
         && !all_of.is_empty()
     {
         let merged = merge_all_of(resolver, all_of)?;
-        return visit_schema(resolver, &merged, pointer, required);
+        return visit_schema(resolver, &merged, pointer, required, active_refs);
     }
 
     if let Some(subs) = schema.subschemas.as_ref() {
@@ -60,6 +95,7 @@ fn visit_schema(
                 schema,
                 pointer,
                 required,
+                active_refs,
             );
         }
         if let Some(any_of) = subs.any_of.as_ref() {
@@ -70,6 +106,7 @@ fn visit_schema(
                 schema,
                 pointer,
                 required,
+                active_refs,
             );
         }
     }
@@ -79,21 +116,7 @@ fn visit_schema(
             .array
             .as_ref()
             .context("array schema must define array metadata")?;
-        let items_schema = resolve_array_items(resolver, array)?;
-        let item_node =
-            if is_object_schema(&items_schema) && !has_composite_subschemas(&items_schema) {
-                // Promote plain object[] arrays (without their own oneOf/anyOf)
-                // to arrays of single-variant composites so that frontends can
-                // treat them uniformly as composite lists rather than raw
-                // JSON object arrays.
-                build_composite_kind(
-                    resolver,
-                    &[Schema::Object(items_schema.clone())],
-                    CompositeMode::OneOf,
-                )?
-            } else {
-                visit_kind(resolver, &items_schema)?
-            };
+        let item_node = visit_array_item_kind(resolver, array, active_refs)?;
         let default_value = schema_default(schema).or_else(|| Some(Value::Array(Vec::new())));
         return Ok(UiNode {
             pointer,
@@ -117,13 +140,13 @@ fn visit_schema(
         let mut children = Vec::new();
         let required_fields = required_list(obj);
         for (name, child_schema) in &obj.properties {
-            let resolved = resolver.resolve_schema(child_schema)?;
             let child_ptr = append_pointer(&pointer, name);
-            let child = visit_schema(
+            let child = visit_schema_entry(
                 resolver,
-                &resolved,
+                child_schema,
                 child_ptr,
                 required_fields.contains(name),
+                active_refs,
             )?;
             children.push(child);
         }
@@ -162,8 +185,9 @@ fn build_composite_kind(
     resolver: &SchemaResolver<'_>,
     schemas: &[Schema],
     mode: CompositeMode,
+    active_refs: &mut Vec<String>,
 ) -> Result<UiNodeKind> {
-    let variants = build_variants(resolver, schemas)?;
+    let variants = build_variants(resolver, schemas, active_refs)?;
     // For both oneOf and anyOf, use single selection (allow_multiple = false)
     // This ensures proper radio group UI for single-value composites
     // and correct behavior for array items
@@ -182,8 +206,9 @@ fn build_composite_node(
     schema: &SchemaObject,
     pointer: String,
     required: bool,
+    active_refs: &mut Vec<String>,
 ) -> Result<UiNode> {
-    let kind = build_composite_kind(resolver, schemas, mode)?;
+    let kind = build_composite_kind(resolver, schemas, mode, active_refs)?;
     let default_value = if let UiNodeKind::Composite {
         variants,
         allow_multiple,
@@ -204,21 +229,25 @@ fn build_composite_node(
     })
 }
 
-fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<UiNodeKind> {
+fn visit_kind(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+    active_refs: &mut Vec<String>,
+) -> Result<UiNodeKind> {
     if let Some(subs) = schema.subschemas.as_ref()
         && let Some(all_of) = subs.all_of.as_ref()
         && !all_of.is_empty()
     {
         let merged = merge_all_of(resolver, all_of)?;
-        return visit_kind(resolver, &merged);
+        return visit_kind(resolver, &merged, active_refs);
     }
 
     if let Some(subs) = schema.subschemas.as_ref() {
         if let Some(one_of) = subs.one_of.as_ref() {
-            return build_composite_kind(resolver, one_of, CompositeMode::OneOf);
+            return build_composite_kind(resolver, one_of, CompositeMode::OneOf, active_refs);
         }
         if let Some(any_of) = subs.any_of.as_ref() {
-            return build_composite_kind(resolver, any_of, CompositeMode::AnyOf);
+            return build_composite_kind(resolver, any_of, CompositeMode::AnyOf, active_refs);
         }
     }
 
@@ -227,25 +256,7 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
             .array
             .as_ref()
             .context("array schema must define array metadata")?;
-        let items_schema = resolve_array_items(resolver, array)?;
-
-        // Treat arrays of plain objects (without their own oneOf/anyOf) as
-        // single-variant composites so that frontends can render them as
-        // composite lists instead of raw JSON buffers.
-        if is_object_schema(&items_schema) && !has_composite_subschemas(&items_schema) {
-            let composite_kind = build_composite_kind(
-                resolver,
-                &[Schema::Object(items_schema.clone())],
-                CompositeMode::OneOf,
-            )?;
-            return Ok(UiNodeKind::Array {
-                item: Box::new(composite_kind),
-                min_items: array.min_items.map(|v| v as u64),
-                max_items: array.max_items.map(|v| v as u64),
-            });
-        }
-
-        let item_node = visit_kind(resolver, &items_schema)?;
+        let item_node = visit_array_item_kind(resolver, array, active_refs)?;
         return Ok(UiNodeKind::Array {
             item: Box::new(item_node),
             min_items: array.min_items.map(|v| v as u64),
@@ -261,9 +272,14 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
         let required_fields = required_list(obj);
         let mut children = Vec::new();
         for (name, schema) in &obj.properties {
-            let resolved = resolver.resolve_schema(schema)?;
             let pointer = append_pointer("", name);
-            let node = visit_schema(resolver, &resolved, pointer, required_fields.contains(name))?;
+            let node = visit_schema_entry(
+                resolver,
+                schema,
+                pointer,
+                required_fields.contains(name),
+                active_refs,
+            )?;
             children.push(node);
         }
         return Ok(UiNodeKind::Object {
@@ -280,35 +296,14 @@ fn visit_kind(resolver: &SchemaResolver<'_>, schema: &SchemaObject) -> Result<Ui
     })
 }
 
-fn build_variants(resolver: &SchemaResolver<'_>, schemas: &[Schema]) -> Result<Vec<UiVariant>> {
+fn build_variants(
+    resolver: &SchemaResolver<'_>,
+    schemas: &[Schema],
+    active_refs: &mut Vec<String>,
+) -> Result<Vec<UiVariant>> {
     let mut out = Vec::new();
     for (index, variant) in schemas.iter().enumerate() {
-        let resolved = resolver.resolve_schema(variant)?;
-        let node = visit_kind(resolver, &resolved)?;
-        let mut schema_value = schema_to_value(&resolved)?;
-        if let Some(defs) = resolver.definitions_snapshot()
-            && let Value::Object(ref mut map) = schema_value
-        {
-            map.entry("$defs".to_string()).or_insert(defs);
-        }
-        let title = resolved
-            .metadata
-            .as_ref()
-            .and_then(|m| m.title.clone())
-            .or_else(|| Some(default_variant_title(index, &resolved)));
-        let description = resolved
-            .metadata
-            .as_ref()
-            .and_then(|m| m.description.clone());
-        let is_object = is_object_schema(&resolved);
-        out.push(UiVariant {
-            id: format!("variant_{}", index),
-            title,
-            description,
-            is_object,
-            node,
-            schema: schema_value,
-        });
+        out.push(build_variant(resolver, variant, index, active_refs)?);
     }
     Ok(out)
 }
@@ -482,21 +477,188 @@ fn merge_all_of(resolver: &SchemaResolver<'_>, all_of: &[Schema]) -> Result<Sche
     serde_json::from_value::<SchemaObject>(acc).context("failed to deserialize merged allOf schema")
 }
 
-fn resolve_array_items(
-    resolver: &SchemaResolver<'_>,
-    array: &ArrayValidation,
-) -> Result<SchemaObject> {
+fn array_item_schema(array: &ArrayValidation) -> Result<&Schema> {
     let items = array
         .items
         .as_ref()
         .context("array items must be present")?;
-    let first = match items {
-        SingleOrVec::Single(schema) => schema.as_ref(),
+    match items {
+        SingleOrVec::Single(schema) => Ok(schema.as_ref()),
         SingleOrVec::Vec(list) => list
             .first()
-            .context("tuple arrays must have at least one item")?,
+            .context("tuple arrays must have at least one item"),
+    }
+}
+
+fn visit_array_item_kind(
+    resolver: &SchemaResolver<'_>,
+    array: &ArrayValidation,
+    active_refs: &mut Vec<String>,
+) -> Result<UiNodeKind> {
+    let item_schema = array_item_schema(array)?;
+    with_resolved_schema(
+        resolver,
+        item_schema,
+        active_refs,
+        |resolved| Ok(recursive_boundary_kind(&resolved)),
+        |resolved, active_refs| {
+            if is_object_schema(&resolved) && !has_composite_subschemas(&resolved) {
+                build_single_variant_composite_kind(resolver, &resolved, active_refs)
+            } else {
+                visit_kind(resolver, &resolved, active_refs)
+            }
+        },
+    )
+}
+
+fn build_variant(
+    resolver: &SchemaResolver<'_>,
+    schema: &Schema,
+    index: usize,
+    active_refs: &mut Vec<String>,
+) -> Result<UiVariant> {
+    with_resolved_schema(
+        resolver,
+        schema,
+        active_refs,
+        |resolved| {
+            build_variant_from_resolved_schema(
+                resolver,
+                index,
+                &resolved,
+                recursive_boundary_kind(&resolved),
+            )
+        },
+        |resolved, active_refs| {
+            let node = visit_kind(resolver, &resolved, active_refs)?;
+            build_variant_from_resolved_schema(resolver, index, &resolved, node)
+        },
+    )
+}
+
+fn build_variant_from_resolved_schema(
+    resolver: &SchemaResolver<'_>,
+    index: usize,
+    schema: &SchemaObject,
+    node: UiNodeKind,
+) -> Result<UiVariant> {
+    let mut schema_value = schema_to_value(schema)?;
+    if let Some(defs) = resolver.definitions_snapshot()
+        && let Value::Object(ref mut map) = schema_value
+    {
+        map.entry("$defs".to_string()).or_insert(defs);
+    }
+    let title = schema
+        .metadata
+        .as_ref()
+        .and_then(|m| m.title.clone())
+        .or_else(|| Some(default_variant_title(index, schema)));
+    let description = schema.metadata.as_ref().and_then(|m| m.description.clone());
+    let is_object = is_object_schema(schema);
+    Ok(UiVariant {
+        id: format!("variant_{}", index),
+        title,
+        description,
+        is_object,
+        node,
+        schema: schema_value,
+    })
+}
+
+fn build_single_variant_composite_kind(
+    resolver: &SchemaResolver<'_>,
+    schema: &SchemaObject,
+    active_refs: &mut Vec<String>,
+) -> Result<UiNodeKind> {
+    let variant = build_variant_from_resolved_schema(
+        resolver,
+        0,
+        schema,
+        visit_kind(resolver, schema, active_refs)?,
+    )?;
+    Ok(UiNodeKind::Composite {
+        mode: CompositeMode::OneOf,
+        allow_multiple: false,
+        variants: vec![variant],
+    })
+}
+
+fn recursive_boundary_node(schema: &SchemaObject, pointer: String, required: bool) -> UiNode {
+    let kind = recursive_boundary_kind(schema);
+    let default_value = match &kind {
+        UiNodeKind::Field {
+            scalar,
+            enum_values,
+            ..
+        } => schema_default(schema).or_else(|| infer_default_scalar(*scalar, enum_values.as_ref())),
+        UiNodeKind::Array { .. } => {
+            schema_default(schema).or_else(|| Some(Value::Array(Vec::new())))
+        }
+        UiNodeKind::Composite { .. } => schema_default(schema),
+        UiNodeKind::Object { .. } => {
+            schema_default(schema).or_else(|| Some(Value::Object(Map::new())))
+        }
     };
-    resolver.resolve_schema(first)
+    UiNode {
+        pointer,
+        title: schema_title(schema),
+        description: schema_description(schema),
+        required,
+        default_value,
+        kind,
+    }
+}
+
+fn recursive_boundary_kind(schema: &SchemaObject) -> UiNodeKind {
+    if is_array_schema(schema) {
+        let array = schema.array.as_ref();
+        return UiNodeKind::Array {
+            item: Box::new(UiNodeKind::Object {
+                children: Vec::new(),
+                required: Vec::new(),
+            }),
+            min_items: array.and_then(|inner| inner.min_items).map(|v| v as u64),
+            max_items: array.and_then(|inner| inner.max_items).map(|v| v as u64),
+        };
+    }
+
+    if let Ok((scalar, enum_options, enum_values)) = detect_scalar(schema) {
+        return UiNodeKind::Field {
+            scalar,
+            enum_options,
+            enum_values,
+        };
+    }
+
+    UiNodeKind::Object {
+        children: Vec::new(),
+        required: Vec::new(),
+    }
+}
+
+fn with_resolved_schema<T, F, R>(
+    resolver: &SchemaResolver<'_>,
+    schema: &Schema,
+    active_refs: &mut Vec<String>,
+    on_recursive: R,
+    on_resolved: F,
+) -> Result<T>
+where
+    F: FnOnce(SchemaObject, &mut Vec<String>) -> Result<T>,
+    R: FnOnce(SchemaObject) -> Result<T>,
+{
+    let resolved = resolver.resolve_schema(schema)?;
+    if let Some(reference) = schema_reference(schema) {
+        if active_refs.iter().any(|active| active == reference) {
+            return on_recursive(resolved);
+        }
+        active_refs.push(reference.to_string());
+        let result = on_resolved(resolved, active_refs);
+        active_refs.pop();
+        result
+    } else {
+        on_resolved(resolved, active_refs)
+    }
 }
 
 fn instance_type(schema: &SchemaObject) -> Option<InstanceType> {

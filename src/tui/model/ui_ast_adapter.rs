@@ -13,20 +13,19 @@ pub fn form_schema_from_ui_ast(ast: &UiAst) -> FormSchema {
     let mut general_fields = Vec::new();
 
     for node in &ast.roots {
-        match &node.kind {
-            UiNodeKind::Object { .. } => {
-                let section = build_section_from_object(node);
-                roots.push(RootSection {
-                    id: section.id.clone(),
-                    title: node
-                        .title
-                        .clone()
-                        .unwrap_or_else(|| prettify_label(&section.id)),
-                    description: node.description.clone(),
-                    sections: vec![section],
-                });
-            }
-            _ => general_fields.push(field_schema_from_node(node)),
+        if is_section_object(node) {
+            let section = build_section_from_object(node);
+            roots.push(RootSection {
+                id: section.id.clone(),
+                title: node
+                    .title
+                    .clone()
+                    .unwrap_or_else(|| prettify_label(&section.id)),
+                description: node.description.clone(),
+                sections: vec![section],
+            });
+        } else {
+            general_fields.push(field_schema_from_node(node));
         }
     }
 
@@ -89,9 +88,10 @@ fn build_section_from_object(node: &UiNode) -> FormSection {
     } = &node.kind
     {
         for child in inner {
-            match &child.kind {
-                UiNodeKind::Object { .. } => children.push(build_section_from_object(child)),
-                _ => fields.push(field_schema_from_node(child)),
+            if is_section_object(child) {
+                children.push(build_section_from_object(child));
+            } else {
+                fields.push(field_schema_from_node(child));
             }
         }
     }
@@ -223,4 +223,11 @@ fn prettify_label(input: &str) -> String {
     } else {
         out
     }
+}
+
+fn is_section_object(node: &UiNode) -> bool {
+    matches!(
+        &node.kind,
+        UiNodeKind::Object { children, .. } if !children.is_empty()
+    )
 }

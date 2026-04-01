@@ -21,6 +21,12 @@ fn schema_path() -> PathBuf {
         .join("test-comprehensive.schema.json")
 }
 
+fn ultra_complex_example_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("examples")
+        .join("ultra-complex.schema.json")
+}
+
 fn defaults_value() -> Value {
     json!({
         "simpleTypes": {
@@ -72,6 +78,49 @@ fn generated_ui_ast_matches_runtime_for_comprehensive_schema() {
     let runtime_pointers = collect_pointers(&runtime_ast);
 
     assert_eq!(runtime_pointers, generated_pointers);
+}
+
+#[test]
+fn ultra_complex_example_builds_artifacts_and_keeps_recursive_tree_fields() {
+    let path = ultra_complex_example_path();
+
+    let bundle = precompile::build_ui_artifact_bundle_from_file(&path, DocumentFormat::Json, None)
+        .expect("build UI artifact bundle for ultra-complex example");
+    let pointers = collect_pointers(&bundle.ui.ui_ast);
+    assert!(
+        pointers.contains("/recursiveTree"),
+        "pointers: {:?}",
+        pointers
+    );
+    assert!(
+        pointers.contains("/recursiveTree/name"),
+        "recursive tree should still expose concrete fields"
+    );
+    assert!(
+        pointers.contains("/recursiveTree/children"),
+        "recursive tree should keep the children array boundary"
+    );
+
+    let recursive_root = bundle
+        .tui
+        .form_schema
+        .roots
+        .iter()
+        .find(|root| root.id == "recursiveTree")
+        .expect("recursive tree root");
+    let section = recursive_root
+        .sections
+        .first()
+        .expect("recursive tree section");
+    let child_field = section
+        .fields
+        .iter()
+        .find(|field| field.pointer == "/recursiveTree/children")
+        .expect("recursive children field");
+    assert!(
+        matches!(child_field.kind, crate::tui::model::FieldKind::Array(_)),
+        "recursive children should remain an array field"
+    );
 }
 
 #[test]

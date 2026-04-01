@@ -15,6 +15,28 @@ fn find_node<'a>(nodes: &'a [UiNode], pointer: &str) -> Option<&'a UiNode> {
     None
 }
 
+fn recursive_tree_schema() -> serde_json::Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "tree": {"$ref": "#/definitions/treeNode"}
+        },
+        "definitions": {
+            "treeNode": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "children": {
+                        "type": "array",
+                        "items": {"$ref": "#/definitions/treeNode"}
+                    }
+                },
+                "required": ["name"]
+            }
+        }
+    })
+}
+
 #[test]
 fn ui_ast_preserves_numeric_enum_values() {
     let schema = json!({
@@ -75,4 +97,44 @@ fn ui_ast_prefers_instance_metadata_over_definition_metadata() {
     assert_eq!(field.title.as_deref(), Some("Request Timeout"));
     assert_eq!(field.description.as_deref(), Some("Per-request timeout"));
     assert_eq!(field.default_value, Some(json!(5)));
+}
+
+#[test]
+fn ui_ast_truncates_recursive_refs_to_finite_boundary() {
+    let ast = build_ui_ast(&recursive_tree_schema()).expect("recursive schema should build");
+    let root = find_node(&ast.roots, "/tree").expect("tree root");
+
+    match &root.kind {
+        UiNodeKind::Object { children, required } => {
+            let child_pointers: Vec<_> = children
+                .iter()
+                .map(|child| child.pointer.as_str())
+                .collect();
+            assert_eq!(required, &vec!["name".to_string()]);
+            assert!(child_pointers.contains(&"/tree/name"));
+            assert!(child_pointers.contains(&"/tree/children"));
+        }
+        other => panic!("expected tree root to remain object, got {:?}", other),
+    }
+
+    let children_field = find_node(&ast.roots, "/tree/children").expect("children field");
+    match &children_field.kind {
+        UiNodeKind::Array { item, .. } => match item.as_ref() {
+            UiNodeKind::Object { children, required } => {
+                assert!(
+                    children.is_empty(),
+                    "recursive item should not expand infinitely"
+                );
+                assert!(
+                    required.is_empty(),
+                    "truncated recursive item should have no nested required fields"
+                );
+            }
+            other => panic!(
+                "expected recursive array item boundary object, got {:?}",
+                other
+            ),
+        },
+        other => panic!("expected children to remain an array, got {:?}", other),
+    }
 }

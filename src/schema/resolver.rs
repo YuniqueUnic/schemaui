@@ -71,6 +71,13 @@ impl<'a> SchemaResolver<'a> {
     }
 }
 
+pub fn schema_reference(schema: &Schema) -> Option<&str> {
+    match schema {
+        Schema::Object(object) => object.reference.as_deref(),
+        Schema::Bool(_) => None,
+    }
+}
+
 fn overlay_reference_annotations(mut target: SchemaObject, source: &SchemaObject) -> SchemaObject {
     if source.metadata.is_some() {
         target.metadata = Some(Box::new(merge_metadata(
