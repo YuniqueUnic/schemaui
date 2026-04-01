@@ -21,6 +21,30 @@ pub struct UiContext<'a> {
     pub help_overlay: Option<HelpOverlayRender<'a>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HelpShortcutRender {
+    pub scope: String,
+    pub keys: String,
+    pub action: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HelpErrorRender {
+    pub index: usize,
+    pub pointer: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct HelpOverlayPage {
+    pub summary: String,
+    pub current_page: usize,
+    pub total_pages: usize,
+    pub shortcuts: Vec<HelpShortcutRender>,
+    pub errors: Vec<HelpErrorRender>,
+    pub total_errors: usize,
+}
+
 pub struct PopupRender<'a> {
     pub title: &'a str,
     pub options: &'a [String],
@@ -31,7 +55,8 @@ pub struct PopupRender<'a> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct HelpOverlayRender<'a> {
-    pub lines: &'a [String],
+    pub page: &'a HelpOverlayPage,
+    pub shortcut_offset: usize,
 }
 
 #[derive(Debug, Clone)]

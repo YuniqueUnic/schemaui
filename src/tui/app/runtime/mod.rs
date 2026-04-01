@@ -1,5 +1,8 @@
 use crate::tui::state::{FormCommand, FormEngine, FormState};
-use crate::tui::view::{self, CompositeOverlay, HelpOverlayRender, UiContext};
+use crate::tui::view::{
+    self, CompositeOverlay, HelpErrorRender, HelpOverlayPage, HelpOverlayRender,
+    HelpShortcutRender, UiContext,
+};
 use anyhow::{Result, anyhow};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
@@ -57,8 +60,23 @@ pub(crate) struct App {
 }
 
 struct HelpOverlayState {
-    pages: Vec<Vec<String>>,
+    pages: Vec<HelpOverlayPage>,
     page: usize,
+    viewport: Rect,
+    shortcut_offset: usize,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HelpOverlaySnapshot {
+    pub total_shortcuts: usize,
+    pub visible_shortcuts: usize,
+    pub shortcut_offset: usize,
+    pub visible_errors: usize,
+    pub total_errors: usize,
+    pub current_page: usize,
+    pub total_pages: usize,
+    pub summary: String,
 }
 
 impl App {
@@ -185,20 +203,32 @@ impl App {
             return;
         }
 
-        let pages = self.build_help_overlay_pages();
+        let viewport = Rect::new(0, 0, 0, 0);
+        let pages = self.build_help_overlay_pages(viewport);
         if pages.is_empty() {
             return;
         }
 
         // Help overlay is global and should not compete with other popups.
         self.popup = None;
-        self.help_overlay = Some(HelpOverlayState { pages, page: 0 });
+        self.help_overlay = Some(HelpOverlayState {
+            pages,
+            page: 0,
+            viewport,
+            shortcut_offset: 0,
+        });
     }
 
     fn handle_help_overlay_key(&mut self, key: &KeyEvent) -> bool {
         let Some(state) = self.help_overlay.as_mut() else {
             return false;
         };
+        let shortcut_capacity = view::help_overlay_panel_capacities(state.viewport).shortcuts;
+        let shortcut_max_offset = state
+            .pages
+            .first()
+            .map(|page| page.shortcuts.len().saturating_sub(shortcut_capacity))
+            .unwrap_or(0);
 
         match key.code {
             KeyCode::Esc => {
@@ -223,60 +253,72 @@ impl App {
                 }
                 true
             }
+            KeyCode::Up | KeyCode::Char('k') => {
+                state.shortcut_offset = state.shortcut_offset.saturating_sub(1);
+                true
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                state.shortcut_offset = (state.shortcut_offset + 1).min(shortcut_max_offset);
+                true
+            }
+            KeyCode::PageUp => {
+                state.shortcut_offset = state.shortcut_offset.saturating_sub(shortcut_capacity);
+                true
+            }
+            KeyCode::PageDown => {
+                state.shortcut_offset =
+                    (state.shortcut_offset + shortcut_capacity).min(shortcut_max_offset);
+                true
+            }
+            KeyCode::Home => {
+                state.shortcut_offset = 0;
+                true
+            }
+            KeyCode::End => {
+                state.shortcut_offset = shortcut_max_offset;
+                true
+            }
             _ => false,
         }
     }
 
-    fn build_help_overlay_pages(&self) -> Vec<Vec<String>> {
+    fn build_help_overlay_pages(&self, viewport: Rect) -> Vec<HelpOverlayPage> {
         const MAX_ERROR_MSG_CHARS: usize = 80;
-        const ERRORS_PER_PAGE: usize = 10;
+        let errors_per_page = view::help_overlay_error_page_capacity(viewport);
 
-        use crate::tui::app::keymap::KeymapContext;
-
-        // --- Collect shortcut rows ---------------------------------------------------------
-        struct ShortcutRow {
-            ctx_label: &'static str,
-            key: String,
-            action: String,
-        }
-
-        let mut shortcuts: Vec<ShortcutRow> = Vec::new();
+        let mut shortcuts: Vec<HelpShortcutRender> = Vec::new();
         let sections = [
-            ("Default", KeymapContext::Default),
-            ("Collection", KeymapContext::Collection),
+            ("Form", KeymapContext::Default),
+            ("List", KeymapContext::Collection),
             ("Overlay", KeymapContext::Overlay),
         ];
 
-        for (label, ctx) in sections {
-            if let Some(text) = self.keymap_store.help_text(ctx) {
-                for snippet in text.split('•') {
-                    let s = snippet.trim();
-                    if s.is_empty() {
-                        continue;
-                    }
-                    // Snippets are in the form "keys -> description".
-                    let (keys, action) = match s.split_once("->") {
-                        Some((k, a)) => (k.trim().to_string(), a.trim().to_string()),
-                        None => (s.to_string(), String::new()),
-                    };
-                    shortcuts.push(ShortcutRow {
-                        ctx_label: label,
-                        key: keys,
-                        action,
-                    });
-                }
+        for (scope, ctx) in sections {
+            for entry in self.keymap_store.help_entries(ctx) {
+                shortcuts.push(HelpShortcutRender {
+                    scope: scope.to_string(),
+                    keys: entry.keys,
+                    action: entry.action,
+                });
             }
         }
 
-        // --- Collect error rows ------------------------------------------------------------
-        let mut errors: Vec<(String, String)> = Vec::new();
+        let mut errors: Vec<HelpErrorRender> = Vec::new();
         for (pointer, message) in self.form_state.error_entries() {
             let short = truncate_with_ellipsis(&message, MAX_ERROR_MSG_CHARS);
-            errors.push((pointer, short));
+            errors.push(HelpErrorRender {
+                index: errors.len() + 1,
+                pointer,
+                message: short,
+            });
         }
         for msg in &self.global_errors {
             let short = truncate_with_ellipsis(msg, MAX_ERROR_MSG_CHARS);
-            errors.push((String::new(), short));
+            errors.push(HelpErrorRender {
+                index: errors.len() + 1,
+                pointer: "<global>".to_string(),
+                message: short,
+            });
         }
 
         let total_errors = errors.len();
@@ -287,75 +329,61 @@ impl App {
         let total_pages = if total_errors == 0 {
             1
         } else {
-            total_errors.div_ceil(ERRORS_PER_PAGE)
+            total_errors.div_ceil(errors_per_page)
         };
 
-        fn build_pages_header(current: usize, total: usize) -> String {
-            if total <= 1 {
-                return "Pages: [1]".to_string();
-            }
-            let mut parts = Vec::with_capacity(total);
-            for idx in 0..total {
-                let label = idx + 1;
-                if idx == current {
-                    parts.push(format!("[{label}]"));
-                } else {
-                    parts.push(label.to_string());
-                }
-            }
-            format!("Pages: {}", parts.join(" | "))
-        }
-
-        let mut pages: Vec<Vec<String>> = Vec::with_capacity(total_pages.max(1));
+        let mut pages: Vec<HelpOverlayPage> = Vec::with_capacity(total_pages.max(1));
 
         for page_idx in 0..total_pages {
-            let mut lines: Vec<String> = Vec::new();
-
-            // Keymap/table section
-            lines.push("Keymap shortcuts".to_string());
-            lines.push("CTX      | KEY                   | ACTION".to_string());
-            lines.push("-----------------------------------------------".to_string());
-            if shortcuts.is_empty() {
-                lines.push("(no shortcuts available)".to_string());
+            let start = page_idx * errors_per_page;
+            let end = (start + errors_per_page).min(total_errors);
+            let page_errors = if total_errors == 0 {
+                Vec::new()
             } else {
-                for row in &shortcuts {
-                    lines.push(format!(
-                        "{:<8} | {:<20} | {}",
-                        row.ctx_label, row.key, row.action
-                    ));
-                }
-            }
-            lines.push(String::new());
+                errors[start..end].to_vec()
+            };
 
-            // Errors section
-            lines.push(format!("Errors ({} issues)", total_errors));
-            if total_errors == 0 {
-                lines.push("No field errors.".to_string());
-            } else {
-                lines.push(build_pages_header(page_idx, total_pages));
-                lines.push("IDX  | POINTER                       | MESSAGE".to_string());
-                lines.push("-----------------------------------------------------".to_string());
-
-                let start = page_idx * ERRORS_PER_PAGE;
-                let end = (start + ERRORS_PER_PAGE).min(total_errors);
-                for (offset, (pointer, message)) in errors[start..end].iter().enumerate() {
-                    let idx = start + offset + 1;
-                    let ptr_display = if pointer.is_empty() {
-                        "<global>".to_string()
-                    } else {
-                        pointer.clone()
-                    };
-                    lines.push(format!("{:<4} | {:<28} | {}", idx, ptr_display, message));
-                }
-            }
-
-            lines.push(String::new());
-            lines.push("Tab: next page  |  Shift+Tab: previous page  |  Esc: close".to_string());
-
-            pages.push(lines);
+            pages.push(HelpOverlayPage {
+                summary:
+                    "All shortcuts stay visible here; only the error list paginates to fit terminal height."
+                        .to_string(),
+                current_page: page_idx + 1,
+                total_pages,
+                shortcuts: shortcuts.clone(),
+                errors: page_errors,
+                total_errors,
+            });
         }
 
         pages
+    }
+
+    fn refresh_help_overlay_pages(&mut self, viewport: Rect) {
+        let Some(current_page) = self.help_overlay.as_ref().map(|overlay| overlay.page) else {
+            return;
+        };
+        let pages = self.build_help_overlay_pages(viewport);
+        let shortcut_capacity = view::help_overlay_panel_capacities(viewport).shortcuts;
+        let shortcut_offset = self
+            .help_overlay
+            .as_ref()
+            .map(|overlay| overlay.shortcut_offset)
+            .unwrap_or(0);
+        let next_page = if pages.is_empty() {
+            0
+        } else {
+            current_page.min(pages.len().saturating_sub(1))
+        };
+        let next_shortcut_offset = pages
+            .first()
+            .map(|page| shortcut_offset.min(page.shortcuts.len().saturating_sub(shortcut_capacity)))
+            .unwrap_or(0);
+        if let Some(overlay) = self.help_overlay.as_mut() {
+            overlay.viewport = viewport;
+            overlay.pages = pages;
+            overlay.page = next_page;
+            overlay.shortcut_offset = next_shortcut_offset;
+        }
     }
 
     fn handle_field_input(&mut self, event: &KeyEvent) {
@@ -421,6 +449,7 @@ impl App {
     fn draw(&mut self, frame: &mut ratatui::Frame<'_>) {
         let help = self.current_help_text();
         let form_dirty = self.form_state.is_dirty();
+        self.refresh_help_overlay_pages(frame.area());
 
         let help_overlay_render = self.help_overlay.as_ref().and_then(|state| {
             if state.pages.is_empty() {
@@ -428,8 +457,11 @@ impl App {
             }
             let total = state.pages.len();
             let idx = state.page.min(total.saturating_sub(1));
-            let lines = &state.pages[idx];
-            Some(HelpOverlayRender { lines })
+            let page = &state.pages[idx];
+            Some(HelpOverlayRender {
+                page,
+                shortcut_offset: state.shortcut_offset,
+            })
         });
 
         if let Some(editor) = self.overlay_stack.last_mut() {
@@ -688,6 +720,37 @@ impl App {
 
     pub(crate) fn handle_key_for_test(&mut self, key: KeyEvent) -> Result<()> {
         self.handle_key(key)
+    }
+
+    pub(crate) fn toggle_help_overlay_for_test(&mut self, viewport: Rect) {
+        self.toggle_help_overlay();
+        self.refresh_help_overlay_pages(viewport);
+    }
+
+    pub(crate) fn help_overlay_snapshot_for_test(
+        &mut self,
+        viewport: Rect,
+    ) -> Option<HelpOverlaySnapshot> {
+        self.refresh_help_overlay_pages(viewport);
+        let capacities = view::help_overlay_panel_capacities(viewport);
+        let overlay = self.help_overlay.as_ref()?;
+        let idx = overlay.page.min(overlay.pages.len().saturating_sub(1));
+        let page = overlay.pages.get(idx)?;
+        let visible_shortcuts = page
+            .shortcuts
+            .len()
+            .saturating_sub(overlay.shortcut_offset)
+            .min(capacities.shortcuts);
+        Some(HelpOverlaySnapshot {
+            total_shortcuts: page.shortcuts.len(),
+            visible_shortcuts,
+            shortcut_offset: overlay.shortcut_offset,
+            visible_errors: page.errors.len(),
+            total_errors: page.total_errors,
+            current_page: page.current_page,
+            total_pages: page.total_pages,
+            summary: page.summary.clone(),
+        })
     }
 }
 

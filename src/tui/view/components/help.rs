@@ -1,37 +1,262 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    text::{Line, Span},
+    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap},
 };
 
-use super::super::frame::HelpOverlayRender;
+use super::super::frame::{
+    HelpErrorRender, HelpOverlayPage, HelpOverlayRender, HelpShortcutRender,
+};
+
+const SIDE_BY_SIDE_MIN_WIDTH: u16 = 110;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct HelpOverlayPanelCapacities {
+    pub shortcuts: usize,
+    pub errors: usize,
+}
+
+pub(crate) fn help_overlay_panel_capacities(area: Rect) -> HelpOverlayPanelCapacities {
+    let inner = bordered_inner(area);
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+    let [shortcut_area, error_area] = split_main_panels(inner, layout[1]);
+    HelpOverlayPanelCapacities {
+        shortcuts: table_row_capacity(shortcut_area),
+        errors: table_row_capacity(error_area),
+    }
+}
+
+pub(crate) fn help_overlay_error_page_capacity(area: Rect) -> usize {
+    help_overlay_panel_capacities(area).errors
+}
 
 pub fn render_help_overlay(frame: &mut Frame<'_>, help: HelpOverlayRender<'_>) {
     let area = frame.area();
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(3)])
-        .split(area);
-
-    let area = layout[0];
     frame.render_widget(Clear, area);
 
-    let block = Block::default()
-        .title("Help & Errors")
-        .borders(Borders::ALL)
-        .style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        );
+    let block = Block::default().title("Help").borders(Borders::ALL).style(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    );
     frame.render_widget(block.clone(), area);
+    let inner = bordered_inner(area);
+
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+
+    let page = help.page;
+    render_header(frame, layout[0], page);
+
+    let main = split_main_panels(inner, layout[1]);
+    let capacities = help_overlay_panel_capacities(area);
+
+    render_shortcuts_table(
+        frame,
+        main[0],
+        &page.shortcuts,
+        help.shortcut_offset,
+        capacities.shortcuts,
+    );
+    render_errors_panel(frame, main[1], page);
+
+    let footer = Paragraph::new(Line::from(vec![
+        Span::styled("Esc", Style::default().fg(Color::Yellow)),
+        Span::raw(" close  "),
+        Span::styled("↑/↓ or j/k", Style::default().fg(Color::Yellow)),
+        Span::raw(" scroll shortcuts  "),
+        Span::styled("Tab / Shift+Tab", Style::default().fg(Color::Yellow)),
+        Span::raw(" switch error page"),
+    ]))
+    .style(Style::default().fg(Color::Gray));
+    frame.render_widget(footer, layout[2]);
+}
+
+fn bordered_inner(area: Rect) -> Rect {
+    Rect {
+        x: area.x.saturating_add(1),
+        y: area.y.saturating_add(1),
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    }
+}
+
+fn split_main_panels(inner: Rect, area: Rect) -> [Rect; 2] {
+    let chunks = if inner.width >= SIDE_BY_SIDE_MIN_WIDTH {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(62), Constraint::Percentage(38)])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
+            .split(area)
+    };
+    [chunks[0], chunks[1]]
+}
+
+fn table_row_capacity(area: Rect) -> usize {
+    let inner = bordered_inner(area);
+    usize::from(inner.height.saturating_sub(1)).max(1)
+}
+
+fn render_header(frame: &mut Frame<'_>, area: Rect, page: &HelpOverlayPage) {
+    let header = Paragraph::new(vec![
+        Line::from(vec![
+            Span::styled(
+                "Shortcuts",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!(" {} ", page.shortcuts.len())),
+            Span::styled("•", Style::default().fg(Color::DarkGray)),
+            Span::raw(format!(" errors {} ", page.total_errors)),
+            Span::styled("•", Style::default().fg(Color::DarkGray)),
+            Span::raw(format!(
+                " error page {}/{}",
+                page.current_page, page.total_pages
+            )),
+        ]),
+        Line::from(Span::styled(
+            page.summary.as_str(),
+            Style::default().fg(Color::Gray),
+        )),
+    ])
+    .wrap(Wrap { trim: true });
+    frame.render_widget(header, area);
+}
+
+fn render_shortcuts_table(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    shortcuts: &[HelpShortcutRender],
+    shortcut_offset: usize,
+    visible_rows: usize,
+) {
+    let max_offset = shortcuts.len().saturating_sub(visible_rows);
+    let start = shortcut_offset.min(max_offset);
+    let end = (start + visible_rows).min(shortcuts.len());
+    let title = if shortcuts.len() <= visible_rows {
+        "Shortcuts".to_string()
+    } else {
+        format!("Shortcuts {}-{} / {}", start + 1, end, shortcuts.len())
+    };
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray));
+    let rows = shortcuts[start..end].iter().map(shortcut_row);
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(7),
+            Constraint::Length(18),
+            Constraint::Min(24),
+        ],
+    )
+    .header(
+        Row::new(vec!["Scope", "Keys", "Action"]).style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+    )
+    .block(block)
+    .column_spacing(1);
+    frame.render_widget(table, area);
+}
+
+fn shortcut_row(entry: &HelpShortcutRender) -> Row<'static> {
+    let scope_style = match entry.scope.as_str() {
+        "Form" => Style::default().fg(Color::Cyan),
+        "List" => Style::default().fg(Color::Magenta),
+        "Overlay" => Style::default().fg(Color::Yellow),
+        _ => Style::default().fg(Color::Gray),
+    };
+    Row::new(vec![
+        Cell::from(entry.scope.clone()).style(scope_style),
+        Cell::from(entry.keys.clone()).style(
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Cell::from(entry.action.clone()),
+    ])
+}
+
+fn render_errors_panel(frame: &mut Frame<'_>, area: Rect, page: &HelpOverlayPage) {
+    let title = if page.total_errors == 0 {
+        "Errors".to_string()
+    } else {
+        let start = page.errors.first().map(|error| error.index).unwrap_or(0);
+        let end = page.errors.last().map(|error| error.index).unwrap_or(0);
+        format!("Errors {start}-{end} / {}", page.total_errors)
+    };
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray));
     let inner = block.inner(area);
+    frame.render_widget(block, area);
 
-    let text = help.lines.join("\n");
-    let paragraph = Paragraph::new(text)
-        .wrap(Wrap { trim: false })
-        .style(Style::default().fg(Color::White));
+    if page.errors.is_empty() {
+        let paragraph = Paragraph::new(vec![
+            Line::from(Span::styled(
+                "No validation errors.",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from("Current form state is clean."),
+        ])
+        .wrap(Wrap { trim: true })
+        .style(Style::default().fg(Color::Gray));
+        frame.render_widget(paragraph, inner);
+        return;
+    }
 
-    frame.render_widget(paragraph, inner);
+    let rows = page.errors.iter().map(error_row);
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(4),
+            Constraint::Length(18),
+            Constraint::Min(18),
+        ],
+    )
+    .header(
+        Row::new(vec!["#", "Field", "Message"]).style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        ),
+    )
+    .column_spacing(1);
+    frame.render_widget(table, inner);
+}
+
+fn error_row(entry: &HelpErrorRender) -> Row<'static> {
+    Row::new(vec![
+        Cell::from(entry.index.to_string()).style(Style::default().fg(Color::Red)),
+        Cell::from(entry.pointer.clone()).style(Style::default().fg(Color::Cyan)),
+        Cell::from(entry.message.clone()).style(Style::default().fg(Color::White)),
+    ])
 }

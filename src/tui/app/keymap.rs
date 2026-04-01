@@ -69,6 +69,12 @@ struct KeyBinding {
     snippet: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct HelpEntry {
+    pub(crate) keys: String,
+    pub(crate) action: String,
+}
+
 impl KeyBinding {
     fn from_raw(raw: RawEntry) -> Result<Self> {
         let contexts = raw
@@ -282,6 +288,20 @@ impl KeymapStore {
         } else {
             Some(snippets.join(" • "))
         }
+    }
+
+    pub(crate) fn help_entries(&self, context: KeymapContext) -> Vec<HelpEntry> {
+        self.bindings
+            .iter()
+            .filter(|binding| binding.contexts.contains(&context))
+            .map(|binding| {
+                let (keys, action) = match binding.snippet.split_once("->") {
+                    Some((keys, action)) => (keys.trim().to_string(), action.trim().to_string()),
+                    None => (binding.snippet.clone(), String::new()),
+                };
+                HelpEntry { keys, action }
+            })
+            .collect()
     }
 }
 
