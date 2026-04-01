@@ -176,10 +176,11 @@ export function useSessionActions(
   const handleSave = useCallback(async () => {
     if (!state.session) return;
 
-    if (state.errors.size > 0) {
+    const validationErrors = await runValidation(state.data);
+    if (validationErrors.size > 0) {
       toast.error(
-        `Cannot save: ${state.errors.size} validation error${
-          state.errors.size > 1 ? "s" : ""
+        `Cannot save: ${validationErrors.size} validation error${
+          validationErrors.size > 1 ? "s" : ""
         } found.`,
         {
           duration: 5000,
@@ -204,11 +205,25 @@ export function useSessionActions(
       toast.error("Failed to save changes");
       actions.setSaving(false);
     }
-  }, [state.session, state.data, state.errors, actions, clearLocalStorage]);
+  }, [state.session, state.data, actions, clearLocalStorage, runValidation]);
 
   // ============================================
   // Handle Exit
   // ============================================
+
+  const forceExit = useCallback(async () => {
+    actions.setExiting(true);
+    try {
+      await exitSession(state.data, false); // commit=false
+      clearLocalStorage();
+      actions.setSessionEnded(true);
+      toast.success("Session aborted (changes discarded)");
+    } catch (error) {
+      console.error("Exit failed", error);
+      toast.error("Failed to exit session");
+      actions.setExiting(false);
+    }
+  }, [state.data, actions, clearLocalStorage]);
 
   const handleExit = useCallback(async (force = false) => {
     // Prevent multiple exit attempts
@@ -216,17 +231,7 @@ export function useSessionActions(
 
     // Force exit: skip all checks, discard changes
     if (force) {
-      actions.setExiting(true);
-      try {
-        await exitSession(state.data, false); // commit=false
-        clearLocalStorage();
-        actions.setSessionEnded(true);
-        toast.success("Session aborted (changes discarded)");
-      } catch (error) {
-        console.error("Exit failed", error);
-        toast.error("Failed to exit session");
-        actions.setExiting(false);
-      }
+      await forceExit();
       return;
     }
 
@@ -239,7 +244,7 @@ export function useSessionActions(
         duration: 10000,
         action: {
           label: "Force Exit",
-          onClick: () => handleExit(true),
+          onClick: () => void forceExit(),
         },
       });
       return;
@@ -252,7 +257,7 @@ export function useSessionActions(
         duration: 10000,
         action: {
           label: "Force Exit",
-          onClick: () => handleExit(true),
+          onClick: () => void forceExit(),
         },
       });
       return;
@@ -277,6 +282,7 @@ export function useSessionActions(
     dirtyRef,
     actions,
     clearLocalStorage,
+    forceExit,
     runValidation,
   ]);
 

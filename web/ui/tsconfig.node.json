@@ -6,7 +6,6 @@
     "module": "ESNext",
     "types": ["node"],
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
       "@schemaui/types/*": ["../types/*"]
     },

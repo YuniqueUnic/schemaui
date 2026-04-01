@@ -4,7 +4,7 @@
  * Centralizes all session-related state using useReducer for predictable updates.
  */
 
-import { useCallback, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { JsonValue, SessionResponse } from "../types";
 
 // ============================================
@@ -172,8 +172,9 @@ export function useSessionState() {
   // Use ref to always have latest dirty value (avoids stale closure issues)
   const dirtyRef = useRef(false);
 
-  // Sync dirtyRef with state
-  dirtyRef.current = state.dirty;
+  useEffect(() => {
+    dirtyRef.current = state.dirty;
+  }, [state.dirty]);
 
   // Action creators
   const actions = {

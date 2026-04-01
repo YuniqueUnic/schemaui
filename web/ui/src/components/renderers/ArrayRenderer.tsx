@@ -24,6 +24,7 @@ import {
   setPointerValue,
   splitPointer,
 } from "../../utils/jsonPointer";
+import { materializeCompositeKind } from "../../utils/schemaToUiKind";
 
 /**
  * Array Renderer - Handles all array rendering logic
@@ -203,6 +204,8 @@ function ComplexArrayRenderer({
   overlay,
   renderNode,
 }: ComplexArrayRendererProps) {
+  const editorKind = materializeCompositeKind(itemKind);
+
   const editEntry = (index: number, initial?: JsonValue) => {
     const entryNode: UiNode = {
       pointer: `${node.pointer}/${index}`,
@@ -212,7 +215,7 @@ function ComplexArrayRenderer({
       description: node.description,
       required: false,
       default_value: node.default_value,
-      kind: itemKind,
+      kind: editorKind,
     };
 
     overlay.open({

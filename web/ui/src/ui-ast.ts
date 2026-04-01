@@ -5,6 +5,7 @@ import {
   mergeDefaults,
   setPointerValue,
 } from "./utils/jsonPointer";
+import { materializeVariantNode } from "./utils/schemaToUiKind";
 import {
   extractSchemaProperties,
   identifyVariantType,
@@ -33,8 +34,10 @@ export function applyUiDefaults(
 }
 
 export function variantDefault(variant: UiVariant): JsonValue {
+  const variantNode = materializeVariantNode(variant);
+
   // For object variants, use configurable variant identification
-  if (variant.node.type === "object") {
+  if (variantNode.type === "object") {
     const result: Record<string, JsonValue> = {};
 
     // First, set any const fields from the schema to ensure unique identification
@@ -59,7 +62,7 @@ export function variantDefault(variant: UiVariant): JsonValue {
     const variantConfig = variantType ? VARIANT_CONFIGS[variantType] : null;
 
     // Process each child node
-    for (const child of variant.node.children) {
+    for (const child of variantNode.children) {
       const key = child.pointer.split("/").pop() || "";
       if (!(key in result)) {
         // Use variant-specific defaults if available
@@ -79,10 +82,10 @@ export function variantDefault(variant: UiVariant): JsonValue {
     }
 
     // Ensure all required fields have values
-    if (variant.node.required) {
-      for (const requiredKey of variant.node.required) {
+    if (variantNode.required) {
+      for (const requiredKey of variantNode.required) {
         if (!(requiredKey in result)) {
-          const childNode = variant.node.children.find(
+          const childNode = variantNode.children.find(
             (c) => c.pointer.split("/").pop() === requiredKey,
           );
           if (childNode) {
@@ -97,12 +100,12 @@ export function variantDefault(variant: UiVariant): JsonValue {
   }
 
   // For array variants, add a sample element to distinguish between string[] and number[]
-  if (variant.node.type === "array") {
-    const itemDefault = defaultForKind(variant.node.item);
+  if (variantNode.type === "array") {
+    const itemDefault = defaultForKind(variantNode.item);
     return [itemDefault];
   }
 
-  return defaultForKind(variant.node);
+  return defaultForKind(variantNode);
 }
 
 export function defaultForKind(kind: UiNodeKind): JsonValue {

@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import type { JsonValue, UiNode } from "../../types";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";

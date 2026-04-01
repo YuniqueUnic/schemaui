@@ -4,6 +4,7 @@ import {
   determineBestVariant,
   determineVariant,
 } from "../../utils/variantHelpers";
+import { materializeVariantNode } from "../../utils/schemaToUiKind";
 import { inferValueType } from "../../utils/typeHelpers";
 import { VariantSelector } from "../VariantSelector";
 import { EntryEditor } from "./shared/EntryEditor";
@@ -88,6 +89,7 @@ function SingleVariantRenderer({
 }: Omit<CompositeRendererProps, "overlay">) {
   const { variants, mode } = node.kind;
   const activeVariant = determineBestVariant(value, variants);
+  const activeVariantNode = materializeVariantNode(activeVariant);
 
   const handleVariantChange = (
     changedPointer: string,
@@ -148,7 +150,7 @@ function SingleVariantRenderer({
             description: activeVariant.description,
             required: false,
             default_value: node.default_value,
-            kind: activeVariant.node,
+            kind: activeVariantNode,
           },
           value,
           errors,
@@ -189,7 +191,7 @@ function MultiVariantRenderer({
       description: variant.description,
       required: false,
       default_value: node.default_value,
-      kind: variant.node,
+      kind: materializeVariantNode(variant),
     };
 
     overlay.open({

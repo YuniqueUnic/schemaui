@@ -12,13 +12,17 @@ export default defineConfig(({ mode }) => {
   const isEmbedded = mode === "embedded";
 
   return {
+    ...(isEmbedded ? {
+      base: "./",
+      publicDir: false,
+    } : {}),
     plugins: [
       react(),
       // Only use single-file plugin for embedded builds
       ...(isEmbedded
         ? [viteSingleFile({
           removeViteModuleLoader: true,
-          useRecommendedBuildConfig: true,
+          useRecommendedBuildConfig: false,
         })]
         : []),
     ],
@@ -35,19 +39,28 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       target: "esnext",
-      minify: "esbuild",
+      minify: "oxc",
       sourcemap: !isEmbedded,
       // For embedded: inline everything; for dev: allow code splitting
-      assetsInlineLimit: isEmbedded ? 100_000_000 : 4096,
+      assetsInlineLimit: isEmbedded ? () => true : 4096,
+      ...(isEmbedded ? {
+        assetsDir: "",
+        chunkSizeWarningLimit: 100_000_000,
+      } : {}),
       cssCodeSplit: !isEmbedded,
       outDir: "../dist",
       emptyOutDir: true,
-      rollupOptions: {
-        output: {
-          // Only use inline dynamic imports for embedded builds
-          ...(isEmbedded ? { inlineDynamicImports: true } : {}),
+      ...(isEmbedded ? {
+        rolldownOptions: {
+          output: {
+            codeSplitting: false,
+          },
         },
-      },
+      } : {}),
+    },
+    test: {
+      environment: "jsdom",
+      setupFiles: "./src/test/setup.ts",
     },
   };
 });

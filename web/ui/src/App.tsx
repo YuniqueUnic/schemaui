@@ -63,6 +63,9 @@ export default function App() {
   } = state;
 
   const hasLayout = !!(session?.layout && session.layout.roots.length > 0);
+  const focusLabel = selectedNode
+    ? (selectedNode.title?.trim() || selectedNode.pointer)
+    : (selectedPointer || undefined);
 
   if (loading) {
     return (
@@ -218,7 +221,10 @@ export default function App() {
           status={status}
           dirty={dirty}
           validating={false}
+          saving={saving}
+          exiting={exiting}
           errorCount={errors.size}
+          focusLabel={focusLabel}
           onErrorsClick={errors.size > 0
             ? () => actions.setShowErrorsDialog(true)
             : undefined}

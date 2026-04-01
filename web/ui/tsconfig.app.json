@@ -13,7 +13,6 @@
       "vite/client"
     ],
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
       "@schemaui/types/*": [
         "../types/*"
