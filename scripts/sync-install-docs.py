@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -57,7 +58,7 @@ def update_marked_block(path: Path, begin: str, end: str, generated: str, check:
         print(f"unchanged {path.relative_to(ROOT)}")
         return
     if check:
-        if format_markdown_text(path, updated) == original:
+        if compare_markdown_equivalent(path, updated, original):
             print(f"unchanged {path.relative_to(ROOT)}")
             return
         raise SyncError(f"{path.relative_to(ROOT)} is out of date")
@@ -65,12 +66,91 @@ def update_marked_block(path: Path, begin: str, end: str, generated: str, check:
     print(f"updated {path.relative_to(ROOT)}")
 
 
-def format_markdown_text(path: Path, text: str) -> str:
+def compare_markdown_equivalent(path: Path, updated: str, original: str) -> bool:
+    deno = shutil.which("deno")
+    if deno is not None:
+        return format_markdown_text(path, updated, deno) == original
+    return normalize_markdown_for_compare(updated) == normalize_markdown_for_compare(original)
+
+
+def format_markdown_text(path: Path, text: str, deno: str) -> str:
     with tempfile.TemporaryDirectory(prefix="schemaui-install-docs-") as tmpdir:
         temp_path = Path(tmpdir) / path.name
         temp_path.write_text(text)
-        subprocess.run(["deno", "fmt", str(temp_path)], check=True, capture_output=True)
+        subprocess.run([deno, "fmt", str(temp_path)], check=True, capture_output=True)
         return temp_path.read_text()
+
+
+def normalize_markdown_for_compare(text: str) -> str:
+    normalized_blocks: list[str] = []
+    in_code_fence = False
+    current_block: list[str] = []
+
+    def flush_block() -> None:
+        if not current_block:
+            return
+        block = normalize_markdown_block(current_block)
+        if block:
+            normalized_blocks.append(block)
+        current_block.clear()
+
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        if line.startswith("```"):
+            if in_code_fence:
+                current_block.append(line)
+                flush_block()
+                in_code_fence = False
+            else:
+                flush_block()
+                in_code_fence = True
+                current_block.append(line)
+            continue
+
+        if in_code_fence:
+            current_block.append(line)
+            continue
+
+        if line.startswith("<!--") or line.startswith("#"):
+            flush_block()
+            current_block.append(line)
+            flush_block()
+            continue
+
+        if not line.strip():
+            flush_block()
+            continue
+
+        current_block.append(line)
+
+    flush_block()
+    return "\n\n".join(normalized_blocks)
+
+
+def normalize_markdown_block(lines: list[str]) -> str:
+    stripped = [line.strip() for line in lines if line.strip()]
+    if not stripped:
+        return ""
+
+    first = stripped[0]
+    if first.startswith("```"):
+        return "\n".join(lines)
+    if first.startswith("<!--"):
+        return "\n".join(stripped)
+    if first.startswith("#"):
+        return "\n".join(stripped)
+    if all(line.startswith(">") for line in stripped):
+        content = " ".join(line[1:].strip() for line in stripped)
+        return f"> {collapse_inline_whitespace(content)}"
+    if first.startswith("#### "):
+        return "\n".join(stripped)
+
+    joined = " ".join(stripped)
+    return collapse_inline_whitespace(joined)
+
+
+def collapse_inline_whitespace(text: str) -> str:
+    return " ".join(text.split())
 
 
 def locale_text(mapping: dict[str, str], locale: str) -> str:
@@ -161,7 +241,13 @@ def main() -> int:
         check=args.check,
     )
     if not args.check:
-        subprocess.run(["deno", "fmt", *[str(path) for path in targets]], check=True)
+        deno = shutil.which("deno")
+        if deno is None:
+            raise SyncError(
+                "sync-install-docs.py requires `deno` when writing docs so the generated "
+                "markdown matches repository formatting"
+            )
+        subprocess.run([deno, "fmt", *[str(path) for path in targets]], check=True)
     if args.check:
         print("installation docs are up to date")
     return 0

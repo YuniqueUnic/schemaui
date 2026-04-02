@@ -73,6 +73,8 @@ python3 scripts/sync-install-docs.py --check
 
 - 使用显式 marker block，只更新 CLI 快捷入口与 installation section
 - `--check` 只校验文档是否已同步，不改文件
+- 写回文档时会使用 `deno fmt` 归一化 Markdown 输出；`--check` 可在无 `deno`
+  环境下运行
 
 ## 🐛 故障排除
 
