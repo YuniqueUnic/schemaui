@@ -25,6 +25,13 @@
 
 该库解析丰富的模式（嵌套部分、`$ref`、数组、键值映射、模式属性等），将其转换为可导航的表单树，将其呈现为键盘优先的编辑器，并在每次编辑后验证结果，以便用户在保存之前始终可以看到完整的错误列表。
 
+<!-- AUTO-GENERATED:CLI-QUICKLINK:BEGIN -->
+
+> CLI 可用：`schemaui-cli` 会安装 `schemaui` 可执行文件。想直接使用 CLI？跳转到
+> [CLI 安装与用法](#cli-schemaui-cli)。
+
+<!-- AUTO-GENERATED:CLI-QUICKLINK:END -->
+
 ## 功能亮点
 
 - **模式保真度** –
@@ -340,22 +347,58 @@ README 快捷键参考都使用单一信息源。
 
 ## CLI (`schemaui-cli`)
 
-### Install
+<!-- AUTO-GENERATED:CLI-INSTALL:BEGIN -->
 
-```bash
-cargo install schemaui-cli
-cargo binstall schemaui-cli
-brew install YuniqueUnic/schemaui/schemaui
-scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
-```
+### 安装
 
 安装后的实际可执行文件名始终是 `schemaui`，所以常规入口仍然是
 `schemaui -c ./config.json`。
 
-对于 Windows Package Manager，仓库内也会同步产出放在 `packaging/winget` 下的
-versioned manifest。官方 `winget` 客户端目前只支持本地 manifest
-目录或已经进入社区仓库的包，所以这部分文件主要用于
-`winget install --manifest <dir>` 或后续提交到社区仓库。
+选择下面任意一种支持的分发方式：
+
+#### Cargo（`cargo install`）
+
+使用 Cargo 从 crates.io 编译安装。
+
+```bash
+cargo install schemaui-cli
+```
+
+#### Cargo binstall
+
+通过 cargo-binstall 拉取预构建的 GitHub release 二进制。
+
+```bash
+cargo binstall schemaui-cli
+```
+
+#### Homebrew
+
+在 macOS 或 Linux 上通过仓库 tap 安装。
+
+```bash
+brew install YuniqueUnic/schemaui/schemaui
+```
+
+#### Scoop
+
+在 Windows 上通过仓库内维护的 Scoop manifest 安装。
+
+```bash
+scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
+```
+
+#### 直接下载
+
+从 `https://github.com/YuniqueUnic/schemaui/releases/latest`
+下载对应平台压缩包，解压 `schemaui` / `schemaui.exe` 后放到 `PATH` 中。
+
+#### winget manifests
+
+使用 `packaging/winget` 中的 versioned manifests 配合
+`winget install --manifest <dir>` 安装，或将其提交到社区仓库。
+
+<!-- AUTO-GENERATED:CLI-INSTALL:END -->
 
 ```bash
 schemaui \

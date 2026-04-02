@@ -58,6 +58,22 @@ python3 scripts/sync-package-manifests.py --tag schemaui-cli-v0.4.1 --check
 - `--check` 只校验是否同步，不改文件
 - 使用 `GITHUB_TOKEN` / `GH_TOKEN` 可提升 GitHub API 额度
 
+#### sync-install-docs.py
+
+从 `packaging/install/install-methods.json` 读取安装方式定义，并回写：
+
+- `README.md`
+- `README.ZH.md`
+- `docs/en/cli_usage.md`
+
+```bash
+python3 scripts/sync-install-docs.py
+python3 scripts/sync-install-docs.py --check
+```
+
+- 使用显式 marker block，只更新 CLI 快捷入口与 installation section
+- `--check` 只校验文档是否已同步，不改文件
+
 ## 🐛 故障排除
 
 ### 常见问题

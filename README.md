@@ -28,6 +28,13 @@ maps, pattern properties…) into a navigable form tree, renders it as a
 keyboard-first editor, and validates the result after every edit so users always
 see the full list of issues before saving.
 
+<!-- AUTO-GENERATED:CLI-QUICKLINK:BEGIN -->
+
+> CLI available: `schemaui-cli` installs the `schemaui` binary. Prefer the CLI?
+> Jump to [CLI installation and usage](#cli-schemaui-cli).
+
+<!-- AUTO-GENERATED:CLI-QUICKLINK:END -->
+
 ## Feature Highlights
 
 - **Schema fidelity** – draft-07 compatible, including `$ref`, `definitions`,
@@ -421,21 +428,60 @@ and make refactors manageable.
 
 ## CLI (`schemaui-cli`)
 
-```bash
-cargo install schemaui-cli
-cargo binstall schemaui-cli
-brew install YuniqueUnic/schemaui/schemaui
-scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
-```
+<!-- AUTO-GENERATED:CLI-INSTALL:BEGIN -->
+
+### Install
 
 The installed binary is always named `schemaui`, so the normal entry point is
 `schemaui -c ./config.json`.
 
-For Windows Package Manager users, the repository also ships versioned winget
-manifests under `packaging/winget`. The official client only supports local
-manifest directories or packages that have been published to the community
-repository, so these files are intended for `winget install --manifest <dir>`
-flows and upstream submission.
+Choose one of the supported channels:
+
+#### Cargo (`cargo install`)
+
+Build from crates.io with Cargo.
+
+```bash
+cargo install schemaui-cli
+```
+
+#### Cargo binstall
+
+Fetch prebuilt GitHub release binaries through cargo-binstall.
+
+```bash
+cargo binstall schemaui-cli
+```
+
+#### Homebrew
+
+Install from the repository tap on macOS or Linux.
+
+```bash
+brew install YuniqueUnic/schemaui/schemaui
+```
+
+#### Scoop
+
+Install on Windows from the repository-hosted Scoop manifest.
+
+```bash
+scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
+```
+
+#### Direct download
+
+Download the matching archive from
+`https://github.com/YuniqueUnic/schemaui/releases/latest`, extract `schemaui` /
+`schemaui.exe`, and place it on your `PATH`.
+
+#### winget manifests
+
+Use the versioned manifests in `packaging/winget` with
+`winget install --manifest <dir>`, or submit them upstream to the community
+repository.
+
+<!-- AUTO-GENERATED:CLI-INSTALL:END -->
 
 ```bash
 schemaui \

@@ -1,0 +1,93 @@
+{
+  "binaryName": "schemaui",
+  "packageName": "schemaui-cli",
+  "cliSectionAnchor": "#cli-schemaui-cli",
+  "cliQuickLink": {
+    "en": "Prefer the CLI? Jump to [CLI installation and usage](#cli-schemaui-cli).",
+    "zh": "想直接使用 CLI？跳转到 [CLI 安装与用法](#cli-schemaui-cli)。"
+  },
+  "intro": {
+    "en": "The installed binary is always named `schemaui`, so the normal entry point is `schemaui -c ./config.json`.",
+    "zh": "安装后的实际可执行文件名始终是 `schemaui`，所以常规入口仍然是 `schemaui -c ./config.json`。"
+  },
+  "channels": [
+    {
+      "id": "cargo-install",
+      "title": {
+        "en": "Cargo (`cargo install`)",
+        "zh": "Cargo（`cargo install`）"
+      },
+      "summary": {
+        "en": "Build from crates.io with Cargo.",
+        "zh": "使用 Cargo 从 crates.io 编译安装。"
+      },
+      "commands": [
+        "cargo install schemaui-cli"
+      ]
+    },
+    {
+      "id": "cargo-binstall",
+      "title": {
+        "en": "Cargo binstall",
+        "zh": "Cargo binstall"
+      },
+      "summary": {
+        "en": "Fetch prebuilt GitHub release binaries through cargo-binstall.",
+        "zh": "通过 cargo-binstall 拉取预构建的 GitHub release 二进制。"
+      },
+      "commands": [
+        "cargo binstall schemaui-cli"
+      ]
+    },
+    {
+      "id": "homebrew",
+      "title": {
+        "en": "Homebrew",
+        "zh": "Homebrew"
+      },
+      "summary": {
+        "en": "Install from the repository tap on macOS or Linux.",
+        "zh": "在 macOS 或 Linux 上通过仓库 tap 安装。"
+      },
+      "commands": [
+        "brew install YuniqueUnic/schemaui/schemaui"
+      ]
+    },
+    {
+      "id": "scoop",
+      "title": {
+        "en": "Scoop",
+        "zh": "Scoop"
+      },
+      "summary": {
+        "en": "Install on Windows from the repository-hosted Scoop manifest.",
+        "zh": "在 Windows 上通过仓库内维护的 Scoop manifest 安装。"
+      },
+      "commands": [
+        "scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json"
+      ]
+    },
+    {
+      "id": "direct-download",
+      "title": {
+        "en": "Direct download",
+        "zh": "直接下载"
+      },
+      "summary": {
+        "en": "Download the matching archive from `https://github.com/YuniqueUnic/schemaui/releases/latest`, extract `schemaui` / `schemaui.exe`, and place it on your `PATH`.",
+        "zh": "从 `https://github.com/YuniqueUnic/schemaui/releases/latest` 下载对应平台压缩包，解压 `schemaui` / `schemaui.exe` 后放到 `PATH` 中。"
+      }
+    },
+    {
+      "id": "winget-manifests",
+      "title": {
+        "en": "winget manifests",
+        "zh": "winget manifests"
+      },
+      "summary": {
+        "en": "Use the versioned manifests in `packaging/winget` with `winget install --manifest <dir>`, or submit them upstream to the community repository.",
+        "zh": "使用 `packaging/winget` 中的 versioned manifests 配合 `winget install --manifest <dir>` 安装，或将其提交到社区仓库。"
+      }
+    }
+  ]
+}

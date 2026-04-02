@@ -16,18 +16,62 @@ cargo run -p schemaui-cli -- tui --schema ./schema.json --config ./config.yaml
 
 ### Install as a binary
 
+<!-- AUTO-GENERATED:CLI-INSTALL:BEGIN -->
+
+The installed binary is always named `schemaui`, so the normal entry point is
+`schemaui -c ./config.json`.
+
+Choose one of the supported channels:
+
+#### Cargo (`cargo install`)
+
+Build from crates.io with Cargo.
+
 ```bash
 cargo install schemaui-cli
-cargo binstall schemaui-cli
-brew install YuniqueUnic/schemaui/schemaui
-scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
-schemaui --help             # binary is named `schemaui` via the clap metadata
 ```
 
-The repository also ships versioned winget manifests under `packaging/winget`.
-The official client only accepts local manifest directories or packages already
-published to the community repository, so use those files with
-`winget install --manifest <dir>` or submit them upstream.
+#### Cargo binstall
+
+Fetch prebuilt GitHub release binaries through cargo-binstall.
+
+```bash
+cargo binstall schemaui-cli
+```
+
+#### Homebrew
+
+Install from the repository tap on macOS or Linux.
+
+```bash
+brew install YuniqueUnic/schemaui/schemaui
+```
+
+#### Scoop
+
+Install on Windows from the repository-hosted Scoop manifest.
+
+```bash
+scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
+```
+
+#### Direct download
+
+Download the matching archive from
+`https://github.com/YuniqueUnic/schemaui/releases/latest`, extract `schemaui` /
+`schemaui.exe`, and place it on your `PATH`.
+
+#### winget manifests
+
+Use the versioned manifests in `packaging/winget` with
+`winget install --manifest <dir>`, or submit them upstream to the community
+repository.
+
+<!-- AUTO-GENERATED:CLI-INSTALL:END -->
+
+```bash
+schemaui --help             # binary is named `schemaui` via the clap metadata
+```
 
 If you omit a mode subcommand, `schemaui` falls back to the TUI flow, so the
 following invocations are equivalent:
