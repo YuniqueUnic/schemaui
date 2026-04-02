@@ -1,16 +1,17 @@
 # schemaui-cli Usage Guide
 
 `schemaui-cli` is the official command-line wrapper around the `schemaui`
-library. It accepts JSON Schema + config snapshots, launches the interactive
-TUI, and emits the edited document in any enabled format. This guide mirrors the
-actual code in `schemaui-cli/src/main.rs` so the behaviour stays predictable.
+library. It accepts JSON Schema + config snapshots, defaults to the interactive
+TUI when no mode subcommand is provided, and also exposes explicit `tui`, `web`,
+`tui-snapshot`, and `web-snapshot` subcommands. This guide mirrors the actual
+code in `schemaui-cli/src/main.rs` so the behaviour stays predictable.
 
 ## 1. Install & Run
 
 ### From source
 
 ```bash
-cargo run -p schemaui-cli -- --schema ./schema.json --config ./config.yaml
+cargo run -p schemaui-cli -- tui --schema ./schema.json --config ./config.yaml
 ```
 
 ### Install as a binary
@@ -18,6 +19,14 @@ cargo run -p schemaui-cli -- --schema ./schema.json --config ./config.yaml
 ```bash
 cargo install schemaui-cli
 schemaui --help             # binary is named `schemaui` via the clap metadata
+```
+
+If you omit a mode subcommand, `schemaui` falls back to the TUI flow, so the
+following invocations are equivalent:
+
+```bash
+schemaui --schema ./schema.json
+schemaui tui --schema ./schema.json
 ```
 
 ## 2. Execution Flow
@@ -86,7 +95,7 @@ can reuse the exact same serialization logic.
 ### Schema + config + dual outputs
 
 ```bash
-schemaui \
+schemaui tui \
   --schema ./schema.json \
   --config ./config.yaml \
   -o - \
@@ -102,8 +111,9 @@ cat defaults.yaml | schemaui --config - --output ./edited.json
 ### Inline schema to avoid double-stdin
 
 ```bash
-schemaui --schema '{"type":"object","properties":{"host":{"type":"string"}}}' \
-             --config ./config.json -o -
+schemaui tui \
+  --schema '{"type":"object","properties":{"host":{"type":"string"}}}' \
+  --config ./config.json -o -
 ```
 
 ## 7. Diagnostics & Errors

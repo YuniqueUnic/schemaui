@@ -17,9 +17,9 @@ path = "src/main.rs"
 [dependencies]
 schemaui = { path = "..", version = "0.6.0" }
 serde_json = "1"
-color-eyre = "0.6"
-clap = { version = "4.5", features = ["derive"] }
-tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
+color-eyre = "0.6.5"
+clap = { version = "4.6.0", features = ["derive"] }
+tokio = { version = "1.50.0", features = ["rt-multi-thread"], optional = true }
 
 [features]
 default = ["full", "web"]
@@ -30,5 +30,5 @@ toml = ["schemaui/toml"]
 web = ["schemaui/web", "dep:tokio"]
 
 [dev-dependencies]
-assert_cmd = "2"
-predicates = "3"
+assert_cmd = "2.2.0"
+predicates = "3.1.4"

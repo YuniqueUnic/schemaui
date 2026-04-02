@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{ArgAction, Args, Parser, Subcommand};
 
 #[cfg(feature = "web")]
 use std::net::IpAddr;
@@ -22,7 +22,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Launch the interactive terminal UI
-    Tui,
+    Tui(TuiCommand),
 
     #[cfg(feature = "web")]
     /// Launch the interactive web UI instead of the terminal UI
@@ -36,8 +36,14 @@ pub enum Commands {
     TuiSnapshot(TuiSnapshotCommand),
 }
 
+#[derive(Debug, Args, Clone)]
+pub struct TuiCommand {
+    #[command(flatten)]
+    pub common: CommonArgs,
+}
+
 #[cfg(feature = "web")]
-#[derive(Debug, Parser, Clone)]
+#[derive(Debug, Args, Clone)]
 pub struct WebCommand {
     #[command(flatten)]
     pub common: CommonArgs,
@@ -54,7 +60,7 @@ pub struct WebCommand {
 }
 
 #[cfg(feature = "web")]
-#[derive(Debug, Parser, Clone)]
+#[derive(Debug, Args, Clone)]
 pub struct WebSnapshotCommand {
     #[command(flatten)]
     pub common: CommonArgs,
@@ -72,7 +78,7 @@ pub struct WebSnapshotCommand {
     pub ts_export: String,
 }
 
-#[derive(Debug, Parser, Clone)]
+#[derive(Debug, Args, Clone)]
 pub struct TuiSnapshotCommand {
     #[command(flatten)]
     pub common: CommonArgs,
@@ -102,7 +108,7 @@ pub struct TuiSnapshotCommand {
     pub layout_fn: String,
 }
 
-#[derive(Debug, Parser, Clone)]
+#[derive(Debug, Args, Clone)]
 pub struct CommonArgs {
     /// Schema spec: file path, inline payload, or "-" for stdin
     #[arg(short = 's', long = "schema", value_name = "SPEC")]

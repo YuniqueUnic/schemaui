@@ -1,7 +1,8 @@
 # schemaui-cli 使用指南
 
 `schemaui-cli` 是 `schemaui` 库的官方命令行包装器。它接受 JSON Schema +
-配置快照，启动交互式 TUI，并以任何启用的格式输出编辑后的文档。本指南与
+配置快照；当未显式指定模式子命令时默认启动交互式 TUI，同时也暴露显式的
+`tui`、`web`、`tui-snapshot`、`web-snapshot` 子命令。本指南与
 `schemaui-cli/src/main.rs` 中的实际代码保持一致，以确保行为的可预测性。
 
 ## 1. 安装与运行
@@ -9,7 +10,7 @@
 ### 从源码运行
 
 ```bash
-cargo run -p schemaui-cli -- --schema ./schema.json --config ./config.yaml
+cargo run -p schemaui-cli -- tui --schema ./schema.json --config ./config.yaml
 ```
 
 ### 安装为二进制文件
@@ -17,6 +18,13 @@ cargo run -p schemaui-cli -- --schema ./schema.json --config ./config.yaml
 ```bash
 cargo install schemaui-cli
 schemaui --help             # 二进制文件通过 clap 元数据命名为 `schemaui`
+```
+
+如果省略模式子命令，`schemaui` 会回退到默认的 TUI 流程，因此下面两种写法等价：
+
+```bash
+schemaui --schema ./schema.json
+schemaui tui --schema ./schema.json
 ```
 
 ## 2. 执行流程
@@ -82,7 +90,7 @@ schemaui --help             # 二进制文件通过 clap 元数据命名为 `sch
 ### Schema + config + 双输出
 
 ```bash
-schemaui \
+schemaui tui \
   --schema ./schema.json \
   --config ./config.yaml \
   -o - \
@@ -98,8 +106,9 @@ cat defaults.yaml | schemaui --config - --output ./edited.json
 ### 内联 schema 以避免双 stdin
 
 ```bash
-schemaui --schema '{"type":"object","properties":{"host":{"type":"string"}}}' \
-    --config ./config.json -o -
+schemaui tui \
+  --schema '{"type":"object","properties":{"host":{"type":"string"}}}' \
+  --config ./config.json -o -
 ```
 
 ## 7. 诊断与错误
