@@ -60,6 +60,17 @@ pub fn metadata_map(schema: &SchemaObject) -> HashMap<String, Value> {
         .collect()
 }
 
+pub fn root_schema_header(schema: &Value) -> (Option<String>, Option<String>) {
+    (
+        root_schema_string(schema, "title"),
+        root_schema_string(schema, "description"),
+    )
+}
+
+fn root_schema_string(schema: &Value, key: &str) -> Option<String> {
+    schema.as_object()?.get(key)?.as_str().map(str::to_string)
+}
+
 pub fn extension_string(schema: &SchemaObject, key: &str) -> Option<String> {
     schema
         .extensions

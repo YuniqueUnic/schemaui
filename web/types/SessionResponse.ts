@@ -3,6 +3,7 @@
 
 export interface SessionResponse {
     title: string | null;
+    description: string | null;
     // Raw UiAst tree from the backend; the web UI wraps this into its own
     // UiAst type in `web/ui/src/types.ts`.
     ui_ast: Record<string, unknown>;

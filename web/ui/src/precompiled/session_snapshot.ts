@@ -2,6 +2,7 @@ import type { SessionResponse } from '@schemaui/types/SessionResponse';
 
 export const PrecompiledSession: SessionResponse = {
   "title": null,
+  "description": null,
   "ui_ast": {
     "roots": [
       {

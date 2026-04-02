@@ -29,6 +29,7 @@ use ts_rs::TS;
 
 use crate::io::{DocumentFormat, input::schema_with_defaults};
 use crate::precompile::UiArtifactBundle;
+use crate::schema::metadata::root_schema_header;
 
 use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
 use crate::ui_ast::{UiAst, UiAstBundle, UiLayout, build_ui_ast_bundle};
@@ -99,6 +100,7 @@ impl WebSessionBuilder {
             .take()
             .unwrap_or_else(|| Value::Object(Map::new()));
         let schema = schema_with_defaults(&self.schema, &data);
+        let (schema_title, description) = root_schema_header(&schema);
         let bundle = if let Some(bundle) = self.ui_artifact_bundle.take() {
             bundle.ui
         } else if let Some(bundle) = self.ui_bundle.take() {
@@ -108,7 +110,8 @@ impl WebSessionBuilder {
         };
         let (ui_ast, layout) = bundle.into_parts();
         Ok(WebSessionConfig {
-            title: self.title,
+            title: self.title.or(schema_title),
+            description,
             ui_ast,
             layout,
             data,
@@ -121,6 +124,7 @@ impl WebSessionBuilder {
 #[derive(Debug, Clone)]
 pub struct WebSessionConfig {
     pub title: Option<String>,
+    pub description: Option<String>,
     pub ui_ast: UiAst,
     pub layout: UiLayout,
     pub data: Value,
@@ -132,6 +136,7 @@ impl WebSessionConfig {
     pub fn session_response(&self) -> SessionResponse {
         SessionResponse {
             title: self.title.clone(),
+            description: self.description.clone(),
             ui_ast: self.ui_ast.clone(),
             data: self.data.clone(),
             formats: DocumentFormat::available_formats()
@@ -233,6 +238,7 @@ pub async fn serve_session(config: WebSessionConfig, options: ServeOptions) -> R
 pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandles)> {
     let WebSessionConfig {
         title,
+        description,
         ui_ast,
         layout,
         data,
@@ -244,6 +250,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let shared = SharedState {
         title,
+        description,
         ui_ast: Arc::new(ui_ast),
         layout: Arc::new(layout),
         data: Arc::new(Mutex::new(data)),
@@ -298,6 +305,7 @@ impl SessionHandles {
 #[derive(Clone)]
 struct SharedState {
     title: Option<String>,
+    description: Option<String>,
     ui_ast: Arc<UiAst>,
     layout: Arc<UiLayout>,
     data: Arc<Mutex<Value>>,
@@ -328,6 +336,7 @@ impl FinishLine {
 #[ts(export, export_to = "web/types/")]
 pub struct SessionResponse {
     pub title: Option<String>,
+    pub description: Option<String>,
     pub ui_ast: UiAst,
     #[ts(type = "Record<string, unknown>")]
     pub data: Value,
@@ -356,6 +365,7 @@ async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
     let layout = (*state.layout).clone();
     let payload = SessionResponse {
         title: state.title.clone(),
+        description: state.description.clone(),
         ui_ast,
         data: state.data.lock().await.clone(),
         formats: state.formats.iter().map(|f| f.to_string()).collect(),

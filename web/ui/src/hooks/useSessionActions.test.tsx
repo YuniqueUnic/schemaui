@@ -42,6 +42,7 @@ function useHarness() {
 
 const session: SessionResponse = {
   title: "Web Save Validation",
+  description: "Session description",
   data: {},
   formats: ["json"],
   ui_ast: {

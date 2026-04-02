@@ -1,6 +1,6 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Paragraph, Wrap},
@@ -40,6 +40,7 @@ pub(crate) struct FooterStatusModel {
     pub message: String,
     pub meta: Vec<String>,
     pub alert: Option<String>,
+    pub session_title: Option<String>,
 }
 
 pub(crate) fn footer_action_items(help: Option<&str>) -> Vec<FooterActionItem> {
@@ -100,6 +101,11 @@ pub(crate) fn footer_status_model(ctx: &UiContext<'_>) -> FooterStatusModel {
         message: compact_status_message(ctx.status_message),
         meta,
         alert,
+        session_title: ctx
+            .session_title
+            .map(str::trim)
+            .filter(|title| !title.is_empty())
+            .map(str::to_string),
     }
 }
 
@@ -118,11 +124,27 @@ pub fn render_footer(frame: &mut Frame<'_>, area: Rect, ctx: &UiContext<'_>) {
     frame.render_widget(action_widget, rows[0]);
 
     let status = footer_status_model(ctx);
+    let status_chunks = split_status_row(rows[1], status.session_title.as_deref());
+
     let status_line = build_status_line(&status);
     let status_widget = Paragraph::new(status_line)
         .wrap(Wrap { trim: true })
         .style(Style::default().bg(STATUS_BG).fg(Color::White));
-    frame.render_widget(status_widget, rows[1]);
+    frame.render_widget(status_widget, status_chunks[0]);
+
+    if let (Some(title), Some(title_area)) = (status.session_title.as_deref(), status_chunks.get(1))
+    {
+        let title_widget = Paragraph::new(Line::from(vec![footer_chip(
+            format!(" {} ", truncate_text(title, title_char_budget(*title_area))),
+            Style::default()
+                .fg(Color::Black)
+                .bg(LABEL_BG)
+                .add_modifier(Modifier::BOLD),
+        )]))
+        .alignment(Alignment::Right)
+        .style(Style::default().bg(STATUS_BG));
+        frame.render_widget(title_widget, *title_area);
+    }
 }
 
 fn build_action_line(actions: &[FooterActionItem]) -> Line<'static> {
@@ -249,4 +271,39 @@ fn truncate_text(input: &str, max_chars: usize) -> String {
         .collect::<String>();
     result.push('…');
     result
+}
+
+fn split_status_row(area: Rect, session_title: Option<&str>) -> Vec<Rect> {
+    let Some(title) = session_title else {
+        return vec![area];
+    };
+
+    let title_width = title_display_width(title, area.width);
+    if title_width == 0 {
+        return vec![area];
+    }
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(12), Constraint::Length(title_width)])
+        .split(area)
+        .to_vec()
+}
+
+fn title_display_width(title: &str, total_width: u16) -> u16 {
+    if total_width <= 12 {
+        return 0;
+    }
+
+    let max_title_width = total_width.saturating_sub(12).min(38);
+    if max_title_width < 10 {
+        return 0;
+    }
+
+    let clipped = truncate_text(title, max_title_width.saturating_sub(2) as usize);
+    clipped.chars().count().saturating_add(2) as u16
+}
+
+fn title_char_budget(area: Rect) -> usize {
+    area.width.saturating_sub(2).clamp(8, 36) as usize
 }

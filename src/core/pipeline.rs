@@ -5,6 +5,7 @@ use serde_json::{Map, Value};
 use crate::core::frontend::{Frontend, FrontendContext};
 use crate::core::io::input::schema_with_defaults;
 use crate::core::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
+use crate::schema::metadata::root_schema_header;
 
 /// Core pipeline for preparing a `FrontendContext` from a base JSON Schema,
 /// optional title, and optional default data.
@@ -78,6 +79,7 @@ impl SchemaPipeline {
 
         let data = defaults.unwrap_or_else(|| Value::Object(Map::new()));
         let enriched = schema_with_defaults(&schema, &data);
+        let (schema_title, schema_description) = root_schema_header(&enriched);
 
         let validator = validator_for(&enriched)?;
         let bundle = match ui_ast_source {
@@ -87,7 +89,8 @@ impl SchemaPipeline {
         let (ui_ast, layout) = bundle.into_parts();
 
         Ok(FrontendContext {
-            title,
+            title: title.or(schema_title),
+            description: schema_description,
             ui_ast,
             layout,
             initial_data: data,

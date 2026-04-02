@@ -9,6 +9,7 @@ use crate::core::ui_ast::{UiAst, UiLayout};
 #[derive(Debug)]
 pub struct FrontendContext {
     pub title: Option<String>,
+    pub description: Option<String>,
     pub ui_ast: UiAst,
     pub layout: UiLayout,
     pub initial_data: Value,

@@ -41,6 +41,7 @@ fn footer_status_model_prioritizes_error_tone_and_focus_context() {
             "matrix[0][2] invalid: expected boolean or null but got string that keeps growing",
         )],
         focus_label: Some("Level4 › Matrix".to_string()),
+        session_title: Some("Service Config"),
         popup: None,
         composite_overlay: None,
         help_overlay: None,
@@ -69,6 +70,7 @@ fn footer_status_model_prioritizes_error_tone_and_focus_context() {
             .is_some_and(|alert| alert.ends_with('…')),
         "global alert text should be truncated for readability"
     );
+    assert_eq!(status.session_title.as_deref(), Some("Service Config"));
 }
 
 #[test]
@@ -80,6 +82,7 @@ fn footer_status_model_compacts_ready_message() {
         help: Some("Ctrl+S -> validate and save"),
         global_errors: &[],
         focus_label: None,
+        session_title: Some("SchemaUI Demo"),
         popup: None,
         composite_overlay: None,
         help_overlay: None,
@@ -92,4 +95,5 @@ fn footer_status_model_compacts_ready_message() {
     assert_eq!(status.message, "Ready for input");
     assert!(status.meta.is_empty());
     assert!(status.alert.is_none());
+    assert_eq!(status.session_title.as_deref(), Some("SchemaUI Demo"));
 }

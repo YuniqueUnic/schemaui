@@ -16,6 +16,7 @@ pub struct UiContext<'a> {
     pub help: Option<&'a str>,
     pub global_errors: &'a [String],
     pub focus_label: Option<String>,
+    pub session_title: Option<&'a str>,
     pub popup: Option<PopupRender<'a>>,
     pub composite_overlay: Option<CompositeOverlay>,
     pub help_overlay: Option<HelpOverlayRender<'a>>,

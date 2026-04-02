@@ -26,6 +26,30 @@ fn defaults_value() -> Value {
     })
 }
 
+fn issue72_schema() -> Value {
+    json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "My title",
+        "description": "My description",
+        "type": "object",
+        "properties": {
+            "EnumInteger": {
+                "title": "integer title",
+                "description": "Select one of a few integers",
+                "enum": [2, 5]
+            },
+            "comment": {
+                "type": "string",
+                "title": "Comment title",
+                "description": "Comment description"
+            }
+        },
+        "propertyNames": true,
+        "required": [],
+        "additionalProperties": false
+    })
+}
+
 #[test]
 fn build_session_snapshot_for_comprehensive_schema_succeeds() {
     let path = schema_path();
@@ -35,6 +59,51 @@ fn build_session_snapshot_for_comprehensive_schema_succeeds() {
 
     assert!(!snapshot.formats.is_empty());
     assert!(!snapshot.ui_ast.roots.is_empty());
+}
+
+#[test]
+fn web_session_builder_uses_root_schema_metadata_for_header() {
+    let snapshot = WebSessionBuilder::new(issue72_schema())
+        .build()
+        .expect("web session config")
+        .session_response();
+
+    assert_eq!(snapshot.title.as_deref(), Some("My title"));
+    assert_eq!(snapshot.description.as_deref(), Some("My description"));
+}
+
+#[test]
+fn web_session_builder_with_title_overrides_only_header_title() {
+    let snapshot = WebSessionBuilder::new(issue72_schema())
+        .with_title("CLI override")
+        .build()
+        .expect("web session config")
+        .session_response();
+
+    assert_eq!(snapshot.title.as_deref(), Some("CLI override"));
+    assert_eq!(snapshot.description.as_deref(), Some("My description"));
+}
+
+#[test]
+fn web_snapshot_builder_uses_root_schema_metadata_for_header() {
+    let mut schema_path = std::env::temp_dir();
+    schema_path.push(format!(
+        "schemaui_issue72_{}_schema.json",
+        std::process::id()
+    ));
+    fs::write(
+        &schema_path,
+        serde_json::to_vec_pretty(&issue72_schema()).expect("serialize schema"),
+    )
+    .expect("write schema file");
+
+    let snapshot = web::build_session_snapshot_from_files(&schema_path, DocumentFormat::Json, None)
+        .expect("session snapshot");
+
+    assert_eq!(snapshot.title.as_deref(), Some("My title"));
+    assert_eq!(snapshot.description.as_deref(), Some("My description"));
+
+    let _ = fs::remove_file(&schema_path);
 }
 
 #[test]

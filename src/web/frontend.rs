@@ -18,6 +18,7 @@ impl Frontend for WebFrontend {
     fn run(self, ctx: FrontendContext) -> Result<Value> {
         let FrontendContext {
             title,
+            description,
             ui_ast,
             layout,
             initial_data,
@@ -29,6 +30,7 @@ impl Frontend for WebFrontend {
 
         let config = WebSessionConfig {
             title,
+            description,
             ui_ast,
             layout,
             data: initial_data,

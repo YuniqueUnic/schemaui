@@ -35,7 +35,8 @@ impl Frontend for TuiFrontend {
         } = self;
 
         let FrontendContext {
-            title: _,
+            title,
+            description: _,
             ui_ast,
             layout,
             initial_data: _,
@@ -50,6 +51,7 @@ impl Frontend for TuiFrontend {
         form_state.set_layout_nav(resolved.layout_nav);
 
         let mut app = App::new(form_state, validator, options);
+        app.set_session_title(title);
         let result = app.run()?;
         Ok(result)
     }

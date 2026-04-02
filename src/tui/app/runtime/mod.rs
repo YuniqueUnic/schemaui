@@ -45,6 +45,7 @@ pub(crate) struct App {
     form_state: FormState,
     validator: Validator,
     options: UiOptions,
+    session_title: Option<String>,
     status: StatusLine,
     global_errors: Vec<String>,
     validation_errors: usize,
@@ -405,6 +406,7 @@ impl App {
             form_state,
             validator,
             options,
+            session_title: None,
             status: StatusLine::new(),
             global_errors: Vec::new(),
             validation_errors: 0,
@@ -418,6 +420,10 @@ impl App {
             keymap_store,
             help_overlay: None,
         }
+    }
+
+    pub fn set_session_title(&mut self, title: Option<String>) {
+        self.session_title = title;
     }
 
     pub fn run(&mut self) -> Result<Value> {
@@ -493,6 +499,7 @@ impl App {
                     help: help.as_deref(),
                     global_errors: &self.global_errors,
                     focus_label,
+                    session_title: self.session_title.as_deref(),
                     popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
                     composite_overlay: Some(overlay_meta),
                     help_overlay: help_overlay_render,
@@ -517,6 +524,7 @@ impl App {
                 help: help.as_deref(),
                 global_errors: &self.global_errors,
                 focus_label,
+                session_title: self.session_title.as_deref(),
                 popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
                 composite_overlay: None,
                 help_overlay: help_overlay_render,

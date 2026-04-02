@@ -34,14 +34,15 @@ vi.mock("sonner", () => ({
 
 const session: SessionResponse = {
   title: "Complex Composite Session",
+  description: "Schema-level description should appear in the header.",
   data: {},
   formats: ["json"],
   ui_ast: {
     roots: [
       {
         pointer: "/complexComposite",
-        title: "10. Complex Composite",
-        description: null,
+        title: "10. Wrong Root Title",
+        description: "Wrong root description",
         required: false,
         default_value: {},
         kind: {
@@ -219,5 +220,23 @@ describe("App web interactions", () => {
     expect(screen.getByText("Object Config content:")).toBeTruthy();
     expect(screen.queryByText("List Config content:")).toBeNull();
     expect(screen.getByText("/settings")).toBeTruthy();
+  });
+
+  it("uses session-level title and description in the page header", async () => {
+    render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Complex Composite Session" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Schema-level description should appear in the header."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", { name: "10. Wrong Root Title" }),
+    ).toBeNull();
   });
 });

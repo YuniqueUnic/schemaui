@@ -98,8 +98,8 @@ export default function App() {
     <OverlayProvider>
       <div className="app-shell flex h-screen flex-col">
         <AppHeader
-          title={session?.title ?? session?.ui_ast?.roots[0]?.title}
-          description={session?.ui_ast?.roots[0]?.description}
+          title={session?.title}
+          description={session?.description}
           dirty={dirty}
           saving={saving}
           exiting={exiting}
