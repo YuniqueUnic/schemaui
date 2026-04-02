@@ -423,9 +423,9 @@ schemaui \
 
 - [x] parse json schema at runtime and generate a TUI
 - [x] parse json schema at runtime and generate a Web UI
-- [ ] parse json schema at compile time Then generate the code for TUI, expose
+- [x] parse json schema at compile time Then generate the code for TUI, expose
       necessary APIs for runtime.
-- [ ] parse json schema at compile time Then generate the code for Web UI,
+- [x] parse json schema at compile time Then generate the code for Web UI,
       expose necessary APIs for runtime.
 - [ ] parse json schema at runtime and generate a Interactive CLI
 - [ ] parse json schema at compile time Then generate the code for Interactive

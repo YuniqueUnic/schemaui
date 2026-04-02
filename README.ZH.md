@@ -341,8 +341,8 @@ schemaui \
 
 - [x] 在运行时解析 JSON Schema 并生成 TUI
 - [x] 在运行时解析 JSON Schema 并生成 Web UI
-- [ ] 在编译时解析 JSON Schema，然后生成 TUI 代码，为运行时暴露必要的 API
-- [ ] 在编译时解析 JSON Schema，然后生成 Web UI 代码，为运行时暴露必要的 API
+- [x] 在编译时解析 JSON Schema，然后生成 TUI 代码，为运行时暴露必要的 API
+- [x] 在编译时解析 JSON Schema，然后生成 Web UI 代码，为运行时暴露必要的 API
 - [ ] 在运行时解析 JSON Schema 并生成交互式 CLI
 - [ ] 在编译时解析 JSON Schema，然后生成交互式 CLI 代码，为运行时暴露必要的 API
 
