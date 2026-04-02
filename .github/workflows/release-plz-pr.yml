@@ -11,6 +11,8 @@ on:
       - "**/Cargo.toml"
       - "Cargo.lock"
       - "README*.md"
+      - "Formula/**"
+      - "packaging/**"
   schedule:
     - cron: "0 0 * * MON"
 

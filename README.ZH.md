@@ -344,10 +344,18 @@ README 快捷键参考都使用单一信息源。
 
 ```bash
 cargo install schemaui-cli
-# It will be installed to `~/.cargo/bin` and renamed to `schemaui`
-# 它将安装到 `~/.cargo/bin` 并重命名为 `schemaui`
-# 所以你应该这样使用： `schemaui -c xxx`
+cargo binstall schemaui-cli
+brew install YuniqueUnic/schemaui/schemaui
+scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
 ```
+
+安装后的实际可执行文件名始终是 `schemaui`，所以常规入口仍然是
+`schemaui -c ./config.json`。
+
+对于 Windows Package Manager，仓库内也会同步产出放在 `packaging/winget` 下的
+versioned manifest。官方 `winget` 客户端目前只支持本地 manifest
+目录或已经进入社区仓库的包，所以这部分文件主要用于
+`winget install --manifest <dir>` 或后续提交到社区仓库。
 
 ```bash
 schemaui \

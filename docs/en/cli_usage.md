@@ -18,8 +18,16 @@ cargo run -p schemaui-cli -- tui --schema ./schema.json --config ./config.yaml
 
 ```bash
 cargo install schemaui-cli
+cargo binstall schemaui-cli
+brew install YuniqueUnic/schemaui/schemaui
+scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
 schemaui --help             # binary is named `schemaui` via the clap metadata
 ```
+
+The repository also ships versioned winget manifests under `packaging/winget`.
+The official client only accepts local manifest directories or packages already
+published to the community repository, so use those files with
+`winget install --manifest <dir>` or submit them upstream.
 
 If you omit a mode subcommand, `schemaui` falls back to the TUI flow, so the
 following invocations are equivalent:

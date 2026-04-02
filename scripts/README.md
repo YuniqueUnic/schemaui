@@ -44,6 +44,20 @@
 - 保持文档版本一致性
 - 依赖 `python3`（可通过 `PYTHON_BIN` 环境变量覆盖）
 
+#### sync-package-manifests.py
+
+从已发布的 `schemaui-cli` GitHub release 拉取真实 asset URL / SHA256，
+并同步生成 Homebrew / Scoop / winget 分发文件。
+
+```bash
+python3 scripts/sync-package-manifests.py --tag schemaui-cli-v0.4.1
+python3 scripts/sync-package-manifests.py --tag schemaui-cli-v0.4.1 --check
+```
+
+- 默认读取 `schemaui-cli/Cargo.toml` 的版本
+- `--check` 只校验是否同步，不改文件
+- 使用 `GITHUB_TOKEN` / `GH_TOKEN` 可提升 GitHub API 额度
+
 ## 🐛 故障排除
 
 ### 常见问题

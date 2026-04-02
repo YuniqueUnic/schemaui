@@ -5,10 +5,20 @@ edition = "2024"
 authors = ["unic <yuniqueunic@gmail.com>"]
 description = "CLI wrapper for schemaui, rendering JSON Schemas as TUIs"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yuniqueunic/schemaui/schemaui-cli"
+repository = "https://github.com/YuniqueUnic/schemaui"
 keywords = ["tui", "schema", "configuration", "terminal", "cross-platform"]
 categories = ["command-line-interface", "config"]
 readme = "cli_usage.md"
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/schemaui-cli-v{ version }/schemaui-{ target }{ archive-suffix }"
+bin-dir = "{ bin }{ binary-ext }"
+
+[package.metadata.binstall.overrides.'cfg(not(target_os = "windows"))']
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.'cfg(target_os = "windows")']
+pkg-fmt = "zip"
 
 [[bin]]
 name = "schemaui"

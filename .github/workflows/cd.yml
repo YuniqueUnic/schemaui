@@ -43,6 +43,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target: x86_64-apple-darwin
+            os: macos-14
           - target: aarch64-pc-windows-msvc
             os: windows-2022
           - target: x86_64-unknown-linux-gnu
@@ -109,3 +111,50 @@ jobs:
           tar: all
           zip: windows
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  sync-package-manifests:
+    name: Sync Package Manifests
+    needs: upload-assets
+    permissions:
+      contents: write
+    if: github.repository_owner == 'YuniqueUnic' && startsWith(github.event.release.name, 'schemaui-cli-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Setup Python 3
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Generate package manager manifests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          python3 scripts/sync-package-manifests.py --tag "$RELEASE_TAG"
+
+      - name: Commit manifest updates
+        env:
+          PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- Formula packaging; then
+            echo "Package manager manifests already up to date."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          git add Formula packaging
+          git commit -m "chore: sync package manager manifests for ${RELEASE_TAG}"
+          git push origin "${{ github.event.repository.default_branch }}"

@@ -1,0 +1,19 @@
+PackageIdentifier: YuniqueUnic.schemaui-cli
+PackageVersion: 0.4.1
+PackageLocale: en-US
+Publisher: YuniqueUnic
+PublisherUrl: https://github.com/YuniqueUnic
+PublisherSupportUrl: https://github.com/YuniqueUnic/schemaui/issues
+PackageName: schemaui-cli
+PackageUrl: https://github.com/YuniqueUnic/schemaui
+Moniker: schemaui
+License: MIT OR Apache-2.0
+ShortDescription: CLI wrapper for schemaui, rendering JSON Schemas as TUIs
+Description: schemaui-cli wraps the schemaui workspace and ships the schemaui binary for terminal and embedded web editing flows.
+Tags:
+  - json-schema
+  - tui
+  - config
+  - web
+ManifestType: defaultLocale
+ManifestVersion: 1.12.0

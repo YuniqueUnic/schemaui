@@ -423,9 +423,19 @@ and make refactors manageable.
 
 ```bash
 cargo install schemaui-cli
-# It will be installed to `~/.cargo/bin` and renamed to `schemaui`
-# so you should use it like this: `schemaui -c xxx`
+cargo binstall schemaui-cli
+brew install YuniqueUnic/schemaui/schemaui
+scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packaging/scoop/schemaui-cli.json
 ```
+
+The installed binary is always named `schemaui`, so the normal entry point is
+`schemaui -c ./config.json`.
+
+For Windows Package Manager users, the repository also ships versioned winget
+manifests under `packaging/winget`. The official client only supports local
+manifest directories or packages that have been published to the community
+repository, so these files are intended for `winget install --manifest <dir>`
+flows and upstream submission.
 
 ```bash
 schemaui \
