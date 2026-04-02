@@ -120,13 +120,17 @@ schema 而不是遇到未定义的行为。
 - **键映射管道** – 引入 `keymap/default.keymap.json`，由 `app::keymap` 通过
   `once_cell::sync::Lazy` 解析一次。每个条目包含：
   - `id` + `description` 用于文档/帮助文本。
-  - `contexts`：`default`、`collection`、`overlay` 中的任意一个。这些映射到
-    `KeymapContext`，以便 `keymap::help_text` 可以渲染正确的页脚片段。
+  - `contexts`：`default`、`collection`、`overlay`、`help`、`text`、`numeric`
+    中的任意一个。这些映射到
+    `KeymapContext`，以便页脚/帮助浮层可以组合应用级提示和当前字段编辑提示。
+  - `dispatch`：可选，默认 `true`；为 `false`
+    时表示该条目只用于帮助展示，不会拦截真实按键事件。
   - `action`：标记对象（`Save`、`FieldStep { delta }`、`ListMove { delta }`
     等），直接反序列化为 `KeyAction`。
   - `combos`：文本快捷方式（例如 `"Ctrl+Shift+Tab"`）。令牌被解析为
     `KeyPattern`（必需的修饰符 + 代码匹配器）。字母组合隐式容忍
-    `Shift`，除非模式已经需要它。`InputRouter::classify` 现在完全委托给
+    `Shift`，除非模式已经需要它；命名按键也覆盖
+    `Home`、`End`、`Backspace`、`Delete`。`InputRouter::classify` 现在完全委托给
     `keymap::classify_key`，覆盖层/状态模块从同一数据集中提取帮助文本，保证 DRY
     文档 + UI。因此，添加快捷方式只需要编辑 JSON 文件（如果引入全新的
     `KeyAction`，可选地编辑 `KeyBindingMap`）。
@@ -187,8 +191,10 @@ Form focus ──Ctrl+E──▶ try_open_composite_editor
 
 - 覆盖层生成自己的 `FormState` 和可选的列表面板元数据，同时通过
   `jsonschema::validator_for` 重用全局验证器，该验证器作用于嵌套 schema。
-- 帮助文本通过 `keymap::help_text(KeymapContext::Overlay)`
-  获取，因此页脚消息保持同步。
+- 帮助文本通过同一份 keymap 数据获取；除了聚焦到 `string/json` 或
+  `integer/number` 编辑器时附加的 help-only `TextInput` / `NumericInput`
+  提示之外，帮助浮层自身的关闭/翻页/滚动操作也来自 `help`
+  context，因此页脚消息可以保持同步而不吞掉原始文本输入。
 
 ## 7. 快捷键参考
 

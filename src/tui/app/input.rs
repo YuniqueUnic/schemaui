@@ -15,6 +15,13 @@ pub enum KeyAction {
     TogglePopup,
     EditComposite,
     ShowHelp,
+    HelpClose,
+    HelpPageStep(i32),
+    HelpShortcutScroll(i32),
+    HelpShortcutPage(i32),
+    HelpShortcutHome,
+    HelpShortcutEnd,
+    HelpErrorScroll(i32),
     FieldStep(i32),
     SectionStep(i32),
     RootStep(i32),
@@ -240,6 +247,13 @@ impl KeyBindingMap {
                     .cloned()
                     .unwrap_or(CommandDispatch::App(AppCommand::ListSelect(delta)))
             }
+            KeyAction::HelpClose
+            | KeyAction::HelpPageStep(_)
+            | KeyAction::HelpShortcutScroll(_)
+            | KeyAction::HelpShortcutPage(_)
+            | KeyAction::HelpShortcutHome
+            | KeyAction::HelpShortcutEnd
+            | KeyAction::HelpErrorScroll(_) => CommandDispatch::None,
             KeyAction::Input(event) => CommandDispatch::Input(event),
             KeyAction::None => CommandDispatch::None,
         }
@@ -265,5 +279,17 @@ impl InputRouter {
         #[cfg(feature = "debug")]
         println!("{key:?}");
         self.store.classify(key).unwrap_or(KeyAction::Input(*key))
+    }
+
+    pub fn classify_for_contexts(
+        &self,
+        key: &KeyEvent,
+        contexts: &[super::keymap::KeymapContext],
+    ) -> KeyAction {
+        #[cfg(feature = "debug")]
+        println!("{key:?} @ {contexts:?}");
+        self.store
+            .classify_for_contexts(key, contexts)
+            .unwrap_or(KeyAction::Input(*key))
     }
 }

@@ -435,6 +435,7 @@ Each entry in `default.keymap.json` looks like this:
   "id": "list.move.up",
   "description": "Move entry up",
   "contexts": ["collection", "overlay"],
+  "dispatch": true,
   "action": { "kind": "listMove", "delta": -1 },
   "combos": ["Ctrl+Up"]
 }
@@ -444,7 +445,10 @@ Fields:
 
 - `id` – stable identifier for the binding (used in docs/logs).
 - `description` – human-readable text used in help messages.
-- `contexts` – semantic scopes (`"default"`, `"collection"`, `"overlay"`).
+- `contexts` – semantic scopes (`"default"`, `"collection"`, `"overlay"`,
+  `"help"`, `"text"`, `"numeric"`).
+- `dispatch` – optional; `false` means the binding is help-only and must not
+  intercept the real key event.
 - `action` – tagged union that deserializes to `RawAction` → `KeyAction`.
 - `combos` – list of textual combos (e.g. `"Ctrl+Shift+Tab"`).
 
@@ -465,6 +469,9 @@ pub enum KeymapContext {
     Default,
     Collection,
     Overlay,
+    Help,
+    TextInput,
+    NumericInput,
 }
 ```
 
@@ -472,22 +479,16 @@ They are **not** used to filter which keys fire; instead they:
 
 - Determine which bindings contribute to the footer help string.
 - Drive which bindings appear in the help overlay for each page.
+- Allow help-only field editor hints to live in the same JSON source as
+  dispatching shortcuts.
 
-The runtime picks a context based on focus:
+The runtime picks one or more contexts based on focus:
 
 ```rust
 fn current_help_text(&self) -> Option<String> {
     if !self.options.show_help { return None; }
-    let context = if self.overlay_depth() > 0 {
-        KeymapContext::Overlay
-    } else if let Some(field) = self.form_state.focused_field()
-        && field.is_composite_list()
-    {
-        KeymapContext::Collection
-    } else {
-        KeymapContext::Default
-    };
-    self.keymap_store.help_text(context)
+    let contexts = self.current_help_contexts();
+    self.keymap_store.help_text_for_contexts(&contexts)
 }
 ```
 
@@ -499,6 +500,12 @@ Semantic meaning:
   collection-like field is focused on the main page.
 - **Overlay** – actions while inside any overlay (including list operations for
   collections inside overlays).
+- **Help** – modal help-overlay controls such as close, page switching,
+  shortcuts scrolling, and horizontal error-text scrolling.
+- **TextInput** – help-only hints for `string` / `json` text editing
+  (`Left/Right`, `Home/End`, delete, undo/redo, `Ctrl+W`).
+- **NumericInput** – help-only hints for `integer` / `number` editors
+  (`Left/Right` stepper, `Shift+Left/Right` fast-stepper, delete, undo/redo).
 
 ### 3.3 From KeyEvent to AppCommand/FormCommand
 

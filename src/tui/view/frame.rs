@@ -58,6 +58,7 @@ pub struct PopupRender<'a> {
 pub struct HelpOverlayRender<'a> {
     pub page: &'a HelpOverlayPage,
     pub shortcut_offset: usize,
+    pub error_offset: usize,
 }
 
 #[derive(Debug, Clone)]

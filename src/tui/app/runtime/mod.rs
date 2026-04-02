@@ -1,3 +1,4 @@
+use crate::tui::model::FieldKind;
 use crate::tui::state::{FormCommand, FormEngine, FormState};
 use crate::tui::view::{
     self, CompositeOverlay, HelpErrorRender, HelpOverlayPage, HelpOverlayRender,
@@ -65,6 +66,7 @@ struct HelpOverlayState {
     page: usize,
     viewport: Rect,
     shortcut_offset: usize,
+    error_offset: usize,
 }
 
 #[cfg(test)]
@@ -73,6 +75,7 @@ pub(crate) struct HelpOverlaySnapshot {
     pub total_shortcuts: usize,
     pub visible_shortcuts: usize,
     pub shortcut_offset: usize,
+    pub error_offset: usize,
     pub visible_errors: usize,
     pub total_errors: usize,
     pub current_page: usize,
@@ -85,16 +88,59 @@ impl App {
         if !self.options.show_help {
             return None;
         }
-        let context = if self.overlay_depth() > 0 {
-            KeymapContext::Overlay
-        } else if let Some(field) = self.form_state.focused_field()
-            && field.is_composite_list()
-        {
-            KeymapContext::Collection
-        } else {
-            KeymapContext::Default
+        let contexts = self.current_help_contexts();
+        match contexts.as_slice() {
+            [context] => self.keymap_store.help_text(*context),
+            _ => self.keymap_store.help_text_for_contexts(&contexts),
+        }
+    }
+
+    fn current_help_contexts(&self) -> Vec<KeymapContext> {
+        if self.overlay_depth() > 0 {
+            let mut contexts = vec![KeymapContext::Overlay];
+            if let Some(field) = self
+                .active_overlay()
+                .and_then(|editor| editor.form_state().focused_field())
+                && let Some(field_context) = field_help_context(&field.schema.kind)
+            {
+                contexts.push(field_context);
+            }
+            return contexts;
+        }
+
+        let Some(field) = self.form_state.focused_field() else {
+            return vec![KeymapContext::Default];
         };
-        self.keymap_store.help_text(context)
+
+        if field.is_composite_list() {
+            return vec![KeymapContext::Collection];
+        }
+
+        let mut contexts = vec![KeymapContext::Default];
+        if let Some(field_context) = field_help_context(&field.schema.kind) {
+            contexts.push(field_context);
+        }
+        contexts
+    }
+
+    fn help_overlay_sections(&self) -> Vec<(String, Vec<KeymapContext>)> {
+        let mut sections = vec![
+            ("Form".to_string(), vec![KeymapContext::Default]),
+            ("List".to_string(), vec![KeymapContext::Collection]),
+            ("Overlay".to_string(), vec![KeymapContext::Overlay]),
+            ("Help".to_string(), vec![KeymapContext::Help]),
+        ];
+
+        if let Some(context) = self.current_help_contexts().into_iter().find(|context| {
+            matches!(
+                context,
+                KeymapContext::TextInput | KeymapContext::NumericInput
+            )
+        }) {
+            sections.push(("Field".to_string(), vec![context]));
+        }
+
+        sections
     }
 
     fn handle_popup_key(&mut self, key: KeyEvent) -> Result<bool> {
@@ -217,10 +263,21 @@ impl App {
             page: 0,
             viewport,
             shortcut_offset: 0,
+            error_offset: 0,
         });
     }
 
     fn handle_help_overlay_key(&mut self, key: &KeyEvent) -> bool {
+        let action = self
+            .input_router
+            .classify_for_contexts(key, &[KeymapContext::Help]);
+        if matches!(action, super::input::KeyAction::HelpClose) {
+            if self.help_overlay.is_none() {
+                return false;
+            }
+            self.help_overlay = None;
+            return true;
+        }
         let Some(state) = self.help_overlay.as_mut() else {
             return false;
         };
@@ -230,74 +287,86 @@ impl App {
             .first()
             .map(|page| page.shortcuts.len().saturating_sub(shortcut_capacity))
             .unwrap_or(0);
+        let error_message_width = view::help_overlay_error_message_capacity(state.viewport);
+        let current_page = state.page.min(state.pages.len().saturating_sub(1));
+        let error_max_offset = state
+            .pages
+            .get(current_page)
+            .map(|page| help_page_error_max_offset(page, error_message_width))
+            .unwrap_or(0);
 
-        match key.code {
-            KeyCode::Esc => {
-                self.help_overlay = None;
-                true
-            }
-            KeyCode::Tab => {
+        match action {
+            super::input::KeyAction::HelpPageStep(delta) => {
                 let total = state.pages.len();
                 if total > 0 {
-                    state.page = (state.page + 1) % total;
+                    let next = (state.page as i32 + delta).rem_euclid(total as i32) as usize;
+                    state.page = next;
                 }
-                true
+                let page = state.page.min(state.pages.len().saturating_sub(1));
+                state.error_offset = state
+                    .pages
+                    .get(page)
+                    .map(|entry| {
+                        state
+                            .error_offset
+                            .min(help_page_error_max_offset(entry, error_message_width))
+                    })
+                    .unwrap_or(0);
             }
-            KeyCode::BackTab => {
-                let total = state.pages.len();
-                if total > 0 {
-                    if state.page == 0 {
-                        state.page = total - 1;
-                    } else {
-                        state.page -= 1;
-                    }
+            super::input::KeyAction::HelpShortcutScroll(delta) => {
+                if delta < 0 {
+                    state.shortcut_offset = state
+                        .shortcut_offset
+                        .saturating_sub(delta.unsigned_abs() as usize);
+                } else {
+                    state.shortcut_offset =
+                        (state.shortcut_offset + delta as usize).min(shortcut_max_offset);
                 }
-                true
             }
-            KeyCode::Up | KeyCode::Char('k') => {
-                state.shortcut_offset = state.shortcut_offset.saturating_sub(1);
-                true
+            super::input::KeyAction::HelpShortcutPage(delta) => {
+                let step = shortcut_capacity.saturating_mul(delta.unsigned_abs() as usize);
+                if delta < 0 {
+                    state.shortcut_offset = state.shortcut_offset.saturating_sub(step);
+                } else {
+                    state.shortcut_offset = (state.shortcut_offset + step).min(shortcut_max_offset);
+                }
             }
-            KeyCode::Down | KeyCode::Char('j') => {
-                state.shortcut_offset = (state.shortcut_offset + 1).min(shortcut_max_offset);
-                true
-            }
-            KeyCode::PageUp => {
-                state.shortcut_offset = state.shortcut_offset.saturating_sub(shortcut_capacity);
-                true
-            }
-            KeyCode::PageDown => {
-                state.shortcut_offset =
-                    (state.shortcut_offset + shortcut_capacity).min(shortcut_max_offset);
-                true
-            }
-            KeyCode::Home => {
+            super::input::KeyAction::HelpShortcutHome => {
                 state.shortcut_offset = 0;
-                true
             }
-            KeyCode::End => {
+            super::input::KeyAction::HelpShortcutEnd => {
                 state.shortcut_offset = shortcut_max_offset;
-                true
             }
-            _ => false,
+            super::input::KeyAction::HelpErrorScroll(delta) => {
+                if delta < 0 {
+                    state.error_offset = state
+                        .error_offset
+                        .saturating_sub(delta.unsigned_abs() as usize);
+                } else {
+                    state.error_offset =
+                        (state.error_offset + delta as usize).min(error_max_offset);
+                }
+            }
+            _ => {}
         }
+
+        true
     }
 
     fn build_help_overlay_pages(&self, viewport: Rect) -> Vec<HelpOverlayPage> {
-        const MAX_ERROR_MSG_CHARS: usize = 80;
         let errors_per_page = view::help_overlay_error_page_capacity(viewport);
 
         let mut shortcuts: Vec<HelpShortcutRender> = Vec::new();
-        let sections = [
-            ("Form", KeymapContext::Default),
-            ("List", KeymapContext::Collection),
-            ("Overlay", KeymapContext::Overlay),
-        ];
+        let sections = self.help_overlay_sections();
 
-        for (scope, ctx) in sections {
-            for entry in self.keymap_store.help_entries(ctx) {
+        for (scope, contexts) in sections {
+            let entries = match contexts.as_slice() {
+                [context] => self.keymap_store.help_entries(*context),
+                _ => self.keymap_store.help_entries_for_contexts(&contexts),
+            };
+            for entry in entries {
                 shortcuts.push(HelpShortcutRender {
-                    scope: scope.to_string(),
+                    scope: scope.clone(),
                     keys: entry.keys,
                     action: entry.action,
                 });
@@ -306,19 +375,17 @@ impl App {
 
         let mut errors: Vec<HelpErrorRender> = Vec::new();
         for (pointer, message) in self.form_state.error_entries() {
-            let short = truncate_with_ellipsis(&message, MAX_ERROR_MSG_CHARS);
             errors.push(HelpErrorRender {
                 index: errors.len() + 1,
                 pointer,
-                message: short,
+                message,
             });
         }
         for msg in &self.global_errors {
-            let short = truncate_with_ellipsis(msg, MAX_ERROR_MSG_CHARS);
             errors.push(HelpErrorRender {
                 index: errors.len() + 1,
                 pointer: "<global>".to_string(),
-                message: short,
+                message: msg.clone(),
             });
         }
 
@@ -365,10 +432,16 @@ impl App {
         };
         let pages = self.build_help_overlay_pages(viewport);
         let shortcut_capacity = view::help_overlay_panel_capacities(viewport).shortcuts;
+        let error_message_width = view::help_overlay_error_message_capacity(viewport);
         let shortcut_offset = self
             .help_overlay
             .as_ref()
             .map(|overlay| overlay.shortcut_offset)
+            .unwrap_or(0);
+        let error_offset = self
+            .help_overlay
+            .as_ref()
+            .map(|overlay| overlay.error_offset)
             .unwrap_or(0);
         let next_page = if pages.is_empty() {
             0
@@ -379,11 +452,16 @@ impl App {
             .first()
             .map(|page| shortcut_offset.min(page.shortcuts.len().saturating_sub(shortcut_capacity)))
             .unwrap_or(0);
+        let next_error_offset = pages
+            .get(next_page)
+            .map(|page| error_offset.min(help_page_error_max_offset(page, error_message_width)))
+            .unwrap_or(0);
         if let Some(overlay) = self.help_overlay.as_mut() {
             overlay.viewport = viewport;
             overlay.pages = pages;
             overlay.page = next_page;
             overlay.shortcut_offset = next_shortcut_offset;
+            overlay.error_offset = next_error_offset;
         }
     }
 
@@ -467,6 +545,7 @@ impl App {
             Some(HelpOverlayRender {
                 page,
                 shortcut_offset: state.shortcut_offset,
+                error_offset: state.error_offset,
             })
         });
 
@@ -701,25 +780,6 @@ impl App {
     }
 }
 
-fn truncate_with_ellipsis(s: &str, max_chars: usize) -> String {
-    if max_chars == 0 {
-        return String::new();
-    }
-    let mut result = String::new();
-    let mut count = 0usize;
-    for ch in s.chars() {
-        if count + 1 >= max_chars {
-            break;
-        }
-        result.push(ch);
-        count += 1;
-    }
-    if s.chars().count() > count {
-        result.push('…');
-    }
-    result
-}
-
 #[cfg(test)]
 impl App {
     pub(crate) fn form_state_mut_for_test(&mut self) -> &mut FormState {
@@ -733,6 +793,10 @@ impl App {
     pub(crate) fn toggle_help_overlay_for_test(&mut self, viewport: Rect) {
         self.toggle_help_overlay();
         self.refresh_help_overlay_pages(viewport);
+    }
+
+    pub(crate) fn current_help_text_for_test(&self) -> Option<String> {
+        self.current_help_text()
     }
 
     pub(crate) fn help_overlay_snapshot_for_test(
@@ -753,6 +817,7 @@ impl App {
             total_shortcuts: page.shortcuts.len(),
             visible_shortcuts,
             shortcut_offset: overlay.shortcut_offset,
+            error_offset: overlay.error_offset,
             visible_errors: page.errors.len(),
             total_errors: page.total_errors,
             current_page: page.current_page,
@@ -760,6 +825,25 @@ impl App {
             summary: page.summary.clone(),
         })
     }
+}
+
+fn field_help_context(kind: &FieldKind) -> Option<KeymapContext> {
+    match kind {
+        FieldKind::String | FieldKind::Json => Some(KeymapContext::TextInput),
+        FieldKind::Integer | FieldKind::Number => Some(KeymapContext::NumericInput),
+        _ => None,
+    }
+}
+
+fn help_page_error_max_offset(page: &HelpOverlayPage, message_width: usize) -> usize {
+    if message_width == 0 {
+        return 0;
+    }
+    page.errors
+        .iter()
+        .map(|entry| entry.message.chars().count().saturating_sub(message_width))
+        .max()
+        .unwrap_or(0)
 }
 
 #[cfg(test)]

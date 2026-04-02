@@ -1,4 +1,3 @@
-use crate::tui::app::keymap::KeymapContext;
 use crate::tui::app::runtime::App;
 use crate::tui::app::runtime::overlay::editor::CompositeEditorOverlay;
 use crate::tui::app::runtime::overlay::state::OverlayHost;
@@ -19,8 +18,7 @@ impl App {
 
     pub(super) fn overlay_help_text(&self) -> String {
         let base = self
-            .keymap_store
-            .help_text(KeymapContext::Overlay)
+            .current_help_text()
             .unwrap_or_else(|| "Ctrl+S save • Esc/Ctrl+Q exit overlay".to_string());
         if let Some(editor) = self.active_overlay() {
             format!("L{} • {}", editor.level(), base)

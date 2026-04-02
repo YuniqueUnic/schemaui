@@ -109,6 +109,16 @@ impl TextComponent {
         self.commit_edit(next, self.cursor + 1)
     }
 
+    fn insert_numeric_char(&mut self, kind: &FieldKind, ch: char) -> bool {
+        let mut next = self.buffer.clone();
+        let byte_index = byte_index_for_char_offset(&next, self.cursor);
+        next.insert(byte_index, ch);
+        if !is_valid_numeric_edit_buffer(kind, &next) {
+            return false;
+        }
+        self.commit_edit(next, self.cursor + 1)
+    }
+
     fn move_cursor_left(&mut self) -> bool {
         if self.cursor == 0 {
             return false;
@@ -250,7 +260,9 @@ impl TextComponent {
             KeyCode::Left | KeyCode::Right => self.step_numeric(schema, key),
             KeyCode::Backspace => self.delete_backward(),
             KeyCode::Delete => self.delete_forward(),
-            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::ALT) => self.insert_char(ch),
+            KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::ALT) => {
+                self.insert_numeric_char(&schema.kind, ch)
+            }
             _ => false,
         }
     }
@@ -304,4 +316,20 @@ fn byte_index_for_char_offset(text: &str, char_offset: usize) -> usize {
         .map(|(idx, _)| idx)
         .nth(char_offset)
         .unwrap_or(text.len())
+}
+
+fn is_valid_numeric_edit_buffer(kind: &FieldKind, buffer: &str) -> bool {
+    if buffer.is_empty() {
+        return true;
+    }
+
+    match kind {
+        FieldKind::Integer => {
+            buffer.parse::<i64>().is_ok() || format!("{buffer}0").parse::<i64>().is_ok()
+        }
+        FieldKind::Number => {
+            buffer.parse::<f64>().is_ok() || format!("{buffer}0").parse::<f64>().is_ok()
+        }
+        _ => false,
+    }
 }

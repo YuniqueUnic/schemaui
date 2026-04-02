@@ -138,13 +138,17 @@ File: `src/tui/app/validation.rs` + `tui::state::reducers`.
 - **Keymap pipeline** – Introduces `keymap/default.keymap.json`, parsed by
   `app::keymap` once via `once_cell::sync::Lazy`. Each entry contains:
   - `id` + `description` for docs/help text.
-  - `contexts`: any of `default`, `collection`, `overlay`. These map to
-    `KeymapContext` so `keymap::help_text` can render the right footer snippet.
+  - `contexts`: any of `default`, `collection`, `overlay`, `help`, `text`,
+    `numeric`. These map to `KeymapContext` so footer/help rendering can combine
+    app-level hints with focused-field editor hints.
+  - `dispatch`: optional, defaults to `true`; `false` marks a help-only entry
+    that is rendered in footer/help UI but never intercepts the real key event.
   - `action`: tagged object (`Save`, `FieldStep { delta }`,
     `ListMove { delta }`, etc.) that deserializes directly into `KeyAction`.
   - `combos`: textual shortcuts (e.g., `"Ctrl+Shift+Tab"`). Tokens are parsed
     into `KeyPattern`s (required modifiers + code matcher). Letter combos
-    implicitly tolerate `Shift` unless the pattern already requires it.
+    implicitly tolerate `Shift` unless the pattern already requires it; named
+    keys now also cover `Home`, `End`, `Backspace`, and `Delete`.
     `InputRouter::classify` now defers entirely to `keymap::classify_key`, and
     the overlay/status modules pull help text from the same dataset,
     guaranteeing DRY docs + UI. Adding a shortcut therefore only requires
@@ -215,8 +219,10 @@ Form focus ──Ctrl+E──▶ try_open_composite_editor
 - Overlays spawn their own `FormState` and optional list panel metadata while
   reusing the global validator via `jsonschema::validator_for` scoped to the
   nested schema.
-- Help text is sourced through `keymap::help_text(KeymapContext::Overlay)` so
-  footer messaging stays synchronized.
+- Help text is sourced through the same keymap dataset, including modal `Help`
+  bindings for the overlay itself plus help-only `TextInput` / `NumericInput`
+  contexts for focused editors, so footer messaging stays synchronized without
+  swallowing raw text input.
 - `App` now owns `overlay_stack: Vec<CompositeEditorOverlay>`; `Ctrl+E` pushes a
   new level, `Esc` / `Ctrl+Q` pops only the top overlay, and `Ctrl+S` saves the
   focused overlay without collapsing the stack. Titles include the overlay level

@@ -32,6 +32,399 @@
     ]
   },
   {
+    "id": "field.text.cursor.left",
+    "description": "Move cursor left",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Left"
+    ]
+  },
+  {
+    "id": "field.text.cursor.right",
+    "description": "Move cursor right",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Right"
+    ]
+  },
+  {
+    "id": "field.text.cursor.home",
+    "description": "Jump to line start",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Home"
+    ]
+  },
+  {
+    "id": "field.text.cursor.end",
+    "description": "Jump to line end",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "End"
+    ]
+  },
+  {
+    "id": "field.text.delete.backward",
+    "description": "Delete previous character",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Backspace"
+    ]
+  },
+  {
+    "id": "field.text.delete.forward",
+    "description": "Delete next character",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Delete"
+    ]
+  },
+  {
+    "id": "field.text.delete.word",
+    "description": "Delete previous word",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Ctrl+W"
+    ]
+  },
+  {
+    "id": "field.text.undo",
+    "description": "Undo text edit",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Ctrl+Z"
+    ]
+  },
+  {
+    "id": "field.text.redo",
+    "description": "Redo text edit",
+    "contexts": [
+      "text"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Ctrl+Y"
+    ]
+  },
+  {
+    "id": "field.numeric.step.left",
+    "description": "Step value down",
+    "contexts": [
+      "numeric"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Left"
+    ]
+  },
+  {
+    "id": "field.numeric.step.right",
+    "description": "Step value up",
+    "contexts": [
+      "numeric"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Right"
+    ]
+  },
+  {
+    "id": "field.numeric.fast-step.left",
+    "description": "Fast step value down",
+    "contexts": [
+      "numeric"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Shift+Left"
+    ]
+  },
+  {
+    "id": "field.numeric.fast-step.right",
+    "description": "Fast step value up",
+    "contexts": [
+      "numeric"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Shift+Right"
+    ]
+  },
+  {
+    "id": "field.numeric.delete.backward",
+    "description": "Delete previous character",
+    "contexts": [
+      "numeric"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Backspace"
+    ]
+  },
+  {
+    "id": "field.numeric.delete.forward",
+    "description": "Delete next character",
+    "contexts": [
+      "numeric"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Delete"
+    ]
+  },
+  {
+    "id": "field.numeric.undo",
+    "description": "Undo numeric edit",
+    "contexts": [
+      "numeric"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Ctrl+Z"
+    ]
+  },
+  {
+    "id": "field.numeric.redo",
+    "description": "Redo numeric edit",
+    "contexts": [
+      "numeric"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Ctrl+Y"
+    ]
+  },
+  {
+    "id": "help.close",
+    "description": "Close help",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpClose"
+    },
+    "combos": [
+      "Esc",
+      "Ctrl+H",
+      "Ctrl+?"
+    ]
+  },
+  {
+    "id": "help.page.next",
+    "description": "Next error page",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpPageStep",
+      "delta": 1
+    },
+    "combos": [
+      "Tab"
+    ]
+  },
+  {
+    "id": "help.page.prev",
+    "description": "Previous error page",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpPageStep",
+      "delta": -1
+    },
+    "combos": [
+      "BackTab"
+    ]
+  },
+  {
+    "id": "help.shortcuts.scroll.up",
+    "description": "Scroll shortcuts up",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpShortcutScroll",
+      "delta": -1
+    },
+    "combos": [
+      "Up",
+      "k"
+    ]
+  },
+  {
+    "id": "help.shortcuts.scroll.down",
+    "description": "Scroll shortcuts down",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpShortcutScroll",
+      "delta": 1
+    },
+    "combos": [
+      "Down",
+      "j"
+    ]
+  },
+  {
+    "id": "help.shortcuts.page.up",
+    "description": "Page shortcuts up",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpShortcutPage",
+      "delta": -1
+    },
+    "combos": [
+      "PageUp"
+    ]
+  },
+  {
+    "id": "help.shortcuts.page.down",
+    "description": "Page shortcuts down",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpShortcutPage",
+      "delta": 1
+    },
+    "combos": [
+      "PageDown"
+    ]
+  },
+  {
+    "id": "help.shortcuts.home",
+    "description": "Jump shortcuts to top",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpShortcutHome"
+    },
+    "combos": [
+      "Home"
+    ]
+  },
+  {
+    "id": "help.shortcuts.end",
+    "description": "Jump shortcuts to bottom",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpShortcutEnd"
+    },
+    "combos": [
+      "End"
+    ]
+  },
+  {
+    "id": "help.errors.scroll.left",
+    "description": "Scroll error text left",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpErrorScroll",
+      "delta": -1
+    },
+    "combos": [
+      "h"
+    ]
+  },
+  {
+    "id": "help.errors.scroll.right",
+    "description": "Scroll error text right",
+    "contexts": [
+      "help"
+    ],
+    "action": {
+      "kind": "helpErrorScroll",
+      "delta": 1
+    },
+    "combos": [
+      "l"
+    ]
+  },
+  {
     "id": "section.next",
     "description": "Next section",
     "contexts": [

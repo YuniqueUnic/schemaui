@@ -417,6 +417,7 @@ fn handle_help_overlay_key(&mut self, key: &KeyEvent) -> bool {
   "id": "list.move.up",
   "description": "Move entry up",
   "contexts": ["collection", "overlay"],
+  "dispatch": true,
   "action": { "kind": "listMove", "delta": -1 },
   "combos": ["Ctrl+Up"]
 }
@@ -426,7 +427,10 @@ fn handle_help_overlay_key(&mut self, key: &KeyEvent) -> bool {
 
 - `id` – 绑定的稳定标识符（用于文档/日志）。
 - `description` – 帮助消息中使用的人类可读文本。
-- `contexts` – 语义范围（`"default"`、`"collection"`、`"overlay"`）。
+- `contexts` –
+  语义范围（`"default"`、`"collection"`、`"overlay"`、`"help"`、`"text"`、`"numeric"`）。
+- `dispatch` – 可选；为 `false`
+  时表示该条目只用于帮助展示，不能拦截真实按键输入。
 - `action` – 标记联合，反序列化为`RawAction` → `KeyAction`。
 - `combos` – 文本组合列表（例如`"Ctrl+Shift+Tab"`）。
 
@@ -447,6 +451,9 @@ pub enum KeymapContext {
     Default,
     Collection,
     Overlay,
+    Help,
+    TextInput,
+    NumericInput,
 }
 ```
 
@@ -454,22 +461,15 @@ pub enum KeymapContext {
 
 - 决定哪些贡献到页脚帮助字符串。
 - 驱动哪些绑定出现在帮助浮层的每一页中。
+- 允许把字段编辑提示也收敛到同一个 JSON 数据源里，而不会劫持真实输入。
 
-运行时根据焦点选择上下文：
+运行时会根据焦点选择一个或多个上下文：
 
 ```rust
 fn current_help_text(&self) -> Option<String> {
     if !self.options.show_help { return None; }
-    let context = if self.overlay_depth() > 0 {
-        KeymapContext::Overlay
-    } else if let Some(field) = self.form_state.focused_field()
-        && field.is_composite_list()
-    {
-        KeymapContext::Collection
-    } else {
-        KeymapContext::Default
-    };
-    self.keymap_store.help_text(context)
+    let contexts = self.current_help_contexts();
+    self.keymap_store.help_text_for_contexts(&contexts)
 }
 ```
 
@@ -479,6 +479,12 @@ fn current_help_text(&self) -> Option<String> {
 - **Collection** –
   在主页面聚焦集合类字段时的列表操作（添加/移除/选择/移动条目）。
 - **Overlay** – 在任何浮层内部时的操作（包括浮层内集合的列表操作）。
+- **Help** – 帮助浮层自身的模态操作，例如关闭、翻页、滚动
+  shortcuts，以及横向滚动错误消息。
+- **TextInput** – `string` / `json` 文本编辑的 help-only
+  提示（`Left/Right`、`Home/End`、删除、undo/redo、`Ctrl+W`）。
+- **NumericInput** – `integer` / `number` 编辑器的 help-only 提示（`Left/Right`
+  stepper、`Shift+Left/Right` fast-stepper、删除、undo/redo）。
 
 ### 3.3 从 KeyEvent 到 AppCommand/FormCommand
 

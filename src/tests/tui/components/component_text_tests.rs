@@ -36,6 +36,20 @@ fn string_schema(default: &str) -> FieldSchema {
     }
 }
 
+fn number_schema() -> FieldSchema {
+    FieldSchema {
+        name: "ratio".to_string(),
+        path: vec!["ratio".to_string()],
+        pointer: "/ratio".to_string(),
+        title: "ratio".to_string(),
+        description: None,
+        kind: FieldKind::Number,
+        required: false,
+        default: None,
+        metadata: Default::default(),
+    }
+}
+
 fn bool_schema() -> FieldSchema {
     FieldSchema {
         name: "enabled".to_string(),
@@ -86,6 +100,64 @@ fn text_component_rejects_control_characters() {
     let ctrl_a = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL);
     assert!(!component.handle_key(&schema, &ctrl_a));
     assert_eq!(component.display_value(&schema), "");
+}
+
+#[test]
+fn number_input_rejects_non_numeric_chars_but_accepts_decimal_and_exponent_editing() {
+    let schema = number_schema();
+    let mut component = TextComponent::new(&schema, Arc::new(ComponentPalette::default()));
+
+    assert!(!component.handle_key(
+        &schema,
+        &KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE)
+    ));
+    assert_eq!(component.display_value(&schema), "");
+
+    for key in [
+        KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Char('1'), KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Char('.'), KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Char('2'), KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Char('3'), KeyModifiers::NONE),
+    ] {
+        assert!(
+            component.handle_key(&schema, &key),
+            "expected {key:?} to be accepted"
+        );
+    }
+    assert_eq!(component.display_value(&schema), "-1.2e-3");
+
+    assert!(!component.handle_key(
+        &schema,
+        &KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)
+    ));
+    assert_eq!(component.display_value(&schema), "-1.2e-3");
+}
+
+#[test]
+fn integer_input_rejects_decimal_and_exponent_chars() {
+    let schema = integer_schema();
+    let mut component = TextComponent::new(&schema, Arc::new(ComponentPalette::default()));
+
+    assert!(component.handle_key(
+        &schema,
+        &KeyEvent::new(KeyCode::Char('1'), KeyModifiers::NONE)
+    ));
+    assert!(!component.handle_key(
+        &schema,
+        &KeyEvent::new(KeyCode::Char('.'), KeyModifiers::NONE)
+    ));
+    assert!(!component.handle_key(
+        &schema,
+        &KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE)
+    ));
+    assert!(!component.handle_key(
+        &schema,
+        &KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE)
+    ));
+    assert_eq!(component.display_value(&schema), "1");
 }
 
 #[test]

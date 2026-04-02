@@ -196,3 +196,76 @@ fn help_overlay_shortcuts_can_scroll_on_short_terminals() {
     assert_eq!(after.visible_shortcuts, before.visible_shortcuts);
     assert_eq!(after.total_shortcuts, before.total_shortcuts);
 }
+
+#[test]
+fn footer_help_includes_string_edit_shortcuts_for_string_fields() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"}
+        }
+    });
+    let app = build_app(schema);
+
+    let help = app.current_help_text_for_test().expect("string help");
+    assert!(help.contains("Tab/Down -> Next field"));
+    assert!(help.contains("Left -> Move cursor left"));
+    assert!(help.contains("Right -> Move cursor right"));
+    assert!(help.contains("Ctrl+W -> Delete previous word"));
+}
+
+#[test]
+fn footer_help_includes_numeric_shortcuts_for_number_fields() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "threshold": {"type": "number"}
+        }
+    });
+    let app = build_app(schema);
+
+    let help = app.current_help_text_for_test().expect("numeric help");
+    assert!(help.contains("Tab/Down -> Next field"));
+    assert!(help.contains("Left -> Step value down"));
+    assert!(help.contains("Right -> Step value up"));
+    assert!(help.contains("Shift+Left -> Fast step value down"));
+    assert!(help.contains("Shift+Right -> Fast step value up"));
+}
+
+#[test]
+fn help_overlay_error_column_supports_horizontal_scroll_with_h_and_l() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"}
+        }
+    });
+    let mut app = build_app(schema);
+    let long_message = "this validation error is intentionally long so horizontal scrolling can reveal the hidden tail of the message in the help overlay";
+    assert!(
+        app.form_state_mut_for_test()
+            .set_error("/name", long_message.to_string()),
+        "expected test field to exist"
+    );
+
+    let viewport = Rect::new(0, 0, 72, 14);
+    app.toggle_help_overlay_for_test(viewport);
+    let before = app
+        .help_overlay_snapshot_for_test(viewport)
+        .expect("initial help snapshot");
+    assert_eq!(before.error_offset, 0);
+
+    app.handle_key_for_test(key(KeyCode::Char('l'), KeyModifiers::NONE))
+        .expect("scroll error text right");
+    let after = app
+        .help_overlay_snapshot_for_test(viewport)
+        .expect("scrolled help snapshot");
+    assert!(after.error_offset > 0, "expected horizontal error scroll");
+
+    app.handle_key_for_test(key(KeyCode::Char('h'), KeyModifiers::NONE))
+        .expect("scroll error text left");
+    let restored = app
+        .help_overlay_snapshot_for_test(viewport)
+        .expect("restored help snapshot");
+    assert_eq!(restored.error_offset, 0);
+}
