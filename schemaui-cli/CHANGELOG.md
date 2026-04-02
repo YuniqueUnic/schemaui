@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.3.0...schemaui-cli-v0.4.0) - 2026-04-02
+
+### Fixed
+
+- *(cli)* add explicit subcommands and default to TUI mode
+
 ## [0.3.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.2.8...schemaui-cli-v0.3.0) - 2026-04-01
 
 ### Added

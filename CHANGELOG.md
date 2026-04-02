@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.6.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.6.0...schemaui-v0.6.1) - 2026-04-02
+
+### Fixed
+
+- fix the composite component nested issue during selection
+- *(web)* add comprehensive test suite for web frontend runtime
+- *(cli)* add explicit subcommands and default to TUI mode
+
+### Other
+
+- enchance the web item render style to make value can be viewed when the item is a object which not a simple primitive type
+
 ## [0.6.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.5.0...schemaui-v0.6.0) - 2026-04-01
 
 ### Added
