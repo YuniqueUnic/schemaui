@@ -268,21 +268,23 @@ function ComplexArrayRenderer({
             return (
               <Card
                 key={`${node.pointer}-${index}`}
-                className="flex items-center justify-between px-3 py-2"
+                className="flex items-start justify-between gap-3 px-3 py-2"
               >
-                <div className="flex items-center gap-2 truncate flex-1">
-                  <Badge variant="secondary">
-                    {index + 1}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="font-mono text-xs"
-                  >
-                    {entryType}
-                  </Badge>
-                  <span className="truncate text-sm">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Badge variant="secondary">
+                      {index + 1}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-xs"
+                    >
+                      {entryType}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground break-words">
                     {formatValueSummary(entry)}
-                  </span>
+                  </p>
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Button

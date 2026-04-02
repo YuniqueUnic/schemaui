@@ -5,7 +5,7 @@ import {
   determineVariant,
 } from "../../utils/variantHelpers";
 import { materializeVariantNode } from "../../utils/schemaToUiKind";
-import { inferValueType } from "../../utils/typeHelpers";
+import { formatValueSummary, inferValueType } from "../../utils/typeHelpers";
 import { VariantSelector } from "../VariantSelector";
 import { EntryEditor } from "./shared/EntryEditor";
 import { useOverlay } from "../Overlay";
@@ -294,24 +294,29 @@ function MultiVariantRenderer({
                 key={`${node.pointer}-variant-${index}`}
                 className="px-3 py-2"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Badge
-                      variant="secondary"
-                      className="shrink-0"
-                    >
-                      {index + 1}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className="font-mono text-xs shrink-0"
-                    >
-                      {entryType}
-                    </Badge>
-                    <span className="text-sm font-medium truncate">
-                      {activeVariant?.title ??
-                        `Variant ${index + 1}`}
-                    </span>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0"
+                      >
+                        {index + 1}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="font-mono text-xs shrink-0"
+                      >
+                        {entryType}
+                      </Badge>
+                      <span className="text-sm font-medium truncate">
+                        {activeVariant?.title ??
+                          `Variant ${index + 1}`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground break-words">
+                      {formatValueSummary(entry)}
+                    </p>
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <Button

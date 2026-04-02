@@ -31,17 +31,7 @@ export function inferValueType(value: JsonValue | undefined): string {
  * Formats a value for summary display
  */
 export function formatValueSummary(value: JsonValue | undefined): string {
-  if (value === null || value === undefined) return "empty";
-  if (typeof value === "string") return value || '""';
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  if (Array.isArray(value)) return `[items: ${value.length}]`;
-  if (typeof value === "object") {
-    const keys = Object.keys(value as Record<string, JsonValue>);
-    return keys.length ? `{ ${keys.slice(0, 3).join(", ")} }` : "{}";
-  }
-  return "value";
+  return formatSummary(value, 0);
 }
 
 /**
@@ -78,4 +68,57 @@ function pointerSegment(pointer: string): string | undefined {
   const segments = pointer.split("/").filter(Boolean);
   const raw = segments[segments.length - 1];
   return raw?.replace(/~1/g, "/").replace(/~0/g, "~");
+}
+
+const MAX_OBJECT_ENTRIES = 3;
+const MAX_ARRAY_ITEMS = 3;
+const MAX_DEPTH = 2;
+const MAX_STRING_LENGTH = 28;
+
+function formatSummary(
+  value: JsonValue | undefined,
+  depth: number,
+): string {
+  if (value === undefined) return "empty";
+  if (value === null) return "null";
+  if (typeof value === "string") {
+    return value.length === 0
+      ? '""'
+      : value.length > MAX_STRING_LENGTH
+      ? `${value.slice(0, MAX_STRING_LENGTH - 1)}…`
+      : value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    if (depth >= MAX_DEPTH) {
+      return `[${value.length} items]`;
+    }
+
+    const items = value.slice(0, MAX_ARRAY_ITEMS).map((entry) =>
+      formatSummary(entry, depth + 1)
+    );
+    const suffix = value.length > MAX_ARRAY_ITEMS
+      ? `, +${value.length - MAX_ARRAY_ITEMS} more`
+      : "";
+    return `[${items.join(", ")}${suffix}]`;
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, JsonValue>);
+    if (entries.length === 0) return "{}";
+    if (depth >= MAX_DEPTH) {
+      return `{${entries.length} fields}`;
+    }
+
+    const summary = entries.slice(0, MAX_OBJECT_ENTRIES).map(([key, entryValue]) =>
+      `${key}: ${formatSummary(entryValue, depth + 1)}`
+    );
+    const suffix = entries.length > MAX_OBJECT_ENTRIES
+      ? `, +${entries.length - MAX_OBJECT_ENTRIES} more`
+      : "";
+    return `{ ${summary.join(", ")}${suffix} }`;
+  }
+  return "value";
 }

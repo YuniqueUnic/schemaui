@@ -692,6 +692,7 @@ describe("NodeRenderer web overlay flows", () => {
         },
       ],
     );
+    expect(screen.getByText("{ id: entry-1, value: 0 }")).toBeTruthy();
   });
 
   it("does not append a complex array entry when the dialog is cancelled", async () => {
