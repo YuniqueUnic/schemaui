@@ -15,6 +15,10 @@ impl FieldState {
         self.component.display_value(&self.schema)
     }
 
+    pub fn cursor_offset(&self) -> Option<usize> {
+        self.component.cursor_offset(&self.schema)
+    }
+
     pub fn current_value(&self) -> Result<Option<Value>, FieldCoercionError> {
         self.component.current_value(&self.schema)
     }

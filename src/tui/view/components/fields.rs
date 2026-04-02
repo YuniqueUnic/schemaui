@@ -221,6 +221,9 @@ fn value_panel_lines(
 ) -> (Vec<Line<'static>>, Option<CursorHint>) {
     let clamp_width = max_width.max(4) as usize;
     let value_text = field.display_value();
+    let cursor_offset = field
+        .cursor_offset()
+        .unwrap_or_else(|| value_text.chars().count());
     let mut wrapped_value = wrap_preserving_spaces(&value_text, clamp_width);
     if wrapped_value.is_empty() {
         wrapped_value.push(String::new());
@@ -229,10 +232,6 @@ fn value_panel_lines(
         .iter()
         .map(|line| UnicodeWidthStr::width(line.as_str()))
         .max()
-        .unwrap_or(0);
-    let last_line_width = wrapped_value
-        .last()
-        .map(|line| UnicodeWidthStr::width(line.as_str()))
         .unwrap_or(0);
     let mut cursor_hint = None;
     let mut lines = Vec::new();
@@ -267,12 +266,10 @@ fn value_panel_lines(
             format!("└{}┘", border_line),
             border_style,
         )));
-        let caret_line = content_start + wrapped_value.len().saturating_sub(1);
-        let trailing_spaces = count_trailing_spaces(&value_text);
-        let mut caret_width = last_line_width + trailing_spaces;
-        if caret_width > inner_width {
-            caret_width = inner_width;
-        }
+        let (relative_line, caret_width) =
+            wrapped_cursor_position(&value_text, clamp_width, cursor_offset);
+        let caret_line = content_start + relative_line.min(wrapped_value.len().saturating_sub(1));
+        let caret_width = caret_width.min(inner_width);
         let prefix_width = UnicodeWidthStr::width(VALUE_BORDER_PREFIX) as u16 + GUTTER_PADDING;
         let highlight_width = highlight_symbol_width();
         let column_offset = LIST_BORDER_OFFSET
@@ -652,10 +649,6 @@ fn composite_selector_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
     Some(lines)
 }
 
-fn count_trailing_spaces(text: &str) -> usize {
-    text.chars().rev().take_while(|c| *c == ' ').count()
-}
-
 fn wrap_preserving_spaces(text: &str, width: usize) -> Vec<String> {
     if width == 0 {
         return vec![text.to_string()];
@@ -678,6 +671,27 @@ fn wrap_preserving_spaces(text: &str, width: usize) -> Vec<String> {
         lines.push(String::new());
     }
     lines
+}
+
+fn wrapped_cursor_position(text: &str, width: usize, cursor_offset: usize) -> (usize, usize) {
+    if width == 0 {
+        return (0, cursor_offset);
+    }
+
+    let mut line = 0usize;
+    let mut line_width = 0usize;
+    for (seen, ch) in text.chars().enumerate() {
+        if seen >= cursor_offset {
+            break;
+        }
+        let ch_width = UnicodeWidthChar::width(ch).unwrap_or(1);
+        if line_width + ch_width > width && line_width > 0 {
+            line += 1;
+            line_width = 0;
+        }
+        line_width += ch_width;
+    }
+    (line, line_width)
 }
 
 fn wrap_with_prefix(

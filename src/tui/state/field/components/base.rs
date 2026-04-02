@@ -32,6 +32,9 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
     }
     fn seed_value(&mut self, schema: &FieldSchema, value: &Value);
     fn current_value(&self, schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError>;
+    fn cursor_offset(&self, _schema: &FieldSchema) -> Option<usize> {
+        None
+    }
 
     fn bool_value(&self) -> Option<bool> {
         None
