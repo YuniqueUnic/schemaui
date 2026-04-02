@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.7.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.6.1...schemaui-v0.7.0) - 2026-04-02
+
+### Added
+
+- *(core)* [**breaking**] add schema title and description support to frontend context
+
+### Other
+
+- *(keymap)* add automated shortcut documentation generation
+- update roadmap to mark compile-time parsing features as complete
+- *(keymap)* add contextual help bindings and improve keymap architecture
+- *(tui)* add text component with cursor editing and undo/redo support
+
 ## [0.6.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.6.0...schemaui-v0.6.1) - 2026-04-02
 
 ### Fixed
