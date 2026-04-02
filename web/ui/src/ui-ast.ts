@@ -68,13 +68,6 @@ export function variantDefault(variant: UiVariant): JsonValue {
         // Use variant-specific defaults if available
         if (variantConfig && key in variantConfig.defaults) {
           result[key] = variantConfig.defaults[key] as JsonValue;
-        } else if (key === "id" && !variantConfig) {
-          // Fallback: Generate hash-based ID for unknown variants
-          const hash = variant.id.split("").reduce(
-            (acc, char) => acc + char.charCodeAt(0),
-            0,
-          );
-          result[key] = hash % 1000;
         } else {
           result[key] = child.default_value ?? defaultForKind(child.kind);
         }

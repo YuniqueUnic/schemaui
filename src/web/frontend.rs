@@ -41,10 +41,8 @@ impl Frontend for WebFrontend {
             .build()
             .context("failed to initialize tokio runtime")?;
 
-        let _guard = runtime.enter();
-
         let serve = self.serve;
-        let value = runtime.block_on(async move {
+        runtime.block_on(async move {
             let bound = bind_session(config, serve)
                 .await
                 .context("failed to bind web session")?;
@@ -52,9 +50,6 @@ impl Frontend for WebFrontend {
             eprintln!("schemaui web UI available at http://{addr}/");
             eprintln!("Press Ctrl+C to abort the session.");
             bound.run().await.context("web UI session failed")
-        })?;
-
-        runtime.shutdown_background();
-        Ok(value)
+        })
     }
 }

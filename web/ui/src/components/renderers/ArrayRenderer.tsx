@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { JsonValue, UiNode } from "../../types";
 import { defaultForKind } from "../../ui-ast";
 import {
@@ -19,12 +18,8 @@ import {
 } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { useOverlay } from "../Overlay";
-import {
-  joinPointer,
-  setPointerValue,
-  splitPointer,
-} from "../../utils/jsonPointer";
 import { materializeCompositeKind } from "../../utils/schemaToUiKind";
+import { EntryEditor } from "./shared/EntryEditor";
 
 /**
  * Array Renderer - Handles all array rendering logic
@@ -206,7 +201,11 @@ function ComplexArrayRenderer({
 }: ComplexArrayRendererProps) {
   const editorKind = materializeCompositeKind(itemKind);
 
-  const editEntry = (index: number, initial?: JsonValue) => {
+  const openEntryEditor = (
+    index: number,
+    initialValue: JsonValue,
+    onSaveEntry: (value: JsonValue) => void,
+  ) => {
     const entryNode: UiNode = {
       pointer: `${node.pointer}/${index}`,
       title: node.title
@@ -221,14 +220,12 @@ function ComplexArrayRenderer({
     overlay.open({
       title: `${node.title ?? node.pointer} · Item ${index + 1}`,
       content: (close) => (
-        <ArrayItemEditor
+        <EntryEditor
           node={entryNode}
-          initialValue={initial ?? entries[index]}
+          initialValue={initialValue}
           errors={errors}
           onSave={(newValue: JsonValue) => {
-            const next = [...entries];
-            next[index] = newValue;
-            onChange(node.pointer, next);
+            onSaveEntry(newValue);
             close();
           }}
           onClose={close}
@@ -238,11 +235,20 @@ function ComplexArrayRenderer({
     });
   };
 
+  const editEntry = (index: number) => {
+    openEntryEditor(index, entries[index], (newValue) => {
+      const next = [...entries];
+      next[index] = newValue;
+      onChange(node.pointer, next);
+    });
+  };
+
   const addEntry = () => {
-    const placeholder = defaultForKind(itemKind);
-    const next = [...entries, placeholder];
-    onChange(node.pointer, next);
-    editEntry(next.length - 1, placeholder);
+    const draftValue = defaultForKind(itemKind);
+    const draftIndex = entries.length;
+    openEntryEditor(draftIndex, draftValue, (newValue) => {
+      onChange(node.pointer, [...entries, newValue]);
+    });
   };
 
   return (
@@ -312,97 +318,6 @@ function ComplexArrayRenderer({
       </Button>
     </div>
   );
-}
-
-/**
- * Array Item Editor - Local state editor for array items
- * Note: This will be connected to NodeRenderer via props to avoid circular dependency
- */
-interface ArrayItemEditorProps {
-  node: UiNode;
-  initialValue: JsonValue;
-  errors: Map<string, string>;
-  onSave: (value: JsonValue) => void;
-  onClose: () => void;
-  renderNode: (
-    node: UiNode,
-    value: JsonValue,
-    errors: Map<string, string>,
-    onChange: (pointer: string, value: JsonValue) => void,
-  ) => React.ReactNode;
-}
-
-function ArrayItemEditor({
-  node,
-  initialValue,
-  errors,
-  onSave,
-  onClose,
-  renderNode,
-}: ArrayItemEditorProps) {
-  const [localValue, setLocalValue] = useState<JsonValue>(initialValue);
-
-  return (
-    <div className="space-y-4">
-      {renderNode(
-        node,
-        localValue,
-        errors,
-        (changedPointer: string, newValue: JsonValue) =>
-          setLocalValue((previous) =>
-            applyLocalChange(
-              node.pointer,
-              previous,
-              changedPointer,
-              newValue,
-            )
-          ),
-      )}
-      <div className="flex justify-end gap-2 mt-4">
-        <Button onClick={onClose} variant="ghost" size="sm">
-          Cancel
-        </Button>
-        <Button
-          onClick={() => onSave(localValue)}
-          variant="outline"
-          size="sm"
-        >
-          Done
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Helper: Apply local change within editor scope
- */
-function applyLocalChange(
-  rootPointer: string,
-  currentValue: JsonValue,
-  changedPointer: string,
-  newValue: JsonValue,
-): JsonValue {
-  if (
-    !changedPointer || changedPointer === rootPointer ||
-    changedPointer === "/"
-  ) {
-    return newValue;
-  }
-
-  const rootSegments = splitPointer(rootPointer);
-  const changedSegments = splitPointer(changedPointer);
-
-  const hasCommonPrefix = rootSegments.length > 0 &&
-    rootSegments.length <= changedSegments.length &&
-    rootSegments.every((segment, index) => segment === changedSegments[index]);
-
-  const relativeSegments = hasCommonPrefix
-    ? changedSegments.slice(rootSegments.length)
-    : changedSegments;
-
-  const relativePointer = joinPointer(relativeSegments);
-  return setPointerValue(currentValue, relativePointer, newValue);
 }
 
 /**

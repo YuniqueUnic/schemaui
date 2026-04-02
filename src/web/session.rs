@@ -177,26 +177,41 @@ impl BoundSession {
                 let _ = shutdown_rx.await;
             })
             .into_future();
-        tokio::pin!(server);
-        tokio::pin!(result_rx);
+        let server = tokio::spawn(server);
 
-        let value = tokio::select! {
-            value = &mut result_rx => {
-                value.map_err(|_| anyhow!("web session closed before emitting a value"))?
-            }
-            outcome = &mut server => {
-                outcome.context("web server exited before the session finished")?;
-                return Err(anyhow!("web server terminated prematurely"));
-            }
+        let value = match result_rx.await {
+            Ok(value) => value,
+            Err(_) => match server.await {
+                Ok(Ok(())) => {
+                    return Err(anyhow!("web session closed before emitting a value"));
+                }
+                Ok(Err(err)) => {
+                    return Err(err).context("web server exited before the session finished");
+                }
+                Err(err) => {
+                    return Err(anyhow!(err))
+                        .context("web server task panicked before the session finished");
+                }
+            },
         };
 
-        let _ = server.await;
+        match server.await {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => {
+                return Err(err).context("web server exited before the session finished");
+            }
+            Err(err) => {
+                return Err(anyhow!(err)).context("web server task panicked");
+            }
+        }
         Ok(value)
     }
 }
 
 pub async fn bind_session(config: WebSessionConfig, options: ServeOptions) -> Result<BoundSession> {
-    let (router, handles) = session_router(config)?;
+    let (router, handles) = tokio::task::spawn_blocking(move || session_router(config))
+        .await
+        .context("failed to build web session state")??;
     let listener = TcpListener::bind(SocketAddr::new(options.host, options.port))
         .await
         .context("failed to bind web listener")?;

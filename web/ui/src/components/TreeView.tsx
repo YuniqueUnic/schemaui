@@ -77,7 +77,8 @@ function TreeRow({
   hasError: (pointer: string) => boolean;
   onSelect(pointer: string): void;
 }) {
-  const isActive = item.pointer === selectedPointer;
+  const isActive = selectedPointer === item.pointer ||
+    selectedPointer?.startsWith(`${item.pointer}/`) === true;
   const isCollapsed = collapsed[item.pointer];
   const itemHasError = hasError(item.pointer);
   const toggle = (event: React.MouseEvent) => {

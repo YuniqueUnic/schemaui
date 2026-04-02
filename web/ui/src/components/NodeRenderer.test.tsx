@@ -356,6 +356,105 @@ const matrixNode: UiNode = {
   },
 };
 
+const arrayOfAnyOfNode: UiNode = {
+  pointer: "/arrayOfAnyOf",
+  title: "5. Array of anyOf items",
+  description: null,
+  required: false,
+  default_value: [],
+  kind: {
+    type: "array",
+    item: {
+      type: "composite",
+      mode: "any_of",
+      allow_multiple: false,
+      variants: [
+        {
+          id: "variant_0",
+          title: "Text Item",
+          description: null,
+          is_object: false,
+          node: {
+            type: "field",
+            scalar: "string",
+            enum_options: null,
+            enum_values: null,
+          },
+          schema: {
+            type: "string",
+            title: "Text Item",
+          },
+        },
+        {
+          id: "variant_1",
+          title: "Number Item",
+          description: null,
+          is_object: false,
+          node: {
+            type: "field",
+            scalar: "number",
+            enum_options: null,
+            enum_values: null,
+          },
+          schema: {
+            type: "number",
+            title: "Number Item",
+          },
+        },
+        {
+          id: "variant_2",
+          title: "Object Item",
+          description: null,
+          is_object: true,
+          node: {
+            type: "object",
+            children: [
+              {
+                pointer: "/id",
+                title: null,
+                description: null,
+                required: true,
+                default_value: "",
+                kind: {
+                  type: "field",
+                  scalar: "string",
+                  enum_options: null,
+                  enum_values: null,
+                },
+              },
+              {
+                pointer: "/value",
+                title: null,
+                description: null,
+                required: false,
+                default_value: 0,
+                kind: {
+                  type: "field",
+                  scalar: "number",
+                  enum_options: null,
+                  enum_values: null,
+                },
+              },
+            ],
+            required: ["id"],
+          },
+          schema: {
+            type: "object",
+            title: "Object Item",
+            properties: {
+              id: { type: "string" },
+              value: { type: "number" },
+            },
+            required: ["id"],
+          },
+        },
+      ],
+    },
+    min_items: null,
+    max_items: null,
+  },
+};
+
 function EditorHarness(
   { node, initialValue }: { node: UiNode; initialValue: JsonValue },
 ) {
@@ -443,5 +542,48 @@ describe("NodeRenderer web overlay flows", () => {
         },
       ],
     ]);
+  });
+
+  it("keeps complex array additions as drafts until done and preserves object variants", async () => {
+    const user = userEvent.setup();
+    render(<EditorHarness node={arrayOfAnyOfNode} initialValue={[]} />);
+
+    await user.click(screen.getByRole("button", { name: /add entry/i }));
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
+      [],
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByText("Object Item"));
+    expect(within(dialog).queryByText("Text Item content:")).toBeNull();
+    expect(within(dialog).getByText("Object Item content:")).toBeTruthy();
+    expect(within(dialog).queryByText("[object Object]")).toBeNull();
+
+    const textboxes = within(dialog).getAllByRole("textbox");
+    await user.clear(textboxes[0]);
+    await user.type(textboxes[0], "entry-1");
+    await user.click(within(dialog).getByRole("button", { name: /^done$/i }));
+
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
+      [
+        {
+          id: "entry-1",
+          value: 0,
+        },
+      ],
+    );
+  });
+
+  it("does not append a complex array entry when the dialog is cancelled", async () => {
+    const user = userEvent.setup();
+    render(<EditorHarness node={arrayOfAnyOfNode} initialValue={[]} />);
+
+    await user.click(screen.getByRole("button", { name: /add entry/i }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^cancel$/i }));
+
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
+      [],
+    );
   });
 });

@@ -9,6 +9,10 @@ import { OverlayProvider } from "./components/Overlay";
 import { ValidationErrorsDialog } from "./components/ValidationErrorsDialog";
 import type { JsonValue, UiLayout, UiNode } from "./types";
 import { getPointerValue } from "./utils/jsonPointer";
+import {
+  findNodeByPointer,
+  resolveNavigablePointer,
+} from "./utils/nodeLookup";
 import { useResizableColumns } from "./hooks/useResizableColumns";
 import { useSessionState } from "./hooks/useSessionState";
 import { useSessionActions } from "./hooks/useSessionActions";
@@ -34,15 +38,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selectedNode = useMemo(
-    () =>
-      findNodeByPointer(
-        state.session?.ui_ast?.roots ?? [],
-        state.selectedPointer,
-      ),
-    [state.session, state.selectedPointer],
-  );
-
   // Destructure state for easier access
   const {
     session,
@@ -61,6 +56,13 @@ export default function App() {
     showErrorsDialog,
     status,
   } = state;
+
+  const roots = session?.ui_ast?.roots ?? [];
+
+  const selectedNode = useMemo(
+    () => findNodeByPointer(roots, state.selectedPointer),
+    [roots, state.selectedPointer],
+  );
 
   const hasLayout = !!(session?.layout && session.layout.roots.length > 0);
   const focusLabel = selectedNode
@@ -233,28 +235,12 @@ export default function App() {
           open={showErrorsDialog}
           onOpenChange={actions.setShowErrorsDialog}
           errors={errors}
-          onNavigateToError={actions.setSelectedPointer}
+          onNavigateToError={(pointer) =>
+            actions.setSelectedPointer(resolveNavigablePointer(roots, pointer))}
         />
       </div>
     </OverlayProvider>
   );
-}
-
-function findNodeByPointer(
-  nodes: UiNode[],
-  pointer?: string,
-): UiNode | undefined {
-  if (!pointer) return nodes[0];
-  for (const node of nodes) {
-    if (node.pointer === pointer) {
-      return node;
-    }
-    if (node.kind.type === "object") {
-      const child = findNodeByPointer(node.kind.children ?? [], pointer);
-      if (child) return child;
-    }
-  }
-  return undefined;
 }
 
 function EditorBreadcrumbs(
@@ -364,7 +350,9 @@ function LayoutSectionNav(
   if (selectedPointer) {
     for (const root of model) {
       const matchingSections = root.sections.filter((section) =>
-        section.pointers.includes(selectedPointer)
+        section.pointers.some((pointer) =>
+          selectedPointer === pointer ||
+          selectedPointer.startsWith(`${pointer}/`))
       );
       if (matchingSections.length > 0) {
         activeRoot = root;
