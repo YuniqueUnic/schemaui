@@ -273,34 +273,117 @@ management and validation can map errors back precisely.
   errors, and context-aware help text. When auto-validate is enabled, each edit
   updates these counters immediately.
 
-| Context     | Shortcut                                                                              | Action                                         |
-| ----------- | ------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Navigation  | `Tab` / `Shift+Tab`                                                                   | Move between fields                            |
-|             | `Ctrl+Tab` / `Ctrl+Shift+Tab`                                                         | Switch sections                                |
-|             | `Ctrl+J` / `Ctrl+L`                                                                   | Switch root tabs                               |
-| Selection   | `Enter`                                                                               | Open popup / apply choice                      |
-| Editing     | `Ctrl+E`                                                                              | Launch composite editor                        |
-| Status      | `Esc`                                                                                 | Clear status or close popup                    |
-| Help        | `Ctrl+?`                                                                              | Toggle help overlay (shortcuts + errors table) |
-| Persistence | `Ctrl+S`                                                                              | Save + validate                                |
-| Exit        | `Ctrl+Q` / `Ctrl+C`                                                                   | Quit (requires confirmation if dirty)          |
-| Collections | `Ctrl+N` / `Ctrl+D`                                                                   | Add / remove entry                             |
-|             | `Ctrl+←/→`, `Ctrl+↑/↓`                                                                | Select / reorder entries                       |
-| Overlay     | `Ctrl+E` (open), `Ctrl+S` (save in place), `Esc` / `Ctrl+Q` (pop), `Ctrl+N/D/←/→/↑/↓` | Manage nested overlays & list entries          |
+### Generated shortcut reference
+
+<!-- AUTO-GENERATED:SHORTCUTS:BEGIN -->
+
+#### Default context
+
+| Shortcut            | Action                                              | Kind      |
+| ------------------- | --------------------------------------------------- | --------- |
+| `Tab` / `Down`      | Next field                                          | `command` |
+| `BackTab` / `Up`    | Previous field                                      | `command` |
+| `Ctrl+Tab`          | Next section                                        | `command` |
+| `Ctrl+Shift+Tab`    | Previous section                                    | `command` |
+| `Ctrl+L`            | Next root tab                                       | `command` |
+| `Ctrl+J`            | Previous root tab                                   | `command` |
+| `Enter`             | Open popup / apply selection                        | `command` |
+| `Ctrl+E`            | Open composite editor                               | `command` |
+| `Ctrl+S`            | Save & validate (overlays stay open)                | `command` |
+| `Ctrl+Q` / `Ctrl+C` | Quit (confirm if dirty)                             | `command` |
+| `Esc`               | Cancel / clear status (overlays: pop current level) | `command` |
+| `Ctrl+?` / `Ctrl+H` | Show help and error summary                         | `command` |
+
+#### Collection context
+
+| Shortcut            | Action                      | Kind      |
+| ------------------- | --------------------------- | --------- |
+| `Ctrl+E`            | Open composite editor       | `command` |
+| `Ctrl+N`            | Add entry                   | `command` |
+| `Ctrl+D`            | Remove entry                | `command` |
+| `Ctrl+Left`         | Select previous entry       | `command` |
+| `Ctrl+Right`        | Select next entry           | `command` |
+| `Ctrl+Up`           | Move entry up               | `command` |
+| `Ctrl+Down`         | Move entry down             | `command` |
+| `Ctrl+?` / `Ctrl+H` | Show help and error summary | `command` |
+
+#### Overlay context
+
+| Shortcut            | Action                                              | Kind      |
+| ------------------- | --------------------------------------------------- | --------- |
+| `Tab` / `Down`      | Next field                                          | `command` |
+| `BackTab` / `Up`    | Previous field                                      | `command` |
+| `Ctrl+N`            | Add entry                                           | `command` |
+| `Ctrl+D`            | Remove entry                                        | `command` |
+| `Ctrl+Left`         | Select previous entry                               | `command` |
+| `Ctrl+Right`        | Select next entry                                   | `command` |
+| `Ctrl+Up`           | Move entry up                                       | `command` |
+| `Ctrl+Down`         | Move entry down                                     | `command` |
+| `Ctrl+S`            | Save & validate (overlays stay open)                | `command` |
+| `Esc`               | Cancel / clear status (overlays: pop current level) | `command` |
+| `Ctrl+?` / `Ctrl+H` | Show help and error summary                         | `command` |
+
+#### Help context
+
+| Shortcut                    | Action                   | Kind      |
+| --------------------------- | ------------------------ | --------- |
+| `Esc` / `Ctrl+H` / `Ctrl+?` | Close help               | `command` |
+| `Tab`                       | Next error page          | `command` |
+| `BackTab`                   | Previous error page      | `command` |
+| `Up` / `k`                  | Scroll shortcuts up      | `command` |
+| `Down` / `j`                | Scroll shortcuts down    | `command` |
+| `PageUp`                    | Page shortcuts up        | `command` |
+| `PageDown`                  | Page shortcuts down      | `command` |
+| `Home`                      | Jump shortcuts to top    | `command` |
+| `End`                       | Jump shortcuts to bottom | `command` |
+| `h`                         | Scroll error text left   | `command` |
+| `l`                         | Scroll error text right  | `command` |
+
+#### Text field context
+
+| Shortcut    | Action                    | Kind         |
+| ----------- | ------------------------- | ------------ |
+| `Left`      | Move cursor left          | `local edit` |
+| `Right`     | Move cursor right         | `local edit` |
+| `Home`      | Jump to line start        | `local edit` |
+| `End`       | Jump to line end          | `local edit` |
+| `Backspace` | Delete previous character | `local edit` |
+| `Delete`    | Delete next character     | `local edit` |
+| `Ctrl+W`    | Delete previous word      | `local edit` |
+| `Ctrl+Z`    | Undo text edit            | `local edit` |
+| `Ctrl+Y`    | Redo text edit            | `local edit` |
+
+#### Numeric field context
+
+| Shortcut      | Action                    | Kind         |
+| ------------- | ------------------------- | ------------ |
+| `Left`        | Step value down           | `local edit` |
+| `Right`       | Step value up             | `local edit` |
+| `Shift+Left`  | Fast step value down      | `local edit` |
+| `Shift+Right` | Fast step value up        | `local edit` |
+| `Backspace`   | Delete previous character | `local edit` |
+| `Delete`      | Delete next character     | `local edit` |
+| `Ctrl+Z`      | Undo numeric edit         | `local edit` |
+| `Ctrl+Y`      | Redo numeric edit         | `local edit` |
+
+<!-- AUTO-GENERATED:SHORTCUTS:END -->
 
 ### Keymap system
 
 Put every shortcut into `keymap/default.keymap.json`, so runtime logic, help
-overlays, and documentation all consume a single source of truth.
+overlays, and generated README shortcut references all consume a single source
+of truth.
 
 - **Format** – each JSON object declares an `id`, human-readable `description`,
-  `contexts` (any of `"default"`, `"collection"`, `"overlay"`), an `action`
-  discriminated union, and a list of textual `combos`. For example:
+  bilingual `descriptionZh`, `contexts` (any of `"default"`, `"collection"`,
+  `"overlay"`, `"help"`, `"text"`, `"numeric"`), an `action` discriminated
+  union, and a list of textual `combos`. For example:
 
   ```json
   {
     "id": "list.move.up",
     "description": "Move entry up",
+    "descriptionZh": "条目上移",
     "contexts": ["collection", "overlay"],
     "action": { "kind": "ListMove", "delta": -1 },
     "combos": ["Ctrl+Up"]
@@ -314,6 +397,10 @@ overlays, and documentation all consume a single source of truth.
   which returns the `KeyAction` embedded in the JSON. `keymap::help_text`
   filters bindings by `KeymapContext`, concatenating snippets used by
   `StatusLine` and overlay instructions.
+- **Generated docs** – `build.rs` parses `keymap/default.keymap.json` and
+  refreshes the shortcut blocks in `README.md` and `README.ZH.md` using explicit
+  HTML markers, so normal Cargo builds keep the bilingual reference in sync with
+  runtime behavior.
 - **Extending** – to add a shortcut, edit the JSON, choose the contexts that
   should expose the help text, and wire the resulting `KeyAction` inside
   `KeyBindingMap` if a new semantic command is introduced.

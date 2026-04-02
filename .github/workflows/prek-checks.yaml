@@ -45,3 +45,8 @@ jobs:
 
       - name: prek
         uses: j178/prek-action@v2
+
+      - name: Verify generated README shortcut docs are committed
+        run: |
+          git diff -- README.md README.ZH.md
+          git diff --exit-code -- README.md README.ZH.md

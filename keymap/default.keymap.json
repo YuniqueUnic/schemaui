@@ -2,6 +2,7 @@
   {
     "id": "field.next",
     "description": "Next field",
+    "descriptionZh": "下一个字段",
     "contexts": [
       "default",
       "overlay"
@@ -18,6 +19,7 @@
   {
     "id": "field.prev",
     "description": "Previous field",
+    "descriptionZh": "上一个字段",
     "contexts": [
       "default",
       "overlay"
@@ -34,6 +36,7 @@
   {
     "id": "field.text.cursor.left",
     "description": "Move cursor left",
+    "descriptionZh": "光标左移",
     "contexts": [
       "text"
     ],
@@ -48,6 +51,7 @@
   {
     "id": "field.text.cursor.right",
     "description": "Move cursor right",
+    "descriptionZh": "光标右移",
     "contexts": [
       "text"
     ],
@@ -62,6 +66,7 @@
   {
     "id": "field.text.cursor.home",
     "description": "Jump to line start",
+    "descriptionZh": "跳到行首",
     "contexts": [
       "text"
     ],
@@ -76,6 +81,7 @@
   {
     "id": "field.text.cursor.end",
     "description": "Jump to line end",
+    "descriptionZh": "跳到行尾",
     "contexts": [
       "text"
     ],
@@ -90,6 +96,7 @@
   {
     "id": "field.text.delete.backward",
     "description": "Delete previous character",
+    "descriptionZh": "删除前一个字符",
     "contexts": [
       "text"
     ],
@@ -104,6 +111,7 @@
   {
     "id": "field.text.delete.forward",
     "description": "Delete next character",
+    "descriptionZh": "删除后一个字符",
     "contexts": [
       "text"
     ],
@@ -118,6 +126,7 @@
   {
     "id": "field.text.delete.word",
     "description": "Delete previous word",
+    "descriptionZh": "删除前一个单词",
     "contexts": [
       "text"
     ],
@@ -132,6 +141,7 @@
   {
     "id": "field.text.undo",
     "description": "Undo text edit",
+    "descriptionZh": "撤销文本编辑",
     "contexts": [
       "text"
     ],
@@ -146,6 +156,7 @@
   {
     "id": "field.text.redo",
     "description": "Redo text edit",
+    "descriptionZh": "重做文本编辑",
     "contexts": [
       "text"
     ],
@@ -160,6 +171,7 @@
   {
     "id": "field.numeric.step.left",
     "description": "Step value down",
+    "descriptionZh": "数值减一步",
     "contexts": [
       "numeric"
     ],
@@ -174,6 +186,7 @@
   {
     "id": "field.numeric.step.right",
     "description": "Step value up",
+    "descriptionZh": "数值加一步",
     "contexts": [
       "numeric"
     ],
@@ -188,6 +201,7 @@
   {
     "id": "field.numeric.fast-step.left",
     "description": "Fast step value down",
+    "descriptionZh": "数值快速减一步",
     "contexts": [
       "numeric"
     ],
@@ -202,6 +216,7 @@
   {
     "id": "field.numeric.fast-step.right",
     "description": "Fast step value up",
+    "descriptionZh": "数值快速加一步",
     "contexts": [
       "numeric"
     ],
@@ -216,6 +231,7 @@
   {
     "id": "field.numeric.delete.backward",
     "description": "Delete previous character",
+    "descriptionZh": "删除前一个字符",
     "contexts": [
       "numeric"
     ],
@@ -230,6 +246,7 @@
   {
     "id": "field.numeric.delete.forward",
     "description": "Delete next character",
+    "descriptionZh": "删除后一个字符",
     "contexts": [
       "numeric"
     ],
@@ -244,6 +261,7 @@
   {
     "id": "field.numeric.undo",
     "description": "Undo numeric edit",
+    "descriptionZh": "撤销数值编辑",
     "contexts": [
       "numeric"
     ],
@@ -258,6 +276,7 @@
   {
     "id": "field.numeric.redo",
     "description": "Redo numeric edit",
+    "descriptionZh": "重做数值编辑",
     "contexts": [
       "numeric"
     ],
@@ -272,6 +291,7 @@
   {
     "id": "help.close",
     "description": "Close help",
+    "descriptionZh": "关闭帮助",
     "contexts": [
       "help"
     ],
@@ -287,6 +307,7 @@
   {
     "id": "help.page.next",
     "description": "Next error page",
+    "descriptionZh": "下一页错误",
     "contexts": [
       "help"
     ],
@@ -301,6 +322,7 @@
   {
     "id": "help.page.prev",
     "description": "Previous error page",
+    "descriptionZh": "上一页错误",
     "contexts": [
       "help"
     ],
@@ -315,6 +337,7 @@
   {
     "id": "help.shortcuts.scroll.up",
     "description": "Scroll shortcuts up",
+    "descriptionZh": "快捷键向上滚动",
     "contexts": [
       "help"
     ],
@@ -330,6 +353,7 @@
   {
     "id": "help.shortcuts.scroll.down",
     "description": "Scroll shortcuts down",
+    "descriptionZh": "快捷键向下滚动",
     "contexts": [
       "help"
     ],
@@ -345,6 +369,7 @@
   {
     "id": "help.shortcuts.page.up",
     "description": "Page shortcuts up",
+    "descriptionZh": "快捷键上翻页",
     "contexts": [
       "help"
     ],
@@ -359,6 +384,7 @@
   {
     "id": "help.shortcuts.page.down",
     "description": "Page shortcuts down",
+    "descriptionZh": "快捷键下翻页",
     "contexts": [
       "help"
     ],
@@ -373,6 +399,7 @@
   {
     "id": "help.shortcuts.home",
     "description": "Jump shortcuts to top",
+    "descriptionZh": "快捷键跳到顶部",
     "contexts": [
       "help"
     ],
@@ -386,6 +413,7 @@
   {
     "id": "help.shortcuts.end",
     "description": "Jump shortcuts to bottom",
+    "descriptionZh": "快捷键跳到底部",
     "contexts": [
       "help"
     ],
@@ -399,6 +427,7 @@
   {
     "id": "help.errors.scroll.left",
     "description": "Scroll error text left",
+    "descriptionZh": "错误文本左滚",
     "contexts": [
       "help"
     ],
@@ -413,6 +442,7 @@
   {
     "id": "help.errors.scroll.right",
     "description": "Scroll error text right",
+    "descriptionZh": "错误文本右滚",
     "contexts": [
       "help"
     ],
@@ -427,6 +457,7 @@
   {
     "id": "section.next",
     "description": "Next section",
+    "descriptionZh": "下一个分区",
     "contexts": [
       "default"
     ],
@@ -441,6 +472,7 @@
   {
     "id": "section.prev",
     "description": "Previous section",
+    "descriptionZh": "上一个分区",
     "contexts": [
       "default"
     ],
@@ -455,6 +487,7 @@
   {
     "id": "root.next",
     "description": "Next root tab",
+    "descriptionZh": "下一个根标签",
     "contexts": [
       "default"
     ],
@@ -469,6 +502,7 @@
   {
     "id": "root.prev",
     "description": "Previous root tab",
+    "descriptionZh": "上一个根标签",
     "contexts": [
       "default"
     ],
@@ -483,6 +517,7 @@
   {
     "id": "popup.toggle",
     "description": "Open popup / apply selection",
+    "descriptionZh": "打开弹窗 / 应用选择",
     "contexts": [
       "default"
     ],
@@ -496,6 +531,7 @@
   {
     "id": "composite.edit",
     "description": "Open composite editor",
+    "descriptionZh": "打开复合编辑器",
     "contexts": [
       "default",
       "collection"
@@ -510,6 +546,7 @@
   {
     "id": "list.add",
     "description": "Add entry",
+    "descriptionZh": "添加条目",
     "contexts": [
       "collection",
       "overlay"
@@ -524,6 +561,7 @@
   {
     "id": "list.remove",
     "description": "Remove entry",
+    "descriptionZh": "删除条目",
     "contexts": [
       "collection",
       "overlay"
@@ -538,6 +576,7 @@
   {
     "id": "list.select.prev",
     "description": "Select previous entry",
+    "descriptionZh": "选择上一个条目",
     "contexts": [
       "collection",
       "overlay"
@@ -553,6 +592,7 @@
   {
     "id": "list.select.next",
     "description": "Select next entry",
+    "descriptionZh": "选择下一个条目",
     "contexts": [
       "collection",
       "overlay"
@@ -568,6 +608,7 @@
   {
     "id": "list.move.up",
     "description": "Move entry up",
+    "descriptionZh": "条目上移",
     "contexts": [
       "collection",
       "overlay"
@@ -583,6 +624,7 @@
   {
     "id": "list.move.down",
     "description": "Move entry down",
+    "descriptionZh": "条目下移",
     "contexts": [
       "collection",
       "overlay"
@@ -598,6 +640,7 @@
   {
     "id": "app.save",
     "description": "Save & validate (overlays stay open)",
+    "descriptionZh": "保存并验证（覆盖层保持打开）",
     "contexts": [
       "default",
       "overlay"
@@ -612,6 +655,7 @@
   {
     "id": "app.quit",
     "description": "Quit (confirm if dirty)",
+    "descriptionZh": "退出（脏状态需确认）",
     "contexts": [
       "default"
     ],
@@ -626,6 +670,7 @@
   {
     "id": "status.reset",
     "description": "Cancel / clear status (overlays: pop current level)",
+    "descriptionZh": "取消 / 清除状态（覆盖层：弹出当前层）",
     "contexts": [
       "default",
       "overlay"
@@ -640,6 +685,7 @@
   {
     "id": "help.show",
     "description": "Show help and error summary",
+    "descriptionZh": "显示帮助与错误摘要",
     "contexts": [
       "default",
       "collection",
