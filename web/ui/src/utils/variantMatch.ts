@@ -3,45 +3,77 @@ import { deepEqual } from "./deepEqual";
 
 type JsonSchema = JsonValue;
 
+interface MatchResult {
+  matched: boolean;
+  score: number;
+}
+
 export function variantMatches(
   value: JsonValue | undefined,
   schema: JsonSchema | undefined,
 ): boolean {
+  return variantMatchScore(value, schema) !== null;
+}
+
+export function variantMatchScore(
+  value: JsonValue | undefined,
+  schema: JsonSchema | undefined,
+): number | null {
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
-    return false;
+    return null;
   }
 
-  return matchSchema(value, schema as Record<string, JsonValue>);
+  const result = matchSchema(value, schema as Record<string, JsonValue>);
+  return result.matched ? result.score : null;
 }
 
 function matchSchema(
   value: JsonValue | undefined,
   schema: Record<string, JsonValue>,
-): boolean {
+): MatchResult {
   if (schema.const !== undefined) {
-    return deepEqual(value, schema.const as JsonValue);
+    return deepEqual(value, schema.const as JsonValue)
+      ? { matched: true, score: 200 }
+      : noMatch();
   }
   if (Array.isArray(schema.enum)) {
     return (schema.enum as JsonValue[]).some((entry) =>
-      deepEqual(entry, value)
-    );
+        deepEqual(entry, value)
+      )
+      ? { matched: true, score: 150 }
+      : noMatch();
   }
 
   if (Array.isArray(schema.allOf)) {
-    return (schema.allOf as JsonSchema[]).every((sub) =>
-      matchSchema(value, ensureObject(sub))
-    );
+    let score = 40;
+    for (const sub of schema.allOf as JsonSchema[]) {
+      const result = matchSchema(value, ensureObject(sub));
+      if (!result.matched) {
+        return noMatch();
+      }
+      score += result.score;
+    }
+    return { matched: true, score };
   }
   if (Array.isArray(schema.oneOf)) {
-    const matches = (schema.oneOf as JsonSchema[]).filter((sub) =>
-      matchSchema(value, ensureObject(sub))
-    );
-    return matches.length === 1;
+    const matches = (schema.oneOf as JsonSchema[])
+      .map((sub) => matchSchema(value, ensureObject(sub)))
+      .filter((result) => result.matched);
+    return matches.length === 1
+      ? { matched: true, score: 60 + matches[0].score }
+      : noMatch();
   }
   if (Array.isArray(schema.anyOf)) {
-    return (schema.anyOf as JsonSchema[]).some((sub) =>
-      matchSchema(value, ensureObject(sub))
-    );
+    const matches = (schema.anyOf as JsonSchema[])
+      .map((sub) => matchSchema(value, ensureObject(sub)))
+      .filter((result) => result.matched);
+    if (matches.length === 0) {
+      return noMatch();
+    }
+    return {
+      matched: true,
+      score: 50 + Math.max(...matches.map((result) => result.score)),
+    };
   }
 
   const normalizedType = normalizeType(schema.type);
@@ -53,20 +85,23 @@ function matchSchema(
   }
 
   if (normalizedType) {
-    return typeMatches(value, normalizedType);
+    return typeMatches(value, normalizedType)
+      ? { matched: true, score: 100 }
+      : noMatch();
   }
 
-  return true;
+  return { matched: true, score: 10 };
 }
 
 function matchObject(
   value: JsonValue | undefined,
   schema: Record<string, JsonValue>,
-): boolean {
+): MatchResult {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return false;
+    return noMatch();
   }
   const obj = value as Record<string, JsonValue>;
+  let score = 120;
 
   // Step 1: Check const fields - these are discriminators for variant matching
   // If any const field doesn't match, this is definitely not the right variant
@@ -78,8 +113,9 @@ function matchObject(
       }
       if ("const" in propSchema) {
         if (!deepEqual(obj[key], propSchema.const)) {
-          return false; // Const field mismatch - definitely wrong variant
+          return noMatch(); // Const field mismatch - definitely wrong variant
         }
+        score += 80;
       }
     }
   }
@@ -90,12 +126,12 @@ function matchObject(
     : [];
   for (const key of required) {
     if (typeof key === "string" && !(key in obj)) {
-      return false; // Missing required field
+      return noMatch(); // Missing required field
     }
+    score += 25;
   }
 
-  // Step 3: For stricter matching, check if the object has only the expected fields
-  // This helps distinguish between variants that have different field sets
+  // Step 3: Check object field compatibility against schema properties.
   if (schema.properties && typeof schema.properties === "object") {
     const props = schema.properties as Record<string, JsonValue>;
     const schemaKeys = Object.keys(props);
@@ -114,41 +150,10 @@ function matchObject(
     // If object has fields not in this schema, it's likely the wrong variant
     // This is critical for discriminating between variants in oneOf/anyOf
     if (unexpectedFieldCount > 0) {
-      // Always be strict about unexpected fields for variant matching
-      // This helps distinguish simpleItem (id, label, enabled) from numericItem (id, values)
-      // The only exception is if additionalProperties is explicitly true
       if (schema.additionalProperties !== true) {
-        return false;
+        return noMatch();
       }
-    }
-
-    // Also check if this schema expects fields that the object doesn't have
-    // This helps distinguish variants with different field sets
-    const missingExpectedFields = schemaKeys.filter((key) => !(key in obj));
-
-    // Check if any missing fields are required - if so, immediate fail
-    for (const missingKey of missingExpectedFields) {
-      if (required.includes(missingKey)) {
-        return false; // Missing required field
-      }
-    }
-
-    // For variant matching: if object has ALL the properties it needs
-    // but schema expects additional properties the object doesn't have,
-    // this might not be the right variant
-    // This helps distinguish simpleItem (id, label, enabled) from numericItem (id, values)
-    if (missingExpectedFields.length > 0 && unexpectedFieldCount === 0) {
-      // Object perfectly matches a subset of this schema's fields
-      // But is missing some optional fields - this is suspicious for variant matching
-      // Only allow this if we have explicit evidence this is the right variant
-
-      // If object has fields NOT in this schema, definitely wrong variant
-      // But we already checked that above (unexpectedFieldCount === 0 here)
-
-      // If we have many missing fields, probably wrong variant
-      if (missingExpectedFields.length > schemaKeys.length * 0.5) {
-        return false; // Too many missing fields
-      }
+      score -= unexpectedFieldCount * 5;
     }
 
     // Check property schemas
@@ -162,33 +167,48 @@ function matchObject(
 
       // If the field exists in the object, it must match the schema
       if (obj[key] !== undefined) {
-        if (!matchSchema(obj[key], propSchema as Record<string, JsonValue>)) {
-          return false;
+        const result = matchSchema(obj[key], propSchema as Record<string, JsonValue>);
+        if (!result.matched) {
+          return noMatch();
         }
+        score += 20 + result.score;
       } else if (required.includes(key)) {
-        return false; // Required field is missing
+        return noMatch(); // Required field is missing
       }
     }
   }
 
-  return true;
+  return { matched: true, score };
 }
 
 function matchArray(
   value: JsonValue | undefined,
   schema: Record<string, JsonValue>,
-): boolean {
+): MatchResult {
   if (!Array.isArray(value)) {
-    return false;
+    return noMatch();
   }
+  let score = 110 + value.length;
   if (!schema.items) {
-    return true;
+    return { matched: true, score };
   }
   if (Array.isArray(schema.items)) {
-    return schema.items.length === 0 ||
-      matchSchema(value[0], ensureObject(schema.items[0]));
+    if (schema.items.length === 0) {
+      return { matched: true, score };
+    }
+    const result = matchSchema(value[0], ensureObject(schema.items[0]));
+    return result.matched
+      ? { matched: true, score: score + result.score }
+      : noMatch();
   }
-  return value.every((entry) => matchSchema(entry, ensureObject(schema.items)));
+  for (const entry of value) {
+    const result = matchSchema(entry, ensureObject(schema.items));
+    if (!result.matched) {
+      return noMatch();
+    }
+    score += result.score;
+  }
+  return { matched: true, score };
 }
 
 function ensureObject(value: JsonValue | undefined): Record<string, JsonValue> {
@@ -228,4 +248,8 @@ function typeMatches(value: JsonValue | undefined, expected: string): boolean {
     default:
       return true;
   }
+}
+
+function noMatch(): MatchResult {
+  return { matched: false, score: Number.NEGATIVE_INFINITY };
 }

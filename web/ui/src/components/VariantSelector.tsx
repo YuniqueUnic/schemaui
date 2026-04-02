@@ -29,13 +29,21 @@ export function VariantSelector({
   return (
     <div className="space-y-2">
       {/* Variant Cards */}
-      <div className="space-y-2">
+      <div
+        className="space-y-2"
+        role="radiogroup"
+        aria-label={`${mode === "one_of" ? "One of" : "Any of"} variants`}
+      >
         {variants.map((variant) => {
           const isActive = variant.id === activeVariantId;
+          const handleActivate = () => onSelect(variant);
 
           return (
             <Card
               key={variant.id}
+              role="radio"
+              aria-checked={isActive}
+              tabIndex={0}
               className={`
                 p-2 cursor-pointer transition-all hover:border-primary/50
                 ${
@@ -44,7 +52,13 @@ export function VariantSelector({
                   : "border-border hover:bg-accent/50"
               }
               `}
-              onClick={() => onSelect(variant)}
+              onClick={handleActivate}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleActivate();
+                }
+              }}
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2">

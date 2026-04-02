@@ -156,25 +156,6 @@ function collectDefaults(
   if (node.kind.type === "object") {
     node.kind.children.forEach((child) => collectDefaults(child, store));
   }
-
-  if (node.kind.type === "composite") {
-    node.kind.variants.forEach((variant) =>
-      walkVariant(variant, store, node.pointer)
-    );
-  }
-}
-
-function walkVariant(
-  variant: UiVariant,
-  store: Record<string, JsonValue | undefined>,
-  basePointer: string,
-) {
-  const defaultValue = variantDefault(variant);
-  store[basePointer] = deepClone(defaultValue);
-  // Note: We don't recursively collect defaults for variant children here
-  // because they should only be applied when this specific variant is active.
-  // The variantDefault function already handles generating the complete default
-  // object for the variant, including all its required fields.
 }
 
 function ensureObjectRoot(value: JsonValue): JsonValue {

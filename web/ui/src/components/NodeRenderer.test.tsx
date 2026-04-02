@@ -455,6 +455,126 @@ const arrayOfAnyOfNode: UiNode = {
   },
 };
 
+const complexCompositeConfigNode: UiNode = {
+  pointer: "/complexComposite/config",
+  title: "complexComposite",
+  description: null,
+  required: false,
+  default_value: [],
+  kind: {
+    type: "composite",
+    mode: "any_of",
+    allow_multiple: false,
+    variants: [
+      {
+        id: "variant_0",
+        title: "List Config",
+        description: null,
+        is_object: false,
+        node: {
+          type: "array",
+          item: {
+            type: "field",
+            scalar: "string",
+            enum_options: null,
+            enum_values: null,
+          },
+          min_items: null,
+          max_items: null,
+        },
+        schema: {
+          type: "array",
+          title: "List Config",
+          items: {
+            type: "string",
+          },
+        },
+      },
+      {
+        id: "variant_1",
+        title: "Object Config",
+        description: null,
+        is_object: true,
+        node: {
+          type: "object",
+          children: [
+            {
+              pointer: "/mode",
+              title: null,
+              description: null,
+              required: false,
+              default_value: "basic",
+              kind: {
+                type: "field",
+                scalar: "string",
+                enum_options: ["basic", "advanced"],
+                enum_values: ["basic", "advanced"],
+              },
+            },
+            {
+              pointer: "/settings",
+              title: null,
+              description: null,
+              required: false,
+              default_value: {},
+              kind: {
+                type: "object",
+                children: [
+                  {
+                    pointer: "/timeout",
+                    title: null,
+                    description: null,
+                    required: false,
+                    default_value: 0,
+                    kind: {
+                      type: "field",
+                      scalar: "integer",
+                      enum_options: null,
+                      enum_values: null,
+                    },
+                  },
+                  {
+                    pointer: "/retries",
+                    title: null,
+                    description: null,
+                    required: false,
+                    default_value: 0,
+                    kind: {
+                      type: "field",
+                      scalar: "integer",
+                      enum_options: null,
+                      enum_values: null,
+                    },
+                  },
+                ],
+                required: [],
+              },
+            },
+          ],
+          required: [],
+        },
+        schema: {
+          type: "object",
+          title: "Object Config",
+          properties: {
+            mode: {
+              type: "string",
+              enum: ["basic", "advanced"],
+            },
+            settings: {
+              type: "object",
+              properties: {
+                timeout: { type: "integer" },
+                retries: { type: "integer" },
+              },
+            },
+          },
+        },
+      },
+    ],
+  },
+};
+
 function EditorHarness(
   { node, initialValue }: { node: UiNode; initialValue: JsonValue },
 ) {
@@ -584,6 +704,35 @@ describe("NodeRenderer web overlay flows", () => {
 
     expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
       [],
+    );
+  });
+
+  it("keeps single composite selector and content in sync for nested object variants", async () => {
+    const user = userEvent.setup();
+    render(
+      <EditorHarness
+        node={complexCompositeConfigNode}
+        initialValue={[]}
+      />,
+    );
+
+    const listRadio = screen.getByRole("radio", { name: /list config/i });
+    const objectRadio = screen.getByRole("radio", { name: /object config/i });
+    expect(listRadio).toHaveAttribute("aria-checked", "true");
+    expect(objectRadio).toHaveAttribute("aria-checked", "false");
+
+    await user.click(objectRadio);
+
+    expect(objectRadio).toHaveAttribute("aria-checked", "true");
+    expect(listRadio).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Object Config content:")).toBeTruthy();
+    expect(screen.queryByText("List Config content:")).toBeNull();
+    expect(screen.getByText("/settings")).toBeTruthy();
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
+      {
+        mode: "basic",
+        settings: {},
+      },
     );
   });
 });

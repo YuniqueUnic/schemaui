@@ -4,7 +4,7 @@ import {
   type VariantConfig,
 } from "../constants/variantDefaults";
 import { deepEqual } from "./deepEqual";
-import { variantMatches } from "./variantMatch";
+import { variantMatchScore } from "./variantMatch";
 import { variantDefault } from "../ui-ast";
 
 /**
@@ -54,8 +54,7 @@ export function determineVariant(
   value: JsonValue | undefined,
   variants: UiVariant[],
 ): UiVariant | undefined {
-  return variants.find((variant) => variantMatches(value, variant.schema)) ??
-    variants[0];
+  return determineBestVariant(value, variants);
 }
 
 /**
@@ -66,25 +65,31 @@ export function determineBestVariant(
   value: JsonValue | undefined,
   variants: UiVariant[],
 ): UiVariant {
-  const matchingVariants = variants.filter((v) =>
-    variantMatches(value, v.schema)
-  );
+  const matchingVariants = variants
+    .map((variant) => ({
+      variant,
+      score: variantMatchScore(value, variant.schema),
+    }))
+    .filter((entry): entry is { variant: UiVariant; score: number } =>
+      entry.score !== null
+    );
 
   // Exactly one match - use it
   if (matchingVariants.length === 1) {
-    return matchingVariants[0];
+    return matchingVariants[0].variant;
   }
 
   // Multiple matches - try exact default matching
   if (matchingVariants.length > 1) {
-    const exactMatch = matchingVariants.find((v) => {
-      const defaultVal = variantDefault(v);
+    const exactMatch = matchingVariants.find(({ variant }) => {
+      const defaultVal = variantDefault(variant);
       return deepEqual(value, defaultVal);
     });
     if (exactMatch) {
-      return exactMatch;
+      return exactMatch.variant;
     }
-    return matchingVariants[0];
+    return matchingVariants
+      .sort((left, right) => right.score - left.score)[0].variant;
   }
 
   // No matches - fallback to first variant
