@@ -76,6 +76,24 @@ python3 scripts/sync-install-docs.py --check
 - 写回文档时会使用 `deno fmt` 归一化 Markdown 输出；`--check` 可在无 `deno`
   环境下运行
 
+## 🚀 发布入口
+
+如果要用 `cargo release` 发布 `schemaui-cli`，仓库已经把 tag 约定和 GitHub
+workflow 串好了：
+
+```bash
+just release-cli-dry-run patch
+just release-cli patch
+```
+
+- `just release-cli` 等价于
+  `cargo release <level> --package schemaui-cli --execute`
+- 发布时会运行 `release.toml` 里的 pre-release hook，更新 web bundle / CLI 依赖
+  / README 版本
+- 推送到 GitHub 后：
+  - `push main` 会触发 `prek-checks`、`release-plz-pr`、`release-plz-release`
+  - `push schemaui-cli-v* tag` 会自动创建 GitHub Release，并继续触发 `CD`
+
 ## 🐛 故障排除
 
 ### 常见问题

@@ -44,6 +44,14 @@ build-web:
 build-cli:
     cargo build -p schemaui-cli -F full
 
+# dry-run a schemaui-cli release locally
+release-cli-dry-run level="patch":
+    cargo release {{level}} --package schemaui-cli
+
+# publish schemaui-cli, create the release tag, and push commit/tag to origin
+release-cli level="patch":
+    cargo release {{level}} --package schemaui-cli --execute
+
 # build everything(cli, web)
 build: build-web
     @just build-cli

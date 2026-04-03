@@ -1,0 +1,35 @@
+name: cargo-release-tag
+
+on:
+  push:
+    tags:
+      - "schemaui-cli-v*"
+
+permissions: {}
+
+jobs:
+  publish-github-release:
+    name: Publish GitHub Release From Cargo Tag
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'YuniqueUnic'
+    permissions:
+      contents: write
+    steps:
+      - name: Create GitHub release for pushed tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub release $RELEASE_TAG already exists; nothing to do."
+            exit 0
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            --repo "$REPOSITORY" \
+            --title "$RELEASE_TAG" \
+            --verify-tag \
+            --generate-notes

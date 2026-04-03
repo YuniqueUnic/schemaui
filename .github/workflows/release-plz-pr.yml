@@ -4,12 +4,10 @@ on:
   push:
     branches:
       - main
-    # 忽略只修改了这些文件的 push（通常是 release-plz 的更改）
+    # 忽略只包含文档/分发产物维护的 push；版本 bump 仍需触发，确保 cargo release 推送可被观察到
     paths-ignore:
       - "CHANGELOG.md"
       - "schemaui-cli/CHANGELOG.md"
-      - "**/Cargo.toml"
-      - "Cargo.lock"
       - "README*.md"
       - "Formula/**"
       - "packaging/**"

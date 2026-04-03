@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-    # 只在这些文件被修改时触发（通常是 release-plz PR 被合并）
+    # 只在 release 关键元数据变更时触发（release-plz PR 合并或 cargo release 版本提交）
     paths:
       - "CHANGELOG.md"
       - "**/Cargo.toml"
@@ -14,10 +14,64 @@ on:
 permissions: {}
 
 jobs:
+  detect-release-origin:
+    name: Detect Cargo Release Publish
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'YuniqueUnic'
+    outputs:
+      skip_release_plz: ${{ steps.detect.outputs.skip_release_plz }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch tags
+        run: git fetch --force --tags origin
+
+      - name: Detect pre-existing release tag on HEAD
+        id: detect
+        env:
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          head_tags="$(git tag --points-at HEAD || true)"
+          skip_release_plz=false
+
+          if grep -Eq '^(schemaui-cli-)?v[0-9]' <<<"$head_tags"; then
+            skip_release_plz=true
+          fi
+
+          if [[ "${HEAD_MESSAGE:-}" =~ ^chore:\ Release\ .+\ version\  ]]; then
+            skip_release_plz=true
+          fi
+
+          echo "HEAD commit message: ${HEAD_MESSAGE:-<none>}"
+          if [[ -n "$head_tags" ]]; then
+            printf 'HEAD release tags:\n%s\n' "$head_tags"
+          else
+            echo "HEAD release tags: <none>"
+          fi
+          echo "skip_release_plz=$skip_release_plz" >> "$GITHUB_OUTPUT"
+
+  release-plz-release-skipped:
+    name: Skip Duplicate Release Publish
+    runs-on: ubuntu-latest
+    needs: detect-release-origin
+    if: github.repository_owner == 'YuniqueUnic' && needs.detect-release-origin.outputs.skip_release_plz == 'true'
+    steps:
+      - name: Explain skip
+        run: |
+          echo "Detected an existing cargo release commit/tag on HEAD."
+          echo "Skipping release-plz release to avoid duplicate crate publish and GitHub release creation."
+
   release-plz-release:
     name: Publish Release
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'YuniqueUnic'
+    needs: detect-release-origin
+    if: github.repository_owner == 'YuniqueUnic' && needs.detect-release-origin.outputs.skip_release_plz != 'true'
     permissions:
       pull-requests: write
       contents: write
