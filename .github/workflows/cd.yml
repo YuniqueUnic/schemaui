@@ -144,17 +144,34 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           permission-contents: write
 
+      - name: Resolve GitHub auth token
+        id: resolve-token
+        env:
+          RELEASE_PLZ_PAT: ${{ secrets.RELEASE_PLZ_PAT }}
+          APP_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${RELEASE_PLZ_PAT:-}" ]]; then
+            echo "token=${RELEASE_PLZ_PAT}" >> "$GITHUB_OUTPUT"
+            echo "source=release_plz_pat" >> "$GITHUB_OUTPUT"
+          else
+            echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
+            echo "source=github_app" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate package manager manifests
         env:
-          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.resolve-token.outputs.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
+          echo "Using auth source: ${{ steps.resolve-token.outputs.source }}"
           python3 scripts/sync-package-manifests.py --tag "$RELEASE_TAG"
 
       - name: Commit manifest updates
         env:
-          PUSH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          PUSH_TOKEN: ${{ steps.resolve-token.outputs.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
@@ -198,17 +215,34 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           permission-contents: write
 
+      - name: Resolve GitHub auth token
+        id: resolve-token
+        env:
+          RELEASE_PLZ_PAT: ${{ secrets.RELEASE_PLZ_PAT }}
+          APP_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${RELEASE_PLZ_PAT:-}" ]]; then
+            echo "token=${RELEASE_PLZ_PAT}" >> "$GITHUB_OUTPUT"
+            echo "source=release_plz_pat" >> "$GITHUB_OUTPUT"
+          else
+            echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
+            echo "source=github_app" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate package manager manifests
         env:
-          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.resolve-token.outputs.token }}
           RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
           set -euo pipefail
+          echo "Using auth source: ${{ steps.resolve-token.outputs.source }}"
           python3 scripts/sync-package-manifests.py --tag "$RELEASE_TAG"
 
       - name: Commit manifest updates
         env:
-          PUSH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          PUSH_TOKEN: ${{ steps.resolve-token.outputs.token }}
           RELEASE_TAG: ${{ github.event.inputs.release_tag }}
         run: |
           set -euo pipefail
