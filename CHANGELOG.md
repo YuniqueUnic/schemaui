@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.7.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.7.0...schemaui-v0.7.1) - 2026-04-03
+
+### Fixed
+
+- *(workflow)* add cargo-release-tag workflow for GitHub releases
+
+### Other
+
+- *(sync-install-docs)* add deno fmt normalization and improve comparison logic
+- add automated CLI installation documentation sync
+- add multi-platform distribution support with automated package management
+
 ## [0.7.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.6.1...schemaui-v0.7.0) - 2026-04-02
 
 ### Added
