@@ -16,6 +16,10 @@ import {
 import { useResizableColumns } from "./hooks/useResizableColumns";
 import { useSessionState } from "./hooks/useSessionState";
 import { useSessionActions } from "./hooks/useSessionActions";
+import { useMediaQuery } from "./hooks/useMediaQuery";
+import { cn } from "@/lib/utils";
+
+type PanelView = "nav" | "editor" | "preview";
 
 export default function App() {
   const { state, actions, dirtyRef } = useSessionState();
@@ -31,6 +35,8 @@ export default function App() {
   } = useSessionActions({ state, actions, dirtyRef });
 
   const [navMode, setNavMode] = useState<"schema" | "layout">("schema");
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const [mobileView, setMobileView] = useState<PanelView>("editor");
 
   // Initialize session on mount (empty deps to run only once)
   useEffect(() => {
@@ -118,11 +124,21 @@ export default function App() {
           onSave={handleSave}
           onExit={() => handleExit()}
         />
-        <div className="app-panel-muted flex flex-1 overflow-hidden border-y border-theme">
+        <div className="app-panel-muted flex flex-1 flex-col overflow-hidden border-y border-theme lg:flex-row">
+          {!isDesktop && (
+            <MobilePanelSwitch
+              value={mobileView}
+              onChange={setMobileView}
+            />
+          )}
           {/* Navigation Panel */}
           <aside
-            className="hidden md:flex app-panel flex-col border-r border-theme"
-            style={{ width: sizes.nav }}
+            className={cn(
+              "app-panel flex-col border-theme lg:flex lg:border-r",
+              !isDesktop && mobileView === "nav" && "flex flex-1 border-b",
+              !isDesktop && mobileView !== "nav" && "hidden",
+            )}
+            style={isDesktop ? { width: sizes.nav } : undefined}
           >
             <div className="border-b border-theme px-4 py-3 text-xs uppercase tracking-[0.3em] text-muted-foreground flex items-center justify-between gap-2">
               <span>Navigation</span>
@@ -158,7 +174,10 @@ export default function App() {
                 ast={session?.ui_ast}
                 selectedPointer={selectedPointer}
                 errors={errors}
-                onSelect={actions.setSelectedPointer}
+                onSelect={(pointer) => {
+                  actions.setSelectedPointer(pointer);
+                  if (!isDesktop) setMobileView("editor");
+                }}
               />
             )}
             {hasLayout && navMode === "layout" && (
@@ -167,7 +186,10 @@ export default function App() {
                   layout={session.layout}
                   ast={session?.ui_ast}
                   selectedPointer={selectedPointer}
-                  onSelect={actions.setSelectedPointer}
+                  onSelect={(pointer) => {
+                    actions.setSelectedPointer(pointer);
+                    if (!isDesktop) setMobileView("editor");
+                  }}
                 />
               </div>
             )}
@@ -182,7 +204,13 @@ export default function App() {
             </div>
           </div>
           {/* Main Editor Panel */}
-          <main className="app-panel flex flex-1 flex-col overflow-hidden px-4 md:px-6 py-4">
+          <main
+            className={cn(
+              "app-panel flex-col overflow-hidden px-4 md:px-6 py-4 lg:flex lg:flex-1",
+              !isDesktop && mobileView === "editor" && "flex flex-1",
+              !isDesktop && mobileView !== "editor" && "hidden",
+            )}
+          >
             <LayoutSectionNav
               roots={roots}
               rootLabel={virtualRootTitle}
@@ -218,8 +246,12 @@ export default function App() {
           </div>
           {/* Preview Panel */}
           <section
-            className="hidden lg:flex app-panel h-full flex-col border-l border-theme"
-            style={{ width: sizes.preview }}
+            className={cn(
+              "app-panel flex-col border-theme lg:flex lg:h-full lg:border-l",
+              !isDesktop && mobileView === "preview" && "flex flex-1 border-t",
+              !isDesktop && mobileView !== "preview" && "hidden",
+            )}
+            style={isDesktop ? { width: sizes.preview } : undefined}
           >
             <PreviewPane
               formats={formats}
@@ -471,4 +503,41 @@ function lastPointerSegment(pointer: string): string | undefined {
   if (!pointer || pointer === "/") return undefined;
   const segments = pointer.split("/").filter(Boolean);
   return segments[segments.length - 1]?.replace(/~1/g, "/").replace(/~0/g, "~");
+}
+
+interface MobilePanelSwitchProps {
+  value: PanelView;
+  onChange(value: PanelView): void;
+}
+
+function MobilePanelSwitch({ value, onChange }: MobilePanelSwitchProps) {
+  const options: { id: PanelView; label: string }[] = [
+    { id: "nav", label: "Nav" },
+    { id: "editor", label: "Editor" },
+    { id: "preview", label: "Preview" },
+  ];
+  return (
+    <div className="lg:hidden flex items-center justify-center gap-1 border-b border-theme bg-background/80 px-2 py-2">
+      <div className="inline-flex rounded-full bg-muted p-0.5 text-xs">
+        {options.map((opt) => {
+          const active = value === opt.id;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => onChange(opt.id)}
+              className={cn(
+                "rounded-full px-3 py-1 transition-colors",
+                active
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
