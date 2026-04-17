@@ -6,6 +6,7 @@ import {
 } from "../../utils/variantHelpers";
 import { materializeVariantNode } from "../../utils/schemaToUiKind";
 import { formatValueSummary, inferValueType } from "../../utils/typeHelpers";
+import { setPointerValue } from "../../utils/jsonPointer";
 import { VariantSelector } from "../VariantSelector";
 import { EntryEditor } from "./shared/EntryEditor";
 import { useOverlay } from "../Overlay";
@@ -95,32 +96,37 @@ function SingleVariantRenderer({
     changedPointer: string,
     newValue: JsonValue,
   ) => {
-    // For composite types with object values, handle nested updates
+    // Only apply nested-path logic when the variant is an object and the
+    // current composite value is an object. This preserves arrays / scalars.
     if (
       activeVariant.node.type === "object" &&
-      typeof value === "object" && value !== null
+      typeof value === "object" && value !== null && !Array.isArray(value)
     ) {
-      // Absolute path (e.g., /e/e1/e2/e3/e4/logic/value)
-      if (changedPointer.startsWith(node.pointer + "/")) {
-        const fieldPath = changedPointer.substring(node.pointer.length);
-        const fieldName = fieldPath.substring(1).split("/")[0];
-        onChange(node.pointer, { ...value, [fieldName]: newValue });
+      // Case 1: changed pointer is absolute and inside the composite pointer.
+      //   e.g. node.pointer=/a/b and changedPointer=/a/b/settings/timeout
+      if (
+        node.pointer && changedPointer.startsWith(`${node.pointer}/`)
+      ) {
+        const relativePath = changedPointer.substring(node.pointer.length);
+        const nextValue = setPointerValue(value, relativePath, newValue);
+        onChange(node.pointer, nextValue);
         return;
       }
 
-      // Relative path (e.g., /value) - shallow only
+      // Case 2: changed pointer is a relative pointer under the variant
+      //   (e.g. /settings/timeout), coming from a variant node built with a
+      //   fresh relative pointer space.
       if (
         changedPointer.startsWith("/") &&
-        !changedPointer.startsWith(node.pointer) &&
-        changedPointer.substring(1).indexOf("/") === -1
+        (!node.pointer || !changedPointer.startsWith(node.pointer))
       ) {
-        const fieldName = changedPointer.substring(1);
-        onChange(node.pointer, { ...value, [fieldName]: newValue });
+        const nextValue = setPointerValue(value, changedPointer, newValue);
+        onChange(node.pointer, nextValue);
         return;
       }
     }
 
-    // Pass through for non-object types or direct replacement
+    // Fall through: direct replacement (arrays, scalars, full-value updates)
     onChange(changedPointer, newValue);
   };
 

@@ -1,5 +1,12 @@
 import { useMemo } from "react";
-import type { UiAst, UiLayout, UiNode } from "../types";
+import { Braces, Hash, ToggleLeft, Type as TypeIcon } from "lucide-react";
+import type {
+  ScalarKind,
+  UiAst,
+  UiLayout,
+  UiNode,
+  UiNodeKind,
+} from "../types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -8,23 +15,36 @@ interface LayoutExplorerProps {
     ast?: UiAst | null;
     selectedPointer?: string;
     onSelect(pointer: string): void;
+    rootLabel?: string;
 }
 
 interface LayoutItem {
     id: string;
     label: string;
     depth: number;
-    pointer?: string;
-    selectable: boolean;
+    pointer: string;
     kind: "section" | "field";
+    selectable: boolean;
+    scalar?: ScalarKind;
 }
 
 export function LayoutExplorer(
-    { layout, ast, selectedPointer, onSelect }: LayoutExplorerProps,
+    {
+        layout,
+        ast,
+        selectedPointer,
+        onSelect,
+        rootLabel,
+    }: LayoutExplorerProps,
 ) {
-    const labelMap = useMemo(() => buildPointerLabelMap(ast), [ast]);
+    const items = useMemo(() => {
+        if (!ast || ast.roots.length === 0) return [];
+        const resolvedRootLabel = rootLabel ??
+            layout?.roots?.[0]?.title ?? "General";
+        return buildItems(ast, resolvedRootLabel);
+    }, [ast, layout, rootLabel]);
 
-    if (!layout || layout.roots.length === 0) {
+    if (items.length === 0) {
         return (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                 No layout available
@@ -32,17 +52,9 @@ export function LayoutExplorer(
         );
     }
 
-    const items: LayoutItem[] = [];
-
-    for (const root of layout.roots) {
-        for (const section of root.sections) {
-            items.push(...buildItemsForSection(section, 0, labelMap));
-        }
-    }
-
     return (
         <ScrollArea className="h-full">
-            <div className="px-3 py-4 text-sm space-y-0.5">
+            <div className="px-2 py-3 text-sm space-y-0.5">
                 {items.map((item) => {
                     const isActive = item.selectable &&
                         item.pointer === selectedPointer;
@@ -51,19 +63,18 @@ export function LayoutExplorer(
                             key={item.id}
                             type="button"
                             onClick={() =>
-                                item.selectable && onSelect(item.pointer ?? "")}
+                                item.selectable && onSelect(item.pointer)}
                             className={cn(
-                                "group flex w-full items-center rounded-md px-2 py-1.5 text-sm transition-colors text-left",
+                                "group flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-sm text-left transition-colors",
                                 "hover:bg-accent hover:text-accent-foreground",
                                 isActive &&
                                     "bg-accent text-accent-foreground font-medium",
                                 !item.selectable && "cursor-default opacity-80",
                             )}
-                            style={{ paddingLeft: 8 + item.depth * 16 }}
+                            style={{ paddingLeft: 8 + item.depth * 14 }}
                         >
-                            <span className="truncate">
-                                {item.label}
-                            </span>
+                            <ItemIcon item={item} />
+                            <span className="truncate">{item.label}</span>
                         </button>
                     );
                 })}
@@ -72,63 +83,71 @@ export function LayoutExplorer(
     );
 }
 
-function buildItemsForSection(
-    section: UiLayout["roots"][number]["sections"][number],
-    depth: number,
-    labelMap: Map<string, string>,
-): LayoutItem[] {
+function ItemIcon({ item }: { item: LayoutItem }) {
+    if (item.kind === "section") {
+        return <Braces className="h-3.5 w-3.5 text-muted-foreground shrink-0" />;
+    }
+    switch (item.scalar) {
+        case "boolean":
+            return (
+                <ToggleLeft className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            );
+        case "integer":
+        case "number":
+            return <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />;
+        default:
+            return (
+                <TypeIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            );
+    }
+}
+
+function buildItems(ast: UiAst, rootLabel: string): LayoutItem[] {
     const items: LayoutItem[] = [];
-
     items.push({
-        id: section.id,
-        label: section.title,
-        depth,
-        pointer: section.pointer || "",
-        selectable: true,
+        id: "section:root",
+        label: rootLabel,
+        depth: 0,
+        pointer: "",
         kind: "section",
+        selectable: true,
     });
-
-    for (const fp of section.field_pointers) {
-        items.push({
-            id: `${section.id}::field::${fp}`,
-            label: labelMap.get(fp) ?? pointerSegment(fp) ?? fp,
-            depth: depth + 1,
-            pointer: fp,
-            selectable: !!fp,
-            kind: "field",
-        });
+    for (const node of ast.roots) {
+        collectItems(node, 1, items);
     }
-
-    for (const child of section.children) {
-        items.push(...buildItemsForSection(child, depth + 1, labelMap));
-    }
-
     return items;
 }
 
-function buildPointerLabelMap(ast?: UiAst | null): Map<string, string> {
-    const map = new Map<string, string>();
-    if (!ast) return map;
-
-    for (const root of ast.roots) {
-        visitNode(root, map);
+function collectItems(node: UiNode, depth: number, out: LayoutItem[]): void {
+    const label = node.title ?? pointerSegment(node.pointer) ?? node.pointer;
+    if (node.kind.type === "object") {
+        out.push({
+            id: `section:${node.pointer}`,
+            label,
+            depth,
+            pointer: node.pointer,
+            kind: "section",
+            selectable: true,
+        });
+        for (const child of node.kind.children ?? []) {
+            collectItems(child, depth + 1, out);
+        }
+        return;
     }
-
-    return map;
+    out.push({
+        id: `field:${node.pointer}`,
+        label,
+        depth,
+        pointer: node.pointer,
+        kind: "field",
+        selectable: true,
+        scalar: inferScalar(node.kind),
+    });
 }
 
-function visitNode(node: UiNode, map: Map<string, string>) {
-    const pointer = node.pointer;
-    const title = node.title ?? pointerSegment(pointer) ?? pointer;
-    if (pointer) {
-        map.set(pointer, title);
-    }
-
-    if (node.kind.type === "object") {
-        for (const child of node.kind.children ?? []) {
-            visitNode(child, map);
-        }
-    }
+function inferScalar(kind: UiNodeKind): ScalarKind | undefined {
+    if (kind.type === "field") return kind.scalar;
+    return undefined;
 }
 
 function pointerSegment(pointer: string): string | undefined {

@@ -131,8 +131,47 @@ export function StatusBar({
     : <CheckCircle2 className="h-3.5 w-3.5" />;
 
   return (
-    <footer className="border-t border-border/60 bg-background/95 px-4 py-3 text-xs backdrop-blur md:px-6">
-      <div className="grid gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+    <footer className="border-t border-border/60 bg-background/95 px-3 py-2 text-xs backdrop-blur md:px-6 md:py-3">
+      {/* Compact single-row view for mobile */}
+      <div className="flex items-center gap-2 md:hidden">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]",
+            toneClass,
+          )}
+        >
+          {statusIcon}
+          <span>{statusModel.badge}</span>
+        </span>
+        {focusLabel && (
+          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+            <LocateFixed className="mr-1 inline h-3 w-3" />
+            <span className="text-foreground">{focusLabel}</span>
+          </span>
+        )}
+        {errorCount > 0 && onErrorsClick
+          ? (
+            <button
+              type="button"
+              onClick={onErrorsClick}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-700 transition hover:bg-rose-500/15 dark:text-rose-300"
+            >
+              <AlertCircle className="h-3 w-3" />
+              <span>{errorCount}</span>
+            </button>
+          )
+          : (
+            <Badge
+              variant="secondary"
+              className="shrink-0 border border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"
+            >
+              OK
+            </Badge>
+          )}
+      </div>
+
+      {/* Full desktop view */}
+      <div className="hidden md:grid gap-2 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
         <section className="rounded-2xl border border-border/60 bg-muted/25 px-3 py-2.5">
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
             <Keyboard className="h-3.5 w-3.5" />

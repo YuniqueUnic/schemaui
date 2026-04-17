@@ -177,6 +177,7 @@ export default function App() {
                   layout={session.layout}
                   ast={session?.ui_ast}
                   selectedPointer={selectedPointer}
+                  rootLabel={virtualRootTitle}
                   onSelect={(pointer) => {
                     actions.setSelectedPointer(pointer);
                     if (!isDesktop) setMobileView("editor");
@@ -388,37 +389,38 @@ function LayoutSectionNav(
   if (rows.length === 0) return null;
 
   return (
-    <div className="mb-4 space-y-1.5 text-xs">
+    <div className="mb-4 space-y-3 text-xs">
       {rows.map((row: TopbarRow, idx: number) => (
         <div
           key={`${row.containerPointer}|${idx}`}
           className={cn(
-            "flex flex-wrap items-center gap-1.5 rounded-xl px-1.5 py-1",
+            "flex items-center gap-1.5 overflow-x-auto whitespace-nowrap rounded-xl px-1.5 py-0.5",
+            "scrollbar-thin [scrollbar-width:thin] [&::-webkit-scrollbar]:h-0.5",
             idx === 0 ? "bg-muted/30" : "bg-transparent",
           )}
         >
           <button
             type="button"
             onClick={() => onSelect(row.containerPointer)}
-            className={navPillClass(
+            className={cn("shrink-0", navPillClass(
               row.activePointer === row.containerPointer,
               true,
-            )}
+            ))}
           >
             {row.containerTitle}
           </button>
           {row.children.length > 0 && (
-            <span className="text-muted-foreground/50">/</span>
+            <span className="shrink-0 text-muted-foreground/50">/</span>
           )}
           {row.children.map((child: { pointer: string; title: string }) => (
             <button
               key={child.pointer}
               type="button"
               onClick={() => onSelect(child.pointer)}
-              className={navPillClass(
+              className={cn("shrink-0", navPillClass(
                 row.activePointer === child.pointer,
                 false,
-              )}
+              ))}
             >
               {child.title}
             </button>
