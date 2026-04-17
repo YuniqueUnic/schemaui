@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.7.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.7.1...schemaui-v0.7.2) - 2026-04-17
+
+### Fixed
+
+- enhance layout explorer and status bar components
+
+### Other
+
+- Refactor app layout with new Panel and SegmentedControl components
+
 ## [0.7.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.7.0...schemaui-v0.7.1) - 2026-04-03
 
 ### Fixed
