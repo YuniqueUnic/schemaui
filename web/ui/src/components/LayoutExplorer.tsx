@@ -15,6 +15,7 @@ interface LayoutItem {
     label: string;
     depth: number;
     pointer?: string;
+    selectable: boolean;
     kind: "section" | "field";
 }
 
@@ -43,20 +44,20 @@ export function LayoutExplorer(
         <ScrollArea className="h-full">
             <div className="px-3 py-4 text-sm space-y-0.5">
                 {items.map((item) => {
-                    const isActive = item.pointer &&
+                    const isActive = item.selectable &&
                         item.pointer === selectedPointer;
                     return (
                         <button
                             key={item.id}
                             type="button"
                             onClick={() =>
-                                item.pointer && onSelect(item.pointer)}
+                                item.selectable && onSelect(item.pointer ?? "")}
                             className={cn(
                                 "group flex w-full items-center rounded-md px-2 py-1.5 text-sm transition-colors text-left",
                                 "hover:bg-accent hover:text-accent-foreground",
                                 isActive &&
                                     "bg-accent text-accent-foreground font-medium",
-                                !item.pointer && "cursor-default opacity-80",
+                                !item.selectable && "cursor-default opacity-80",
                             )}
                             style={{ paddingLeft: 8 + item.depth * 16 }}
                         >
@@ -82,7 +83,8 @@ function buildItemsForSection(
         id: section.id,
         label: section.title,
         depth,
-        pointer: section.pointer || undefined,
+        pointer: section.pointer || "",
+        selectable: true,
         kind: "section",
     });
 
@@ -92,6 +94,7 @@ function buildItemsForSection(
             label: labelMap.get(fp) ?? pointerSegment(fp) ?? fp,
             depth: depth + 1,
             pointer: fp,
+            selectable: !!fp,
             kind: "field",
         });
     }

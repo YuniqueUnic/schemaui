@@ -7,7 +7,7 @@ import { TreeView } from "./components/TreeView";
 import { LayoutExplorer } from "./components/LayoutExplorer";
 import { OverlayProvider } from "./components/Overlay";
 import { ValidationErrorsDialog } from "./components/ValidationErrorsDialog";
-import type { JsonValue, UiLayout, UiNode } from "./types";
+import type { JsonValue, UiNode } from "./types";
 import { getPointerValue } from "./utils/jsonPointer";
 import {
   findNodeByPointer,
@@ -59,10 +59,22 @@ export default function App() {
 
   const roots = session?.ui_ast?.roots ?? [];
 
-  const selectedNode = useMemo(
-    () => findNodeByPointer(roots, state.selectedPointer),
-    [roots, state.selectedPointer],
-  );
+  const virtualRootTitle = session?.layout?.roots?.[0]?.title ?? "General";
+
+  const selectedNode = useMemo<UiNode | undefined>(() => {
+    if (!state.selectedPointer) {
+      if (roots.length === 0) return undefined;
+      return {
+        pointer: "",
+        title: virtualRootTitle,
+        description: null,
+        required: false,
+        default_value: null,
+        kind: { type: "object", children: roots, required: [] },
+      };
+    }
+    return findNodeByPointer(roots, state.selectedPointer);
+  }, [roots, state.selectedPointer, virtualRootTitle]);
 
   const hasLayout = !!(session?.layout && session.layout.roots.length > 0);
   const focusLabel = selectedNode
@@ -172,7 +184,8 @@ export default function App() {
           {/* Main Editor Panel */}
           <main className="app-panel flex flex-1 flex-col overflow-hidden px-4 md:px-6 py-4">
             <LayoutSectionNav
-              layout={session?.layout}
+              roots={roots}
+              rootLabel={virtualRootTitle}
               selectedPointer={selectedPointer}
               onSelect={actions.setSelectedPointer}
             />
@@ -316,167 +329,146 @@ function pointerSegments(pointer?: string) {
 }
 
 interface LayoutSectionNavProps {
-  layout?: UiLayout | null;
+  roots: UiNode[];
+  rootLabel: string;
   selectedPointer?: string;
   onSelect(pointer: string): void;
 }
 
-interface NavRoot {
-  id: string;
-  title: string;
-  sections: NavSection[];
-}
-
-interface NavSection {
-  id: string;
-  title: string;
-  firstPointer?: string;
-  pointers: string[];
+interface TopbarRow {
+  containerPointer: string;
+  containerTitle: string;
+  children: Array<{ pointer: string; title: string }>;
+  activePointer: string;
 }
 
 function LayoutSectionNav(
-  { layout, selectedPointer, onSelect }: LayoutSectionNavProps,
+  { roots, rootLabel, selectedPointer, onSelect }: LayoutSectionNavProps,
 ) {
-  const model = useMemo<NavRoot[]>(
-    () => layout && layout.roots.length > 0 ? buildNavModel(layout) : [],
-    [layout],
+  const rows = useMemo<TopbarRow[]>(
+    () => buildTopbarRows(roots, rootLabel, selectedPointer ?? ""),
+    [roots, rootLabel, selectedPointer],
   );
 
-  if (!model.length) return null;
-
-  let activeRoot = model[0];
-  let activeSection = activeRoot.sections[0] ?? null;
-
-  if (selectedPointer) {
-    for (const root of model) {
-      const matchingSections = root.sections.filter((section) =>
-        section.pointers.some((pointer) =>
-          selectedPointer === pointer ||
-          selectedPointer.startsWith(`${pointer}/`))
-      );
-      if (matchingSections.length > 0) {
-        activeRoot = root;
-        activeSection = matchingSections[matchingSections.length - 1] ?? null;
-        break;
-      }
-    }
-  }
-
-  const handleRootClick = (root: NavRoot) => {
-    const target = root.sections[0];
-    if (target?.firstPointer) {
-      onSelect(target.firstPointer);
-    }
-  };
-
-  const handleSectionClick = (section: NavSection) => {
-    if (section.firstPointer) {
-      onSelect(section.firstPointer);
-    }
-  };
+  if (rows.length === 0) return null;
 
   return (
-    <div className="mb-3 space-y-2 text-xs">
-      <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
-        {model.map((root) => {
-          const isActive = root.id === activeRoot.id;
-          return (
+    <div className="mb-3 space-y-1.5 text-xs">
+      {rows.map((row, idx) => (
+        <div
+          key={`${row.containerPointer}|${idx}`}
+          className="flex flex-wrap items-center gap-1.5 text-muted-foreground"
+        >
+          <button
+            type="button"
+            onClick={() => onSelect(row.containerPointer)}
+            className={navPillClass(
+              row.activePointer === row.containerPointer,
+              true,
+            )}
+          >
+            {row.containerTitle}
+          </button>
+          {row.children.map((child) => (
             <button
-              key={root.id}
+              key={child.pointer}
               type="button"
-              onClick={() => handleRootClick(root)}
-              className={`rounded-full border px-3 py-1 transition-colors ${
-                isActive
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "border-transparent bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
+              onClick={() => onSelect(child.pointer)}
+              className={navPillClass(
+                row.activePointer === child.pointer,
+                false,
+              )}
             >
-              {root.title || "Root"}
+              {child.title}
             </button>
-          );
-        })}
-      </div>
-      {activeRoot.sections.length > 1 && (
-        <div className="flex flex-wrap gap-1">
-          {activeRoot.sections.map((section) => {
-            const isActive = !!activeSection && section.id === activeSection.id;
-            return (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => handleSectionClick(section)}
-                className={`rounded-full px-3 py-1 transition-colors ${
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {section.title}
-              </button>
-            );
-          })}
+          ))}
         </div>
-      )}
+      ))}
     </div>
   );
 }
 
-type LayoutSectionType = UiLayout["roots"][number]["sections"][number];
+function navPillClass(active: boolean, isContainer: boolean): string {
+  if (active) {
+    return "rounded-full border border-primary bg-primary/10 px-3 py-1 text-foreground transition-colors";
+  }
+  if (isContainer) {
+    return "rounded-full border border-transparent bg-muted/60 px-3 py-1 text-muted-foreground transition-colors hover:bg-muted";
+  }
+  return "rounded-full px-3 py-1 text-muted-foreground transition-colors hover:bg-muted";
+}
 
-function buildNavModel(layout: UiLayout): NavRoot[] {
-  const roots: NavRoot[] = [];
+function buildTopbarRows(
+  roots: UiNode[],
+  rootLabel: string,
+  selectedPointer: string,
+): TopbarRow[] {
+  if (roots.length === 0) return [];
 
-  for (const root of layout.roots) {
-    const sections: NavSection[] = [];
-    for (const section of root.sections) {
-      collectSection(section, sections);
-    }
-    if (!sections.length) continue;
-    roots.push({
-      id: root.id,
-      title: root.title ?? "Root",
-      sections,
+  const rows: TopbarRow[] = [];
+  let containerPointer = "";
+  let containerTitle = rootLabel;
+  let containerChildren: UiNode[] = roots;
+
+  // Safety: bound iterations to tree depth
+  for (let depth = 0; depth < 32; depth++) {
+    const matching = containerChildren.find((child) =>
+      child.pointer === selectedPointer ||
+      (selectedPointer.length > 0 &&
+        selectedPointer.startsWith(`${child.pointer}/`))
+    );
+
+    const activePointer = matching
+      ? matching.pointer
+      : selectedPointer === containerPointer
+      ? containerPointer
+      : "";
+
+    rows.push({
+      containerPointer,
+      containerTitle,
+      children: containerChildren.map((child) => ({
+        pointer: child.pointer,
+        title: nodeLabel(child),
+      })),
+      activePointer,
     });
+
+    if (!matching) break;
+    if (matching.kind.type !== "object") break;
+    const nextChildren = matching.kind.children ?? [];
+    if (nextChildren.length === 0) break;
+
+    containerPointer = matching.pointer;
+    containerTitle = nodeLabel(matching);
+    containerChildren = nextChildren;
+
+    if (matching.pointer === selectedPointer) {
+      rows.push({
+        containerPointer,
+        containerTitle,
+        children: nextChildren.map((child) => ({
+          pointer: child.pointer,
+          title: nodeLabel(child),
+        })),
+        activePointer: containerPointer,
+      });
+      break;
+    }
   }
 
-  return roots;
+  return rows;
 }
 
-function collectSection(section: LayoutSectionType, out: NavSection[]) {
-  const pointers: string[] = [];
-  collectPointers(section, pointers);
-  const firstPointer = findFirstPointer(section);
-  out.push({
-    id: section.id,
-    title: section.title,
-    firstPointer,
-    pointers,
-  });
-
-  for (const child of section.children) {
-    collectSection(child, out);
-  }
+function nodeLabel(node: UiNode): string {
+  const title = node.title?.trim();
+  if (title) return title;
+  const segment = lastPointerSegment(node.pointer);
+  return segment ?? node.pointer ?? "(root)";
 }
 
-function collectPointers(section: LayoutSectionType, out: string[]) {
-  for (const fp of section.field_pointers) {
-    out.push(fp);
-  }
-  if (section.pointer) {
-    out.push(section.pointer);
-  }
-  for (const child of section.children) {
-    collectPointers(child, out);
-  }
-}
-
-function findFirstPointer(section: LayoutSectionType): string | undefined {
-  if (section.field_pointers.length > 0) {
-    return section.field_pointers[0];
-  }
-  for (const child of section.children) {
-    const childPtr = findFirstPointer(child);
-    if (childPtr) return childPtr;
-  }
-  return section.pointer || undefined;
+function lastPointerSegment(pointer: string): string | undefined {
+  if (!pointer || pointer === "/") return undefined;
+  const segments = pointer.split("/").filter(Boolean);
+  return segments[segments.length - 1]?.replace(/~1/g, "/").replace(/~0/g, "~");
 }
