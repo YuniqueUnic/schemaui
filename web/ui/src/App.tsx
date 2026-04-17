@@ -7,6 +7,8 @@ import { TreeView } from "./components/TreeView";
 import { LayoutExplorer } from "./components/LayoutExplorer";
 import { OverlayProvider } from "./components/Overlay";
 import { ValidationErrorsDialog } from "./components/ValidationErrorsDialog";
+import { Panel, PanelHeader } from "./components/Panel";
+import { SegmentedControl } from "./components/SegmentedControl";
 import type { JsonValue, UiNode } from "./types";
 import { getPointerValue } from "./utils/jsonPointer";
 import {
@@ -18,6 +20,7 @@ import { useSessionState } from "./hooks/useSessionState";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { FileText, ListTree } from "lucide-react";
 
 type PanelView = "nav" | "editor" | "preview";
 
@@ -132,43 +135,31 @@ export default function App() {
             />
           )}
           {/* Navigation Panel */}
-          <aside
+          <Panel
+            as="aside"
             className={cn(
-              "app-panel flex-col border-theme lg:flex lg:border-r",
+              "lg:flex lg:border-r border-theme",
               !isDesktop && mobileView === "nav" && "flex flex-1 border-b",
               !isDesktop && mobileView !== "nav" && "hidden",
             )}
             style={isDesktop ? { width: sizes.nav } : undefined}
           >
-            <div className="border-b border-theme px-4 py-3 text-xs uppercase tracking-[0.3em] text-muted-foreground flex items-center justify-between gap-2">
-              <span>Navigation</span>
-              {hasLayout && (
-                <div className="inline-flex rounded-full bg-muted p-0.5 text-[10px]">
-                  <button
-                    type="button"
-                    onClick={() => setNavMode("schema")}
-                    className={`px-2 py-0.5 rounded-full transition-colors ${
-                      navMode === "schema"
-                        ? "bg-background text-foreground"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    Schema
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNavMode("layout")}
-                    className={`px-2 py-0.5 rounded-full transition-colors ${
-                      navMode === "layout"
-                        ? "bg-background text-foreground"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    Layout
-                  </button>
-                </div>
-              )}
-            </div>
+            <PanelHeader
+              icon={<ListTree className="h-3.5 w-3.5" />}
+              label="Navigation"
+              actions={hasLayout
+                ? (
+                  <SegmentedControl<"schema" | "layout">
+                    value={navMode}
+                    onChange={(v) => setNavMode(v)}
+                    options={[
+                      { id: "schema", label: "Schema" },
+                      { id: "layout", label: "Layout" },
+                    ]}
+                  />
+                )
+                : undefined}
+            />
             {(!hasLayout || navMode === "schema") && (
               <TreeView
                 ast={session?.ui_ast}
@@ -193,61 +184,69 @@ export default function App() {
                 />
               </div>
             )}
-          </aside>
+          </Panel>
           {/* Resizer */}
           <div
-            className="hidden lg:block w-1 cursor-col-resize bg-gray-200/60 relative hover:bg-gray-400/40"
+            className="app-resizer hidden lg:block"
             onPointerDown={(event) => startDrag(event, "nav")}
-          >
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-px h-4 bg-gray-800"></div>
-            </div>
-          </div>
+          />
           {/* Main Editor Panel */}
-          <main
+          <Panel
+            as="main"
             className={cn(
-              "app-panel flex-col overflow-hidden px-4 md:px-6 py-4 lg:flex lg:flex-1",
+              "lg:flex lg:flex-1",
               !isDesktop && mobileView === "editor" && "flex flex-1",
               !isDesktop && mobileView !== "editor" && "hidden",
             )}
           >
-            <LayoutSectionNav
-              roots={roots}
-              rootLabel={virtualRootTitle}
-              selectedPointer={selectedPointer}
-              onSelect={actions.setSelectedPointer}
-            />
-            <EditorBreadcrumbs node={selectedNode} pointer={selectedPointer} />
-            <div className="mt-4 flex-1 overflow-y-auto pr-2 md:pr-4 text-sm">
-              {selectedNode
-                ? (
-                  <EditorBody
-                    node={selectedNode}
-                    data={data}
-                    errors={errors}
-                    onChange={handleChange}
-                  />
-                )
-                : (
-                  <div className="text-center text-muted-foreground">
-                    Select a node from the tree to start editing.
-                  </div>
-                )}
+            <div className="flex flex-1 flex-col overflow-hidden px-4 py-4 md:px-6">
+              <LayoutSectionNav
+                roots={roots}
+                rootLabel={virtualRootTitle}
+                selectedPointer={selectedPointer}
+                onSelect={actions.setSelectedPointer}
+              />
+              <EditorBreadcrumbs
+                node={selectedNode}
+                pointer={selectedPointer}
+              />
+              <div
+                className="mt-4 flex-1 min-h-0 overflow-y-auto text-sm [scrollbar-gutter:stable_both-edges]"
+              >
+                <div className="px-1 py-1 pr-3 pb-8">
+                  {selectedNode
+                    ? (
+                      <EditorBody
+                        node={selectedNode}
+                        data={data}
+                        errors={errors}
+                        onChange={handleChange}
+                      />
+                    )
+                    : (
+                      <div className="flex h-full items-center justify-center py-16">
+                        <div className="text-center text-muted-foreground">
+                          <FileText className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                          <p className="text-sm">
+                            Select a node to start editing
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                </div>
+              </div>
             </div>
-          </main>
+          </Panel>
           {/* Resizer */}
           <div
-            className="hidden lg:block w-1 cursor-col-resize bg-gray-200/60 relative hover:bg-gray-400/40"
+            className="app-resizer hidden lg:block"
             onPointerDown={(event) => startDrag(event, "preview")}
-          >
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-px h-4 bg-gray-800"></div>
-            </div>
-          </div>
+          />
           {/* Preview Panel */}
-          <section
+          <Panel
+            as="section"
             className={cn(
-              "app-panel flex-col border-theme lg:flex lg:h-full lg:border-l",
+              "lg:flex lg:h-full lg:border-l border-theme",
               !isDesktop && mobileView === "preview" && "flex flex-1 border-t",
               !isDesktop && mobileView !== "preview" && "hidden",
             )}
@@ -262,7 +261,7 @@ export default function App() {
               payload={previewPayload}
               loading={false}
             />
-          </section>
+          </Panel>
         </div>
         <StatusBar
           status={status}
@@ -296,22 +295,20 @@ function EditorBreadcrumbs(
     return null;
   }
   return (
-    <nav className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+    <nav className="mb-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
       {segments.map((segment, index) => (
-        <span
-          key={`${segment}-${index}`}
-          className="rounded-full bg-white/5 px-3 py-1 text-slate-400"
-        >
-          {segment}
+        <span key={`${segment}-${index}`} className="flex items-center gap-1">
+          {index > 0 && <span className="opacity-40">/</span>}
+          <span className="rounded-md bg-muted/60 px-2 py-0.5 font-mono text-[11px] text-foreground/80">
+            {segment}
+          </span>
         </span>
       ))}
-      {node?.required
-        ? (
-          <span className="text-[10px] uppercase tracking-[0.3em] text-rose-600">
-            Required
-          </span>
-        )
-        : null}
+      {node?.required && (
+        <span className="ml-2 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-destructive">
+          Required
+        </span>
+      )}
     </nav>
   );
 }
@@ -329,26 +326,32 @@ function EditorBody({
 }) {
   if (node.kind.type === "object") {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {(node.kind.children ?? []).map((child) => (
-          <NodeRenderer
+          <div
             key={child.pointer}
-            node={child}
-            value={getPointerValue(data, child.pointer)}
-            errors={errors}
-            onChange={onChange}
-          />
+            className="rounded-xl border border-theme bg-card/60 px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:border-theme-strong"
+          >
+            <NodeRenderer
+              node={child}
+              value={getPointerValue(data, child.pointer)}
+              errors={errors}
+              onChange={onChange}
+            />
+          </div>
         ))}
       </div>
     );
   }
   return (
-    <NodeRenderer
-      node={node}
-      value={getPointerValue(data, node.pointer)}
-      errors={errors}
-      onChange={onChange}
-    />
+    <div className="rounded-xl border border-theme bg-card/60 px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+      <NodeRenderer
+        node={node}
+        value={getPointerValue(data, node.pointer)}
+        errors={errors}
+        onChange={onChange}
+      />
+    </div>
   );
 }
 
@@ -385,11 +388,14 @@ function LayoutSectionNav(
   if (rows.length === 0) return null;
 
   return (
-    <div className="mb-3 space-y-1.5 text-xs">
-      {rows.map((row, idx) => (
+    <div className="mb-4 space-y-1.5 text-xs">
+      {rows.map((row: TopbarRow, idx: number) => (
         <div
           key={`${row.containerPointer}|${idx}`}
-          className="flex flex-wrap items-center gap-1.5 text-muted-foreground"
+          className={cn(
+            "flex flex-wrap items-center gap-1.5 rounded-xl px-1.5 py-1",
+            idx === 0 ? "bg-muted/30" : "bg-transparent",
+          )}
         >
           <button
             type="button"
@@ -401,7 +407,10 @@ function LayoutSectionNav(
           >
             {row.containerTitle}
           </button>
-          {row.children.map((child) => (
+          {row.children.length > 0 && (
+            <span className="text-muted-foreground/50">/</span>
+          )}
+          {row.children.map((child: { pointer: string; title: string }) => (
             <button
               key={child.pointer}
               type="button"
@@ -422,12 +431,12 @@ function LayoutSectionNav(
 
 function navPillClass(active: boolean, isContainer: boolean): string {
   if (active) {
-    return "rounded-full border border-primary bg-primary/10 px-3 py-1 text-foreground transition-colors";
+    return "app-pill app-pill-active font-medium";
   }
   if (isContainer) {
-    return "rounded-full border border-transparent bg-muted/60 px-3 py-1 text-muted-foreground transition-colors hover:bg-muted";
+    return "app-pill app-pill-muted font-medium";
   }
-  return "rounded-full px-3 py-1 text-muted-foreground transition-colors hover:bg-muted";
+  return "app-pill text-muted-foreground hover:bg-muted hover:text-foreground";
 }
 
 function buildTopbarRows(
@@ -511,33 +520,18 @@ interface MobilePanelSwitchProps {
 }
 
 function MobilePanelSwitch({ value, onChange }: MobilePanelSwitchProps) {
-  const options: { id: PanelView; label: string }[] = [
-    { id: "nav", label: "Nav" },
-    { id: "editor", label: "Editor" },
-    { id: "preview", label: "Preview" },
-  ];
   return (
-    <div className="lg:hidden flex items-center justify-center gap-1 border-b border-theme bg-background/80 px-2 py-2">
-      <div className="inline-flex rounded-full bg-muted p-0.5 text-xs">
-        {options.map((opt) => {
-          const active = value === opt.id;
-          return (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => onChange(opt.id)}
-              className={cn(
-                "rounded-full px-3 py-1 transition-colors",
-                active
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
+    <div className="flex items-center justify-center border-b border-theme bg-background/80 px-2 py-2 backdrop-blur lg:hidden">
+      <SegmentedControl<PanelView>
+        value={value}
+        onChange={onChange}
+        size="md"
+        options={[
+          { id: "nav", label: "Nav" },
+          { id: "editor", label: "Editor" },
+          { id: "preview", label: "Preview" },
+        ]}
+      />
     </div>
   );
 }
