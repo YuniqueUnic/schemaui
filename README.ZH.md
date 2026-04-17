@@ -50,7 +50,7 @@
 
 ```toml
 [dependencies]
-schemaui = "0.7.1"
+schemaui = "0.7.2"
 serde_json = "1"
 ```
 
