@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.4.3...schemaui-cli-v0.5.0) - 2026-04-18
+
+### Fixed
+
+- *(cli)* add shell completion support with argh_complete
+
+### Other
+
+- *(ui-ast)* add support for opaque object schemas with allOf references
+- [**breaking**] replace clap with argh for CLI argument parsing
+- *(cli)* [**breaking**] add config schema auto-detection and remote schema loading
+
 ## [0.4.3](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.4.2...schemaui-cli-v0.4.3) - 2026-04-17
 
 ### Other

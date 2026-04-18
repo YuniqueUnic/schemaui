@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.8.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.7.2...schemaui-v0.8.0) - 2026-04-18
+
+### Fixed
+
+- *(cli)* add shell completion support with argh_complete
+
+### Other
+
+- *(ui-ast)* add support for opaque object schemas with allOf references
+- [**breaking**] replace clap with argh for CLI argument parsing
+- *(cli)* [**breaking**] add config schema auto-detection and remote schema loading
+
 ## [0.7.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.7.1...schemaui-v0.7.2) - 2026-04-17
 
 ### Fixed

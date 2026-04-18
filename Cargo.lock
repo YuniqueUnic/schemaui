@@ -2515,7 +2515,7 @@ dependencies = [
 
 [[package]]
 name = "schemaui"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2541,7 +2541,7 @@ dependencies = [
 
 [[package]]
 name = "schemaui-cli"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "argh",
  "argh_complete",
