@@ -1,144 +1,643 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Args, Parser, Subcommand};
+use argh::FromArgs;
 
 #[cfg(feature = "web")]
 use std::net::IpAddr;
 
-#[derive(Debug, Parser)]
-#[command(
-    name = "schemaui",
-    version,
-    about = "Render JSON Schemas as interactive TUIs or Web UIs"
-)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Cli {
-    #[command(flatten)]
     pub common: CommonArgs,
-
-    #[command(subcommand)]
     pub command: Option<Commands>,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Commands {
-    /// Launch the interactive terminal UI
     Tui(TuiCommand),
-
     #[cfg(feature = "web")]
-    /// Launch the interactive web UI instead of the terminal UI
     Web(WebCommand),
-
     #[cfg(feature = "web")]
-    /// Precompute Web session snapshots instead of launching the UI
     WebSnapshot(WebSnapshotCommand),
-
-    /// Precompute TUI FormSchema/LayoutNavModel modules instead of launching the UI
     TuiSnapshot(TuiSnapshotCommand),
 }
 
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TuiCommand {
-    #[command(flatten)]
     pub common: CommonArgs,
 }
 
 #[cfg(feature = "web")]
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebCommand {
-    #[command(flatten)]
     pub common: CommonArgs,
-
-    /// Bind address for the temporary HTTP server
-    #[rustfmt::skip]
-    #[arg(alias = "bind", alias = "listen")]
-    #[arg( short = 'l', long = "host", value_name = "IP", default_value = "127.0.0.1" )]
     pub host: IpAddr,
-
-    /// Bind port for the temporary HTTP server (0 picks a random free port)
-    #[arg(short = 'p', long = "port", value_name = "PORT", default_value_t = 0)]
     pub port: u16,
 }
 
 #[cfg(feature = "web")]
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebSnapshotCommand {
-    #[command(flatten)]
     pub common: CommonArgs,
-
-    /// Output directory for generated Web snapshots (JSON + TS)
-    #[arg(long = "out-dir", value_name = "DIR", default_value = "web_snapshots")]
     pub out_dir: PathBuf,
-
-    /// Name of the exported constant in the generated TS module
-    #[arg(
-        long = "ts-export",
-        value_name = "NAME",
-        default_value = "SessionSnapshot"
-    )]
     pub ts_export: String,
 }
 
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TuiSnapshotCommand {
-    #[command(flatten)]
     pub common: CommonArgs,
-
-    /// Output directory for generated TUI artifact modules (Rust source)
-    #[arg(long = "out-dir", value_name = "DIR", default_value = "tui_artifacts")]
     pub out_dir: PathBuf,
-
-    /// Name of the generated TuiArtifacts constructor function
-    #[arg(long = "tui-fn", value_name = "NAME", default_value = "tui_artifacts")]
     pub tui_fn: String,
-
-    /// Name of the generated FormSchema constructor function
-    #[arg(
-        long = "form-fn",
-        value_name = "NAME",
-        default_value = "tui_form_schema"
-    )]
     pub form_fn: String,
-
-    /// Name of the generated LayoutNavModel constructor function
-    #[arg(
-        long = "layout-fn",
-        value_name = "NAME",
-        default_value = "tui_layout_nav"
-    )]
     pub layout_fn: String,
 }
 
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CommonArgs {
-    /// Schema spec: local path, file/HTTP URL, inline payload, or "-" for stdin
-    #[arg(short = 's', long = "schema", value_name = "SPEC")]
     pub schema: Option<String>,
-
-    /// Config spec: local path, file/HTTP URL, inline payload, or "-" for stdin
-    #[arg(short = 'c', long = "config", alias = "data", value_name = "SPEC")]
     pub config: Option<String>,
-
-    /// Title shown at the top of the UI
-    #[arg(long = "title", value_name = "TEXT")]
     pub title: Option<String>,
-
-    /// Output destinations ("-" writes to stdout). Accepts multiple values per flag use.
-    #[arg(short = 'o', long = "output", value_name = "DEST", num_args = 1.., action = ArgAction::Append)]
     pub outputs: Vec<String>,
-
-    /// Write to PATH when no destinations are set (stdout remains the default)
-    #[arg(long = "temp-file", value_name = "PATH")]
     pub temp_file: Option<PathBuf>,
-
-    /// Compatibility no-op: stdout is already the default when no destinations are set
-    #[arg(long = "no-temp-file", conflicts_with = "temp_file")]
     pub no_temp_file: bool,
-
-    /// Emit compact JSON/TOML rather than pretty formatting
-    #[arg(long = "no-pretty")]
     pub no_pretty: bool,
-
-    /// Overwrite output files even if they already exist
-    #[arg(short = 'f', long = "force", short_alias = 'y', alias = "yes")]
     pub force: bool,
+}
+
+impl CommonArgs {
+    pub fn merged_with(&self, local: &Self) -> Self {
+        let mut outputs = self.outputs.clone();
+        outputs.extend(local.outputs.clone());
+
+        Self {
+            schema: local.schema.clone().or_else(|| self.schema.clone()),
+            config: local.config.clone().or_else(|| self.config.clone()),
+            title: local.title.clone().or_else(|| self.title.clone()),
+            outputs,
+            temp_file: local.temp_file.clone().or_else(|| self.temp_file.clone()),
+            no_temp_file: self.no_temp_file || local.no_temp_file,
+            no_pretty: self.no_pretty || local.no_pretty,
+            force: self.force || local.force,
+        }
+    }
+}
+
+impl Cli {
+    pub fn parse() -> Self {
+        Self::from_env_or_exit()
+    }
+
+    pub fn from_env_or_exit() -> Self {
+        match Self::try_parse_from(std::env::args()) {
+            Ok(cli) => cli,
+            Err(exit) => {
+                if exit.status.is_ok() {
+                    print!("{}", exit.output);
+                    std::process::exit(0);
+                }
+                eprint!("{}", exit.output);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    pub fn parse_from<I, T>(args: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        Self::try_parse_from(args).unwrap_or_else(|exit| {
+            panic!("failed to parse args: {}", exit.output);
+        })
+    }
+
+    pub fn try_parse_from<I, T>(args: I) -> Result<Self, argh::EarlyExit>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<String>,
+    {
+        let raw = args.into_iter().map(Into::into).collect::<Vec<_>>();
+        let program = raw
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "schemaui".to_string());
+
+        let normalized = normalize_args(&raw[1..]);
+        let scan = scan_for_command(&normalized);
+        let mut parse_args = normalized.clone();
+        let injected_default_tui = matches!(scan, CommandScan::None);
+        if injected_default_tui {
+            parse_args.push("tui".to_string());
+        }
+        let parse_args = expand_output_values(&parse_args);
+        let parse_refs = parse_args.iter().map(String::as_str).collect::<Vec<_>>();
+        let parsed = ArghCli::from_args(&[program.as_str()], &parse_refs)?;
+        Ok(Self::from_argh(parsed, injected_default_tui))
+    }
+
+    fn from_argh(parsed: ArghCli, injected_default_tui: bool) -> Self {
+        let common = common_args_from_root(&parsed);
+        match parsed.command {
+            ArghCommands::Tui(_command) if injected_default_tui => Self {
+                common,
+                command: None,
+            },
+            ArghCommands::Tui(command) => Self {
+                common,
+                command: Some(Commands::Tui(TuiCommand {
+                    common: common_args_from_tui(command),
+                })),
+            },
+            #[cfg(feature = "web")]
+            ArghCommands::Web(command) => Self {
+                common,
+                command: Some(Commands::Web(WebCommand {
+                    common: common_args_from_web(&command),
+                    host: command.host,
+                    port: command.port,
+                })),
+            },
+            #[cfg(feature = "web")]
+            ArghCommands::WebSnapshot(command) => Self {
+                common,
+                command: Some(Commands::WebSnapshot(WebSnapshotCommand {
+                    common: common_args_from_web_snapshot(&command),
+                    out_dir: command.out_dir,
+                    ts_export: command.ts_export,
+                })),
+            },
+            ArghCommands::TuiSnapshot(command) => Self {
+                common,
+                command: Some(Commands::TuiSnapshot(TuiSnapshotCommand {
+                    common: common_args_from_tui_snapshot(&command),
+                    out_dir: command.out_dir,
+                    tui_fn: command.tui_fn,
+                    form_fn: command.form_fn,
+                    layout_fn: command.layout_fn,
+                })),
+            },
+        }
+    }
+}
+
+fn common_args_from_root(args: &ArghCli) -> CommonArgs {
+    CommonArgs {
+        schema: args.schema.clone(),
+        config: args.config.clone(),
+        title: args.title.clone(),
+        outputs: args.outputs.clone(),
+        temp_file: args.temp_file.clone(),
+        no_temp_file: args.no_temp_file,
+        no_pretty: args.no_pretty,
+        force: args.force,
+    }
+}
+
+fn common_args_from_tui(args: ArghTuiCommand) -> CommonArgs {
+    CommonArgs {
+        schema: args.schema,
+        config: args.config,
+        title: args.title,
+        outputs: args.outputs,
+        temp_file: args.temp_file,
+        no_temp_file: args.no_temp_file,
+        no_pretty: args.no_pretty,
+        force: args.force,
+    }
+}
+
+#[cfg(feature = "web")]
+fn common_args_from_web(args: &ArghWebCommand) -> CommonArgs {
+    CommonArgs {
+        schema: args.schema.clone(),
+        config: args.config.clone(),
+        title: args.title.clone(),
+        outputs: args.outputs.clone(),
+        temp_file: args.temp_file.clone(),
+        no_temp_file: args.no_temp_file,
+        no_pretty: args.no_pretty,
+        force: args.force,
+    }
+}
+
+#[cfg(feature = "web")]
+fn common_args_from_web_snapshot(args: &ArghWebSnapshotCommand) -> CommonArgs {
+    CommonArgs {
+        schema: args.schema.clone(),
+        config: args.config.clone(),
+        title: args.title.clone(),
+        outputs: args.outputs.clone(),
+        temp_file: args.temp_file.clone(),
+        no_temp_file: args.no_temp_file,
+        no_pretty: args.no_pretty,
+        force: args.force,
+    }
+}
+
+fn common_args_from_tui_snapshot(args: &ArghTuiSnapshotCommand) -> CommonArgs {
+    CommonArgs {
+        schema: args.schema.clone(),
+        config: args.config.clone(),
+        title: args.title.clone(),
+        outputs: args.outputs.clone(),
+        temp_file: args.temp_file.clone(),
+        no_temp_file: args.no_temp_file,
+        no_pretty: args.no_pretty,
+        force: args.force,
+    }
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(help_triggers("-h", "--help", "help"))]
+/// Render JSON Schemas as interactive TUIs or Web UIs
+struct ArghCli {
+    /// schema spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 's')]
+    schema: Option<String>,
+
+    /// config spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 'c')]
+    config: Option<String>,
+
+    /// title shown at the top of the UI
+    #[argh(option)]
+    title: Option<String>,
+
+    /// output destinations ("-" writes to stdout). Repeat the flag to add more.
+    #[argh(option, short = 'o')]
+    outputs: Vec<String>,
+
+    /// write to PATH when no destinations are set (stdout remains the default)
+    #[argh(option)]
+    temp_file: Option<PathBuf>,
+
+    /// compatibility no-op: stdout is already the default when no destinations are set
+    #[argh(switch)]
+    no_temp_file: bool,
+
+    /// emit compact JSON/TOML rather than pretty formatting
+    #[argh(switch)]
+    no_pretty: bool,
+
+    /// overwrite output files even if they already exist
+    #[argh(switch, short = 'f')]
+    force: bool,
+
+    #[argh(subcommand)]
+    command: ArghCommands,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand)]
+enum ArghCommands {
+    Tui(ArghTuiCommand),
+    #[cfg(feature = "web")]
+    Web(ArghWebCommand),
+    #[cfg(feature = "web")]
+    WebSnapshot(ArghWebSnapshotCommand),
+    TuiSnapshot(ArghTuiSnapshotCommand),
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "tui", help_triggers("-h", "--help", "help"))]
+/// Launch the interactive terminal UI
+struct ArghTuiCommand {
+    /// schema spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 's')]
+    schema: Option<String>,
+
+    /// config spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 'c')]
+    config: Option<String>,
+
+    /// title shown at the top of the UI
+    #[argh(option)]
+    title: Option<String>,
+
+    /// output destinations ("-" writes to stdout). Repeat the flag to add more.
+    #[argh(option, short = 'o')]
+    outputs: Vec<String>,
+
+    /// write to PATH when no destinations are set (stdout remains the default)
+    #[argh(option)]
+    temp_file: Option<PathBuf>,
+
+    /// compatibility no-op: stdout is already the default when no destinations are set
+    #[argh(switch)]
+    no_temp_file: bool,
+
+    /// emit compact JSON/TOML rather than pretty formatting
+    #[argh(switch)]
+    no_pretty: bool,
+
+    /// overwrite output files even if they already exist
+    #[argh(switch, short = 'f')]
+    force: bool,
+}
+
+#[cfg(feature = "web")]
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "web", help_triggers("-h", "--help", "help"))]
+/// Launch the interactive web UI instead of the terminal UI
+struct ArghWebCommand {
+    /// schema spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 's')]
+    schema: Option<String>,
+
+    /// config spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 'c')]
+    config: Option<String>,
+
+    /// title shown at the top of the UI
+    #[argh(option)]
+    title: Option<String>,
+
+    /// output destinations ("-" writes to stdout). Repeat the flag to add more.
+    #[argh(option, short = 'o')]
+    outputs: Vec<String>,
+
+    /// write to PATH when no destinations are set (stdout remains the default)
+    #[argh(option)]
+    temp_file: Option<PathBuf>,
+
+    /// compatibility no-op: stdout is already the default when no destinations are set
+    #[argh(switch)]
+    no_temp_file: bool,
+
+    /// emit compact JSON/TOML rather than pretty formatting
+    #[argh(switch)]
+    no_pretty: bool,
+
+    /// overwrite output files even if they already exist
+    #[argh(switch, short = 'f')]
+    force: bool,
+
+    /// bind address for the temporary HTTP server
+    #[argh(option, short = 'l', default = "default_host()")]
+    host: IpAddr,
+
+    /// bind port for the temporary HTTP server (0 picks a random free port)
+    #[argh(option, short = 'p', default = "0")]
+    port: u16,
+}
+
+#[cfg(feature = "web")]
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "web-snapshot",
+    help_triggers("-h", "--help", "help")
+)]
+/// Precompute Web session snapshots instead of launching the UI
+struct ArghWebSnapshotCommand {
+    /// schema spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 's')]
+    schema: Option<String>,
+
+    /// config spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 'c')]
+    config: Option<String>,
+
+    /// title shown at the top of the UI
+    #[argh(option)]
+    title: Option<String>,
+
+    /// output destinations ("-" writes to stdout). Repeat the flag to add more.
+    #[argh(option, short = 'o')]
+    outputs: Vec<String>,
+
+    /// write to PATH when no destinations are set (stdout remains the default)
+    #[argh(option)]
+    temp_file: Option<PathBuf>,
+
+    /// compatibility no-op: stdout is already the default when no destinations are set
+    #[argh(switch)]
+    no_temp_file: bool,
+
+    /// emit compact JSON/TOML rather than pretty formatting
+    #[argh(switch)]
+    no_pretty: bool,
+
+    /// overwrite output files even if they already exist
+    #[argh(switch, short = 'f')]
+    force: bool,
+
+    /// output directory for generated Web snapshots (JSON + TS)
+    #[argh(option, default = "PathBuf::from(\"web_snapshots\")")]
+    out_dir: PathBuf,
+
+    /// name of the exported constant in the generated TS module
+    #[argh(option, default = "String::from(\"SessionSnapshot\")")]
+    ts_export: String,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "tui-snapshot",
+    help_triggers("-h", "--help", "help")
+)]
+/// Precompute TUI FormSchema/LayoutNavModel modules instead of launching the UI
+struct ArghTuiSnapshotCommand {
+    /// schema spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 's')]
+    schema: Option<String>,
+
+    /// config spec: local path, file/HTTP URL, inline payload, or "-" for stdin
+    #[argh(option, short = 'c')]
+    config: Option<String>,
+
+    /// title shown at the top of the UI
+    #[argh(option)]
+    title: Option<String>,
+
+    /// output destinations ("-" writes to stdout). Repeat the flag to add more.
+    #[argh(option, short = 'o')]
+    outputs: Vec<String>,
+
+    /// write to PATH when no destinations are set (stdout remains the default)
+    #[argh(option)]
+    temp_file: Option<PathBuf>,
+
+    /// compatibility no-op: stdout is already the default when no destinations are set
+    #[argh(switch)]
+    no_temp_file: bool,
+
+    /// emit compact JSON/TOML rather than pretty formatting
+    #[argh(switch)]
+    no_pretty: bool,
+
+    /// overwrite output files even if they already exist
+    #[argh(switch, short = 'f')]
+    force: bool,
+
+    /// output directory for generated TUI artifact modules (Rust source)
+    #[argh(option, default = "PathBuf::from(\"tui_artifacts\")")]
+    out_dir: PathBuf,
+
+    /// name of the generated TuiArtifacts constructor function
+    #[argh(option, default = "String::from(\"tui_artifacts\")")]
+    tui_fn: String,
+
+    /// name of the generated FormSchema constructor function
+    #[argh(option, default = "String::from(\"tui_form_schema\")")]
+    form_fn: String,
+
+    /// name of the generated LayoutNavModel constructor function
+    #[argh(option, default = "String::from(\"tui_layout_nav\")")]
+    layout_fn: String,
+}
+
+#[cfg(feature = "web")]
+fn default_host() -> IpAddr {
+    IpAddr::from([127, 0, 0, 1])
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommandScan {
+    None,
+    Help,
+    Explicit,
+}
+
+fn scan_for_command(args: &[String]) -> CommandScan {
+    let mut index = 0usize;
+    while index < args.len() {
+        let token = args[index].as_str();
+        if is_help_trigger(token) {
+            return CommandScan::Help;
+        }
+        if is_known_subcommand(token) {
+            return CommandScan::Explicit;
+        }
+        if consumes_multiple_values(token) {
+            index += 1;
+            while index < args.len() {
+                let next = args[index].as_str();
+                if next.starts_with('-') || is_known_subcommand(next) || is_help_trigger(next) {
+                    break;
+                }
+                index += 1;
+            }
+            continue;
+        }
+        if consumes_single_value(token) {
+            index += 2;
+            continue;
+        }
+        index += 1;
+    }
+    CommandScan::None
+}
+
+fn normalize_args(args: &[String]) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for token in args {
+        if let Some((flag, value)) = normalize_inline_option(token) {
+            normalized.push(flag);
+            normalized.push(value);
+            continue;
+        }
+
+        let token = match token.as_str() {
+            "--data" => "--config",
+            "--bind" | "--listen" => "--host",
+            "-y" | "--yes" => "--force",
+            other => other,
+        };
+        normalized.push(token.to_string());
+    }
+    normalized
+}
+
+fn normalize_inline_option(token: &str) -> Option<(String, String)> {
+    const INLINE_ALIASES: &[(&str, &str)] = &[
+        ("--schema=", "--schema"),
+        ("--config=", "--config"),
+        ("--data=", "--config"),
+        ("--title=", "--title"),
+        ("--output=", "--output"),
+        ("--temp-file=", "--temp-file"),
+        ("--host=", "--host"),
+        ("--bind=", "--host"),
+        ("--listen=", "--host"),
+        ("--port=", "--port"),
+        ("--out-dir=", "--out-dir"),
+        ("--tui-fn=", "--tui-fn"),
+        ("--form-fn=", "--form-fn"),
+        ("--layout-fn=", "--layout-fn"),
+        ("--ts-export=", "--ts-export"),
+    ];
+
+    for (prefix, canonical) in INLINE_ALIASES {
+        if let Some(value) = token.strip_prefix(prefix) {
+            return Some(((*canonical).to_string(), value.to_string()));
+        }
+    }
+    None
+}
+
+fn expand_output_values(args: &[String]) -> Vec<String> {
+    let mut expanded = Vec::new();
+    let mut index = 0usize;
+    while index < args.len() {
+        let token = args[index].as_str();
+        if consumes_multiple_values(token) {
+            let canonical = "--output".to_string();
+            expanded.push(canonical.clone());
+            index += 1;
+
+            let mut consumed_any = false;
+            while index < args.len() {
+                let next = args[index].as_str();
+                if next.starts_with('-') || is_known_subcommand(next) {
+                    break;
+                }
+
+                if consumed_any {
+                    expanded.push(canonical.clone());
+                }
+                expanded.push(args[index].clone());
+                consumed_any = true;
+                index += 1;
+            }
+            continue;
+        }
+
+        expanded.push(args[index].clone());
+        index += 1;
+    }
+    expanded
+}
+
+fn consumes_single_value(token: &str) -> bool {
+    matches!(
+        token,
+        "-s" | "--schema"
+            | "-c"
+            | "--config"
+            | "--title"
+            | "--temp-file"
+            | "-l"
+            | "--host"
+            | "-p"
+            | "--port"
+            | "--out-dir"
+            | "--tui-fn"
+            | "--form-fn"
+            | "--layout-fn"
+            | "--ts-export"
+    )
+}
+
+fn consumes_multiple_values(token: &str) -> bool {
+    matches!(token, "-o" | "--output")
+}
+
+fn is_help_trigger(token: &str) -> bool {
+    matches!(token, "-h" | "--help" | "help")
+}
+
+fn is_known_subcommand(token: &str) -> bool {
+    matches!(token, "tui" | "tui-snapshot")
+        || cfg!(feature = "web") && matches!(token, "web" | "web-snapshot")
 }

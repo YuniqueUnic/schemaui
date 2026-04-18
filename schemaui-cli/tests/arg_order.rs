@@ -1,4 +1,3 @@
-use clap::Parser;
 use schemaui_cli::cli::{Cli, Commands};
 
 #[test]
@@ -41,6 +40,24 @@ fn explicit_tui_snapshot_subcommand_accepts_common_args() {
     assert_eq!(cmd.out_dir.to_str(), Some("./out"));
 }
 
+#[test]
+fn alias_flags_are_normalized_before_parsing() {
+    let cli = Cli::parse_from([
+        "schemaui",
+        "--data",
+        "./config.json",
+        "--yes",
+        "--output",
+        "./a.json",
+        "./b.json",
+    ]);
+
+    assert!(cli.command.is_none(), "expected implicit default TUI mode");
+    assert_eq!(cli.common.config.as_deref(), Some("./config.json"));
+    assert!(cli.common.force);
+    assert_eq!(cli.common.outputs, vec!["./a.json", "./b.json"]);
+}
+
 #[cfg(feature = "web")]
 #[test]
 fn explicit_web_subcommand_accepts_common_args() {
@@ -75,6 +92,25 @@ fn trailing_web_token_is_parsed_as_subcommand_after_root_args() {
     assert_eq!(cli.common.schema.as_deref(), Some("./schema.json"));
     assert!(cli.common.force);
     assert_eq!(cmd.common.schema, None);
+}
+
+#[cfg(feature = "web")]
+#[test]
+fn web_host_aliases_are_normalized_before_parsing() {
+    let cli = Cli::parse_from([
+        "schemaui",
+        "web",
+        "--bind",
+        "0.0.0.0",
+        "--listen",
+        "127.0.0.1",
+    ]);
+
+    let Some(Commands::Web(cmd)) = cli.command else {
+        panic!("expected explicit web subcommand");
+    };
+
+    assert_eq!(cmd.host.to_string(), "127.0.0.1");
 }
 
 #[cfg(feature = "web")]
