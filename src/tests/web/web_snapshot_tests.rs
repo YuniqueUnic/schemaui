@@ -26,6 +26,33 @@ fn defaults_value() -> Value {
     })
 }
 
+fn opaque_object_schema() -> Value {
+    json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Opaque Object Schema",
+        "type": "object",
+        "properties": {
+            "permissions": {
+                "allOf": [
+                    { "$ref": "#/definitions/PermissionsToml" }
+                ],
+                "description": "Named permission profiles."
+            },
+            "features": {
+                "type": "object",
+                "properties": {
+                    "apps": { "type": "boolean" }
+                }
+            }
+        },
+        "definitions": {
+            "PermissionsToml": {
+                "type": "object"
+            }
+        }
+    })
+}
+
 fn issue72_schema() -> Value {
     json!({
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -48,6 +75,30 @@ fn issue72_schema() -> Value {
         "required": [],
         "additionalProperties": false
     })
+}
+
+#[test]
+fn web_session_builder_accepts_opaque_object_fields() {
+    let snapshot = WebSessionBuilder::new(opaque_object_schema())
+        .with_initial_data(json!({
+            "features": {
+                "apps": true
+            }
+        }))
+        .build()
+        .expect("web session config")
+        .session_response();
+
+    assert_eq!(snapshot.title.as_deref(), Some("Opaque Object Schema"));
+    assert_eq!(snapshot.data, json!({ "features": { "apps": true } }));
+    assert!(
+        snapshot
+            .ui_ast
+            .roots
+            .iter()
+            .any(|node| node.pointer == "/permissions"),
+        "opaque object fields should remain representable in the web session UI AST",
+    );
 }
 
 #[test]

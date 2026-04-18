@@ -25,10 +25,11 @@ pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
         bail!("root schema must describe an object");
     }
 
+    let fallback_object = ObjectValidation::default();
     let object = root_object
         .object
         .as_ref()
-        .context("root schema must define properties")?;
+        .map_or(&fallback_object, Box::as_ref);
     let required = required_list(object);
 
     let mut active_refs = Vec::new();
@@ -151,10 +152,8 @@ fn visit_schema(
     }
 
     if is_object_schema(schema) {
-        let obj = schema
-            .object
-            .as_ref()
-            .context("object schema missing properties")?;
+        let fallback_object = ObjectValidation::default();
+        let obj = schema.object.as_ref().map_or(&fallback_object, Box::as_ref);
         let mut children = Vec::new();
         let required_fields = required_list(obj);
         for (name, child_schema) in &obj.properties {
@@ -291,10 +290,8 @@ fn visit_kind(
     }
 
     if is_object_schema(schema) {
-        let obj = schema
-            .object
-            .as_ref()
-            .context("object schema missing properties")?;
+        let fallback_object = ObjectValidation::default();
+        let obj = schema.object.as_ref().map_or(&fallback_object, Box::as_ref);
         let required_fields = required_list(obj);
         let mut children = Vec::new();
         for (name, schema) in &obj.properties {

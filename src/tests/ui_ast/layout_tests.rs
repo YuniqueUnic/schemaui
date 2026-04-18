@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde_json::{Value, json};
 
 use crate::io::{DocumentFormat, input::parse_document_str};
-use crate::ui_ast::{build_ui_ast, index, layout};
+use crate::ui_ast::{UiNodeKind, build_ui_ast, index, layout};
 
 fn schema_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -165,5 +165,74 @@ fn layout_preserves_declared_root_and_nested_property_order() {
         child_pointers,
         vec!["/zeta/network", "/zeta/auth"],
         "nested section order should follow schema declaration order",
+    );
+}
+
+#[test]
+fn build_ui_ast_accepts_object_only_allof_refs_without_crashing() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "permissions": {
+                "allOf": [
+                    { "$ref": "#/definitions/PermissionsToml" }
+                ]
+            },
+            "features": {
+                "type": "object",
+                "properties": {
+                    "apps": { "type": "boolean" }
+                }
+            }
+        },
+        "definitions": {
+            "PermissionsToml": {
+                "type": "object"
+            }
+        }
+    });
+
+    let ast = build_ui_ast(&schema).expect("runtime UiAst");
+    assert_eq!(
+        ast.roots.len(),
+        2,
+        "all top-level roots should still be built"
+    );
+
+    let permissions = ast
+        .roots
+        .iter()
+        .find(|node| node.pointer == "/permissions")
+        .expect("permissions root");
+    assert_eq!(permissions.default_value, Some(json!({})));
+    assert!(
+        matches!(
+            permissions.kind,
+            UiNodeKind::Object {
+                ref children,
+                ref required
+            } if children.is_empty() && required.is_empty()
+        ),
+        "opaque object schemas should degrade to an empty object boundary instead of crashing",
+    );
+
+    let features = ast
+        .roots
+        .iter()
+        .find(|node| node.pointer == "/features")
+        .expect("features root");
+    assert!(
+        matches!(
+            features.kind,
+            UiNodeKind::Object { ref children, .. }
+                if children.iter().any(|child| child.pointer == "/features/apps")
+        ),
+        "ordinary object schemas should remain fully traversable",
+    );
+
+    let ui_layout = layout::build_ui_layout(&ast);
+    assert!(
+        ui_layout.roots.iter().any(|root| root.id == "features"),
+        "layout should still be buildable when an opaque object field is present",
     );
 }

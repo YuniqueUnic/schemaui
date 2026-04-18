@@ -71,6 +71,33 @@ fn spawn_schema_server(schema: Value) -> (String, thread::JoinHandle<()>) {
     (url, handle)
 }
 
+fn opaque_object_schema() -> Value {
+    json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Opaque Object Schema",
+        "type": "object",
+        "properties": {
+            "permissions": {
+                "allOf": [
+                    { "$ref": "#/definitions/PermissionsToml" }
+                ],
+                "description": "Named permission profiles."
+            },
+            "features": {
+                "type": "object",
+                "properties": {
+                    "apps": { "type": "boolean" }
+                }
+            }
+        },
+        "definitions": {
+            "PermissionsToml": {
+                "type": "object"
+            }
+        }
+    })
+}
+
 #[test]
 fn prepare_session_uses_json_root_schema_and_strips_metadata_from_defaults() {
     let temp = unique_temp_dir("json_root");
@@ -245,6 +272,47 @@ fn web_snapshot_accepts_yaml_fallback_local_schema_declaration() {
     assert_eq!(snapshot["title"], "Web Snapshot Local Schema");
     assert_eq!(snapshot["data"], json!({ "name": "bob" }));
     assert!(out_dir.join("session_snapshot.ts").exists());
+
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[cfg(all(feature = "web", feature = "remote-schema", feature = "toml"))]
+#[test]
+fn web_snapshot_accepts_remote_schema_with_opaque_object_fields() {
+    let temp = unique_temp_dir("web_snapshot_remote_opaque_object");
+    let out_dir = temp.join("snapshots");
+    let (schema_url, handle) = spawn_schema_server(opaque_object_schema());
+    let config_path = temp.join("config.toml");
+    fs::write(
+        &config_path,
+        format!("#:schema {schema_url}\n[features]\napps = true\n"),
+    )
+    .expect("write toml config");
+
+    schemaui_cli::web::run_snapshot_cli(WebSnapshotCommand {
+        common: base_args(None, Some(config_path.to_string_lossy().into_owned())),
+        out_dir: out_dir.clone(),
+        ts_export: "SessionSnapshot".to_string(),
+    })
+    .expect("run web snapshot");
+
+    handle.join().expect("schema server thread");
+
+    let snapshot_path = out_dir.join("session_snapshot.json");
+    let snapshot: Value =
+        serde_json::from_str(&fs::read_to_string(&snapshot_path).expect("read web snapshot json"))
+            .expect("parse web snapshot json");
+
+    assert_eq!(snapshot["title"], "Opaque Object Schema");
+    assert_eq!(snapshot["data"], json!({ "features": { "apps": true } }));
+    assert!(
+        snapshot["ui_ast"]["roots"]
+            .as_array()
+            .expect("ui ast roots")
+            .iter()
+            .any(|node| node["pointer"] == "/permissions"),
+        "opaque object fields should remain representable in the generated UI AST",
+    );
 
     let _ = fs::remove_dir_all(temp);
 }
