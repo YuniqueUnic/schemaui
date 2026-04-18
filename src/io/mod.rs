@@ -3,4 +3,4 @@ pub mod output;
 
 mod format;
 
-pub use format::DocumentFormat;
+pub use format::{DocumentFormat, DocumentFormatProbe};

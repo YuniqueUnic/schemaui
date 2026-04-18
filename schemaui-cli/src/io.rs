@@ -59,7 +59,7 @@ fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result
             }
             Err(Report::msg(format!(
                 "failed to parse {label}: tried {} (first error: {primary})",
-                format_list()
+                DocumentFormat::format_list()
             )))
         }
     }
@@ -68,23 +68,4 @@ fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result
 pub fn is_not_found(err: &Report) -> bool {
     err.downcast_ref::<io::Error>()
         .is_some_and(|io_err| io_err.kind() == io::ErrorKind::NotFound)
-}
-
-fn format_list() -> &'static str {
-    #[cfg(all(feature = "yaml", feature = "toml"))]
-    {
-        "JSON/YAML/TOML"
-    }
-    #[cfg(all(feature = "yaml", not(feature = "toml")))]
-    {
-        "JSON/YAML"
-    }
-    #[cfg(all(not(feature = "yaml"), feature = "toml"))]
-    {
-        "JSON/TOML"
-    }
-    #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
-    {
-        "JSON"
-    }
 }

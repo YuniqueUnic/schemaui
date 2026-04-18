@@ -4,7 +4,6 @@ use schemaui::{DocumentFormat, OutputDestination, OutputOptions};
 
 use crate::cli::CommonArgs;
 
-use super::DEFAULT_TEMP_FILE;
 use super::diagnostics::DiagnosticCollector;
 use super::format::{ExtensionFormat, probe_format_from_extension};
 
@@ -30,14 +29,11 @@ pub fn build_output_options(
     }
 
     if destinations.is_empty() && !explicit_outputs {
-        if args.no_temp_file {
-            return (None, Vec::new());
+        if let Some(path) = args.temp_file.clone() {
+            destinations.push(OutputDestination::file(path));
+        } else {
+            destinations.push(OutputDestination::Stdout);
         }
-        let fallback = args
-            .temp_file
-            .clone()
-            .unwrap_or_else(|| PathBuf::from(DEFAULT_TEMP_FILE));
-        destinations.push(OutputDestination::file(fallback.clone()));
     }
 
     if destinations.is_empty() {

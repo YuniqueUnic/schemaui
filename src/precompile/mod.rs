@@ -1,12 +1,12 @@
 use std::{fs, path::Path};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
-use crate::io::DocumentFormat;
 use crate::io::input::{parse_document_str, schema_with_defaults};
+use crate::io::{DocumentFormat, DocumentFormatProbe};
 use crate::tui::model::{FormSchema, form_schema_from_ui_ast};
 use crate::tui::state::LayoutNavModel;
 use crate::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
@@ -79,7 +79,8 @@ pub fn build_ui_artifact_bundle_from_file(
 ) -> Result<UiArtifactBundle> {
     let schema = read_document_file(schema_path, schema_format)?;
     let defaults = if let Some(path) = defaults_path {
-        Some(read_document_file(path, schema_format)?)
+        let format = resolve_file_format(path, schema_format, "defaults file")?;
+        Some(read_document_file(path, format)?)
     } else {
         None
     };
@@ -168,6 +169,24 @@ fn read_document_file(path: &Path, format: DocumentFormat) -> Result<Value> {
     let contents = fs::read_to_string(path)?;
     let schema: Value = parse_document_str(&contents, format)?;
     Ok(schema)
+}
+
+pub(crate) fn resolve_file_format(
+    path: &Path,
+    fallback: DocumentFormat,
+    label: &str,
+) -> Result<DocumentFormat> {
+    match DocumentFormat::probe_extension(path) {
+        DocumentFormatProbe::Known(format) => Ok(format),
+        DocumentFormatProbe::UnsupportedFeature {
+            format_name,
+            feature_flag,
+        } => Err(anyhow!(
+            "{label} {} requires {format_name} support, but this build lacks the '{feature_flag}' feature",
+            path.display()
+        )),
+        DocumentFormatProbe::Unknown => Ok(fallback),
+    }
 }
 
 fn stable_value_bytes(value: &Value) -> Result<Vec<u8>> {

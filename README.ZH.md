@@ -46,6 +46,48 @@
 - **内置 CLI** –
   `schemaui-cli`提供了与库相同的流程，包括多目标输出、stdin/内联规范和聚合诊断。
 
+## Config Schema 自动检测
+
+当你只传 `--config` 而不显式传 `--schema` 时，`schemaui-cli`
+现在会按以下优先级解析 schema：
+
+1. 显式 `--schema`
+2. 配置文件内声明的 schema
+3. `schema_from_data_value` 自动推断
+
+支持的声明形式：
+
+- **JSON**：根级 `$schema`
+- **TOML**：`#:schema ./schema.json`
+- **YAML**：`# yaml-language-server: $schema=...`
+- **YAML fallback**：`# @schema ...`
+
+本地与远程 schema 都支持。相对本地路径会按配置文件所在目录解析；如果配置来自
+stdin/内联文本，则回退到当前工作目录。对于 JSON 配置，根级 `$schema`
+只作为元数据使用，会在内存中的 defaults
+里剥离，避免编辑器提示字段污染最终校验与输出。
+
+远程 `http(s)` schema 加载只存在于 `schemaui-cli`，并且 CLI 默认开启
+`remote-schema` feature；如果你希望二进制只保留本地能力，可以关闭它。 `schemaui`
+这个库默认不会开启任何远程 schema 加载能力。
+
+两者的默认 feature 按使用场景刻意分开：
+
+- `schemaui-cli` 默认走“开箱即用”路径：TUI + Web + 远程 schema 加载都开启。
+- `schemaui` 作为库默认开 `tui + json`，这样保留最基础的 JSON
+  能力，同时不默认引入 Web 与联网相关能力。
+- `json`、`yaml`、`toml` 都是真正落在代码路径上的 feature
+  gate；三者不能全关，否则会直接给出清晰的编译期错误。
+
+参考：
+
+- JSON Schema
+  `$schema`：<https://json-schema.org/understanding-json-schema/reference/schema>
+- Taplo `#:schema`
+  指令：<https://taplo.tamasfe.dev/configuration/directives.html>
+- YAML language server
+  modeline：<https://github.com/redhat-developer/yaml-language-server>
+
 ## 快速开始
 
 ```toml
@@ -143,7 +185,7 @@ fn main() -> color_eyre::Result<()> {
 ## 输入与输出设计
 
 - `io::input::parse_document_str`将
-  JSON/YAML/TOML（通过`serde_json`、`serde_yaml`、`toml`）转换为`serde_json::Value`。功能标志（`json`、`yaml`、`toml`、`all_formats`）保持依赖项精简。
+  JSON/YAML/TOML（通过`serde_json`、`serde_yaml`、`toml`）转换为`serde_json::Value`。功能标志（`json`、`yaml`、`toml`、`all_formats`）不仅控制依赖项，也会真实控制`DocumentFormat`的解析与探测路径。
 - `schema_from_data_value/str`从活动配置中推断模式，注入草稿 -07
   元数据和默认值，以便 UI 加载现有值。
 - `schema_with_defaults`将规范模式与用户数据合并，通过`properties`、`patternProperties`、`additionalProperties`、`dependencies`、`dependentSchemas`、数组和`$ref`目标传播默认值，而不修改原始树。
@@ -433,7 +475,8 @@ schemaui \
 - 诊断 –
   `DiagnosticCollector`累积格式问题、功能标志不匹配、标准输入冲突和现有输出文件，以执行前的诊断。
 - 输出 –
-  `-o/--output`可重复使用，并且可以混合文件路径与`-`用于标准输出。当未设置目标时，工具写入`/tmp/schemaui.json`，除非传递了`--no-temp-file`。扩展名决定格式；拒绝冲突的扩展名。
+  `-o/--output`可重复使用，并且可以混合文件路径与`-`用于标准输出。当未设置目标时，工具直接写到
+  stdout；如果你明确想走回退文件，可以传`--temp-file <PATH>`。扩展名决定格式；拒绝冲突的扩展名。
 - 标志 –
   `--no-pretty`切换紧凑输出，`--force/--yes`允许覆盖文件，`--title`传递到`SchemaUI::with_title`。
 

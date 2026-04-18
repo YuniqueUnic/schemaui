@@ -1,10 +1,9 @@
 mod builder;
 mod bundle;
-mod diagnostics;
-mod format;
+pub(crate) mod diagnostics;
+pub(crate) mod format;
 mod output;
+pub(crate) mod schema_source;
 
 pub use builder::prepare_session;
 pub use bundle::SessionBundle;
-
-const DEFAULT_TEMP_FILE: &str = "/tmp/schemaui.json";

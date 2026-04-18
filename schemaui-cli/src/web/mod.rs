@@ -1,15 +1,16 @@
 use std::fs;
-use std::path::PathBuf;
 
 use color_eyre::eyre::{Report, Result};
+use schemaui::SchemaUI;
 use schemaui::precompile::web::{
-    build_session_snapshot_from_files, write_session_snapshot_json,
-    write_session_snapshot_ts_module,
+    build_session_snapshot, write_session_snapshot_json, write_session_snapshot_ts_module,
 };
 use schemaui::web::session::ServeOptions as WebServeOptions;
-use schemaui::{DocumentFormat, SchemaUI};
 
 use crate::cli::{WebCommand, WebSnapshotCommand};
+use crate::session::diagnostics::DiagnosticCollector;
+use crate::session::format::resolve_format_hint;
+use crate::session::schema_source::{load_optional_document, resolve_session_inputs};
 use crate::session::{SessionBundle, prepare_session};
 
 pub fn run_cli(cmd: WebCommand) -> Result<()> {
@@ -45,48 +46,37 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
 }
 
 pub fn run_snapshot_cli(cmd: WebSnapshotCommand) -> Result<()> {
-    // For snapshots we intentionally use a simpler pipeline that only supports
-    // file-based schema/config. This keeps behaviour predictable and mirrors
-    // the `web_snapshot_codegen` example.
-
-    let schema_spec = cmd
-        .common
-        .schema
-        .as_deref()
-        .ok_or_else(|| Report::msg("web-snapshot requires --schema <PATH>"))?;
-    if schema_spec == "-" {
-        return Err(Report::msg(
-            "web-snapshot does not support --schema - (stdin); please pass a file path",
-        ));
-    }
-
+    let schema_spec = cmd.common.schema.as_deref();
     let config_spec = cmd.common.config.as_deref();
-    if config_spec == Some("-") {
-        return Err(Report::msg(
-            "web-snapshot does not support --config - (stdin); please pass a file path",
-        ));
+    let mut diagnostics = DiagnosticCollector::default();
+    let schema_stdin = schema_spec == Some("-");
+    let config_stdin = config_spec == Some("-");
+    if schema_stdin && config_stdin {
+        diagnostics.push_input(
+            "schema/config",
+            "cannot read schema and config from stdin simultaneously; provide inline content, files, or a remote schema",
+        );
     }
-
-    let schema_path = PathBuf::from(schema_spec);
-    if !schema_path.exists() {
-        return Err(Report::msg(format!(
-            "schema path {:?} does not exist",
-            schema_path
-        )));
-    }
-
-    let defaults_path = config_spec.map(PathBuf::from);
-    if let Some(ref p) = defaults_path
-        && !p.exists()
-    {
-        return Err(Report::msg(format!("config path {:?} does not exist", p)));
-    }
-
-    let format = DocumentFormat::from_extension(&schema_path).unwrap_or(DocumentFormat::Json);
-
-    let snapshot =
-        build_session_snapshot_from_files(&schema_path, format, defaults_path.as_deref())
-            .map_err(Report::msg)?;
+    let schema_hint = resolve_format_hint(schema_spec, "schema", &mut diagnostics);
+    let config_hint = resolve_format_hint(config_spec, "config", &mut diagnostics);
+    let schema_document = load_optional_document(
+        schema_spec,
+        schema_hint.hint.format,
+        "schema",
+        schema_hint.blocked || (schema_stdin && config_stdin),
+        &mut diagnostics,
+    );
+    let config_document = load_optional_document(
+        config_spec,
+        config_hint.hint.format,
+        "config",
+        config_hint.blocked || (schema_stdin && config_stdin),
+        &mut diagnostics,
+    );
+    diagnostics.into_result()?;
+    let resolved = resolve_session_inputs(schema_document, config_document).map_err(Report::msg)?;
+    let snapshot = build_session_snapshot(&resolved.schema, resolved.defaults.as_ref())
+        .map_err(Report::msg)?;
 
     fs::create_dir_all(&cmd.out_dir)?;
     let json_out = cmd.out_dir.join("session_snapshot.json");

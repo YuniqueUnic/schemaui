@@ -96,7 +96,8 @@ schemaui tui --schema ./schema.json
 
 Key components:
 
-- **`InputSource`** – resolves files vs stdin vs inline specs.
+- **`schema_source`** – resolves explicit `--schema`, config-file declarations,
+  remote/local schema loading, and final fallback inference in one place.
 - **`FormatHint`** – inspects extensions and ensures disabled formats are
   rejected before parsing.
 - **`DiagnosticCollector`** – aggregates every input/output issue and aborts
@@ -106,24 +107,49 @@ Key components:
 
 ## 3. Input Modes
 
-| Flag                  | Behaviour                                            | Notes                                                                           |
-| --------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `-s, --schema <SPEC>` | File path, literal JSON/YAML/TOML, or `-` for stdin. | If the path does not exist the CLI treats the argument as inline text.          |
-| `-c, --config <SPEC>` | Same semantics as `--schema`.                        | Optional; when omitted, defaults are inferred from the config value if present. |
+| Flag                  | Behaviour                                                                      | Notes                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `-s, --schema <SPEC>` | Local path, `file://`, `http(s)://`, literal JSON/YAML/TOML, or `-` for stdin. | Explicit schema wins over any declaration found inside `--config`.                     |
+| `-c, --config <SPEC>` | Same loading semantics as `--schema`.                                          | Optional; if `--schema` is omitted the CLI tries config declarations before inferring. |
 
 Constraints enforced by code:
 
 - `stdin` can only be consumed once, so `--schema -` and `--config -` cannot be
   combined.
-- If only `--config` is provided, the CLI calls `schema_from_data_value` to
-  build a schema with defaults.
+- Resolution priority is: `--schema` > config declaration > inferred schema.
+- Relative local declarations are resolved against the config file's directory.
+  For inline/stdin config payloads, relative paths are resolved against the
+  current working directory.
+- HTTP(S) schema loading is controlled by the `schemaui-cli` `remote-schema`
+  feature, which is enabled by default for the CLI. Local paths and `file://`
+  URLs always work, and the `schemaui` library crate keeps remote schema loading
+  disabled by default. The library crate defaults to `tui + json`, while the CLI
+  defaults to the convenience-oriented feature set.
+- `json`, `yaml`, and `toml` are all real feature gates. Keep at least one of
+  them enabled; disabling all three fails the build with a clear error.
+
+### Config schema auto-detection
+
+When only `--config` is provided, `schemaui-cli` scans the config for a schema
+hint before falling back to `schema_from_data_value`.
+
+Supported declarations:
+
+- **JSON**: root `$schema`
+- **TOML**: `#:schema https://example.com/schema.json`
+- **YAML**: `# yaml-language-server: $schema=...`
+- **YAML fallback**: `# @schema ...`
+
+JSON declarations are treated as metadata, so the root `$schema` key is removed
+from the in-memory defaults before validation/output.
 
 ## 4. Output & Persistence
 
 - `-o, --output <DEST>` is repeatable; pass `-` to include stdout alongside
   files. Extensions (`.json`, `.yaml`, `.toml`) drive `DocumentFormat`.
-- When no destination is set, the CLI writes to `/tmp/schemaui.json` unless
-  `--no-temp-file` is passed or `--temp-file <PATH>` overrides the fallback.
+- When no destination is set, the CLI writes to stdout. Pass
+  `--temp-file
+  <PATH>` if you explicitly want a fallback file instead.
 - `--no-pretty` toggles compact serialization; pretty output is the default.
 - `--force`/`--yes` allows overwriting existing files. Without the flag the CLI
   refuses to run when a destination already exists.
@@ -133,14 +159,14 @@ can reuse the exact same serialization logic.
 
 ## 5. Argument Reference
 
-| Flag                  | Description                                        | Code hook                           |
-| --------------------- | -------------------------------------------------- | ----------------------------------- |
-| `-o, --output <DEST>` | Append destinations (`-` writes to stdout).        | `build_output_options`              |
-| `--title <TEXT>`      | Overrides the TUI title bar.                       | `SchemaUI::with_title`              |
-| `--temp-file <PATH>`  | Custom fallback file when no destinations are set. | `build_output_options`              |
-| `--no-temp-file`      | Disable the fallback file behaviour entirely.      | `build_output_options`              |
-| `--no-pretty`         | Emit compact JSON/TOML/YAML.                       | `OutputOptions::with_pretty(false)` |
-| `--force`, `--yes`    | Allow overwriting files.                           | `ensure_output_paths_available`     |
+| Flag                  | Description                                         | Code hook                           |
+| --------------------- | --------------------------------------------------- | ----------------------------------- |
+| `-o, --output <DEST>` | Append destinations (`-` writes to stdout).         | `build_output_options`              |
+| `--title <TEXT>`      | Overrides the TUI title bar.                        | `SchemaUI::with_title`              |
+| `--temp-file <PATH>`  | Write to this file when no `--output` is given.     | `build_output_options`              |
+| `--no-temp-file`      | Compatibility no-op; stdout is already the default. | `build_output_options`              |
+| `--no-pretty`         | Emit compact JSON/TOML/YAML.                        | `OutputOptions::with_pretty(false)` |
+| `--force`, `--yes`    | Allow overwriting files.                            | `ensure_output_paths_available`     |
 
 ## 6. Usage Examples
 
@@ -158,6 +184,26 @@ schemaui tui \
 
 ```bash
 cat defaults.yaml | schemaui --config - --output ./edited.json
+```
+
+### Config only with schema declaration
+
+```bash
+schemaui web --config ./config.yaml
+```
+
+```yaml
+# yaml-language-server: $schema=./schema.json
+name: api
+port: 8080
+```
+
+### Explicit schema override beats the file header
+
+```bash
+schemaui \
+  --schema https://example.com/runtime.schema.json \
+  --config ./config.toml
 ```
 
 ### Inline schema to avoid double-stdin
@@ -204,15 +250,16 @@ and validation pipeline.
 
 ## 9. Feature Flags
 
-| Feature          | Effect                                                   |
-| ---------------- | -------------------------------------------------------- |
-| `json` (default) | Enables JSON parsing/serialization. Always on.           |
-| `yaml` (default) | Adds YAML parsing/serialization via `serde_yaml`.        |
-| `toml` (opt-in)  | Adds TOML parsing/serialization via `toml`.              |
-| `all_formats`    | Convenience feature: enables `json`, `yaml`, and `toml`. |
+| Feature          | Effect                                                     |
+| ---------------- | ---------------------------------------------------------- |
+| `json` (default) | Enables JSON parsing/serialization and JSON format probes. |
+| `yaml`           | Adds YAML parsing/serialization via `serde_yaml`.          |
+| `toml` (opt-in)  | Adds TOML parsing/serialization via `toml`.                |
+| `all_formats`    | Convenience feature: enables `json`, `yaml`, and `toml`.   |
 
 `DocumentFormat::available_formats()` obeys the same feature matrix, so both the
-CLI and host applications automatically reflect build-time capabilities.
+CLI and host applications automatically reflect build-time capabilities. At
+least one of `json`, `yaml`, or `toml` must remain enabled.
 
 ## 10. Operational Tips
 

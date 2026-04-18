@@ -2601,9 +2601,11 @@ dependencies = [
  "clap",
  "color-eyre",
  "predicates",
+ "reqwest",
  "schemaui",
  "serde_json",
  "tokio",
+ "url",
 ]
 
 [[package]]

@@ -110,11 +110,11 @@ pub struct TuiSnapshotCommand {
 
 #[derive(Debug, Args, Clone)]
 pub struct CommonArgs {
-    /// Schema spec: file path, inline payload, or "-" for stdin
+    /// Schema spec: local path, file/HTTP URL, inline payload, or "-" for stdin
     #[arg(short = 's', long = "schema", value_name = "SPEC")]
     pub schema: Option<String>,
 
-    /// Config spec: file path, inline payload, or "-" for stdin
+    /// Config spec: local path, file/HTTP URL, inline payload, or "-" for stdin
     #[arg(short = 'c', long = "config", alias = "data", value_name = "SPEC")]
     pub config: Option<String>,
 
@@ -126,12 +126,12 @@ pub struct CommonArgs {
     #[arg(short = 'o', long = "output", value_name = "DEST", num_args = 1.., action = ArgAction::Append)]
     pub outputs: Vec<String>,
 
-    /// Override the default temp file location (only used when no other destinations are set)
+    /// Write to PATH when no destinations are set (stdout remains the default)
     #[arg(long = "temp-file", value_name = "PATH")]
     pub temp_file: Option<PathBuf>,
 
-    /// Disable writing to the default temp file when no destinations are provided
-    #[arg(long = "no-temp-file")]
+    /// Compatibility no-op: stdout is already the default when no destinations are set
+    #[arg(long = "no-temp-file", conflicts_with = "temp_file")]
     pub no_temp_file: bool,
 
     /// Emit compact JSON/TOML rather than pretty formatting

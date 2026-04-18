@@ -4,6 +4,8 @@ use schemaui::DocumentFormat;
 
 use super::diagnostics::DiagnosticCollector;
 
+pub use schemaui::DocumentFormatProbe as ExtensionFormat;
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FormatHint {
     pub format: DocumentFormat,
@@ -65,38 +67,6 @@ pub fn resolve_format_hint(
     }
 }
 
-#[derive(Debug)]
-pub enum ExtensionFormat {
-    Known(DocumentFormat),
-    #[allow(dead_code)]
-    UnsupportedFeature {
-        format_name: &'static str,
-        feature_flag: &'static str,
-    },
-    Unknown,
-}
-
 pub fn probe_format_from_extension(path: &Path) -> ExtensionFormat {
-    let Some(ext) = path.extension() else {
-        return ExtensionFormat::Unknown;
-    };
-    let normalized = ext.to_string_lossy().to_ascii_lowercase();
-    match normalized.as_str() {
-        "json" => ExtensionFormat::Known(DocumentFormat::Json),
-        #[cfg(feature = "yaml")]
-        "yaml" | "yml" => ExtensionFormat::Known(DocumentFormat::Yaml),
-        #[cfg(not(feature = "yaml"))]
-        "yaml" | "yml" => ExtensionFormat::UnsupportedFeature {
-            format_name: "yaml",
-            feature_flag: "yaml",
-        },
-        #[cfg(feature = "toml")]
-        "toml" => ExtensionFormat::Known(DocumentFormat::Toml),
-        #[cfg(not(feature = "toml"))]
-        "toml" => ExtensionFormat::UnsupportedFeature {
-            format_name: "toml",
-            feature_flag: "toml",
-        },
-        _ => ExtensionFormat::Unknown,
-    }
+    DocumentFormat::probe_extension(path)
 }

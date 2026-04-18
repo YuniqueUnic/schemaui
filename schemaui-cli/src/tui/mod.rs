@@ -1,11 +1,13 @@
 use std::fs;
-use std::path::PathBuf;
 
 use color_eyre::eyre::{Report, Result};
+use schemaui::SchemaUI;
 use schemaui::precompile::tui as pre_tui;
-use schemaui::{DocumentFormat, SchemaUI};
 
 use crate::cli::{CommonArgs, TuiSnapshotCommand};
+use crate::session::diagnostics::DiagnosticCollector;
+use crate::session::format::resolve_format_hint;
+use crate::session::schema_source::{load_optional_document, resolve_session_inputs};
 use crate::session::{SessionBundle, prepare_session};
 
 pub fn run_cli(args: &CommonArgs) -> Result<()> {
@@ -34,70 +36,58 @@ pub(crate) fn execute_session(session: SessionBundle) -> Result<()> {
 }
 
 pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {
-    // For TUI snapshots we require a schema file path (no stdin/inline).
-    let schema_spec = cmd
-        .common
-        .schema
-        .as_deref()
-        .ok_or_else(|| Report::msg("tui-snapshot requires --schema <PATH>"))?;
-    if schema_spec == "-" {
-        return Err(Report::msg(
-            "tui-snapshot does not support --schema - (stdin); please pass a file path",
-        ));
-    }
-
-    let schema_path = PathBuf::from(schema_spec);
-    if !schema_path.exists() {
-        return Err(Report::msg(format!(
-            "schema path {:?} does not exist",
-            schema_path
-        )));
-    }
-
+    let schema_spec = cmd.common.schema.as_deref();
     let config_spec = cmd.common.config.as_deref();
-    if config_spec == Some("-") {
-        return Err(Report::msg(
-            "tui-snapshot does not support --config - (stdin); please pass a file path",
-        ));
+    let mut diagnostics = DiagnosticCollector::default();
+    let schema_stdin = schema_spec == Some("-");
+    let config_stdin = config_spec == Some("-");
+    if schema_stdin && config_stdin {
+        diagnostics.push_input(
+            "schema/config",
+            "cannot read schema and config from stdin simultaneously; provide inline content, files, or a remote schema",
+        );
     }
-
-    let defaults_path = config_spec.map(PathBuf::from);
-    if let Some(ref path) = defaults_path
-        && !path.exists()
-    {
-        return Err(Report::msg(format!(
-            "config path {:?} does not exist",
-            path
-        )));
-    }
-
-    let format = DocumentFormat::from_extension(&schema_path).unwrap_or(DocumentFormat::Json);
+    let schema_hint = resolve_format_hint(schema_spec, "schema", &mut diagnostics);
+    let config_hint = resolve_format_hint(config_spec, "config", &mut diagnostics);
+    let schema_document = load_optional_document(
+        schema_spec,
+        schema_hint.hint.format,
+        "schema",
+        schema_hint.blocked || (schema_stdin && config_stdin),
+        &mut diagnostics,
+    );
+    let config_document = load_optional_document(
+        config_spec,
+        config_hint.hint.format,
+        "config",
+        config_hint.blocked || (schema_stdin && config_stdin),
+        &mut diagnostics,
+    );
+    diagnostics.into_result()?;
+    let resolved = resolve_session_inputs(schema_document, config_document).map_err(Report::msg)?;
 
     fs::create_dir_all(&cmd.out_dir)?;
     let tui_module = cmd.out_dir.join("tui_artifacts.rs");
     let form_module = cmd.out_dir.join("tui_form_schema.rs");
     let layout_module = cmd.out_dir.join("tui_layout_nav.rs");
 
-    pre_tui::generate_tui_artifacts_module(
-        &schema_path,
-        format,
-        defaults_path.as_deref(),
+    pre_tui::generate_tui_artifacts_module_from_value(
+        &resolved.schema,
+        resolved.defaults.as_ref(),
         &tui_module,
         &cmd.tui_fn,
     )
     .map_err(Report::msg)?;
-    pre_tui::generate_tui_form_schema_module(
-        &schema_path,
-        format,
-        defaults_path.as_deref(),
+    pre_tui::generate_tui_form_schema_module_from_value(
+        &resolved.schema,
+        resolved.defaults.as_ref(),
         &form_module,
         &cmd.form_fn,
     )
     .map_err(Report::msg)?;
-    pre_tui::generate_tui_layout_nav_module(
-        &schema_path,
-        format,
-        defaults_path.as_deref(),
+    pre_tui::generate_tui_layout_nav_module_from_value(
+        &resolved.schema,
+        resolved.defaults.as_ref(),
         &layout_module,
         &cmd.layout_fn,
     )

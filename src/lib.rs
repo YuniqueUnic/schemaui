@@ -16,7 +16,7 @@ pub(crate) mod tests;
 
 // pub use app::{SchemaUI, UiOptions};
 pub use io::{
-    DocumentFormat,
+    DocumentFormat, DocumentFormatProbe,
     input::{
         parse_document_str, schema_from_data_str, schema_from_data_value, schema_with_defaults,
     },

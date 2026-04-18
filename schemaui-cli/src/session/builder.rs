@@ -1,14 +1,12 @@
 use color_eyre::eyre::{Result, eyre};
-use schemaui::{DocumentFormat, schema_from_data_value};
-use serde_json::Value;
 
 use crate::cli::CommonArgs;
-use crate::io::load_value;
 
 use super::bundle::SessionBundle;
 use super::diagnostics::DiagnosticCollector;
 use super::format::resolve_format_hint;
 use super::output::{build_output_options, ensure_output_paths_available};
+use super::schema_source::{load_optional_document, resolve_session_inputs};
 
 pub fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
     let mut diagnostics = DiagnosticCollector::default();
@@ -27,14 +25,14 @@ pub fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
     let schema_hint = resolve_format_hint(schema_spec, "schema", &mut diagnostics);
     let config_hint = resolve_format_hint(config_spec, "config", &mut diagnostics);
 
-    let schema_value = load_optional_value(
+    let schema_document = load_optional_document(
         schema_spec,
         schema_hint.hint.format,
         "schema",
         schema_hint.blocked || (schema_stdin && config_stdin),
         &mut diagnostics,
     );
-    let config_value = load_optional_value(
+    let config_document = load_optional_document(
         config_spec,
         config_hint.hint.format,
         "config",
@@ -52,95 +50,15 @@ pub fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
 
     diagnostics.into_result()?;
 
-    let mut schema_value = schema_value;
-    let mut config_value = config_value;
-    if schema_value.is_none()
-        && let Some(config_doc) = config_value.as_ref()
-        && looks_like_json_schema(config_doc)
-    {
-        eprintln!("detected JSON Schema provided via --config; treating it as the active schema");
-        schema_value = config_value.take();
-    }
-
-    if schema_value.is_none() && config_value.is_none() {
+    if schema_document.is_none() && config_document.is_none() {
         return Err(eyre!("provide at least --schema or --config"));
     }
-
-    let schema = match (schema_value, config_value.as_ref()) {
-        (Some(schema), _) => schema,
-        (None, Some(defaults)) => schema_from_data_value(defaults),
-        (None, None) => unreachable!("validated above"),
-    };
+    let resolved = resolve_session_inputs(schema_document, config_document)?;
 
     Ok(SessionBundle {
-        schema,
-        defaults: config_value,
+        schema: resolved.schema,
+        defaults: resolved.defaults,
         title: args.title.clone(),
         output: output_settings,
     })
-}
-
-fn load_optional_value(
-    spec: Option<&str>,
-    format: DocumentFormat,
-    label: &str,
-    skip: bool,
-    diagnostics: &mut DiagnosticCollector,
-) -> Option<Value> {
-    if skip {
-        return None;
-    }
-    let raw = spec?;
-    match load_value(raw, format, label) {
-        Ok(value) => Some(value),
-        Err(err) => {
-            diagnostics.push_input(label, err.to_string());
-            None
-        }
-    }
-}
-
-fn looks_like_json_schema(value: &Value) -> bool {
-    let obj = match value.as_object() {
-        Some(map) => map,
-        None => return false,
-    };
-
-    if obj
-        .get("properties")
-        .and_then(Value::as_object)
-        .map(|props| props.len())
-        .unwrap_or(0)
-        == 0
-    {
-        return false;
-    }
-
-    if obj.contains_key("$schema") {
-        return true;
-    }
-
-    if matches!(obj.get("type"), Some(Value::String(t)) if t == "object") {
-        return true;
-    }
-
-    if let Some(props) = obj.get("properties").and_then(Value::as_object) {
-        let mut scored = 0usize;
-
-        for value in props.values() {
-            if value.get("type").is_some() {
-                scored += 1;
-            }
-            if value.get("properties").is_some() {
-                scored += 1;
-            }
-            if value.get("enum").is_some() {
-                scored += 1;
-            }
-        }
-
-        return scored >= 2;
-    }
-
-    false
 }

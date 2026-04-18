@@ -33,7 +33,7 @@ include = [
 ]
 
 [features]
-default = ["tui", "web", "json"]
+default = ["tui", "json"]
 full = ["all_formats", "tui", "web"]
 tui = []
 web = ["dep:include_dir", "dep:axum", "dep:tokio", "dep:ts-rs"]

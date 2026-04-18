@@ -11,6 +11,7 @@ const JSON_SCHEMA_DRAFT: &str = "http://json-schema.org/draft-07/schema#";
 /// Parse structured data in any supported format into a `serde_json::Value`.
 pub fn parse_document_str(contents: &str, format: DocumentFormat) -> Result<Value> {
     match format {
+        #[cfg(feature = "json")]
         DocumentFormat::Json => {
             serde_json::from_str::<Value>(contents).with_context(|| "failed to parse JSON document")
         }
@@ -371,6 +372,7 @@ mod tests {
         assert_eq!(schema["items"]["type"], json!("string"));
     }
 
+    #[cfg(feature = "json")]
     #[test]
     fn parse_json_documents() {
         let raw = "{\"enabled\":true}";

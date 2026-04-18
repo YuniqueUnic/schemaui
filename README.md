@@ -54,6 +54,51 @@ see the full list of issues before saving.
   exposes helpers under `schemaui::web::session` so host applications can serve
   the experience without reimplementing the stack.
 
+## Config Schema Auto-Detection
+
+When you launch the CLI with `--config` and omit `--schema`, `schemaui-cli` now
+resolves the schema in this order:
+
+1. Explicit `--schema`
+2. A schema declaration embedded in the config document
+3. Fallback inference via `schema_from_data_value`
+
+Supported declarations:
+
+- **JSON**: root `$schema`
+- **TOML**: `#:schema ./schema.json`
+- **YAML**: `# yaml-language-server: $schema=...`
+- **YAML fallback**: `# @schema ...`
+
+Both local and remote schema references are supported. Relative local paths are
+resolved against the config file directory, while inline/stdin configs fall back
+to the current working directory. JSON `$schema` metadata is stripped from the
+in-memory defaults before validation/output so editor hints do not leak into the
+final config payload.
+
+Remote `http(s)` schema loading exists only in `schemaui-cli`, and the CLI
+enables the `remote-schema` feature by default. Disable it if you want a
+local-only binary surface; the `schemaui` library crate does not enable any
+remote schema loading by default.
+
+Feature defaults are intentionally split by audience:
+
+- `schemaui-cli` defaults to the convenient, batteries-included path: TUI +
+  Web + remote schema loading.
+- `schemaui` defaults to `tui + json`, so library consumers keep JSON support
+  without pulling in Web or remote/network-related surface area by default.
+- `json`, `yaml`, and `toml` are real code-level gates. Keep at least one of
+  them enabled; disabling all three triggers a clear compile-time error.
+
+References:
+
+- JSON Schema `$schema`:
+  <https://json-schema.org/understanding-json-schema/reference/schema>
+- Taplo directives (`#:schema`):
+  <https://taplo.tamasfe.dev/configuration/directives.html>
+- YAML language server modeline:
+  <https://github.com/redhat-developer/yaml-language-server>
+
 ## Quick Start
 
 ```toml
@@ -153,7 +198,8 @@ code change to its architectural responsibility.
 
 - `io::input::parse_document_str` converts JSON/YAML/TOML (via `serde_json`,
   `serde_yaml`, `toml`) into `serde_json::Value`. Feature flags (`json`, `yaml`,
-  `toml`, `all_formats`) keep dependencies lean.
+  `toml`, `all_formats`) keep dependencies lean, and the same gates also drive
+  `DocumentFormat` parsing/probing at compile time.
 - `schema_from_data_value/str` infers schemas from live configs, injecting
   draft-07 metadata and defaults so UIs load pre-existing values.
 - `schema_with_defaults` merges canonical schemas with user data, propagating
@@ -516,9 +562,9 @@ schemaui \
 - Diagnostics – `DiagnosticCollector` accumulates format issues, feature flag
   mismatches, stdin conflicts, and existing output files before execution.
 - Outputs – `-o/--output` is repeatable and may mix file paths with `-` for
-  stdout. When no destination is set, the tool writes to `/tmp/schemaui.json`
-  unless `--no-temp-file` is passed. Extensions dictate formats; conflicting
-  extensions are rejected.
+  stdout. When no destination is set, the tool writes to stdout; pass
+  `--temp-file <PATH>` if you explicitly want a fallback file. Extensions
+  dictate formats; conflicting extensions are rejected.
 - Flags – `--no-pretty` toggles compact output, `--force/--yes` allows
   overwriting files, and `--title` wires through to `SchemaUI::with_title`.
 

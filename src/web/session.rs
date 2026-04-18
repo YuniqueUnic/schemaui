@@ -513,7 +513,11 @@ fn encode_value(
     format: DocumentFormat,
     pretty: bool,
 ) -> Result<String, anyhow::Error> {
+    #[cfg(all(not(feature = "json"), not(feature = "toml")))]
+    let _ = pretty;
+
     match format {
+        #[cfg(feature = "json")]
         DocumentFormat::Json => {
             if pretty {
                 Ok(serde_json::to_string_pretty(value)?)

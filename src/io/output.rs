@@ -55,7 +55,7 @@ impl OutputOptions {
 
 impl Default for OutputOptions {
     fn default() -> Self {
-        Self::new(DocumentFormat::Json)
+        Self::new(DocumentFormat::default())
     }
 }
 
@@ -78,6 +78,7 @@ pub fn emit(value: &Value, options: &OutputOptions) -> Result<()> {
 
 fn serialize_value(value: &Value, options: &OutputOptions) -> Result<String> {
     match options.format {
+        #[cfg(feature = "json")]
         DocumentFormat::Json => {
             if options.pretty {
                 serde_json::to_string_pretty(value).context("failed to serialize JSON")
@@ -121,6 +122,7 @@ fn write_payload(destination: &OutputDestination, payload: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parse_document_str;
     use serde_json::json;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -128,7 +130,7 @@ mod tests {
     #[test]
     fn writes_to_stdout_noop_when_not_configured() {
         let options = OutputOptions {
-            format: DocumentFormat::Json,
+            format: DocumentFormat::default(),
             pretty: true,
             destinations: Vec::new(),
         };
@@ -147,13 +149,14 @@ mod tests {
         );
         let path = dir.join(filename);
         let options = OutputOptions {
-            format: DocumentFormat::Json,
+            format: DocumentFormat::default(),
             pretty: true,
             destinations: vec![OutputDestination::file(&path)],
         };
         emit(&json!({"ok": true}), &options).unwrap();
         let contents = fs::read_to_string(&path).unwrap();
-        assert!(contents.contains("\"ok\""));
+        let parsed = parse_document_str(&contents, options.format).unwrap();
+        assert_eq!(parsed, json!({"ok": true}));
         let _ = fs::remove_file(path);
     }
 }
