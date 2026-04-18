@@ -69,6 +69,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "argh_complete"
+version = "0.1.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63b8dffc879097ecf0b672f84aaed1268ae6c740e8a7ffc0dd9ef8fd2a731b69"
+dependencies = [
+ "argh_shared",
+]
+
+[[package]]
 name = "argh_derive"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2535,6 +2544,7 @@ name = "schemaui-cli"
 version = "0.4.3"
 dependencies = [
  "argh",
+ "argh_complete",
  "assert_cmd",
  "color-eyre",
  "predicates",

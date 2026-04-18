@@ -2,9 +2,10 @@
 
 `schemaui-cli` is the official command-line wrapper around the `schemaui`
 library. It accepts JSON Schema + config snapshots, defaults to the interactive
-TUI when no mode subcommand is provided, and also exposes explicit `tui`, `web`,
-`tui-snapshot`, and `web-snapshot` subcommands. This guide mirrors the actual
-code in `schemaui-cli/src/main.rs` so the behaviour stays predictable.
+TUI when no mode subcommand is provided, and also exposes explicit `completion`,
+`tui`, `web`, `tui-snapshot`, and `web-snapshot` subcommands. This guide mirrors
+the actual code in `schemaui-cli/src/main.rs` so the behaviour stays
+predictable.
 
 ## 1. Install & Run
 
@@ -70,7 +71,7 @@ repository.
 <!-- AUTO-GENERATED:CLI-INSTALL:END -->
 
 ```bash
-schemaui --help             # binary is named `schemaui` via the clap metadata
+schemaui --help
 ```
 
 If you omit a mode subcommand, `schemaui` falls back to the TUI flow, so the
@@ -81,11 +82,26 @@ schemaui --schema ./schema.json
 schemaui tui --schema ./schema.json
 ```
 
+### Shell completion
+
+`schemaui-cli` now ships an `argh`-backed completion generator:
+
+```bash
+schemaui completion bash > ~/.local/share/bash-completion/completions/schemaui
+schemaui completion zsh > ~/.zfunc/_schemaui
+schemaui completion fish > ~/.config/fish/completions/schemaui.fish
+schemaui completion nushell > ~/.config/nushell/completions/schemaui.nu
+```
+
+Supported shells are `bash`, `zsh`, `fish`, and `nushell`. PowerShell is not
+listed yet because upstream `argh_complete` does not currently ship a PowerShell
+generator.
+
 ## 2. Execution Flow
 
 ```
 ┌────────┐ args┌───────────────┐ schema/config ┌──────────────┐ result ┌────────────┐
-│  clap  ├────▶│ InputSource   ├──────────────▶│ SchemaUI     ├──────▶│ io::output │
+│  argh  ├────▶│ InputSource   ├──────────────▶│ SchemaUI     ├──────▶│ io::output │
 └────┬───┘     └─────────┬─────┘               │ (library)    │        └────┬───────┘
      │ diagnostics       │ format hint         └─────┬────────┘             │  writes
 ┌────▼─────────┐         │ DocumentFormat            │ validator            ▼  files/stdout
@@ -102,6 +118,8 @@ Key components:
   rejected before parsing.
 - **`DiagnosticCollector`** – aggregates every input/output issue and aborts
   early if anything is wrong.
+- **`completion`** – renders shell completion scripts from the same command
+  graph used for runtime parsing.
 - **`SchemaUI`** – same runtime used by library consumers; the CLI only wires up
   arguments.
 
@@ -148,8 +166,7 @@ from the in-memory defaults before validation/output.
 - `-o, --output <DEST>` is repeatable; pass `-` to include stdout alongside
   files. Extensions (`.json`, `.yaml`, `.toml`) drive `DocumentFormat`.
 - When no destination is set, the CLI writes to stdout. Pass
-  `--temp-file
-  <PATH>` if you explicitly want a fallback file instead.
+  `--temp-file <PATH>` if you explicitly want a fallback file instead.
 - `--no-pretty` toggles compact serialization; pretty output is the default.
 - `--force`/`--yes` allows overwriting existing files. Without the flag the CLI
   refuses to run when a destination already exists.
@@ -214,6 +231,12 @@ schemaui tui \
   --config ./config.json -o -
 ```
 
+### Generate a completion script
+
+```bash
+schemaui completion bash
+```
+
 ## 7. Diagnostics & Errors
 
 - **Aggregated reporting** – `DiagnosticCollector` stores every input/output
@@ -250,12 +273,15 @@ and validation pipeline.
 
 ## 9. Feature Flags
 
-| Feature          | Effect                                                     |
-| ---------------- | ---------------------------------------------------------- |
-| `json` (default) | Enables JSON parsing/serialization and JSON format probes. |
-| `yaml`           | Adds YAML parsing/serialization via `serde_yaml`.          |
-| `toml` (opt-in)  | Adds TOML parsing/serialization via `toml`.                |
-| `all_formats`    | Convenience feature: enables `json`, `yaml`, and `toml`.   |
+| Feature                            | Effect                                                            |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `json`                             | Enables JSON parsing/serialization and JSON format probes.        |
+| `yaml`                             | Adds YAML parsing/serialization via `serde_yaml`.                 |
+| `toml`                             | Adds TOML parsing/serialization via `toml`.                       |
+| `web`                              | Enables the browser UI subcommands and the embedded HTTP runtime. |
+| `full`                             | Convenience feature: enables `json`, `yaml`, `toml`, and `web`.   |
+| `remote-schema`                    | Enables HTTP(S) schema loading through `reqwest`.                 |
+| default (`full` + `remote-schema`) | Matches the convenience-oriented CLI build shipped to end users.  |
 
 `DocumentFormat::available_formats()` obeys the same feature matrix, so both the
 CLI and host applications automatically reflect build-time capabilities. At

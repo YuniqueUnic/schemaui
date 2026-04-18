@@ -198,8 +198,8 @@ code change to its architectural responsibility.
 
 - `io::input::parse_document_str` converts JSON/YAML/TOML (via `serde_json`,
   `serde_yaml`, `toml`) into `serde_json::Value`. Feature flags (`json`, `yaml`,
-  `toml`, `all_formats`) keep dependencies lean, and the same gates also drive
-  `DocumentFormat` parsing/probing at compile time.
+  `toml`) keep dependencies lean, and the same gates also drive `DocumentFormat`
+  parsing/probing at compile time.
 - `schema_from_data_value/str` infers schemas from live configs, injecting
   draft-07 metadata and defaults so UIs load pre-existing values.
 - `schema_with_defaults` merges canonical schemas with user data, propagating
@@ -538,7 +538,7 @@ schemaui \
 ```
 
 ```text
-┌────────┐  clap args   ┌──────────────┐ read stdin/files ┌─────────────┐
+┌────────┐  argh args   ┌──────────────┐ read stdin/files ┌─────────────┐
 │  CLI   ├─────────────▶│ InputSource  ├─────────────────▶│ io::input   │
 └────┬───┘              └──────┬───────┘                  └────┬────────┘
      │ diagnostics             │ schema/default Value          │
@@ -567,19 +567,23 @@ schemaui \
   dictate formats; conflicting extensions are rejected.
 - Flags – `--no-pretty` toggles compact output, `--force/--yes` allows
   overwriting files, and `--title` wires through to `SchemaUI::with_title`.
+- Shell completion – `schemaui completion <bash|zsh|fish|nushell>` emits
+  completion scripts from the same `argh` command graph. PowerShell is not
+  exposed yet because upstream `argh_complete` does not currently ship a
+  PowerShell generator.
 
 ## Key Dependencies
 
-| Crate                                       | Purpose                                                     |
-| ------------------------------------------- | ----------------------------------------------------------- |
-| `serde`, `serde_json`, `serde_yaml`, `toml` | Parsing and serializing schema/config data.                 |
-| `schemars`                                  | Draft-07 schema representation used by the `schema` module. |
-| `jsonschema`                                | Runtime validation for forms and overlays.                  |
-| `ratatui`                                   | Rendering widgets, layouts, overlays, and footer.           |
-| `crossterm`                                 | Terminal events consumed by `InputRouter`.                  |
-| `indexmap`                                  | Order-preserving maps for schema traversal.                 |
-| `once_cell`                                 | Lazy parsing of the keymap JSON.                            |
-| `clap`, `color-eyre` (CLI)                  | Argument parsing and ergonomic diagnostics.                 |
+| Crate                                       | Purpose                                                        |
+| ------------------------------------------- | -------------------------------------------------------------- |
+| `serde`, `serde_json`, `serde_yaml`, `toml` | Parsing and serializing schema/config data.                    |
+| `schemars`                                  | Draft-07 schema representation used by the `schema` module.    |
+| `jsonschema`                                | Runtime validation for forms and overlays.                     |
+| `ratatui`                                   | Rendering widgets, layouts, overlays, and footer.              |
+| `crossterm`                                 | Terminal events consumed by `InputRouter`.                     |
+| `indexmap`                                  | Order-preserving maps for schema traversal.                    |
+| `once_cell`                                 | Lazy parsing of the keymap JSON.                               |
+| `argh`, `argh_complete`, `color-eyre` (CLI) | Argument parsing, shell completion, and ergonomic diagnostics. |
 
 ## Documentation Map
 

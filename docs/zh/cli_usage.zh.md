@@ -2,8 +2,8 @@
 
 `schemaui-cli` 是 `schemaui` 库的官方命令行包装器。它接受 JSON Schema +
 配置快照；当未显式指定模式子命令时默认启动交互式 TUI，同时也暴露显式的
-`tui`、`web`、`tui-snapshot`、`web-snapshot` 子命令。本指南与
-`schemaui-cli/src/main.rs` 中的实际代码保持一致，以确保行为的可预测性。
+`completion`、`tui`、`web`、`tui-snapshot`、`web-snapshot` 子命令。本指南与
+`schemaui-cli/src/main.rs` 中的实际代码保持一致，以确保行为可预测。
 
 ## 1. 安装与运行
 
@@ -17,7 +17,7 @@ cargo run -p schemaui-cli -- tui --schema ./schema.json --config ./config.yaml
 
 ```bash
 cargo install schemaui-cli
-schemaui --help             # 二进制文件通过 clap 元数据命名为 `schemaui`
+schemaui --help
 ```
 
 如果省略模式子命令，`schemaui` 会回退到默认的 TUI 流程，因此下面两种写法等价：
@@ -27,11 +27,25 @@ schemaui --schema ./schema.json
 schemaui tui --schema ./schema.json
 ```
 
+### Shell completion
+
+`schemaui-cli` 现在内置了基于 `argh_complete` 的补全脚本生成能力：
+
+```bash
+schemaui completion bash > ~/.local/share/bash-completion/completions/schemaui
+schemaui completion zsh > ~/.zfunc/_schemaui
+schemaui completion fish > ~/.config/fish/completions/schemaui.fish
+schemaui completion nushell > ~/.config/nushell/completions/schemaui.nu
+```
+
+当前官方支持的 shell 是 `bash`、`zsh`、`fish`、`nushell`。PowerShell
+还没有接入，因为上游 `argh_complete` 目前没有提供 PowerShell generator。
+
 ## 2. 执行流程
 
 ```
 ┌────────┐ args┌───────────────┐ schema/config ┌──────────────┐ result ┌────────────┐
-│  clap  ├────▶│ InputSource   ├──────────────▶│ SchemaUI     ├──────▶│ io::output │
+│  argh  ├────▶│ InputSource   ├──────────────▶│ SchemaUI     ├──────▶│ io::output │
 └────┬───┘     └─────────┬─────┘               │ (library)    │        └────┬───────┘
      │ diagnostics       │ format hint         └─────┬────────┘             │  writes
 ┌────▼─────────┐         │ DocumentFormat            │ validator            ▼  files/stdout
@@ -42,52 +56,75 @@ schemaui tui --schema ./schema.json
 
 关键组件：
 
-- **`InputSource`** – 解析文件、stdin 或内联规范。
-- **`FormatHint`** – 检查扩展名并确保在解析前拒绝已禁用的格式。
-- **`DiagnosticCollector`** –
-  汇总每个输入/输出问题，如果出现任何错误则提前中止。
-- **`SchemaUI`** – 与库消费者使用的相同运行时；CLI 仅负责连接参数。
+- **`schema_source`**：统一处理显式 `--schema`、配置文件内声明、远程/本地 schema
+  加载，以及最终的兜底推断。
+- **`FormatHint`**：根据扩展名检查格式，并在真正解析前拦截被 feature
+  关闭的格式。
+- **`DiagnosticCollector`**：聚合每个输入/输出问题，出错时统一中止。
+- **`completion`**：基于同一套命令树渲染 shell completion 脚本。
+- **`SchemaUI`**：CLI 复用的仍然是库中的同一套运行时能力。
 
 ## 3. 输入模式
 
-| 标志                  | 行为                                              | 注意事项                                         |
-| --------------------- | ------------------------------------------------- | ------------------------------------------------ |
-| `-s, --schema <SPEC>` | 文件路径、字面 JSON/YAML/TOML 或 `-` 表示 stdin。 | 如果路径不存在，CLI 会将参数视为内联文本。       |
-| `-c, --config <SPEC>` | 与 `--schema` 相同的语义。                        | 可选；省略时，如果存在配置值，则从中推断默认值。 |
+| 标志                  | 行为                                                                        | 注意事项                                                         |
+| --------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `-s, --schema <SPEC>` | 本地路径、`file://`、`http(s)://`、内联 JSON/YAML/TOML，或 `-` 表示 stdin。 | 显式 schema 的优先级高于 `--config` 中发现的任何 schema 声明。   |
+| `-c, --config <SPEC>` | 与 `--schema` 相同的加载语义。                                              | 可选；省略 `--schema` 时，CLI 会先尝试配置内声明，再做兜底推断。 |
 
-代码强制执行的约束：
+代码层强制执行的约束：
 
 - `stdin` 只能使用一次，因此 `--schema -` 和 `--config -` 不能同时使用。
-- 如果仅提供 `--config`，CLI 会调用 `schema_from_data_value` 来构建带有默认值的
-  schema。
+- 优先级为：`--schema` > 配置声明 > 推断 schema。
+- 相对本地声明路径会相对 `--config` 所在目录解析。
+- 若配置来自内联文本或 stdin，相对路径会相对当前工作目录解析。
+- HTTP(S) schema 加载由 `schemaui-cli` 的 `remote-schema` feature 控制。CLI
+  默认启用； `schemaui` 库默认关闭远程 schema 加载。
+- `schemaui` 库默认 feature 为 `tui + json`；CLI 默认 feature 为
+  `full + remote-schema`。
+- `json`、`yaml`、`toml` 都是真实的 feature
+  gate；三者全关时，编译会直接报清晰错误。
+
+### 配置 schema 自动检测
+
+当只传 `--config` 时，`schemaui-cli` 会先扫描配置中的 schema 声明，再回退到
+`schema_from_data_value`。
+
+支持的声明格式：
+
+- **JSON**：根级 `$schema`
+- **TOML**：`#:schema https://example.com/schema.json`
+- **YAML**：`# yaml-language-server: $schema=...`
+- **YAML 兜底**：`# @schema ...`
+
+对于 JSON，根级 `$schema`
+被视为元数据，因此在内存中的默认值会先移除该字段，再参与 校验与输出。
 
 ## 4. 输出与持久化
 
-- `-o, --output <DEST>` 可重复；传递 `-` 可在文件之外包含
-  stdout。扩展名（`.json`、`.yaml`、`.toml`）驱动 `DocumentFormat`。
-- 当未设置目的地时，CLI 会写入 `/tmp/schemaui.json`，除非传递了 `--no-temp-file`
-  或 `--temp-file <PATH>` 覆盖回退路径。
-- `--no-pretty` 切换紧凑序列化；默认为美化输出。
-- `--force`/`--yes` 允许覆盖现有文件。如果没有此标志，当目标文件已存在时，CLI
-  会拒绝运行。
+- `-o, --output <DEST>` 可重复传递；`-` 表示写到 stdout。
+- 输出扩展名（`.json`、`.yaml`、`.toml`）决定 `DocumentFormat`。
+- 当未指定任何目标时，CLI 默认写到 stdout；如果你明确想走回退文件，再显式传
+  `--temp-file <PATH>`。
+- `--no-pretty` 切换为紧凑序列化；默认是 pretty 输出。
+- `--force` / `--yes` 允许覆盖已有文件；否则遇到已存在目标会直接拒绝执行。
 
-内部由 `io::output::OutputOptions`
-提供支持，因此嵌入项目可以重用完全相同的序列化逻辑。
+这些行为都由 `io::output::OutputOptions`
+驱动，因此嵌入方可以复用完全相同的输出逻辑。
 
 ## 5. 参数参考
 
-| 标志                  | 描述                           | 代码钩子                            |
-| --------------------- | ------------------------------ | ----------------------------------- |
-| `-o, --output <DEST>` | 追加目标（`-` 写入 stdout）。  | `build_output_options`              |
-| `--title <TEXT>`      | 覆盖 TUI 标题栏。              | `SchemaUI::with_title`              |
-| `--temp-file <PATH>`  | 未设置目标时的自定义回退文件。 | `build_output_options`              |
-| `--no-temp-file`      | 完全禁用回退文件行为。         | `build_output_options`              |
-| `--no-pretty`         | 输出紧凑的 JSON/TOML/YAML。    | `OutputOptions::with_pretty(false)` |
-| `--force`, `--yes`    | 允许覆盖文件。                 | `ensure_output_paths_available`     |
+| 标志                  | 描述                                    | 代码钩子                            |
+| --------------------- | --------------------------------------- | ----------------------------------- |
+| `-o, --output <DEST>` | 追加输出目标（`-` 写到 stdout）。       | `build_output_options`              |
+| `--title <TEXT>`      | 覆盖 TUI 标题栏。                       | `SchemaUI::with_title`              |
+| `--temp-file <PATH>`  | 未设置 `--output` 时，显式写到该文件。  | `build_output_options`              |
+| `--no-temp-file`      | 兼容性 no-op；默认行为本来就是 stdout。 | `build_output_options`              |
+| `--no-pretty`         | 输出紧凑 JSON/TOML/YAML。               | `OutputOptions::with_pretty(false)` |
+| `--force`, `--yes`    | 允许覆盖现有文件。                      | `ensure_output_paths_available`     |
 
 ## 6. 使用示例
 
-### Schema + config + 双输出
+### schema + config + 双输出
 
 ```bash
 schemaui tui \
@@ -103,7 +140,27 @@ schemaui tui \
 cat defaults.yaml | schemaui --config - --output ./edited.json
 ```
 
-### 内联 schema 以避免双 stdin
+### 仅 config，但使用文件头中的 schema 声明
+
+```bash
+schemaui web --config ./config.yaml
+```
+
+```yaml
+# yaml-language-server: $schema=./schema.json
+name: api
+port: 8080
+```
+
+### 显式 schema 覆盖文件头声明
+
+```bash
+schemaui \
+  --schema https://example.com/runtime.schema.json \
+  --config ./config.toml
+```
+
+### 用内联 schema 避免双 stdin
 
 ```bash
 schemaui tui \
@@ -111,20 +168,23 @@ schemaui tui \
   --config ./config.json -o -
 ```
 
+### 生成 completion 脚本
+
+```bash
+schemaui completion bash
+```
+
 ## 7. 诊断与错误
 
-- **汇总报告** – `DiagnosticCollector` 存储每个输入/输出问题（冲突的
-  stdin、禁用的格式、现有文件），并在以非零代码退出之前将它们打印为编号列表。
-- **格式推断** – `resolve_format_hint`
-  在扩展名需要已禁用的功能时发出警告（例如，没有 `yaml` 功能时使用
-  `.yaml`）。CLI 立即停止，而不是稍后在序列化期间失败。
-- **运行时错误** – 其他所有内容都通过 `color-eyre`
-  冒泡，因此堆栈跟踪包含上下文，如 `failed to parse config as yaml` 或
-  `failed to compile JSON schema`。
+- **聚合报告**：`DiagnosticCollector` 会把冲突
+  stdin、格式被禁用、输出文件已存在等问题 聚合成编号列表，再以非零状态退出。
+- **格式推断**：当扩展名要求的格式 feature 没开时，CLI 会在解析前直接停止。
+- **运行时错误**：其余错误经由 `color-eyre` 输出上下文，例如
+  `failed to parse config as yaml` 或 `failed to compile JSON schema`。
 
 ## 8. 库互操作
 
-CLI 是 `SchemaUI` 的薄包装器：
+CLI 只是 `SchemaUI` 的一层薄包装：
 
 ```rust
 let mut ui = SchemaUI::new(schema);
@@ -140,25 +200,34 @@ if let Some(options) = output_settings {
 ui.run()?;
 ```
 
-这意味着嵌入项目可以逐字重现 CLI 流程，或完全替换前端（例如，构建自定义 CLI 或
-GUI），同时重用相同的 I/O 和验证管道。
+这意味着嵌入项目既可以原样复刻 CLI 行为，也可以替换前端，只复用同一套 I/O
+与校验链路。
 
-## 9. 功能标志
+## 9. Feature Flags
 
-| 功能           | 效果                                      |
-| -------------- | ----------------------------------------- |
-| `json`（默认） | 启用 JSON 解析/序列化。始终开启。         |
-| `yaml`（默认） | 通过 `serde_yaml` 添加 YAML 解析/序列化。 |
-| `toml`（可选） | 通过 `toml` 添加 TOML 解析/序列化。       |
-| `all_formats`  | 便利功能：启用 `json`、`yaml` 和 `toml`。 |
+| Feature                          | 作用                                           |
+| -------------------------------- | ---------------------------------------------- |
+| `json`                           | 启用 JSON 解析/序列化以及 JSON 格式探测。      |
+| `yaml`                           | 通过 `serde_yaml` 启用 YAML 解析/序列化。      |
+| `toml`                           | 通过 `toml` 启用 TOML 解析/序列化。            |
+| `web`                            | 启用浏览器 UI 子命令以及内嵌 HTTP 运行时。     |
+| `full`                           | 便利组合：启用 `json`、`yaml`、`toml`、`web`。 |
+| `remote-schema`                  | 通过 `reqwest` 启用 HTTP(S) schema 加载。      |
+| 默认值（`full + remote-schema`） | 对最终 CLI 用户开放的开箱即用构建。            |
 
-`DocumentFormat::available_formats()` 遵循相同的功能矩阵，因此 CLI
-和宿主应用程序都会自动反映构建时的能力。
+`DocumentFormat::available_formats()` 会自动反映同一套 feature 矩阵。至少保留
+`json`、`yaml`、`toml` 中的一个。
 
-## 10. Web 模式
+## 10. 操作提示
 
-当在启用 `web` 功能（默认启用）的构建下运行时，`schemaui-cli` 暴露 `web`
-子命令，用于代理库提供的浏览器 UI：
+- 如果 schema 和 config 都想走
+  stdin，就把其中一个改为内联文本；可执行文件只会消费一次 stdin。
+- 输出最好总是带扩展名；格式推断使用第一个文件的后缀，跨文件冲突会被直接拒绝。
+- 可以把 `-o -` 和文件输出同时使用，这样既能进 CI 日志，也能真正落盘。
+
+## 11. Web 模式
+
+启用 `web` feature（CLI 默认启用）后，`schemaui-cli` 会暴露 `web` 子命令：
 
 ```bash
 schemaui web \
@@ -168,29 +237,18 @@ schemaui web \
   -o -
 ```
 
-该命令重用与 TUI 流程相同的 schema/config 管道，然后调用
-`schemaui::web::session::bind_session` 将静态资源和 HTTP API 嵌入到临时 HTTP
-服务中。终端会打印绑定地址（端口为 `0` 时选择一个随机空闲端口）。
+该命令与 TUI 共用同一套 schema/config 加载链路，然后调用
+`schemaui::web::session::bind_session` 启动临时 HTTP 服务并挂载静态资源与 API。
+终端会打印绑定地址；如果端口传 `0`，则自动选择随机空闲端口。
 
-- 点击 **Save** 可以在不退出的情况下持久化编辑结果；
-- 点击 **Save & Exit** 会关闭临时服务器，并通过配置好的输出目标 发出最终 JSON。
+- 点击 **Save** 可以在不退出页面的情况下持久化当前编辑内容。
+- 点击 **Save & Exit** 会关闭临时服务，并把最终结果写到配置好的输出目标。
 
-`web` 子命令特有的参数：
+`web` 子命令额外参数：
 
-| 标志            | 描述                               |
-| --------------- | ---------------------------------- |
-| `--host <IP>`   | 临时 HTTP 服务器的绑定地址。       |
-| `--port <PORT>` | 绑定端口（`0` 表示请求临时端口）。 |
+| 标志            | 描述                                 |
+| --------------- | ------------------------------------ |
+| `--host <IP>`   | 临时 HTTP 服务绑定地址。             |
+| `--port <PORT>` | 绑定端口；`0` 表示请求随机空闲端口。 |
 
-其他参数（`--schema`、`--config`、`--output` 等）的行为与 TUI 模式完全一致：
-同样支持文件/内联规范、多个输出目标以及汇总诊断。
-
-## 11. 操作提示
-
-- 当 schema 和 config 都需要 stdin
-  时，将一个流作为字面文本传递（不存在的路径被视为内联）；可执行文件只读取 stdin
-  一次。
-- 为输出提供明确的扩展名——格式推断使用第一个文件的后缀，跨文件的不匹配将被拒绝。
-- 将 `-o -` 与文件输出结合使用，可以在写入磁盘的同时将结果传输到 CI 日志中。
-
-使用这些模式，您可以在 CI/CD 管道或开发者工具中自信地编写 `schemaui-cli` 脚本。
+其他参数（`--schema`、`--config`、`--output` 等）与 TUI 模式完全一致。

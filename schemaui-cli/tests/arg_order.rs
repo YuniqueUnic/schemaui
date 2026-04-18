@@ -1,4 +1,4 @@
-use schemaui_cli::cli::{Cli, Commands};
+use schemaui_cli::cli::{Cli, Commands, CompletionShell};
 
 #[test]
 fn defaults_to_tui_when_no_subcommand_is_provided() {
@@ -19,6 +19,17 @@ fn explicit_tui_subcommand_accepts_common_args() {
 
     assert_eq!(cmd.common.schema.as_deref(), Some("./schema.json"));
     assert!(cmd.common.force);
+}
+
+#[test]
+fn explicit_completion_subcommand_is_not_rewritten_to_default_tui() {
+    let cli = Cli::parse_from(["schemaui", "completion", "bash"]);
+
+    let Some(Commands::Completion(cmd)) = cli.command else {
+        panic!("expected explicit completion subcommand");
+    };
+
+    assert_eq!(cmd.shell, CompletionShell::Bash);
 }
 
 #[test]

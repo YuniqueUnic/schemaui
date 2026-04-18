@@ -3,6 +3,7 @@
 use color_eyre::eyre::Result;
 
 use schemaui_cli::cli::{Cli, Commands, TuiSnapshotCommand};
+use schemaui_cli::completion;
 use schemaui_cli::tui;
 
 #[cfg(feature = "web")]
@@ -15,6 +16,7 @@ fn main() -> Result<()> {
     let Cli { common, command } = Cli::from_env_or_exit();
 
     match command {
+        Some(Commands::Completion(args)) => completion::run_cli(args),
         Some(Commands::Tui(args)) => {
             let common = common.merged_with(&args.common);
             tui::run_cli(&common)

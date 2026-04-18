@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use argh::FromArgs;
+use argh::{ArgsInfo, FromArgValue, FromArgs};
 
 #[cfg(feature = "web")]
 use std::net::IpAddr;
@@ -13,6 +13,7 @@ pub struct Cli {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Commands {
+    Completion(CompletionCommand),
     Tui(TuiCommand),
     #[cfg(feature = "web")]
     Web(WebCommand),
@@ -24,6 +25,19 @@ pub enum Commands {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TuiCommand {
     pub common: CommonArgs,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompletionCommand {
+    pub shell: CompletionShell,
+}
+
+#[derive(FromArgValue, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionShell {
+    Bash,
+    Zsh,
+    Fish,
+    Nushell,
 }
 
 #[cfg(feature = "web")]
@@ -141,6 +155,12 @@ impl Cli {
                 common,
                 command: None,
             },
+            ArghCommands::Completion(command) => Self {
+                common,
+                command: Some(Commands::Completion(CompletionCommand {
+                    shell: command.shell,
+                })),
+            },
             ArghCommands::Tui(command) => Self {
                 common,
                 command: Some(Commands::Tui(TuiCommand {
@@ -177,6 +197,10 @@ impl Cli {
             },
         }
     }
+}
+
+pub fn command_info() -> argh::CommandInfoWithArgs {
+    ArghCli::get_args_info()
 }
 
 fn common_args_from_root(args: &ArghCli) -> CommonArgs {
@@ -246,7 +270,7 @@ fn common_args_from_tui_snapshot(args: &ArghTuiSnapshotCommand) -> CommonArgs {
     }
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(FromArgs, ArgsInfo, Debug, PartialEq)]
 #[argh(help_triggers("-h", "--help", "help"))]
 /// Render JSON Schemas as interactive TUIs or Web UIs
 struct ArghCli {
@@ -263,7 +287,7 @@ struct ArghCli {
     title: Option<String>,
 
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
-    #[argh(option, short = 'o')]
+    #[argh(option, short = 'o', long = "output")]
     outputs: Vec<String>,
 
     /// write to PATH when no destinations are set (stdout remains the default)
@@ -286,9 +310,10 @@ struct ArghCli {
     command: ArghCommands,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(FromArgs, ArgsInfo, Debug, PartialEq)]
 #[argh(subcommand)]
 enum ArghCommands {
+    Completion(ArghCompletionCommand),
     Tui(ArghTuiCommand),
     #[cfg(feature = "web")]
     Web(ArghWebCommand),
@@ -297,7 +322,16 @@ enum ArghCommands {
     TuiSnapshot(ArghTuiSnapshotCommand),
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(FromArgs, ArgsInfo, Debug, PartialEq)]
+/// Generate shell completion scripts for the schemaui CLI
+#[argh(subcommand, name = "completion", help_triggers("-h", "--help", "help"))]
+struct ArghCompletionCommand {
+    /// target shell: bash, zsh, fish, or nushell
+    #[argh(positional)]
+    shell: CompletionShell,
+}
+
+#[derive(FromArgs, ArgsInfo, Debug, PartialEq)]
 #[argh(subcommand, name = "tui", help_triggers("-h", "--help", "help"))]
 /// Launch the interactive terminal UI
 struct ArghTuiCommand {
@@ -314,7 +348,7 @@ struct ArghTuiCommand {
     title: Option<String>,
 
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
-    #[argh(option, short = 'o')]
+    #[argh(option, short = 'o', long = "output")]
     outputs: Vec<String>,
 
     /// write to PATH when no destinations are set (stdout remains the default)
@@ -335,7 +369,7 @@ struct ArghTuiCommand {
 }
 
 #[cfg(feature = "web")]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(FromArgs, ArgsInfo, Debug, PartialEq)]
 #[argh(subcommand, name = "web", help_triggers("-h", "--help", "help"))]
 /// Launch the interactive web UI instead of the terminal UI
 struct ArghWebCommand {
@@ -352,7 +386,7 @@ struct ArghWebCommand {
     title: Option<String>,
 
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
-    #[argh(option, short = 'o')]
+    #[argh(option, short = 'o', long = "output")]
     outputs: Vec<String>,
 
     /// write to PATH when no destinations are set (stdout remains the default)
@@ -381,7 +415,7 @@ struct ArghWebCommand {
 }
 
 #[cfg(feature = "web")]
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(FromArgs, ArgsInfo, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "web-snapshot",
@@ -402,7 +436,7 @@ struct ArghWebSnapshotCommand {
     title: Option<String>,
 
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
-    #[argh(option, short = 'o')]
+    #[argh(option, short = 'o', long = "output")]
     outputs: Vec<String>,
 
     /// write to PATH when no destinations are set (stdout remains the default)
@@ -430,7 +464,7 @@ struct ArghWebSnapshotCommand {
     ts_export: String,
 }
 
-#[derive(FromArgs, Debug, PartialEq)]
+#[derive(FromArgs, ArgsInfo, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "tui-snapshot",
@@ -451,7 +485,7 @@ struct ArghTuiSnapshotCommand {
     title: Option<String>,
 
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
-    #[argh(option, short = 'o')]
+    #[argh(option, short = 'o', long = "output")]
     outputs: Vec<String>,
 
     /// write to PATH when no destinations are set (stdout remains the default)
@@ -531,22 +565,73 @@ fn scan_for_command(args: &[String]) -> CommandScan {
 
 fn normalize_args(args: &[String]) -> Vec<String> {
     let mut normalized = Vec::new();
-    for token in args {
+    let mut index = 0usize;
+    let mut segment_start = 0usize;
+
+    while index < args.len() {
+        let token = args[index].as_str();
+
         if let Some((flag, value)) = normalize_inline_option(token) {
-            normalized.push(flag);
-            normalized.push(value);
+            if consumes_single_value(&flag) {
+                upsert_single_value_option(&mut normalized, segment_start, flag, value);
+            } else {
+                normalized.push(flag);
+                normalized.push(value);
+            }
+            index += 1;
             continue;
         }
 
-        let token = match token.as_str() {
+        let token = match token {
             "--data" => "--config",
             "--bind" | "--listen" => "--host",
             "-y" | "--yes" => "--force",
             other => other,
         };
+
+        if is_known_subcommand(token) {
+            normalized.push(token.to_string());
+            segment_start = normalized.len();
+            index += 1;
+            continue;
+        }
+
+        if consumes_single_value(token)
+            && let Some(value) = args.get(index + 1)
+        {
+            upsert_single_value_option(
+                &mut normalized,
+                segment_start,
+                token.to_string(),
+                value.clone(),
+            );
+            index += 2;
+            continue;
+        }
+
         normalized.push(token.to_string());
+        index += 1;
     }
+
     normalized
+}
+
+fn upsert_single_value_option(
+    normalized: &mut Vec<String>,
+    segment_start: usize,
+    flag: String,
+    value: String,
+) {
+    if let Some(position) = normalized[segment_start..]
+        .windows(2)
+        .position(|window| window[0] == flag)
+    {
+        normalized[segment_start + position + 1] = value;
+        return;
+    }
+
+    normalized.push(flag);
+    normalized.push(value);
 }
 
 fn normalize_inline_option(token: &str) -> Option<(String, String)> {
@@ -638,6 +723,6 @@ fn is_help_trigger(token: &str) -> bool {
 }
 
 fn is_known_subcommand(token: &str) -> bool {
-    matches!(token, "tui" | "tui-snapshot")
+    matches!(token, "completion" | "tui" | "tui-snapshot")
         || cfg!(feature = "web") && matches!(token, "web" | "web-snapshot")
 }

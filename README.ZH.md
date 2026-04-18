@@ -185,7 +185,7 @@ fn main() -> color_eyre::Result<()> {
 ## 输入与输出设计
 
 - `io::input::parse_document_str`将
-  JSON/YAML/TOML（通过`serde_json`、`serde_yaml`、`toml`）转换为`serde_json::Value`。功能标志（`json`、`yaml`、`toml`、`all_formats`）不仅控制依赖项，也会真实控制`DocumentFormat`的解析与探测路径。
+  JSON/YAML/TOML（通过`serde_json`、`serde_yaml`、`toml`）转换为`serde_json::Value`。功能标志（`json`、`yaml`、`toml`）不仅控制依赖项，也会真实控制`DocumentFormat`的解析与探测路径。
 - `schema_from_data_value/str`从活动配置中推断模式，注入草稿 -07
   元数据和默认值，以便 UI 加载现有值。
 - `schema_with_defaults`将规范模式与用户数据合并，通过`properties`、`patternProperties`、`additionalProperties`、`dependencies`、`dependentSchemas`、数组和`$ref`目标传播默认值，而不修改原始树。
@@ -451,7 +451,7 @@ schemaui \
 ```
 
 ```
-┌────────┐  clap args   ┌──────────────┐ read stdin/files ┌─────────────┐
+┌────────┐  argh args   ┌──────────────┐ read stdin/files ┌─────────────┐
 │  CLI   ├─────────────▶│ InputSource  ├─────────────────▶│ io::input   │
 └────┬───┘              └──────┬───────┘                  └────┬────────┘
      │ diagnostics             │ schema/default Value          │
@@ -479,6 +479,9 @@ schemaui \
   stdout；如果你明确想走回退文件，可以传`--temp-file <PATH>`。扩展名决定格式；拒绝冲突的扩展名。
 - 标志 –
   `--no-pretty`切换紧凑输出，`--force/--yes`允许覆盖文件，`--title`传递到`SchemaUI::with_title`。
+- Shell completion – `schemaui completion <bash|zsh|fish|nushell>` 会从同一套
+  `argh` 命令树生成补全脚本。PowerShell 暂未暴露，因为上游 `argh_complete`
+  目前没有提供 PowerShell generator。
 
 ## 关键依赖项
 
@@ -491,7 +494,7 @@ schemaui \
 | `crossterm`                                 | 输入路由器消耗的终端事件。                |
 | `indexmap`                                  | 模式遍历的顺序保持映射。                  |
 | `once_cell`                                 | 懒解析快捷键 JSON。                       |
-| `clap`, `color-eyre` (CLI)                  | 参数解析和用户友好的诊断。                |
+| `argh`, `argh_complete`, `color-eyre` (CLI) | 参数解析、Shell 补全生成和友好的诊断。    |
 
 ## 文档映射
 
