@@ -15,30 +15,36 @@ pub mod web;
 pub(crate) mod tests;
 
 // pub use app::{SchemaUI, UiOptions};
+pub use core::frontend::FrontendOptions;
 pub use io::{
     DocumentFormat, DocumentFormatProbe,
     input::{
-        parse_document_str, schema_from_data_str, schema_from_data_value, schema_with_defaults,
+        looks_like_json_schema, parse_document_auto, parse_document_str, schema_from_data_str,
+        schema_from_data_value, schema_with_defaults,
     },
     output::{OutputDestination, OutputOptions},
 };
 pub use precompile::{TuiArtifacts, UiArtifactBundle};
 pub use tui::{
-    app::{SchemaUI, options::UiOptions},
+    app::{SchemaUI, options::UiOptions, schema_ui::DocumentInput},
     model::FormSchema,
     session::TuiFrontend,
     state::LayoutNavModel,
     view::{CompositeOverlay, PopupRender, UiContext, draw},
 };
 #[cfg(feature = "web")]
-pub use web::frontend::WebFrontend;
+pub use web::{frontend::WebFrontend, session::ServeOptions};
 pub mod prelude {
+    pub use super::DocumentInput;
+    pub use super::FrontendOptions;
     pub use super::SchemaUI;
     pub use super::TuiFrontend;
     pub use super::UiOptions;
     pub use super::draw;
     pub use super::tui::view::{CompositeOverlay, PopupRender, UiContext};
 
+    #[cfg(feature = "web")]
+    pub use super::ServeOptions;
     #[cfg(feature = "web")]
     pub use super::WebFrontend;
 }

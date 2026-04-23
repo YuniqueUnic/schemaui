@@ -25,6 +25,7 @@ enum UiAstSource {
 pub struct SchemaPipeline {
     schema: Value,
     title: Option<String>,
+    description: Option<String>,
     defaults: Option<Value>,
     ui_ast_source: UiAstSource,
 }
@@ -34,6 +35,7 @@ impl SchemaPipeline {
         Self {
             schema,
             title: None,
+            description: None,
             defaults: None,
             ui_ast_source: UiAstSource::Runtime,
         }
@@ -41,6 +43,11 @@ impl SchemaPipeline {
 
     pub fn with_title(mut self, title: Option<String>) -> Self {
         self.title = title;
+        self
+    }
+
+    pub fn with_description(mut self, description: Option<String>) -> Self {
+        self.description = description;
         self
     }
 
@@ -73,6 +80,7 @@ impl SchemaPipeline {
         let SchemaPipeline {
             schema,
             title,
+            description,
             defaults,
             ui_ast_source,
         } = self;
@@ -90,7 +98,7 @@ impl SchemaPipeline {
 
         Ok(FrontendContext {
             title: title.or(schema_title),
-            description: schema_description,
+            description: description.or(schema_description),
             ui_ast,
             layout,
             initial_data: data,

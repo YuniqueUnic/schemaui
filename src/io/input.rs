@@ -28,6 +28,32 @@ pub fn parse_document_str(contents: &str, format: DocumentFormat) -> Result<Valu
     }
 }
 
+/// Parse an inline document by trying every enabled format.
+///
+/// The default crate format is attempted first, followed by the remaining
+/// enabled formats. This is useful for ergonomic APIs that accept either a
+/// `serde_json::Value` or raw inline text without an explicit format hint.
+pub fn parse_document_auto(contents: &str) -> Result<Value> {
+    let preferred = DocumentFormat::default();
+    match parse_document_str(contents, preferred) {
+        Ok(value) => Ok(value),
+        Err(primary) => {
+            for candidate in DocumentFormat::available_formats() {
+                if candidate == preferred {
+                    continue;
+                }
+                if let Ok(value) = parse_document_str(contents, candidate) {
+                    return Ok(value);
+                }
+            }
+            Err(anyhow::anyhow!(
+                "failed to parse inline document: tried {} (first error: {primary})",
+                DocumentFormat::format_list()
+            ))
+        }
+    }
+}
+
 /// Convert structured data into a JSON Schema with inferred defaults.
 pub fn schema_from_data_str(contents: &str, format: DocumentFormat) -> Result<Value> {
     let value = parse_document_str(contents, format)?;
@@ -49,6 +75,52 @@ pub fn schema_with_defaults(schema: &Value, defaults: &Value) -> Value {
     let mut enriched = schema.clone();
     DefaultApplier::new().apply(&mut enriched, defaults);
     enriched
+}
+
+/// Heuristic used when callers pass a single document and expect SchemaUI to
+/// decide whether it is a JSON Schema or already-instantiated config data.
+pub fn looks_like_json_schema(value: &Value) -> bool {
+    let obj = match value.as_object() {
+        Some(map) => map,
+        None => return false,
+    };
+
+    if obj
+        .get("properties")
+        .and_then(Value::as_object)
+        .map(|props| props.is_empty())
+        .unwrap_or(true)
+    {
+        return false;
+    }
+
+    if obj.contains_key("$schema") {
+        return true;
+    }
+
+    if matches!(obj.get("type"), Some(Value::String(kind)) if kind == "object") {
+        return true;
+    }
+
+    if let Some(props) = obj.get("properties").and_then(Value::as_object) {
+        let mut scored = 0usize;
+
+        for value in props.values() {
+            if value.get("type").is_some() {
+                scored += 1;
+            }
+            if value.get("properties").is_some() {
+                scored += 1;
+            }
+            if value.get("enum").is_some() {
+                scored += 1;
+            }
+        }
+
+        return scored >= 2;
+    }
+
+    false
 }
 
 struct DefaultApplier {

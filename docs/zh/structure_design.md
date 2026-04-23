@@ -285,7 +285,10 @@ fn run_tui(schema: Value, defaults: Option<Value>) -> Result<Value> {
         .with_title(Some("Title".into()))
         .with_defaults(defaults);
 
-    let frontend = TuiFrontend { options: UiOptions::default() };
+    let frontend = TuiFrontend {
+        options: UiOptions::default(),
+        tui_artifacts: None,
+    };
     pipeline.run_with_frontend(frontend)
 }
 ```

@@ -187,17 +187,18 @@ schemaui completion bash
 CLI 只是 `SchemaUI` 的一层薄包装：
 
 ```rust
-let mut ui = SchemaUI::new(schema);
+let mut ui = if let Some(defaults) = config_value {
+    SchemaUI::new(defaults).with_schema(schema)
+} else {
+    SchemaUI::from_schema(schema)
+};
 if let Some(title) = cli.title.as_ref() {
     ui = ui.with_title(title.clone());
 }
-if let Some(defaults) = config_value.as_ref() {
-    ui = ui.with_default_data(defaults);
+let value = ui.run_tui()?;
+if let Some(options) = output_settings.as_ref() {
+    options.write(&value)?;
 }
-if let Some(options) = output_settings {
-    ui = ui.with_output(options);
-}
-ui.run()?;
 ```
 
 这意味着嵌入项目既可以原样复刻 CLI 行为，也可以替换前端，只复用同一套 I/O

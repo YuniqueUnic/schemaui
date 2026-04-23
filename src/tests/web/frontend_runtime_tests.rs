@@ -6,8 +6,8 @@ use reqwest::StatusCode;
 use reqwest::blocking::Client;
 use serde_json::json;
 
-use crate::SchemaUI;
 use crate::web::session::ServeOptions;
+use crate::{FrontendOptions, SchemaUI};
 
 fn reserve_port() -> u16 {
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind ephemeral port");
@@ -50,10 +50,10 @@ fn web_frontend_exit_does_not_panic_when_runtime_is_dropped() {
     });
 
     let handle = thread::spawn(move || {
-        SchemaUI::new(schema).run_web(ServeOptions {
+        SchemaUI::from_schema(schema).run(FrontendOptions::Web(ServeOptions {
             host: IpAddr::from([127, 0, 0, 1]),
             port,
-        })
+        }))
     });
 
     let client = Client::builder()

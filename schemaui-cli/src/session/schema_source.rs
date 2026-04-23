@@ -8,7 +8,10 @@ use std::time::Duration;
 use color_eyre::eyre::{Report, Result, WrapErr, eyre};
 #[cfg(feature = "remote-schema")]
 use reqwest::blocking::Client;
-use schemaui::{DocumentFormat, DocumentFormatProbe, parse_document_str, schema_from_data_value};
+use schemaui::{
+    DocumentFormat, DocumentFormatProbe, looks_like_json_schema, parse_document_str,
+    schema_from_data_value,
+};
 use serde_json::Value;
 use url::Url;
 
@@ -459,49 +462,4 @@ fn reference_location_label(location: &ReferenceLocation) -> String {
         ReferenceLocation::File(path) => path.display().to_string(),
         ReferenceLocation::Url(url) => url.to_string(),
     }
-}
-
-fn looks_like_json_schema(value: &Value) -> bool {
-    let obj = match value.as_object() {
-        Some(map) => map,
-        None => return false,
-    };
-
-    if obj
-        .get("properties")
-        .and_then(Value::as_object)
-        .map(|props| props.len())
-        .unwrap_or(0)
-        == 0
-    {
-        return false;
-    }
-
-    if obj.contains_key("$schema") {
-        return true;
-    }
-
-    if matches!(obj.get("type"), Some(Value::String(t)) if t == "object") {
-        return true;
-    }
-
-    if let Some(props) = obj.get("properties").and_then(Value::as_object) {
-        let mut scored = 0usize;
-
-        for value in props.values() {
-            if value.get("type").is_some() {
-                scored += 1;
-            }
-            if value.get("properties").is_some() {
-                scored += 1;
-            }
-            if value.get("enum").is_some() {
-                scored += 1;
-            }
-        }
-
-        return scored >= 2;
-    }
-
-    false
 }

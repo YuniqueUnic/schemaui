@@ -46,7 +46,7 @@ fn main() -> Result<()> {
         .with_confirm_exit(true);
 
     // 5) Build SchemaUI with prepared artifacts.
-    let ui = SchemaUI::new(schema_value)
+    let ui = SchemaUI::from_schema(schema_value)
         .with_title(format!(
             "Artifact TUI demo - {:?}",
             schema_path.file_name().unwrap_or_default()

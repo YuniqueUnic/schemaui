@@ -38,6 +38,7 @@ pub struct WebSessionBuilder {
     schema: Value,
     defaults: Option<Value>,
     title: Option<String>,
+    description: Option<String>,
     asset_provider: Arc<dyn WebAssetProvider>,
     ui_bundle: Option<UiAstBundle>,
     ui_artifact_bundle: Option<UiArtifactBundle>,
@@ -49,6 +50,7 @@ impl WebSessionBuilder {
             schema,
             defaults: None,
             title: None,
+            description: None,
             #[allow(clippy::default_constructed_unit_structs)]
             asset_provider: Arc::new(EmbeddedAssets::default()),
             ui_bundle: None,
@@ -58,6 +60,11 @@ impl WebSessionBuilder {
 
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
+        self
+    }
+
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
         self
     }
 
@@ -111,7 +118,7 @@ impl WebSessionBuilder {
         let (ui_ast, layout) = bundle.into_parts();
         Ok(WebSessionConfig {
             title: self.title.or(schema_title),
-            description,
+            description: self.description.or(description),
             ui_ast,
             layout,
             data,

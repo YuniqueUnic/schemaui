@@ -145,12 +145,17 @@ fn main() -> color_eyre::Result<()> {
         "required": ["metadata", "runtime"]
     });
 
-    let options = UiOptions::default();
-    let ui = SchemaUI::new(schema)
+    let config = serde_json::json!({
+        "metadata": { "name": "demo-service" },
+        "runtime": { "http": { "host": "127.0.0.1", "port": 8080 } }
+    });
+
+    let value = SchemaUI::new(config)
+        .with_schema(schema)
         .with_title("SchemaUI Demo")
-        .with_options(options.clone());
-    let frontend = TuiFrontend { options };
-    let value = ui.run_with_frontend(frontend)?;
+        .with_description("Edit an existing config against a validation schema")
+        .with_options(UiOptions::default())
+        .run_tui()?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
@@ -160,8 +165,10 @@ fn main() -> color_eyre::Result<()> {
 
 For library integrations, the main entry points are:
 
-- **TUI runtime**: `crate::tui::app::{SchemaUI, UiOptions}` and
-  `crate::tui::session::TuiFrontend`
+- **High-level runtime**: `SchemaUI`, `DocumentInput`, `FrontendOptions`,
+  `ServeOptions`, and `UiOptions`
+- **TUI runtime**: `crate::tui::session::TuiFrontend` for custom frontend
+  injection via `SchemaUI::run_with_frontend`
 - **TUI state**: `crate::tui::state::*` (for example `FormState`, `FormCommand`,
   `FormEngine`, `SectionState`)
 - **Schema backend**: `crate::ui_ast::build_ui_ast` together with
@@ -209,8 +216,9 @@ code change to its architectural responsibility.
 - `io::output::OutputOptions` encapsulates serialization format, pretty/compact
   toggle, and a vector of `OutputDestination::{Stdout, File}`. Multiple
   destinations are supported; conflicts are caught before emission.
-- `SchemaUI::with_output` wires these options into the runtime so the final
-  `serde_json::Value` can be written automatically after the session ends.
+- `OutputOptions::render` turns the final `serde_json::Value` into
+  JSON/YAML/TOML text, and `OutputOptions::write` sends that payload to
+  stdout/files explicitly after `SchemaUI::run*` returns.
 
 ## Web UI Mode
 

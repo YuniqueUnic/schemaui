@@ -22,17 +22,19 @@ pub(crate) fn execute_session(session: SessionBundle) -> Result<()> {
         title,
         output,
     } = session;
-    let mut ui = SchemaUI::new(schema);
+    let mut ui = if let Some(defaults) = defaults {
+        SchemaUI::new(defaults).with_schema(schema)
+    } else {
+        SchemaUI::from_schema(schema)
+    };
     if let Some(title) = title {
         ui = ui.with_title(title);
     }
-    if let Some(ref defaults) = defaults {
-        ui = ui.with_default_data(defaults);
-    }
+    let value = ui.run_tui().map_err(Report::msg)?;
     if let Some(options) = output {
-        ui = ui.with_output(options);
+        options.write(&value).map_err(Report::msg)?;
     }
-    ui.run().map_err(Report::msg).map(|_| ())
+    Ok(())
 }
 
 pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {

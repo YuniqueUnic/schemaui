@@ -134,12 +134,17 @@ fn main() -> color_eyre::Result<()> {
         "required": ["metadata", "runtime"]
     });
 
-    let options = UiOptions::default();
-    let ui = SchemaUI::new(schema)
+    let config = serde_json::json!({
+        "metadata": { "name": "demo-service" },
+        "runtime": { "http": { "host": "127.0.0.1", "port": 8080 } }
+    });
+
+    let value = SchemaUI::new(config)
+        .with_schema(schema)
         .with_title("SchemaUI 演示")
-        .with_options(options.clone());
-    let frontend = TuiFrontend { options };
-    let value = ui.run_with_frontend(frontend)?;
+        .with_description("基于现有配置和校验 schema 进行编辑")
+        .with_options(UiOptions::default())
+        .run_tui()?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
@@ -149,8 +154,10 @@ fn main() -> color_eyre::Result<()> {
 
 在作为库集成 schemaui 时，主要的入口包括：
 
-- **TUI 运行时**：`crate::tui::app::{SchemaUI, UiOptions}`（配合
-  `crate::tui::session::TuiFrontend` 使用）
+- **高层运行入口**：`SchemaUI`、`DocumentInput`、`FrontendOptions`、
+  `ServeOptions`、`UiOptions`
+- **TUI 运行时**：`crate::tui::session::TuiFrontend`（适合通过
+  `SchemaUI::run_with_frontend` 注入自定义前端）
 - **TUI 状态**：`crate::tui::state::*`（例如
   `FormState`、`FormCommand`、`FormEngine`、`SectionState` 等）
 - **Schema 后端**：`crate::ui_ast::build_ui_ast` 配合
@@ -190,7 +197,9 @@ fn main() -> color_eyre::Result<()> {
   元数据和默认值，以便 UI 加载现有值。
 - `schema_with_defaults`将规范模式与用户数据合并，通过`properties`、`patternProperties`、`additionalProperties`、`dependencies`、`dependentSchemas`、数组和`$ref`目标传播默认值，而不修改原始树。
 - `io::output::OutputOptions`封装了序列化格式、美观/紧凑切换以及`OutputDestination::{Stdout, File}`的向量。支持多个目标；冲突在输出前被捕获。
-- `SchemaUI::with_output`将这些选项集成到运行时中，以便在会话结束后自动写入最终的`serde_json::Value`。
+- `OutputOptions::render` 负责把最终的 `serde_json::Value`
+  渲染成 JSON/YAML/TOML 文本，`OutputOptions::write`
+  则在 `SchemaUI::run*` 返回后显式输出到 stdout / 文件。
 
 ## JSON Schema → TUI 映射
 

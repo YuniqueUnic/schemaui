@@ -3,6 +3,8 @@ use jsonschema::Validator;
 use serde_json::Value;
 
 use crate::core::ui_ast::{UiAst, UiLayout};
+#[cfg(feature = "web")]
+use crate::web::session::ServeOptions;
 
 /// Shared context prepared by the core pipeline and consumed by frontends
 /// (TUI, Web, or others).
@@ -15,6 +17,14 @@ pub struct FrontendContext {
     pub initial_data: Value,
     pub schema: Value,
     pub validator: Validator,
+}
+
+/// Built-in runtime targets exposed by the high-level `SchemaUI` API.
+#[derive(Debug, Clone, Copy)]
+pub enum FrontendOptions {
+    Tui,
+    #[cfg(feature = "web")]
+    Web(ServeOptions),
 }
 
 /// Pluggable frontend interface. A frontend receives a `FrontendContext`,

@@ -254,17 +254,18 @@ schemaui completion bash
 The CLI is a thin wrapper over `SchemaUI`:
 
 ```rust
-let mut ui = SchemaUI::new(schema);
+let mut ui = if let Some(defaults) = config_value {
+    SchemaUI::new(defaults).with_schema(schema)
+} else {
+    SchemaUI::from_schema(schema)
+};
 if let Some(title) = cli.title.as_ref() {
     ui = ui.with_title(title.clone());
 }
-if let Some(defaults) = config_value.as_ref() {
-    ui = ui.with_default_data(defaults);
+let value = ui.run_tui()?;
+if let Some(options) = output_settings.as_ref() {
+    options.write(&value)?;
 }
-if let Some(options) = output_settings {
-    ui = ui.with_output(options);
-}
-ui.run()?;
 ```
 
 This means embedding projects can reproduce the CLI flow verbatim or replace the

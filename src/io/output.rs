@@ -51,6 +51,26 @@ impl OutputOptions {
         self.destinations.push(destination);
         self
     }
+
+    pub fn render(&self, value: &Value) -> Result<String> {
+        serialize_value(value, self)
+    }
+
+    pub fn write(&self, value: &Value) -> Result<()> {
+        if self.destinations.is_empty() {
+            return Ok(());
+        }
+        let payload = self.render(value)?;
+        for destination in &self.destinations {
+            write_payload(destination, &payload).with_context(|| match destination {
+                OutputDestination::Stdout => "failed to write to stdout".to_string(),
+                OutputDestination::File(path) => {
+                    format!("failed to write to file {}", path.display())
+                }
+            })?;
+        }
+        Ok(())
+    }
 }
 
 impl Default for OutputOptions {
@@ -61,19 +81,7 @@ impl Default for OutputOptions {
 
 /// Serialize and write the final value according to the configured format and destinations.
 pub fn emit(value: &Value, options: &OutputOptions) -> Result<()> {
-    if options.destinations.is_empty() {
-        return Ok(());
-    }
-    let payload = serialize_value(value, options)?;
-    for destination in &options.destinations {
-        write_payload(destination, &payload).with_context(|| match destination {
-            OutputDestination::Stdout => "failed to write to stdout".to_string(),
-            OutputDestination::File(path) => {
-                format!("failed to write to file {}", path.display())
-            }
-        })?;
-    }
-    Ok(())
+    options.write(value)
 }
 
 fn serialize_value(value: &Value, options: &OutputOptions) -> Result<String> {
@@ -135,6 +143,14 @@ mod tests {
             destinations: Vec::new(),
         };
         emit(&json!({"ok": true}), &options).unwrap();
+    }
+
+    #[test]
+    fn renders_payload_without_writing() {
+        let options = OutputOptions::default();
+        let payload = options.render(&json!({"ok": true})).unwrap();
+        let parsed = parse_document_str(&payload, options.format).unwrap();
+        assert_eq!(parsed, json!({"ok": true}));
     }
 
     #[test]
