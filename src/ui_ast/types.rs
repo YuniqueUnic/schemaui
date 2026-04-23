@@ -32,6 +32,7 @@ pub enum UiNodeKind {
         enum_options: Option<Vec<String>>,
         #[cfg_attr(feature = "web", ts(type = "unknown[] | null"))]
         enum_values: Option<Vec<Value>>,
+        nullable: bool,
     },
     Array {
         item: Box<UiNodeKind>,

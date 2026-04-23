@@ -295,6 +295,16 @@ fn kind_to_schema_fragment(kind: &FieldKind) -> Value {
         FieldKind::Number => json!({"type": "number"}),
         FieldKind::Boolean => json!({"type": "boolean"}),
         FieldKind::Enum { values, .. } => json!({"enum": values}),
+        FieldKind::Nullable(inner) => {
+            let mut schema = kind_to_schema_fragment(inner);
+            if let Some(obj) = schema.as_object_mut() {
+                obj.insert(
+                    "type".to_string(),
+                    json!([obj.get("type").cloned().unwrap_or(json!("string")), "null"]),
+                );
+            }
+            schema
+        }
         FieldKind::Json => json!({"type": "object"}),
         _ => json!({"type": "string"}),
     }
@@ -310,6 +320,7 @@ fn default_value(kind: &FieldKind) -> Value {
             .first()
             .cloned()
             .unwrap_or_else(|| Value::String(String::new())),
+        FieldKind::Nullable(_) => Value::Null,
         _ => Value::String(String::new()),
     }
 }

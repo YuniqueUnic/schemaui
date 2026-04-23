@@ -357,6 +357,7 @@ fn field_type_label(kind: &FieldKind) -> String {
         FieldKind::Number => "number".to_string(),
         FieldKind::Boolean => "boolean".to_string(),
         FieldKind::Enum { .. } => "enum".to_string(),
+        FieldKind::Nullable(inner) => format!("{} | null", field_type_label(inner)),
         FieldKind::Array(inner) => match inner.as_ref() {
             FieldKind::Json => "object[]".to_string(),
             FieldKind::Composite(comp) => {
@@ -406,7 +407,7 @@ fn extract_constraints(schema: &FieldSchema) -> Vec<String> {
     }
 
     // 字符串长度约束
-    if matches!(schema.kind, FieldKind::String) {
+    if matches!(schema.kind, FieldKind::String | FieldKind::Nullable(_)) {
         if let Some(min) = schema.metadata.get("minLength").and_then(|v| v.as_u64()) {
             if let Some(max) = schema.metadata.get("maxLength").and_then(|v| v.as_u64()) {
                 constraints.push(format!("length: {}..{}", min, max));
@@ -419,7 +420,10 @@ fn extract_constraints(schema: &FieldSchema) -> Vec<String> {
     }
 
     // 数值范围约束
-    if matches!(schema.kind, FieldKind::Integer | FieldKind::Number) {
+    if matches!(
+        schema.kind,
+        FieldKind::Integer | FieldKind::Number | FieldKind::Nullable(_)
+    ) {
         let min = schema
             .metadata
             .get("minimum")

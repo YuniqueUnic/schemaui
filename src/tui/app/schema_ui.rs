@@ -238,10 +238,22 @@ impl SchemaUI {
         self.run_with_frontend(WebFrontend { serve })
     }
 
+    /// Run in Web mode from an existing async runtime.
+    #[cfg(feature = "web")]
+    pub async fn run_web_async(self, serve: WebServeOptions) -> Result<Value> {
+        let ctx = self.into_frontend_context()?;
+        WebFrontend { serve }.run_async(ctx).await
+    }
+
     pub fn run_with_frontend<F>(self, frontend: F) -> Result<Value>
     where
         F: Frontend,
     {
+        let ctx = self.into_frontend_context()?;
+        frontend.run(ctx)
+    }
+
+    fn into_frontend_context(self) -> Result<crate::core::frontend::FrontendContext> {
         let inputs = self.resolve_inputs()?;
         let SchemaUI {
             document: _,
@@ -261,6 +273,6 @@ impl SchemaUI {
             .with_defaults(inputs.defaults)
             .with_prepared_ui_ast(ui_ast)
             .with_prepared_ui_bundle(ui_bundle);
-        pipeline.run_with_frontend(frontend)
+        pipeline.build_frontend_context()
     }
 }

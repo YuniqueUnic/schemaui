@@ -31,9 +31,11 @@ fn build_component(
     palette: Arc<ComponentPalette>,
 ) -> Box<dyn FieldComponent> {
     match &schema.kind {
-        FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Json => {
-            Box::new(TextComponent::new(schema, Arc::clone(&palette)))
-        }
+        FieldKind::String
+        | FieldKind::Integer
+        | FieldKind::Number
+        | FieldKind::Json
+        | FieldKind::Nullable(_) => Box::new(TextComponent::new(schema, Arc::clone(&palette))),
         FieldKind::Boolean => Box::new(BoolComponent::new(schema, Arc::clone(&palette))),
         FieldKind::Enum { labels, values } => Box::new(EnumComponent::new(
             labels,

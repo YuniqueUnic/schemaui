@@ -59,6 +59,7 @@ export type UiNodeKind =
     scalar: ScalarKind;
     enum_options?: string[] | null;
     enum_values?: JsonValue[] | null;
+    nullable?: boolean;
   }
   | {
     type: "array";

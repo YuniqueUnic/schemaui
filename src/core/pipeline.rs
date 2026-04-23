@@ -76,7 +76,7 @@ impl SchemaPipeline {
         self
     }
 
-    fn build_frontend_context(self) -> Result<FrontendContext> {
+    pub(crate) fn build_frontend_context(self) -> Result<FrontendContext> {
         let SchemaPipeline {
             schema,
             title,
@@ -107,6 +107,7 @@ impl SchemaPipeline {
         })
     }
 
+    #[allow(dead_code)]
     pub fn run_with_frontend<F>(self, frontend: F) -> Result<Value>
     where
         F: Frontend,

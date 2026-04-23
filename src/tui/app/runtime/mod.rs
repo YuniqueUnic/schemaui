@@ -829,7 +829,9 @@ impl App {
 
 fn field_help_context(kind: &FieldKind) -> Option<KeymapContext> {
     match kind {
-        FieldKind::String | FieldKind::Json => Some(KeymapContext::TextInput),
+        FieldKind::String | FieldKind::Json | FieldKind::Nullable(_) => {
+            Some(KeymapContext::TextInput)
+        }
         FieldKind::Integer | FieldKind::Number => Some(KeymapContext::NumericInput),
         _ => None,
     }

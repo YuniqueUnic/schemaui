@@ -136,3 +136,29 @@ fn schema_ui_builds_tui_frontend_from_frontend_options_payload() {
     assert!(!frontend.options.confirm_exit);
     assert_eq!(frontend.tui_artifacts, Some(bundle.tui));
 }
+
+#[test]
+fn nullable_scalar_schema_marks_field_nullable_and_preserves_null_default() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "data-size": {
+                "type": ["integer", "null"],
+                "default": null
+            },
+            "bind-address-v6": {
+                "type": ["string", "null"],
+                "format": "ipv6",
+                "default": null
+            }
+        }
+    });
+
+    let result = SchemaUI::from_schema(schema)
+        .run_with_frontend(CaptureFrontend)
+        .expect("nullable schema should build frontend context");
+
+    let data = &result["schema"]["properties"]["data-size"];
+    assert_eq!(data["default"], Value::Null);
+    assert_eq!(data["type"], json!(["integer", "null"]));
+}

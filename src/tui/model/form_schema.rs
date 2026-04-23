@@ -40,6 +40,7 @@ pub enum FieldKind {
         labels: Vec<String>,
         values: Vec<Value>,
     },
+    Nullable(Box<FieldKind>),
     Array(Box<FieldKind>),
     Json,
     Composite(Box<CompositeField>),

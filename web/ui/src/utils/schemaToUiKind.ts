@@ -310,6 +310,7 @@ function detectScalarKind(schema: JsonSchema): UiNodeKind {
       scalar: inferEnumScalar(enumValues),
       enum_options: enumValues.map(enumLabel),
       enum_values: enumValues,
+      nullable: enumValues.some((value) => value === null),
     };
   }
 
@@ -319,6 +320,7 @@ function detectScalarKind(schema: JsonSchema): UiNodeKind {
       scalar: inferEnumScalar([schema.const]),
       enum_options: [enumLabel(schema.const)],
       enum_values: [schema.const],
+      nullable: schema.const === null,
     };
   }
 
@@ -328,6 +330,7 @@ function detectScalarKind(schema: JsonSchema): UiNodeKind {
       scalar: "string",
       enum_options: ["null"],
       enum_values: [null],
+      nullable: true,
     };
   }
 
@@ -336,7 +339,13 @@ function detectScalarKind(schema: JsonSchema): UiNodeKind {
     scalar: normalizeScalarKind(schema),
     enum_options: null,
     enum_values: null,
+    nullable: schemaAllowsNull(schema),
   };
+}
+
+function schemaAllowsNull(schema: JsonSchema): boolean {
+  const rawType = schema.type;
+  return rawType === "null" || (Array.isArray(rawType) && rawType.includes("null"));
 }
 
 function normalizeScalarKind(schema: JsonSchema): ScalarKind {

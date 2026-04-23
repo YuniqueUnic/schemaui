@@ -36,6 +36,7 @@ function cloneJsonValue<T extends JsonValue>(value: T): T {
  */
 export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
   const resolved = value ?? node.default_value ?? defaultForKind(node.kind);
+  const nullable = node.kind.nullable === true;
 
   if (node.kind.enum_options?.length) {
     const enumValues = node.kind.enum_values ?? node.kind.enum_options;
@@ -72,16 +73,22 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
       return (
         <Input
           type="number"
-          value={typeof resolved === "number" ? resolved : 0}
+          value={typeof resolved === "number" ? resolved : ""}
           onChange={(event) => {
-            const numValue = event.target.value === ""
-              ? 0
-              : Number(event.target.value);
+            if (event.target.value === "" && nullable) {
+              onChange(node.pointer, null);
+              return;
+            }
+            const numValue = Number(event.target.value);
             if (!isNaN(numValue)) {
               onChange(node.pointer, numValue);
             }
           }}
           onBlur={(event) => {
+            if (event.target.value === "" && nullable) {
+              onChange(node.pointer, null);
+              return;
+            }
             const numValue = event.target.value === ""
               ? 0
               : Number(event.target.value);
@@ -109,7 +116,11 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
         <Input
           type="text"
           value={(resolved as string) ?? ""}
-          onChange={(event) => onChange(node.pointer, event.target.value)}
+          onChange={(event) =>
+            onChange(
+              node.pointer,
+              event.target.value === "" && nullable ? null : event.target.value,
+            )}
         />
       );
   }
@@ -125,6 +136,7 @@ export function renderSimpleFieldInline(
   onChange: (value: JsonValue) => void,
 ): React.ReactNode {
   const resolved = value ?? defaultForKind(fieldKind);
+  const nullable = fieldKind.nullable === true;
 
   if (fieldKind.enum_options?.length) {
     const enumValues = fieldKind.enum_values ?? fieldKind.enum_options;
@@ -161,8 +173,14 @@ export function renderSimpleFieldInline(
       return (
         <Input
           type="number"
-          value={typeof resolved === "number" ? resolved : 0}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={typeof resolved === "number" ? resolved : ""}
+          onChange={(event) => {
+            if (event.target.value === "" && nullable) {
+              onChange(null);
+              return;
+            }
+            onChange(Number(event.target.value));
+          }}
           className="h-9"
         />
       );
@@ -184,7 +202,8 @@ export function renderSimpleFieldInline(
         <Input
           type="text"
           value={(resolved as string) ?? ""}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) =>
+            onChange(event.target.value === "" && nullable ? null : event.target.value)}
           className="h-9"
         />
       );

@@ -5,6 +5,7 @@ use crate::tui::state::error::FieldCoercionError;
 
 pub(super) fn value_to_string(value: &Value) -> String {
     match value {
+        Value::Null => String::new(),
         Value::String(text) => text.clone(),
         Value::Number(num) => num.to_string(),
         Value::Bool(flag) => flag.to_string(),
@@ -33,6 +34,45 @@ pub(super) fn string_value(
         return Ok(None);
     }
     Ok(Some(Value::String(contents.to_string())))
+}
+
+pub(super) fn nullable_value(
+    contents: &str,
+    inner: &FieldKind,
+    schema: &FieldSchema,
+) -> Result<Option<Value>, FieldCoercionError> {
+    if contents.trim().is_empty() {
+        return Ok(Some(Value::Null));
+    }
+
+    match inner {
+        FieldKind::String => string_value(contents, schema),
+        FieldKind::Integer => integer_value(contents, schema),
+        FieldKind::Number => number_value(contents, schema),
+        FieldKind::Boolean => match contents.trim().to_ascii_lowercase().as_str() {
+            "true" => Ok(Some(Value::Bool(true))),
+            "false" => Ok(Some(Value::Bool(false))),
+            _ => Err(FieldCoercionError {
+                pointer: schema.pointer.clone(),
+                message: "expected boolean".to_string(),
+            }),
+        },
+        FieldKind::Enum { labels, values } => {
+            if let Some(index) = labels.iter().position(|label| label == contents.trim()) {
+                Ok(Some(values[index].clone()))
+            } else {
+                Err(FieldCoercionError {
+                    pointer: schema.pointer.clone(),
+                    message: format!(
+                        "value '{}' is not one of: {}",
+                        contents.trim(),
+                        labels.join(", ")
+                    ),
+                })
+            }
+        }
+        _ => string_value(contents, schema),
+    }
 }
 
 pub(super) fn integer_value(
@@ -129,6 +169,9 @@ pub(super) fn array_value(
                 }
             }
             FieldKind::Json | FieldKind::Composite(_) => Value::String(item.to_string()),
+            FieldKind::Nullable(inner) => {
+                nullable_value(item, inner, schema)?.unwrap_or(Value::Null)
+            }
             FieldKind::KeyValue(_) => {
                 return Err(FieldCoercionError {
                     pointer: schema.pointer.clone(),

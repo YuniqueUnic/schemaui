@@ -107,6 +107,9 @@ export function defaultForKind(kind: UiNodeKind): JsonValue {
       if (kind.enum_values?.length) {
         return deepClone(kind.enum_values[0] as JsonValue);
       }
+      if (kind.nullable) {
+        return null;
+      }
       if (kind.enum_options?.length) {
         return kind.enum_options[0] as JsonValue;
       }

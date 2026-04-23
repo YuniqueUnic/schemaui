@@ -183,7 +183,11 @@ impl App {
             FieldKind::Array(inner)
                 if matches!(
                     inner.as_ref(),
-                    FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Boolean
+                    FieldKind::String
+                        | FieldKind::Integer
+                        | FieldKind::Number
+                        | FieldKind::Boolean
+                        | FieldKind::Nullable(_)
                 ) =>
             {
                 let pointer = field.schema.pointer.clone();

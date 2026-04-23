@@ -6,8 +6,8 @@ use serde_json::Value;
 use crate::tui::model::{FieldKind, FieldSchema};
 use crate::tui::state::error::FieldCoercionError;
 use crate::tui::state::field::convert::{
-    NumericStepValue, adjust_numeric_value, integer_value, number_value, string_value,
-    value_to_string,
+    NumericStepValue, adjust_numeric_value, integer_value, nullable_value, number_value,
+    string_value, value_to_string,
 };
 
 use super::{ComponentKind, FieldComponent, palette::ComponentPalette};
@@ -279,7 +279,9 @@ impl FieldComponent for TextComponent {
 
     fn handle_key(&mut self, schema: &FieldSchema, key: &KeyEvent) -> bool {
         match schema.kind {
-            FieldKind::String | FieldKind::Json => self.handle_string_like_key(key),
+            FieldKind::String | FieldKind::Json | FieldKind::Nullable(_) => {
+                self.handle_string_like_key(key)
+            }
             FieldKind::Integer | FieldKind::Number => self.handle_numeric_key(schema, key),
             _ => false,
         }
@@ -299,13 +301,14 @@ impl FieldComponent for TextComponent {
             FieldKind::Integer => integer_value(&self.buffer, schema),
             FieldKind::Number => number_value(&self.buffer, schema),
             FieldKind::Json => string_value(&self.buffer, schema),
+            FieldKind::Nullable(ref inner) => nullable_value(&self.buffer, inner, schema),
             _ => Ok(None),
         }
     }
 
     fn cursor_offset(&self, schema: &FieldSchema) -> Option<usize> {
         match schema.kind {
-            FieldKind::String | FieldKind::Json => Some(self.cursor),
+            FieldKind::String | FieldKind::Json | FieldKind::Nullable(_) => Some(self.cursor),
             _ => None,
         }
     }

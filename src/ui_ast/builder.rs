@@ -181,7 +181,7 @@ fn visit_schema(
         });
     }
 
-    let (scalar, enum_options, enum_values) = detect_scalar(schema)?;
+    let (scalar, enum_options, enum_values, nullable) = detect_scalar(schema)?;
     let default_value = schema_default_or_const(schema)
         .or_else(|| infer_default_scalar(scalar, enum_values.as_ref()));
     Ok(UiNode {
@@ -194,6 +194,7 @@ fn visit_schema(
             scalar,
             enum_options,
             enum_values,
+            nullable,
         },
     })
 }
@@ -311,11 +312,12 @@ fn visit_kind(
         });
     }
 
-    let (scalar, enum_options, enum_values) = detect_scalar(schema)?;
+    let (scalar, enum_options, enum_values, nullable) = detect_scalar(schema)?;
     Ok(UiNodeKind::Field {
         scalar,
         enum_options,
         enum_values,
+        nullable,
     })
 }
 
@@ -442,24 +444,32 @@ fn default_for_kind(kind: &UiNodeKind) -> Option<Value> {
     }
 }
 
-type DetectedScalar = (ScalarKind, Option<Vec<String>>, Option<Vec<Value>>);
+type DetectedScalar = (ScalarKind, Option<Vec<String>>, Option<Vec<Value>>, bool);
 
 fn detect_scalar(schema: &SchemaObject) -> Result<DetectedScalar> {
     if let Some(enum_values) = schema.enum_values.as_ref()
         && !enum_values.is_empty()
     {
         let labels = enum_values.iter().map(enum_label).collect::<Vec<_>>();
+        let nullable = enum_values.iter().any(Value::is_null);
         return Ok((
             infer_enum_scalar(enum_values),
             Some(labels),
             Some(enum_values.clone()),
+            nullable,
         ));
     }
 
     if let Some(const_value) = schema_const_value(schema) {
         let labels = vec![enum_label(const_value)];
         let values = vec![const_value.clone()];
-        return Ok((infer_enum_scalar(&values), Some(labels), Some(values)));
+        let nullable = values.iter().any(Value::is_null);
+        return Ok((
+            infer_enum_scalar(&values),
+            Some(labels),
+            Some(values),
+            nullable,
+        ));
     }
 
     let instance = instance_type(schema);
@@ -468,6 +478,7 @@ fn detect_scalar(schema: &SchemaObject) -> Result<DetectedScalar> {
             ScalarKind::String,
             Some(vec!["null".to_string()]),
             Some(vec![Value::Null]),
+            true,
         ));
     }
 
@@ -481,7 +492,7 @@ fn detect_scalar(schema: &SchemaObject) -> Result<DetectedScalar> {
             bail!("composite types should be handled earlier")
         }
     };
-    Ok((scalar, None, None))
+    Ok((scalar, None, None, schema_allows_null(schema)))
 }
 
 fn enum_label(value: &Value) -> String {
@@ -697,11 +708,12 @@ fn recursive_boundary_kind(schema: &SchemaObject) -> UiNodeKind {
         };
     }
 
-    if let Ok((scalar, enum_options, enum_values)) = detect_scalar(schema) {
+    if let Ok((scalar, enum_options, enum_values, nullable)) = detect_scalar(schema) {
         return UiNodeKind::Field {
             scalar,
             enum_options,
             enum_values,
+            nullable,
         };
     }
 
@@ -734,6 +746,16 @@ where
     } else {
         on_resolved(resolved, active_refs)
     }
+}
+
+fn schema_allows_null(schema: &SchemaObject) -> bool {
+    schema
+        .instance_type
+        .as_ref()
+        .is_some_and(|inner| match inner {
+            SingleOrVec::Single(single) => matches!(**single, InstanceType::Null),
+            SingleOrVec::Vec(list) => list.contains(&InstanceType::Null),
+        })
 }
 
 fn instance_type(schema: &SchemaObject) -> Option<InstanceType> {

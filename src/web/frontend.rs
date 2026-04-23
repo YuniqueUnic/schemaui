@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::core::frontend::{Frontend, FrontendContext};
 
-use super::assets::{EmbeddedAssets, WebAssetProvider};
+use super::assets::EmbeddedAssets;
 use super::session::{ServeOptions, WebSessionConfig, bind_session};
 
 /// Web frontend implementation that consumes a prepared `FrontendContext`
@@ -14,44 +14,48 @@ pub struct WebFrontend {
     pub serve: ServeOptions,
 }
 
+impl WebFrontend {
+    pub async fn run_async(self, ctx: FrontendContext) -> Result<Value> {
+        let config = web_session_config(ctx);
+        let bound = bind_session(config, self.serve)
+            .await
+            .context("failed to bind web session")?;
+        let addr = bound.local_addr();
+        eprintln!("schemaui web UI available at http://{addr}/");
+        eprintln!("Press Ctrl+C to abort the session.");
+        bound.run().await.context("web UI session failed")
+    }
+}
+
 impl Frontend for WebFrontend {
     fn run(self, ctx: FrontendContext) -> Result<Value> {
-        let FrontendContext {
-            title,
-            description,
-            ui_ast,
-            layout,
-            initial_data,
-            schema,
-            validator: _,
-        } = ctx;
-
-        let asset_provider: Arc<dyn WebAssetProvider> = Arc::new(EmbeddedAssets);
-
-        let config = WebSessionConfig {
-            title,
-            description,
-            ui_ast,
-            layout,
-            data: initial_data,
-            schema,
-            asset_provider,
-        };
-
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .context("failed to initialize tokio runtime")?;
 
-        let serve = self.serve;
-        runtime.block_on(async move {
-            let bound = bind_session(config, serve)
-                .await
-                .context("failed to bind web session")?;
-            let addr = bound.local_addr();
-            eprintln!("schemaui web UI available at http://{addr}/");
-            eprintln!("Press Ctrl+C to abort the session.");
-            bound.run().await.context("web UI session failed")
-        })
+        runtime.block_on(self.run_async(ctx))
+    }
+}
+
+fn web_session_config(ctx: FrontendContext) -> WebSessionConfig {
+    let FrontendContext {
+        title,
+        description,
+        ui_ast,
+        layout,
+        initial_data,
+        schema,
+        validator: _,
+    } = ctx;
+
+    WebSessionConfig {
+        title,
+        description,
+        ui_ast,
+        layout,
+        data: initial_data,
+        schema,
+        asset_provider: Arc::new(EmbeddedAssets),
     }
 }
