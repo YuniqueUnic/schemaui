@@ -48,9 +48,8 @@ fn main() -> anyhow::Result<()> {
     });
 
     let options = schemaui::UiOptions::default();
-    let result = schemaui::SchemaUI::from_schema(schema)
-        .with_options(options)
-        .run_tui()?;
+    let result =
+        schemaui::SchemaUI::from_schema(schema).run(schemaui::FrontendOptions::Tui(options))?;
 
     let json = serde_json::to_string_pretty(&result)?;
     println!("{}", json);

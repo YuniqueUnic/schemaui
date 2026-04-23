@@ -59,6 +59,7 @@ pub fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
         schema: resolved.schema,
         defaults: resolved.defaults,
         title: args.title.clone(),
+        description: args.description.clone(),
         output: output_settings,
     })
 }

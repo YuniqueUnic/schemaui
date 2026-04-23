@@ -143,8 +143,7 @@ fn main() -> color_eyre::Result<()> {
         .with_schema(schema)
         .with_title("SchemaUI 演示")
         .with_description("基于现有配置和校验 schema 进行编辑")
-        .with_options(UiOptions::default())
-        .run_tui()?;
+        .run(FrontendOptions::Tui(UiOptions::default()))?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
@@ -197,9 +196,9 @@ fn main() -> color_eyre::Result<()> {
   元数据和默认值，以便 UI 加载现有值。
 - `schema_with_defaults`将规范模式与用户数据合并，通过`properties`、`patternProperties`、`additionalProperties`、`dependencies`、`dependentSchemas`、数组和`$ref`目标传播默认值，而不修改原始树。
 - `io::output::OutputOptions`封装了序列化格式、美观/紧凑切换以及`OutputDestination::{Stdout, File}`的向量。支持多个目标；冲突在输出前被捕获。
-- `OutputOptions::render` 负责把最终的 `serde_json::Value`
-  渲染成 JSON/YAML/TOML 文本，`OutputOptions::write`
-  则在 `SchemaUI::run*` 返回后显式输出到 stdout / 文件。
+- `OutputOptions::render` 负责把最终的 `serde_json::Value` 渲染成 JSON/YAML/TOML
+  文本，`OutputOptions::write` 则在 `SchemaUI::run*` 返回后显式输出到 stdout /
+  文件。
 
 ## JSON Schema → TUI 映射
 
@@ -486,8 +485,9 @@ schemaui \
 - 输出 –
   `-o/--output`可重复使用，并且可以混合文件路径与`-`用于标准输出。当未设置目标时，工具直接写到
   stdout；如果你明确想走回退文件，可以传`--temp-file <PATH>`。扩展名决定格式；拒绝冲突的扩展名。
-- 标志 –
-  `--no-pretty`切换紧凑输出，`--force/--yes`允许覆盖文件，`--title`传递到`SchemaUI::with_title`。
+- 标志 – `--no-pretty`切换紧凑输出，`--force/--yes`允许覆盖文件，`--title` /
+  `--description`分别传递到`SchemaUI::with_title` /
+  `SchemaUI::with_description`。
 - Shell completion – `schemaui completion <bash|zsh|fish|nushell>` 会从同一套
   `argh` 命令树生成补全脚本。PowerShell 暂未暴露，因为上游 `argh_complete`
   目前没有提供 PowerShell generator。

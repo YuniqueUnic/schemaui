@@ -113,14 +113,15 @@ schemaui completion nushell > ~/.config/nushell/completions/schemaui.nu
 
 ## 5. 参数参考
 
-| 标志                  | 描述                                    | 代码钩子                            |
-| --------------------- | --------------------------------------- | ----------------------------------- |
-| `-o, --output <DEST>` | 追加输出目标（`-` 写到 stdout）。       | `build_output_options`              |
-| `--title <TEXT>`      | 覆盖 TUI 标题栏。                       | `SchemaUI::with_title`              |
-| `--temp-file <PATH>`  | 未设置 `--output` 时，显式写到该文件。  | `build_output_options`              |
-| `--no-temp-file`      | 兼容性 no-op；默认行为本来就是 stdout。 | `build_output_options`              |
-| `--no-pretty`         | 输出紧凑 JSON/TOML/YAML。               | `OutputOptions::with_pretty(false)` |
-| `--force`, `--yes`    | 允许覆盖现有文件。                      | `ensure_output_paths_available`     |
+| 标志                   | 描述                                    | 代码钩子                            |
+| ---------------------- | --------------------------------------- | ----------------------------------- |
+| `-o, --output <DEST>`  | 追加输出目标（`-` 写到 stdout）。       | `build_output_options`              |
+| `--title <TEXT>`       | 覆盖当前 UI 头部标题。                  | `SchemaUI::with_title`              |
+| `--description <TEXT>` | 覆盖当前 UI 头部描述。                  | `SchemaUI::with_description`        |
+| `--temp-file <PATH>`   | 未设置 `--output` 时，显式写到该文件。  | `build_output_options`              |
+| `--no-temp-file`       | 兼容性 no-op；默认行为本来就是 stdout。 | `build_output_options`              |
+| `--no-pretty`          | 输出紧凑 JSON/TOML/YAML。               | `OutputOptions::with_pretty(false)` |
+| `--force`, `--yes`     | 允许覆盖现有文件。                      | `ensure_output_paths_available`     |
 
 ## 6. 使用示例
 

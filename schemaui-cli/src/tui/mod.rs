@@ -20,6 +20,7 @@ pub(crate) fn execute_session(session: SessionBundle) -> Result<()> {
         schema,
         defaults,
         title,
+        description,
         output,
     } = session;
     let mut ui = if let Some(defaults) = defaults {
@@ -29,6 +30,9 @@ pub(crate) fn execute_session(session: SessionBundle) -> Result<()> {
     };
     if let Some(title) = title {
         ui = ui.with_title(title);
+    }
+    if let Some(description) = description {
+        ui = ui.with_description(description);
     }
     let value = ui.run_tui().map_err(Report::msg)?;
     if let Some(options) = output {

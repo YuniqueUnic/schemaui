@@ -23,6 +23,7 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
         schema,
         defaults,
         title,
+        description,
         output,
     } = session;
 
@@ -33,6 +34,9 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
     };
     if let Some(title) = title {
         ui = ui.with_title(title);
+    }
+    if let Some(description) = description {
+        ui = ui.with_description(description);
     }
 
     let serve = WebServeOptions {
@@ -77,8 +81,14 @@ pub fn run_snapshot_cli(cmd: WebSnapshotCommand) -> Result<()> {
     );
     diagnostics.into_result()?;
     let resolved = resolve_session_inputs(schema_document, config_document).map_err(Report::msg)?;
-    let snapshot = build_session_snapshot(&resolved.schema, resolved.defaults.as_ref())
+    let mut snapshot = build_session_snapshot(&resolved.schema, resolved.defaults.as_ref())
         .map_err(Report::msg)?;
+    if let Some(title) = cmd.common.title {
+        snapshot.title = Some(title);
+    }
+    if let Some(description) = cmd.common.description {
+        snapshot.description = Some(description);
+    }
 
     fs::create_dir_all(&cmd.out_dir)?;
     let json_out = cmd.out_dir.join("session_snapshot.json");

@@ -154,8 +154,7 @@ fn main() -> color_eyre::Result<()> {
         .with_schema(schema)
         .with_title("SchemaUI Demo")
         .with_description("Edit an existing config against a validation schema")
-        .with_options(UiOptions::default())
-        .run_tui()?;
+        .run(FrontendOptions::Tui(UiOptions::default()))?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     Ok(())
 }
@@ -574,7 +573,8 @@ schemaui \
   `--temp-file <PATH>` if you explicitly want a fallback file. Extensions
   dictate formats; conflicting extensions are rejected.
 - Flags – `--no-pretty` toggles compact output, `--force/--yes` allows
-  overwriting files, and `--title` wires through to `SchemaUI::with_title`.
+  overwriting files, and `--title` / `--description` wire through to
+  `SchemaUI::with_title` / `SchemaUI::with_description`.
 - Shell completion – `schemaui completion <bash|zsh|fish|nushell>` emits
   completion scripts from the same `argh` command graph. PowerShell is not
   exposed yet because upstream `argh_complete` does not currently ship a

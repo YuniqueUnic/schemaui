@@ -3,6 +3,8 @@ use serde_json::{Value, json};
 
 use crate::SchemaUI;
 use crate::core::frontend::{Frontend, FrontendContext};
+use crate::precompile::build_ui_artifact_bundle;
+use crate::tui::app::UiOptions;
 
 struct CaptureFrontend;
 
@@ -107,4 +109,30 @@ fn schema_ui_description_override_wins_over_schema_description() {
 
     assert_eq!(result["title"], "CLI override");
     assert_eq!(result["description"], "Manual description");
+}
+
+#[test]
+fn schema_ui_builds_tui_frontend_from_frontend_options_payload() {
+    let schema = json!({
+        "title": "Service Config",
+        "type": "object",
+        "properties": {
+            "enabled": { "type": "boolean" }
+        }
+    });
+    let defaults = json!({ "enabled": true });
+    let bundle = build_ui_artifact_bundle(&schema, Some(&defaults))
+        .expect("artifact bundle should build for TUI frontend preparation");
+    let options = UiOptions::default()
+        .with_auto_validate(false)
+        .with_confirm_exit(false);
+
+    let frontend = SchemaUI::new(defaults)
+        .with_schema(schema)
+        .with_ui_artifact_bundle(bundle.clone())
+        .build_tui_frontend(options.clone());
+
+    assert!(!frontend.options.auto_validate);
+    assert!(!frontend.options.confirm_exit);
+    assert_eq!(frontend.tui_artifacts, Some(bundle.tui));
 }

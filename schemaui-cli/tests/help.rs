@@ -7,5 +7,6 @@ fn prints_help() {
     cmd.arg("--help")
         .assert()
         .success()
-        .stdout(contains("schemaui"));
+        .stdout(contains("schemaui"))
+        .stdout(contains("--description"));
 }

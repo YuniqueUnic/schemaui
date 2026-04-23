@@ -176,14 +176,15 @@ can reuse the exact same serialization logic.
 
 ## 5. Argument Reference
 
-| Flag                  | Description                                         | Code hook                           |
-| --------------------- | --------------------------------------------------- | ----------------------------------- |
-| `-o, --output <DEST>` | Append destinations (`-` writes to stdout).         | `build_output_options`              |
-| `--title <TEXT>`      | Overrides the TUI title bar.                        | `SchemaUI::with_title`              |
-| `--temp-file <PATH>`  | Write to this file when no `--output` is given.     | `build_output_options`              |
-| `--no-temp-file`      | Compatibility no-op; stdout is already the default. | `build_output_options`              |
-| `--no-pretty`         | Emit compact JSON/TOML/YAML.                        | `OutputOptions::with_pretty(false)` |
-| `--force`, `--yes`    | Allow overwriting files.                            | `ensure_output_paths_available`     |
+| Flag                   | Description                                         | Code hook                           |
+| ---------------------- | --------------------------------------------------- | ----------------------------------- |
+| `-o, --output <DEST>`  | Append destinations (`-` writes to stdout).         | `build_output_options`              |
+| `--title <TEXT>`       | Overrides the active UI header title.               | `SchemaUI::with_title`              |
+| `--description <TEXT>` | Overrides the active UI header description.         | `SchemaUI::with_description`        |
+| `--temp-file <PATH>`   | Write to this file when no `--output` is given.     | `build_output_options`              |
+| `--no-temp-file`       | Compatibility no-op; stdout is already the default. | `build_output_options`              |
+| `--no-pretty`          | Emit compact JSON/TOML/YAML.                        | `OutputOptions::with_pretty(false)` |
+| `--force`, `--yes`     | Allow overwriting files.                            | `ensure_output_paths_available`     |
 
 ## 6. Usage Examples
 

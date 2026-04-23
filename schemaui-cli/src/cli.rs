@@ -70,6 +70,7 @@ pub struct CommonArgs {
     pub schema: Option<String>,
     pub config: Option<String>,
     pub title: Option<String>,
+    pub description: Option<String>,
     pub outputs: Vec<String>,
     pub temp_file: Option<PathBuf>,
     pub no_temp_file: bool,
@@ -86,6 +87,10 @@ impl CommonArgs {
             schema: local.schema.clone().or_else(|| self.schema.clone()),
             config: local.config.clone().or_else(|| self.config.clone()),
             title: local.title.clone().or_else(|| self.title.clone()),
+            description: local
+                .description
+                .clone()
+                .or_else(|| self.description.clone()),
             outputs,
             temp_file: local.temp_file.clone().or_else(|| self.temp_file.clone()),
             no_temp_file: self.no_temp_file || local.no_temp_file,
@@ -208,6 +213,7 @@ fn common_args_from_root(args: &ArghCli) -> CommonArgs {
         schema: args.schema.clone(),
         config: args.config.clone(),
         title: args.title.clone(),
+        description: args.description.clone(),
         outputs: args.outputs.clone(),
         temp_file: args.temp_file.clone(),
         no_temp_file: args.no_temp_file,
@@ -221,6 +227,7 @@ fn common_args_from_tui(args: ArghTuiCommand) -> CommonArgs {
         schema: args.schema,
         config: args.config,
         title: args.title,
+        description: args.description,
         outputs: args.outputs,
         temp_file: args.temp_file,
         no_temp_file: args.no_temp_file,
@@ -235,6 +242,7 @@ fn common_args_from_web(args: &ArghWebCommand) -> CommonArgs {
         schema: args.schema.clone(),
         config: args.config.clone(),
         title: args.title.clone(),
+        description: args.description.clone(),
         outputs: args.outputs.clone(),
         temp_file: args.temp_file.clone(),
         no_temp_file: args.no_temp_file,
@@ -249,6 +257,7 @@ fn common_args_from_web_snapshot(args: &ArghWebSnapshotCommand) -> CommonArgs {
         schema: args.schema.clone(),
         config: args.config.clone(),
         title: args.title.clone(),
+        description: args.description.clone(),
         outputs: args.outputs.clone(),
         temp_file: args.temp_file.clone(),
         no_temp_file: args.no_temp_file,
@@ -262,6 +271,7 @@ fn common_args_from_tui_snapshot(args: &ArghTuiSnapshotCommand) -> CommonArgs {
         schema: args.schema.clone(),
         config: args.config.clone(),
         title: args.title.clone(),
+        description: args.description.clone(),
         outputs: args.outputs.clone(),
         temp_file: args.temp_file.clone(),
         no_temp_file: args.no_temp_file,
@@ -285,6 +295,10 @@ struct ArghCli {
     /// title shown at the top of the UI
     #[argh(option)]
     title: Option<String>,
+
+    /// description shown under the title in the active UI
+    #[argh(option)]
+    description: Option<String>,
 
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
     #[argh(option, short = 'o', long = "output")]
@@ -347,6 +361,10 @@ struct ArghTuiCommand {
     #[argh(option)]
     title: Option<String>,
 
+    /// description shown under the title in the active UI
+    #[argh(option)]
+    description: Option<String>,
+
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
     #[argh(option, short = 'o', long = "output")]
     outputs: Vec<String>,
@@ -384,6 +402,10 @@ struct ArghWebCommand {
     /// title shown at the top of the UI
     #[argh(option)]
     title: Option<String>,
+
+    /// description shown under the title in the active UI
+    #[argh(option)]
+    description: Option<String>,
 
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
     #[argh(option, short = 'o', long = "output")]
@@ -435,6 +457,10 @@ struct ArghWebSnapshotCommand {
     #[argh(option)]
     title: Option<String>,
 
+    /// description shown under the title in the active UI
+    #[argh(option)]
+    description: Option<String>,
+
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
     #[argh(option, short = 'o', long = "output")]
     outputs: Vec<String>,
@@ -483,6 +509,10 @@ struct ArghTuiSnapshotCommand {
     /// title shown at the top of the UI
     #[argh(option)]
     title: Option<String>,
+
+    /// description shown under the title in the active UI
+    #[argh(option)]
+    description: Option<String>,
 
     /// output destinations ("-" writes to stdout). Repeat the flag to add more.
     #[argh(option, short = 'o', long = "output")]
@@ -640,6 +670,7 @@ fn normalize_inline_option(token: &str) -> Option<(String, String)> {
         ("--config=", "--config"),
         ("--data=", "--config"),
         ("--title=", "--title"),
+        ("--description=", "--description"),
         ("--output=", "--output"),
         ("--temp-file=", "--temp-file"),
         ("--host=", "--host"),
@@ -701,6 +732,7 @@ fn consumes_single_value(token: &str) -> bool {
             | "-c"
             | "--config"
             | "--title"
+            | "--description"
             | "--temp-file"
             | "-l"
             | "--host"

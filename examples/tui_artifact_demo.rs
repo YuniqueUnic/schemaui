@@ -4,14 +4,14 @@ use std::path::PathBuf;
 
 use anyhow::{Result, bail};
 use schemaui::precompile::build_ui_artifact_bundle_from_file;
-use schemaui::{DocumentFormat, SchemaUI, TuiFrontend, UiOptions, parse_document_str};
+use schemaui::{DocumentFormat, FrontendOptions, SchemaUI, UiOptions, parse_document_str};
 
 /// Run the TUI using a prepared UI artifact bundle.
 ///
 /// This example:
 /// - reads a JSON Schema from disk
 /// - uses `build_ui_artifact_bundle_from_file` to build UiAst + FormSchema + LayoutNav
-/// - feeds those prepared artifacts into `SchemaUI` + `TuiFrontend`
+/// - feeds those prepared artifacts into `SchemaUI::run(FrontendOptions::Tui(_))`
 ///
 /// You can run it with:
 ///
@@ -46,23 +46,15 @@ fn main() -> Result<()> {
         .with_confirm_exit(true);
 
     // 5) Build SchemaUI with prepared artifacts.
-    let ui = SchemaUI::from_schema(schema_value)
+    let result = SchemaUI::from_schema(schema_value)
         .with_title(format!(
             "Artifact TUI demo - {:?}",
             schema_path.file_name().unwrap_or_default()
         ))
-        .with_options(options.clone())
-        .with_ui_artifact_bundle(artifact_bundle.clone());
+        .with_ui_artifact_bundle(artifact_bundle)
+        .run(FrontendOptions::Tui(options))?;
 
-    // 6) Run the TUI using the prepared TUI artifacts.
-    let frontend = TuiFrontend {
-        options,
-        tui_artifacts: Some(artifact_bundle.tui.clone()),
-    };
-
-    let result = ui.run_with_frontend(frontend)?;
-
-    // 7) Print the resulting JSON document on exit.
+    // 6) Print the resulting JSON document on exit.
     let json = serde_json::to_string_pretty(&result)?;
     println!("{}", json);
 

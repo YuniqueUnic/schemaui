@@ -3,6 +3,7 @@ use jsonschema::Validator;
 use serde_json::Value;
 
 use crate::core::ui_ast::{UiAst, UiLayout};
+use crate::tui::app::UiOptions;
 #[cfg(feature = "web")]
 use crate::web::session::ServeOptions;
 
@@ -20,9 +21,9 @@ pub struct FrontendContext {
 }
 
 /// Built-in runtime targets exposed by the high-level `SchemaUI` API.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum FrontendOptions {
-    Tui,
+    Tui(UiOptions),
     #[cfg(feature = "web")]
     Web(ServeOptions),
 }

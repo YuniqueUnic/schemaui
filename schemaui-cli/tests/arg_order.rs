@@ -10,6 +10,35 @@ fn defaults_to_tui_when_no_subcommand_is_provided() {
 }
 
 #[test]
+fn default_tui_accepts_description_flag() {
+    let cli = Cli::parse_from([
+        "schemaui",
+        "--schema",
+        "./schema.json",
+        "--description",
+        "Root description",
+    ]);
+
+    assert!(cli.command.is_none(), "expected implicit default TUI mode");
+    assert_eq!(cli.common.description.as_deref(), Some("Root description"));
+}
+
+#[test]
+fn inline_description_assignment_is_normalized_before_parsing() {
+    let cli = Cli::parse_from([
+        "schemaui",
+        "--schema=./schema.json",
+        "--description=Inline description",
+    ]);
+
+    assert!(cli.command.is_none(), "expected implicit default TUI mode");
+    assert_eq!(
+        cli.common.description.as_deref(),
+        Some("Inline description")
+    );
+}
+
+#[test]
 fn explicit_tui_subcommand_accepts_common_args() {
     let cli = Cli::parse_from(["schemaui", "tui", "--schema", "./schema.json", "-f"]);
 
@@ -19,6 +48,27 @@ fn explicit_tui_subcommand_accepts_common_args() {
 
     assert_eq!(cmd.common.schema.as_deref(), Some("./schema.json"));
     assert!(cmd.common.force);
+}
+
+#[test]
+fn subcommand_description_overrides_root_description_during_merge() {
+    let cli = Cli::parse_from([
+        "schemaui",
+        "--description",
+        "root description",
+        "tui",
+        "--description",
+        "local description",
+    ]);
+
+    let Some(Commands::Tui(cmd)) = cli.command else {
+        panic!("expected explicit tui subcommand");
+    };
+
+    let merged = cli.common.merged_with(&cmd.common);
+    assert_eq!(cli.common.description.as_deref(), Some("root description"));
+    assert_eq!(cmd.common.description.as_deref(), Some("local description"));
+    assert_eq!(merged.description.as_deref(), Some("local description"));
 }
 
 #[test]

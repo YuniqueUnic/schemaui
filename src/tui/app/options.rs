@@ -1,5 +1,7 @@
 use std::{borrow::Cow, sync::Arc, time::Duration};
 
+use anyhow::Result;
+
 use super::{
     input::KeyBindingMap,
     keymap::{self, KeymapStore},
@@ -38,6 +40,11 @@ impl UiOptions {
     pub fn with_keymap(mut self, keymap: KeyBindingMap) -> Self {
         self.keymap = keymap;
         self
+    }
+
+    pub fn with_keymap_json(self, raw: &str) -> Result<Self> {
+        let keymap_store = Arc::new(KeymapStore::from_json(raw)?);
+        Ok(self.with_keymap_store(keymap_store))
     }
 
     pub(crate) fn with_keymap_store(mut self, keymap_store: Arc<KeymapStore>) -> Self {

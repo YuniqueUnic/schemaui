@@ -1,19 +1,16 @@
 use anyhow::Result;
 use serde_json::Value;
-use std::{borrow::Cow, sync::Arc, time::Duration};
 
-use crate::core::frontend::FrontendOptions;
+use crate::core::frontend::{Frontend, FrontendOptions};
 use crate::core::pipeline::SchemaPipeline;
 use crate::io::{
     self, DocumentFormat,
     input::{looks_like_json_schema, parse_document_auto},
 };
 
-use super::{input::KeyBindingMap, keymap::KeymapStore, options::UiOptions};
-use crate::core::frontend::Frontend;
+use super::options::UiOptions;
 use crate::precompile::{TuiArtifacts, UiArtifactBundle};
 use crate::tui::session::TuiFrontend;
-use crate::tui::state::field::components::ComponentPalette;
 use crate::ui_ast::{UiAst, UiAstBundle};
 #[cfg(feature = "web")]
 use crate::web::{frontend::WebFrontend, session::ServeOptions as WebServeOptions};
@@ -69,7 +66,6 @@ pub struct SchemaUI {
     validation_schema: Option<DocumentInput>,
     title: Option<String>,
     description: Option<String>,
-    options: UiOptions,
     ui_ast: Option<UiAst>,
     ui_bundle: Option<UiAstBundle>,
     ui_artifact_bundle: Option<UiArtifactBundle>,
@@ -83,7 +79,6 @@ impl SchemaUI {
             validation_schema: None,
             title: None,
             description: None,
-            options: UiOptions::default(),
             ui_ast: None,
             ui_bundle: None,
             ui_artifact_bundle: None,
@@ -164,122 +159,8 @@ impl SchemaUI {
         self
     }
 
-    pub fn with_options(mut self, options: UiOptions) -> Self {
-        self.options = options;
-        self
-    }
-
     pub fn with_default_data(mut self, defaults: &Value) -> Self {
         self.document = Some(DocumentInput::Value(defaults.clone()));
-        self
-    }
-
-    /// Expose the current UI options so callers can build a frontend
-    /// (e.g. TuiFrontend) configured consistently with this builder.
-    pub fn options(&self) -> &UiOptions {
-        &self.options
-    }
-
-    pub fn with_keymap(mut self, keymap: KeyBindingMap) -> Self {
-        self.options = self.options.clone().with_keymap(keymap);
-        self
-    }
-
-    pub fn with_keymap_json(mut self, json: &str) -> Result<Self> {
-        let store = KeymapStore::from_json(json)?;
-        self.options = self.options.clone().with_keymap_store(Arc::new(store));
-        Ok(self)
-    }
-
-    pub fn with_auto_validate(mut self, enabled: bool) -> Self {
-        self.options = self.options.clone().with_auto_validate(enabled);
-        self
-    }
-
-    pub fn with_help(mut self, show: bool) -> Self {
-        self.options = self.options.clone().with_help(show);
-        self
-    }
-
-    pub fn with_confirm_exit(mut self, confirm: bool) -> Self {
-        self.options = self.options.clone().with_confirm_exit(confirm);
-        self
-    }
-
-    pub fn with_tick_rate(mut self, tick_rate: Duration) -> Self {
-        self.options = self.options.clone().with_tick_rate(tick_rate);
-        self
-    }
-
-    pub fn with_component_palette(mut self, palette: ComponentPalette) -> Self {
-        self.options = self.options.clone().with_component_palette(palette);
-        self
-    }
-
-    pub fn with_integer_step(mut self, step: i64) -> Self {
-        self.options = self.options.clone().with_integer_step(step);
-        self
-    }
-
-    pub fn with_integer_fast_step(mut self, step: i64) -> Self {
-        self.options = self.options.clone().with_integer_fast_step(step);
-        self
-    }
-
-    pub fn with_float_step(mut self, step: f64) -> Self {
-        self.options = self.options.clone().with_float_step(step);
-        self
-    }
-
-    pub fn with_float_fast_step(mut self, step: f64) -> Self {
-        self.options = self.options.clone().with_float_fast_step(step);
-        self
-    }
-
-    pub fn with_bool_labels(
-        mut self,
-        true_label: impl Into<Cow<'static, str>>,
-        false_label: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        self.options = self
-            .options
-            .clone()
-            .with_bool_labels(true_label, false_label);
-        self
-    }
-
-    pub fn with_bool_toggle_arrows(mut self, enabled: bool) -> Self {
-        self.options = self.options.clone().with_bool_toggle_arrows(enabled);
-        self
-    }
-
-    pub fn with_bool_toggle_space(mut self, enabled: bool) -> Self {
-        self.options = self.options.clone().with_bool_toggle_space(enabled);
-        self
-    }
-
-    pub fn with_enum_wrap(mut self, wrap: bool) -> Self {
-        self.options = self.options.clone().with_enum_wrap(wrap);
-        self
-    }
-
-    pub fn with_overlay_instructions(mut self, instructions: impl Into<Cow<'static, str>>) -> Self {
-        self.options = self.options.clone().with_overlay_instructions(instructions);
-        self
-    }
-
-    pub fn with_list_hint(mut self, hint: impl Into<Cow<'static, str>>) -> Self {
-        self.options = self.options.clone().with_list_hint(hint);
-        self
-    }
-
-    pub fn with_composite_single_hint(mut self, hint: impl Into<Cow<'static, str>>) -> Self {
-        self.options = self.options.clone().with_composite_single_hint(hint);
-        self
-    }
-
-    pub fn with_composite_multi_hint(mut self, hint: impl Into<Cow<'static, str>>) -> Self {
-        self.options = self.options.clone().with_composite_multi_hint(hint);
         self
     }
 
@@ -322,27 +203,32 @@ impl SchemaUI {
         }
     }
 
-    pub fn run(self, frontend: FrontendOptions) -> Result<Value> {
-        match frontend {
-            FrontendOptions::Tui => self.run_tui(),
-            #[cfg(feature = "web")]
-            FrontendOptions::Web(serve) => self.run_web(serve),
-        }
-    }
-
-    /// Run explicitly in TUI mode, using the options configured on this
-    /// `SchemaUI` builder.
-    pub fn run_tui(self) -> Result<Value> {
-        let options = self.options.clone();
+    pub(crate) fn build_tui_frontend(&self, options: UiOptions) -> TuiFrontend {
         let tui_artifacts = self.tui_artifacts.clone().or_else(|| {
             self.ui_artifact_bundle
                 .as_ref()
                 .map(|bundle| bundle.tui.clone())
         });
-        self.run_with_frontend(TuiFrontend {
+        TuiFrontend {
             options,
             tui_artifacts,
-        })
+        }
+    }
+
+    pub fn run(self, frontend: FrontendOptions) -> Result<Value> {
+        match frontend {
+            FrontendOptions::Tui(options) => {
+                let frontend = self.build_tui_frontend(options);
+                self.run_with_frontend(frontend)
+            }
+            #[cfg(feature = "web")]
+            FrontendOptions::Web(serve) => self.run_web(serve),
+        }
+    }
+
+    /// Run explicitly in TUI mode using default `UiOptions`.
+    pub fn run_tui(self) -> Result<Value> {
+        self.run(FrontendOptions::Tui(UiOptions::default()))
     }
 
     /// Run in Web mode, using the given serve options to configure the
@@ -362,7 +248,6 @@ impl SchemaUI {
             validation_schema: _,
             title,
             description,
-            options: _,
             ui_ast,
             ui_bundle,
             ui_artifact_bundle,

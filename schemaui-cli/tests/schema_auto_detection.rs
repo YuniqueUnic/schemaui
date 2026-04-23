@@ -39,6 +39,7 @@ fn base_args(schema: Option<String>, config: Option<String>) -> CommonArgs {
         schema,
         config,
         title: None,
+        description: None,
         outputs: vec![],
         temp_file: None,
         no_temp_file: true,
@@ -129,6 +130,38 @@ fn prepare_session_uses_json_root_schema_and_strips_metadata_from_defaults() {
 
     assert_eq!(session.schema, schema);
     assert_eq!(session.defaults, Some(json!({ "name": "alice" })));
+
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[test]
+fn prepare_session_preserves_cli_description_override() {
+    let temp = unique_temp_dir("description_override");
+    let schema_path = temp.join("schema.json");
+    let config_path = temp.join("config.json");
+    write_json(
+        &schema_path,
+        &json!({
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Local Schema",
+            "description": "Schema description",
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" }
+            }
+        }),
+    );
+    write_json(&config_path, &json!({ "name": "alice" }));
+
+    let mut args = base_args(
+        Some(schema_path.to_string_lossy().into_owned()),
+        Some(config_path.to_string_lossy().into_owned()),
+    );
+    args.description = Some("CLI description".to_string());
+
+    let session = prepare_session(&args).expect("prepare session");
+
+    assert_eq!(session.description.as_deref(), Some("CLI description"));
 
     let _ = fs::remove_dir_all(temp);
 }
@@ -272,6 +305,52 @@ fn web_snapshot_accepts_yaml_fallback_local_schema_declaration() {
     assert_eq!(snapshot["title"], "Web Snapshot Local Schema");
     assert_eq!(snapshot["data"], json!({ "name": "bob" }));
     assert!(out_dir.join("session_snapshot.ts").exists());
+
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[cfg(feature = "web")]
+#[test]
+fn web_snapshot_applies_cli_header_overrides() {
+    let temp = unique_temp_dir("web_snapshot_override");
+    let schema_path = temp.join("schema.json");
+    let config_path = temp.join("config.json");
+    let out_dir = temp.join("snapshots");
+    write_json(
+        &schema_path,
+        &json!({
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "Schema title",
+            "description": "Schema description",
+            "type": "object",
+            "properties": {
+                "enabled": { "type": "boolean" }
+            }
+        }),
+    );
+    write_json(&config_path, &json!({ "enabled": true }));
+
+    let mut common = base_args(
+        Some(schema_path.to_string_lossy().into_owned()),
+        Some(config_path.to_string_lossy().into_owned()),
+    );
+    common.title = Some("CLI title".to_string());
+    common.description = Some("CLI description".to_string());
+
+    schemaui_cli::web::run_snapshot_cli(WebSnapshotCommand {
+        common,
+        out_dir: out_dir.clone(),
+        ts_export: "SessionSnapshot".to_string(),
+    })
+    .expect("run web snapshot");
+
+    let snapshot_path = out_dir.join("session_snapshot.json");
+    let snapshot: Value =
+        serde_json::from_str(&fs::read_to_string(&snapshot_path).expect("read web snapshot json"))
+            .expect("parse web snapshot json");
+
+    assert_eq!(snapshot["title"], "CLI title");
+    assert_eq!(snapshot["description"], "CLI description");
 
     let _ = fs::remove_dir_all(temp);
 }
