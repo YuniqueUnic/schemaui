@@ -328,6 +328,7 @@ function EditorBody({
   if (node.kind.type === "object") {
     return (
       <div className="space-y-3">
+        <EditorSectionIntro node={node} />
         {(node.kind.children ?? []).map((child) => (
           <div
             key={child.pointer}
@@ -353,6 +354,36 @@ function EditorBody({
         onChange={onChange}
       />
     </div>
+  );
+}
+
+function EditorSectionIntro({ node }: { node: UiNode }) {
+  const title = node.title?.trim();
+  const description = node.description?.trim();
+  const showHeader = node.pointer.length > 0 || !!description || node.required;
+
+  if (!showHeader || (!title && !description && !node.required)) {
+    return null;
+  }
+
+  return (
+    <header className="space-y-1 px-1">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-foreground">
+          {title || node.pointer}
+        </h2>
+        {node.required && (
+          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-destructive">
+            Required
+          </span>
+        )}
+      </div>
+      {description && (
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      )}
+    </header>
   );
 }
 

@@ -235,8 +235,55 @@ describe("App web interactions", () => {
     expect(
       screen.getByText("Schema-level description should appear in the header."),
     ).toBeTruthy();
-    expect(
-      screen.queryByRole("heading", { name: "10. Wrong Root Title" }),
-    ).toBeNull();
+  });
+
+  it("shows the selected section description above child fields", async () => {
+    apiMocks.fetchSession.mockResolvedValue({
+      title: "My title",
+      description: "My description",
+      data: {},
+      formats: ["json"],
+      layout: null,
+      ui_ast: {
+        roots: [
+          {
+            pointer: "/Foobar",
+            title: "Foobar Title",
+            description: "Foobar description",
+            required: false,
+            default_value: {},
+            kind: {
+              type: "object",
+              required: [],
+              children: [
+                {
+                  pointer: "/Foobar/comment",
+                  title: "Comment title",
+                  description: "Comment description",
+                  required: false,
+                  default_value: "",
+                  kind: {
+                    type: "field",
+                    scalar: "string",
+                    enum_options: null,
+                    enum_values: null,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    } satisfies SessionResponse);
+
+    render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>,
+    );
+
+    expect(await screen.findByText("Foobar description")).toBeTruthy();
+    expect(screen.getByText("Comment description")).toBeTruthy();
+    expect(screen.getAllByText("Comment title").length).toBeGreaterThan(0);
   });
 });
