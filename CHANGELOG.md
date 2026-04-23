@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.9.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.8.0...schemaui-v0.9.0) - 2026-04-23
+
+### Fixed
+
+- add section description header in EditorBody component
+
+### Other
+
+- [**breaking**] add description option to CLI and update SchemaUI API
+- [**breaking**] enhance SchemaUI with flexible input handling and improved API
+
 ## [0.8.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.7.2...schemaui-v0.8.0) - 2026-04-18
 
 ### Fixed
