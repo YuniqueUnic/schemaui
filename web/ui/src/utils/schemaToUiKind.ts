@@ -36,16 +36,34 @@ export function materializeCompositeKind(kind: UiNodeKind): UiNodeKind {
 }
 
 export function materializeVariantNode(variant: UiVariant): UiNodeKind {
-  if (!needsMaterializedNode(variant)) {
+  const resolvedSchema = resolveStandaloneSchema(ensureObject(variant.schema));
+  if (!needsMaterializedNode(variant, resolvedSchema)) {
     return variant.node;
   }
-  return buildKindFromSchema(variant.schema);
+  return buildKindFromSchema({
+    ...resolvedSchema,
+    definitions: ensureObject(variant.schema).definitions,
+    $defs: ensureObject(variant.schema).$defs,
+  });
 }
 
-function needsMaterializedNode(variant: UiVariant): boolean {
+function needsMaterializedNode(variant: UiVariant, schema: JsonSchema): boolean {
   return variant.node.type === "object" &&
     variant.node.children.length === 0 &&
-    isObjectSchema(ensureObject(variant.schema));
+    isObjectSchema(schema);
+}
+
+function resolveStandaloneSchema(schema: JsonSchema): JsonSchema {
+  const ref = readString(schema.$ref);
+  if (!ref || !ref.startsWith("#/")) {
+    return schema;
+  }
+  const definitions = {
+    ...ensureObjectMap(schema.$defs),
+    ...ensureObjectMap(schema.definitions),
+  };
+  const resolved = resolveLocalRef(ref, definitions);
+  return Object.keys(resolved).length === 0 ? schema : resolved;
 }
 
 function visitNode(
@@ -463,7 +481,7 @@ function resolveLocalRef(
   definitions: Record<string, JsonValue>,
 ): JsonSchema {
   const segments = ref.slice(2).split("/");
-  let current: JsonValue = { definitions };
+  let current: JsonValue = { definitions, $defs: definitions };
   for (const raw of segments) {
     const key = raw.replace(/~1/g, "/").replace(/~0/g, "~");
     const next: JsonValue | undefined = ensureObject(current)[key];
@@ -480,8 +498,13 @@ function schemaWithDefinitions(
   definitions: Record<string, JsonValue>,
 ): JsonValue {
   const next = clone(schema) as JsonSchema;
-  if (!next.definitions && Object.keys(definitions).length > 0) {
-    next.definitions = clone(definitions);
+  if (Object.keys(definitions).length > 0) {
+    if (!next.definitions) {
+      next.definitions = clone(definitions);
+    }
+    if (!next.$defs) {
+      next.$defs = clone(definitions);
+    }
   }
   return next;
 }

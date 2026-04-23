@@ -575,6 +575,65 @@ const complexCompositeConfigNode: UiNode = {
   },
 };
 
+const speedtestCompositeNode: UiNode = {
+  pointer: "/multipath/speedtest",
+  title: "Speedtest configuration",
+  description: null,
+  required: false,
+  default_value: {},
+  kind: {
+    type: "composite",
+    mode: "any_of",
+    allow_multiple: false,
+    variants: [
+      {
+        id: "variant_0",
+        title: "Object",
+        description: null,
+        is_object: true,
+        node: {
+          type: "object",
+          children: [],
+          required: [],
+        },
+        schema: {
+          $ref: "#/$defs/SpeedtestConfig",
+          $defs: {
+            SpeedtestConfig: {
+              type: "object",
+              title: "Speedtest configuration",
+              properties: {
+                "speedtest-target": {
+                  type: "string",
+                  default: "127.0.0.1:8080",
+                },
+                "expected-rate-mbps": {
+                  type: "integer",
+                  default: 5,
+                },
+              },
+            },
+          },
+        },
+      },
+      {
+        id: "variant_1",
+        title: "Null",
+        description: null,
+        is_object: false,
+        node: {
+          type: "field",
+          scalar: "string",
+          enum_options: ["null"],
+          enum_values: [null],
+          nullable: true,
+        },
+        schema: { type: "null" },
+      },
+    ],
+  },
+};
+
 function EditorHarness(
   { node, initialValue }: { node: UiNode; initialValue: JsonValue },
 ) {
@@ -735,5 +794,43 @@ describe("NodeRenderer web overlay flows", () => {
         settings: {},
       },
     );
+  });
+
+  it("materializes object defaults for $defs-backed object-or-null variants", async () => {
+    const user = userEvent.setup();
+    render(<EditorHarness node={speedtestCompositeNode} initialValue={null} />);
+
+    const objectRadio = screen.getByRole("radio", { name: /objectObject/i });
+    const nullRadio = screen.getByRole("radio", { name: /enum\(1\)Null/i });
+
+    expect(nullRadio).toHaveAttribute("aria-checked", "true");
+    expect(objectRadio).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Null content:")).toBeTruthy();
+    expect(screen.getByRole("combobox")).toHaveTextContent("null");
+    expect(screen.queryByText("Select an option")).toBeNull();
+
+    await user.click(objectRadio);
+
+    expect(objectRadio).toHaveAttribute("aria-checked", "true");
+    expect(nullRadio).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Object content:")).toBeTruthy();
+    expect(screen.getByDisplayValue("127.0.0.1:8080")).toBeTruthy();
+    expect(screen.getByDisplayValue("5")).toBeTruthy();
+    expect(screen.queryByText("Select an option")).toBeNull();
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
+      {
+        "speedtest-target": "127.0.0.1:8080",
+        "expected-rate-mbps": 5,
+      },
+    );
+
+    await user.click(nullRadio);
+
+    expect(nullRadio).toHaveAttribute("aria-checked", "true");
+    expect(objectRadio).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Null content:")).toBeTruthy();
+    expect(screen.getByRole("combobox")).toHaveTextContent("null");
+    expect(screen.queryByText("Select an option")).toBeNull();
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toBeNull();
   });
 });

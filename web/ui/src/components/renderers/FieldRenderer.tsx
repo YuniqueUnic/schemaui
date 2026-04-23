@@ -35,7 +35,9 @@ function cloneJsonValue<T extends JsonValue>(value: T): T {
  * Renders field controls (string, number, boolean, enum)
  */
 export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
-  const resolved = value ?? node.default_value ?? defaultForKind(node.kind);
+  const resolved = value === undefined
+    ? (node.default_value ?? defaultForKind(node.kind))
+    : value;
   const nullable = node.kind.nullable === true;
 
   if (node.kind.enum_options?.length) {
@@ -135,7 +137,7 @@ export function renderSimpleFieldInline(
   value: JsonValue | undefined,
   onChange: (value: JsonValue) => void,
 ): React.ReactNode {
-  const resolved = value ?? defaultForKind(fieldKind);
+  const resolved = value === undefined ? defaultForKind(fieldKind) : value;
   const nullable = fieldKind.nullable === true;
 
   if (fieldKind.enum_options?.length) {

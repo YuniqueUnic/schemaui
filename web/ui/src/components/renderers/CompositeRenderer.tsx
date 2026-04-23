@@ -155,7 +155,7 @@ function SingleVariantRenderer({
             title: undefined,
             description: activeVariant.description,
             required: false,
-            default_value: node.default_value,
+            default_value: variantDefault(activeVariant),
             kind: activeVariantNode,
           },
           value,

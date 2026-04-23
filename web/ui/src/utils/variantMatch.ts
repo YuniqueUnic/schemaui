@@ -232,6 +232,8 @@ function normalizeType(typeValue: JsonValue | undefined): string | undefined {
 
 function typeMatches(value: JsonValue | undefined, expected: string): boolean {
   switch (expected) {
+    case "null":
+      return value === null;
     case "string":
       return typeof value === "string";
     case "integer":
