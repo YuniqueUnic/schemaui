@@ -414,6 +414,8 @@ function defaultForKind(kind: UiNodeKind): JsonValue {
         return [];
       }
       return kind.variants[0] ? generateVariantDefault(kind.variants[0]) : {};
+    case "key_value":
+      return {};
   }
 }
 

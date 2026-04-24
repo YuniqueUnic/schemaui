@@ -12,11 +12,15 @@ import type { JsonValue, UiNode, UiNodeKind } from "../types";
 import { ArrayRenderer } from "./renderers/ArrayRenderer";
 import { CompositeRenderer } from "./renderers/CompositeRenderer";
 import { FieldRenderer } from "./renderers/FieldRenderer";
+import { KeyValueRenderer } from "./renderers/KeyValueRenderer";
 import { ObjectRenderer } from "./renderers/ObjectRenderer";
 
 // Type narrowing helpers
 type FieldNode = UiNode & { kind: Extract<UiNodeKind, { type: "field" }> };
 type ArrayNode = UiNode & { kind: Extract<UiNodeKind, { type: "array" }> };
+type KeyValueNode = UiNode & {
+  kind: Extract<UiNodeKind, { type: "key_value" }>;
+};
 type CompositeNode = UiNode & {
   kind: Extract<UiNodeKind, { type: "composite" }>;
 };
@@ -131,6 +135,17 @@ function NodeBody({
       return (
         <ArrayRenderer
           node={node as ArrayNode}
+          value={value}
+          errors={errors}
+          onChange={onChange}
+          renderNode={renderNode}
+        />
+      );
+
+    case "key_value":
+      return (
+        <KeyValueRenderer
+          node={node as KeyValueNode}
           value={value}
           errors={errors}
           onChange={onChange}

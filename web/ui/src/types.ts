@@ -68,6 +68,10 @@ export type UiNodeKind =
     max_items?: number | null;
   }
   | {
+    type: "key_value";
+    template: UiKeyValueNode;
+  }
+  | {
     type: "composite";
     mode: CompositeMode;
     allow_multiple: boolean;
@@ -91,6 +95,19 @@ export interface UiVariant {
   is_object: boolean;
   node: UiNodeKind;
   schema: JsonValue;
+}
+
+export interface UiKeyValueNode {
+  key_title: string;
+  key_description?: string | null;
+  key_default?: JsonValue | null;
+  key_schema: JsonValue;
+  value_title: string;
+  value_description?: string | null;
+  value_default?: JsonValue | null;
+  value_schema: JsonValue;
+  value_kind: UiNodeKind;
+  entry_schema: JsonValue;
 }
 
 export interface UiAst {

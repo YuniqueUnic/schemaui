@@ -634,6 +634,47 @@ const speedtestCompositeNode: UiNode = {
   },
 };
 
+const dnsHostsNode: UiNode = {
+  pointer: "/dns/hosts",
+  title: "hosts",
+  description: "www.google.com: 8.8.8.8",
+  required: false,
+  default_value: {},
+  kind: {
+    type: "key_value",
+    template: {
+      key_title: "Key",
+      key_description: null,
+      key_default: null,
+      key_schema: {
+        type: "string",
+        title: "Key",
+      },
+      value_title: "Value",
+      value_description: null,
+      value_default: null,
+      value_schema: {
+        type: "string",
+        format: "ip",
+      },
+      value_kind: {
+        type: "field",
+        scalar: "string",
+        enum_options: null,
+        enum_values: null,
+      },
+      entry_schema: {
+        type: "object",
+        properties: {
+          key: { type: "string", title: "Key" },
+          value: { type: "string", format: "ip", title: "Value" },
+        },
+        required: ["key"],
+      },
+    },
+  },
+};
+
 function EditorHarness(
   { node, initialValue }: { node: UiNode; initialValue: JsonValue },
 ) {
@@ -832,5 +873,44 @@ describe("NodeRenderer web overlay flows", () => {
     expect(screen.getByRole("combobox")).toHaveTextContent("null");
     expect(screen.queryByText("Select an option")).toBeNull();
     expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toBeNull();
+  });
+
+  it("renders key-value nodes with add-entry controls and saves dns hosts entries", async () => {
+    const user = userEvent.setup();
+    render(<EditorHarness node={dnsHostsNode} initialValue={{}} />);
+
+    expect(screen.getByText("www.google.com: 8.8.8.8")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /\+ add entry/i })).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: /\+ add entry/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    const textboxes = within(dialog).getAllByRole("textbox");
+    await user.type(textboxes[0], "www.google.com");
+    await user.type(textboxes[1], "8.8.8.8");
+    await user.click(within(dialog).getByRole("button", { name: /^done$/i }));
+
+    expect(screen.getByText("www.google.com")).toBeTruthy();
+    expect(screen.getByText("8.8.8.8")).toBeTruthy();
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
+      { "www.google.com": "8.8.8.8" },
+    );
+  });
+
+  it("adds inner padding to overlay scroll region so focused inputs are not clipped", async () => {
+    const user = userEvent.setup();
+    render(<EditorHarness node={dnsHostsNode} initialValue={{}} />);
+
+    await user.click(screen.getByRole("button", { name: /\+ add entry/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    const scrollRegion = within(dialog)
+      .getByText("Key")
+      .closest("div.max-h-\\[60vh\\]");
+
+    expect(scrollRegion).toBeTruthy();
+    expect(scrollRegion?.className).toContain("px-1");
+    expect(scrollRegion?.className).toContain("py-1");
+    expect(scrollRegion?.className).toContain("sm:px-2");
   });
 });

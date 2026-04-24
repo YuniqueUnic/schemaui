@@ -126,6 +126,8 @@ export function defaultForKind(kind: UiNodeKind): JsonValue {
     }
     case "array":
       return [];
+    case "key_value":
+      return {};
     case "object":
       return {};
     case "composite":

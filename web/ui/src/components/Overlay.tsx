@@ -72,7 +72,7 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
               </DialogDescription>
             )}
           </DialogHeader>
-          <div className="max-h-[60vh] min-h-[16rem] overflow-y-auto pr-4">
+          <div className="max-h-[60vh] min-h-[16rem] overflow-y-auto px-1 py-1 sm:px-2">
             {stack.map((frame, index) => (
               <div
                 key={frame.id}
