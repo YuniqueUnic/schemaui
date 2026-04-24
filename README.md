@@ -231,26 +231,26 @@ use schemaui::web::session::{
     bind_session,
 };
 
-# async fn run() -> anyhow::Result<()> {
-let schema = serde_json::json!({
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "properties": {
-        "host": {"type": "string", "default": "127.0.0.1"},
-        "port": {"type": "integer", "default": 8080}
-    },
-    "required": ["host", "port"]
-});
+async fn run() -> anyhow::Result<()> {
+  let schema = serde_json::json!({
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+          "host": {"type": "string", "default": "127.0.0.1"},
+          "port": {"type": "integer", "default": 8080}
+      },
+      "required": ["host", "port"]
+  });
 
-let config = WebSessionBuilder::new(schema)
-    .with_title("Service Config")
-    .build()?;
-let session = bind_session(config, ServeOptions::default()).await?;
-println!("visit http://{}/", session.local_addr());
-let value = session.run().await?;
-println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
-# Ok(())
-# }
+  let config = WebSessionBuilder::new(schema)
+      .with_title("Service Config")
+      .build()?;
+  let session = bind_session(config, ServeOptions::default()).await?;
+  println!("visit http://{}/", session.local_addr());
+  let value = session.run().await?;
+  println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
+  Ok(())
+}
 ```
 
 The helper spawns an Axum router that exposes `/api/session`, `/api/save`, and
