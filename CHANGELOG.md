@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.10.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.9.0...schemaui-v0.10.0) - 2026-04-24
+
+### Fixed
+
+- *(ui)* add key-value renderer component for DNS hosts configuration
+- *(ui)* add support for $defs-backed schema resolution in composite variants
+- add nullable field support and async web frontend
+
 ## [0.9.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.8.0...schemaui-v0.9.0) - 2026-04-23
 
 ### Fixed
