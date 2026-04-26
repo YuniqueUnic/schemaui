@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+## [0.10.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.10.0...schemaui-v0.10.1) - 2026-04-26
+
+### Fixed
+
+- overlay input truncation fix
+
+### Other
+
+- Adjust content width calculation in fields.rs
+
 ## [0.10.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.9.0...schemaui-v0.10.0) - 2026-04-24
 
 ### Fixed

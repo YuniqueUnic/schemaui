@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.5.2...schemaui-cli-v0.5.3) - 2026-04-26
+
+### Other
+
+- updated the following local packages: schemaui
+
 ## [0.5.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.5.1...schemaui-cli-v0.5.2) - 2026-04-24
 
 ### Other
