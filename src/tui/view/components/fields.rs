@@ -55,7 +55,7 @@ pub fn render_fields(
 
     let content_width = field_area
         .width
-        .saturating_sub(4 + highlight_symbol_width());
+        .saturating_sub(8 + highlight_symbol_width());
     let mut items = Vec::with_capacity(section.fields.len());
     let mut cursor_hint: Option<CursorHint> = None;
     let mut field_heights = Vec::with_capacity(section.fields.len());
