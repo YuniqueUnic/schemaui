@@ -16,6 +16,65 @@ release_commits = "^(release|feat|fix)[(:]"
 pr_branch_prefix = "release-plz-"
 pr_labels = ["release"]
 
+[changelog]
+body = """
+{% macro commit_meta(commit) -%}
+    {%- if commit.remote.pr_number or commit.remote.username -%}
+        (
+        {%- if commit.remote.pr_number -%}
+            [#{{ commit.remote.pr_number }}]({{ remote.link }}/pull/{{ commit.remote.pr_number }})
+            {%- if commit.remote.username %}, {% endif -%}
+        {%- endif -%}
+        {%- if commit.remote.username -%}
+            @{{ commit.remote.username }}
+        {%- endif -%}
+        )
+    {%- endif -%}
+{%- endmacro %}
+{% macro render_group(title, commits) -%}
+{% if commits | length > 0 %}
+### {{ title }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{% if commit.breaking %}**BREAKING** {% endif %}{{ commit.message | trim }}{{ self::commit_meta(commit=commit) }}
+{% endfor %}
+{% endif %}
+{%- endmacro %}
+
+## [{{ version }}]
+{%- if release_link -%}
+    ({{ release_link }})
+{%- endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
+{% set grouped = commits | group_by(attribute="group") %}
+{{ self::render_group(title="Breaking Changes", commits=commits | filter(attribute="breaking", value=true)) }}
+{{ self::render_group(title="Features", commits=(grouped["<!-- 1 -->Features"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
+{{ self::render_group(title="Bug Fixes", commits=(grouped["<!-- 2 -->Bug Fixes"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
+{{ self::render_group(title="Documentation", commits=(grouped["<!-- 3 -->Documentation"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
+{{ self::render_group(title="Refactors", commits=(grouped["<!-- 4 -->Refactors"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
+{{ self::render_group(title="Tests", commits=(grouped["<!-- 5 -->Tests"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
+{{ self::render_group(title="Build and CI", commits=(grouped["<!-- 6 -->Build and CI"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
+{{ self::render_group(title="Other", commits=(grouped["<!-- 7 -->Other"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
+{%- if remote.contributors %}
+### Contributors
+{% for contributor in remote.contributors %}
+- @{{ contributor.username }}
+{% endfor %}
+{% endif -%}
+"""
+trim = true
+sort_commits = "oldest"
+protect_breaking_commits = true
+commit_parsers = [
+  { message = "^feat", group = "<!-- 1 -->Features" },
+  { message = "^fix", group = "<!-- 2 -->Bug Fixes" },
+  { message = "^docs?", group = "<!-- 3 -->Documentation" },
+  { message = "^refactor", group = "<!-- 4 -->Refactors" },
+  { message = "^test", group = "<!-- 5 -->Tests" },
+  { message = "^(build|ci)", group = "<!-- 6 -->Build and CI" },
+  { message = "^chore\\(release\\):", skip = true },
+  { message = "^release:", skip = true },
+  { message = "^.*", group = "<!-- 7 -->Other" },
+]
+
 [[package]]
 name = "schemaui"
 changelog_path = "CHANGELOG.md"
