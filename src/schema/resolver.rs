@@ -3,6 +3,8 @@ use percent_encoding::percent_decode_str;
 use schemars::schema::{Metadata, RootSchema, Schema, SchemaObject};
 use serde_json::Value;
 
+use super::dialect::RootDialectContext;
+
 #[derive(Debug)]
 pub struct SchemaResolver<'a> {
     raw: &'a Value,
@@ -32,9 +34,8 @@ impl<'a> SchemaResolver<'a> {
         }
     }
 
-    pub fn definitions_snapshot(&self) -> Option<Value> {
-        let obj = self.raw.as_object()?;
-        obj.get("$defs").or_else(|| obj.get("definitions")).cloned()
+    pub fn root_dialect_context(&self) -> RootDialectContext {
+        RootDialectContext::from_root(self.raw)
     }
 
     fn follow_reference(&self, reference: &str) -> Result<SchemaObject> {

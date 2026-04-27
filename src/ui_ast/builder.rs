@@ -806,10 +806,8 @@ fn schema_to_value_with_defs(
     schema: &SchemaObject,
 ) -> Result<Value> {
     let mut value = schema_to_value(schema)?;
-    if let Some(defs) = resolver.definitions_snapshot()
-        && let Value::Object(ref mut map) = value
-    {
-        map.entry("definitions".to_string()).or_insert(defs);
+    if let Value::Object(ref mut map) = value {
+        resolver.root_dialect_context().apply_to_overlay(map);
     }
     Ok(value)
 }

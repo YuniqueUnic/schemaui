@@ -1,0 +1,45 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "My title",
+    "description": "My description",
+    "$defs": {
+        "bar": {
+            "type": "string"
+        },
+        "baz": {
+            "type": "integer"
+        }
+    },
+    "type": "object",
+    "properties": {
+        "blah": {
+            "oneOf": [
+                {
+                    "title": "Option 1",
+                    "properties": {
+                        "Bar": {
+                            "$ref": "#/$defs/bar"
+                        },
+                        "Id": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                {
+                    "title": "Option 2",
+                    "properties": {
+                        "Baz": {
+                            "$ref": "#/$defs/baz"
+                        },
+                        "Id": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "propertyNames": true,
+    "required": [],
+    "additionalProperties": false
+}
