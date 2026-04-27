@@ -31,14 +31,17 @@ pub fn render_popup(frame: &mut Frame<'_>, popup: PopupRender<'_>) {
         })
         .collect();
 
-    let max_width = rendered_labels
+    let max_label_width = rendered_labels
         .iter()
         .map(|label| UnicodeWidthStr::width(label.as_str()))
         .max()
         .unwrap_or(10) as u16;
+    let title_width = u16::try_from(UnicodeWidthStr::width(popup.title)).unwrap_or(10);
     let width_limit = frame.area().width.saturating_sub(2).max(1);
     // Extra padding for borders and highlight symbol
-    let width = (max_width.saturating_add(8)).min(width_limit);
+    let width = (max_label_width.saturating_add(8))
+        .max(title_width.saturating_add(2))
+        .min(width_limit);
     let height = popup
         .options
         .len()
