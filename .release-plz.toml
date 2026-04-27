@@ -46,13 +46,34 @@ body = """
 {%- endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
 {% set grouped = commits | group_by(attribute="group") %}
 {{ self::render_group(title="Breaking Changes", commits=commits | filter(attribute="breaking", value=true)) }}
-{{ self::render_group(title="Features", commits=(grouped["<!-- 1 -->Features"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
-{{ self::render_group(title="Bug Fixes", commits=(grouped["<!-- 2 -->Bug Fixes"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
-{{ self::render_group(title="Documentation", commits=(grouped["<!-- 3 -->Documentation"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
-{{ self::render_group(title="Refactors", commits=(grouped["<!-- 4 -->Refactors"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
-{{ self::render_group(title="Tests", commits=(grouped["<!-- 5 -->Tests"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
-{{ self::render_group(title="Build and CI", commits=(grouped["<!-- 6 -->Build and CI"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
-{{ self::render_group(title="Other", commits=(grouped["<!-- 7 -->Other"] | default(value=[])) | filter(attribute="breaking", value=false)) }}
+{% if "<!-- 1 -->Features" in grouped %}
+{% set feature_commits = grouped["<!-- 1 -->Features"] | filter(attribute="breaking", value=false) %}
+{{ self::render_group(title="Features", commits=feature_commits) }}
+{% endif %}
+{% if "<!-- 2 -->Bug Fixes" in grouped %}
+{% set bug_fix_commits = grouped["<!-- 2 -->Bug Fixes"] | filter(attribute="breaking", value=false) %}
+{{ self::render_group(title="Bug Fixes", commits=bug_fix_commits) }}
+{% endif %}
+{% if "<!-- 3 -->Documentation" in grouped %}
+{% set documentation_commits = grouped["<!-- 3 -->Documentation"] | filter(attribute="breaking", value=false) %}
+{{ self::render_group(title="Documentation", commits=documentation_commits) }}
+{% endif %}
+{% if "<!-- 4 -->Refactors" in grouped %}
+{% set refactor_commits = grouped["<!-- 4 -->Refactors"] | filter(attribute="breaking", value=false) %}
+{{ self::render_group(title="Refactors", commits=refactor_commits) }}
+{% endif %}
+{% if "<!-- 5 -->Tests" in grouped %}
+{% set test_commits = grouped["<!-- 5 -->Tests"] | filter(attribute="breaking", value=false) %}
+{{ self::render_group(title="Tests", commits=test_commits) }}
+{% endif %}
+{% if "<!-- 6 -->Build and CI" in grouped %}
+{% set build_ci_commits = grouped["<!-- 6 -->Build and CI"] | filter(attribute="breaking", value=false) %}
+{{ self::render_group(title="Build and CI", commits=build_ci_commits) }}
+{% endif %}
+{% if "<!-- 7 -->Other" in grouped %}
+{% set other_commits = grouped["<!-- 7 -->Other"] | filter(attribute="breaking", value=false) %}
+{{ self::render_group(title="Other", commits=other_commits) }}
+{% endif %}
 {%- if remote.contributors %}
 ### Contributors
 {% for contributor in remote.contributors %}
