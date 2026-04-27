@@ -24,7 +24,7 @@ fn default_tui_accepts_description_flag() {
 }
 
 #[test]
-fn inline_description_assignment_is_normalized_before_parsing() {
+fn inline_description_assignment_is_parsed_by_clap() {
     let cli = Cli::parse_from([
         "schemaui",
         "--schema=./schema.json",
@@ -72,7 +72,7 @@ fn subcommand_description_overrides_root_description_during_merge() {
 }
 
 #[test]
-fn explicit_completion_subcommand_is_not_rewritten_to_default_tui() {
+fn explicit_completion_subcommand_remains_completion() {
     let cli = Cli::parse_from(["schemaui", "completion", "bash"]);
 
     let Some(Commands::Completion(cmd)) = cli.command else {
@@ -102,7 +102,7 @@ fn explicit_tui_snapshot_subcommand_accepts_common_args() {
 }
 
 #[test]
-fn alias_flags_are_normalized_before_parsing() {
+fn alias_flags_are_parsed_by_clap() {
     let cli = Cli::parse_from([
         "schemaui",
         "--data",
@@ -190,8 +190,8 @@ fn explicit_web_snapshot_subcommand_accepts_common_args() {
 }
 
 #[test]
-fn version_flags_are_normalized_before_parsing() {
-    for flag in ["--version", "-V", "-v"] {
+fn version_flags_short_circuit_parsing() {
+    for flag in ["--version", "-V"] {
         let exit = Cli::try_parse_from(["schemaui", flag])
             .expect_err("version should short-circuit parsing");
         assert!(exit.status.is_ok(), "{flag} should exit successfully");
@@ -204,7 +204,22 @@ fn version_flags_are_normalized_before_parsing() {
 }
 
 #[test]
-fn version_like_option_values_do_not_trigger_version_exit() {
+fn bare_lowercase_v_is_not_a_version_alias() {
+    let exit = Cli::try_parse_from(["schemaui", "-v"]).expect_err("-v should fail to parse");
+
+    assert!(
+        exit.status.is_err(),
+        "-v should be treated as an unknown flag"
+    );
+    assert!(
+        exit.output.contains("unexpected argument '-v'"),
+        "unexpected output: {}",
+        exit.output
+    );
+}
+
+#[test]
+fn hyphen_prefixed_option_values_are_allowed_for_title() {
     let cli = Cli::parse_from(["schemaui", "--title", "-v"]);
 
     assert!(cli.command.is_none(), "expected implicit default TUI mode");
