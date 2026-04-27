@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > CLI-specific release notes now live under `schemaui-cli/CHANGELOG.md`.
 
+
+
+## [0.10.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.10.1...schemaui-v0.10.2) - 2026-04-27
+
+
+
+
+
+
+### Bug Fixes
+
+- **cli:** restore version support with clap([#112](https://github.com/YuniqueUnic/schemaui/pull/112), @YuniqueUnic)
+
+- **schema:** preserve root definitions in composite overlays([#113](https://github.com/YuniqueUnic/schemaui/pull/113), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+- @cconverse711
+
+
 ## [0.10.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.10.0...schemaui-v0.10.1) - 2026-04-26
 
 ### Fixed

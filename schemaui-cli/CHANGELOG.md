@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+
+## [0.6.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.5.3...schemaui-cli-v0.6.0) - 2026-04-27
+
+
+
+
+
+
+### Bug Fixes
+
+- **cli:** restore version support with clap([#112](https://github.com/YuniqueUnic/schemaui/pull/112), @YuniqueUnic)
+
+
+
+
+
+
+### Refactors
+
+- **cli:** migrate to declarative clap derive macros([#112](https://github.com/YuniqueUnic/schemaui/pull/112), @YuniqueUnic)
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.5.3](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.5.2...schemaui-cli-v0.5.3) - 2026-04-26
 
 ### Other
