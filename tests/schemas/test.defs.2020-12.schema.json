@@ -1,45 +1,55 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "My title",
-  "description": "My description",
-  "$defs": {
-    "bar": {
-      "type": "string"
-    },
-    "baz": {
-      "type": "integer"
-    }
-  },
-  "type": "object",
-  "properties": {
-    "blah": {
-      "oneOf": [
-        {
-          "title": "Option 1",
-          "type": "object",
-          "properties": {
-            "Bar": {
-              "$ref": "#/$defs/bar"
-            },
-            "Id": {
-              "type": "integer"
-            }
-          }
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "My title",
+    "description": "My description",
+    "$defs": {
+        "bar": {
+            "type": "string"
         },
-        {
-          "title": "Option 2",
-          "type": "object",
-          "properties": {
-            "Baz": {
-              "$ref": "#/$defs/baz"
-            },
-            "Id": {
-              "type": "integer"
-            }
-          }
+        "baz": {
+            "type": "integer"
         }
-      ]
-    }
-  },
-  "additionalProperties": false
+    },
+    "type": "object",
+    "properties": {
+        "blah": {
+            "oneOf": [
+                {
+                    "title": "Option 1",
+                    "type": "object",
+                    "properties": {
+                        "Bar": {
+                            "$ref": "#/$defs/bar"
+                        },
+                        "Id": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "Bar",
+                        "Id"
+                    ],
+                    "additionalProperties": false
+                },
+                {
+                    "title": "Option 2",
+                    "type": "object",
+                    "properties": {
+                        "Baz": {
+                            "$ref": "#/$defs/baz"
+                        },
+                        "Id": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "Baz",
+                        "Id"
+                    ],
+                    "additionalProperties": false
+                }
+            ]
+        }
+    },
+    "additionalProperties": false
 }

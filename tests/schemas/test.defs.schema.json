@@ -23,7 +23,13 @@
                         "Id": {
                             "type": "integer"
                         }
-                    }
+                    },
+                    "type": "object",
+                    "required": [
+                        "Bar",
+                        "Id"
+                    ],
+                    "additionalProperties": false
                 },
                 {
                     "title": "Option 2",
@@ -34,7 +40,13 @@
                         "Id": {
                             "type": "integer"
                         }
-                    }
+                    },
+                    "type": "object",
+                    "required": [
+                        "Baz",
+                        "Id"
+                    ],
+                    "additionalProperties": false
                 }
             ]
         }
