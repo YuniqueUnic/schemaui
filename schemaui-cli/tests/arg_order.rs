@@ -157,21 +157,16 @@ fn trailing_web_token_is_parsed_as_subcommand_after_root_args() {
 
 #[cfg(feature = "web")]
 #[test]
-fn web_host_aliases_are_normalized_before_parsing() {
-    let cli = Cli::parse_from([
-        "schemaui",
-        "web",
-        "--bind",
-        "0.0.0.0",
-        "--listen",
-        "127.0.0.1",
-    ]);
+fn web_host_aliases_parse_as_host() {
+    for (flag, expected) in [("--bind", "0.0.0.0"), ("--listen", "127.0.0.1")] {
+        let cli = Cli::parse_from(["schemaui", "web", flag, expected]);
 
-    let Some(Commands::Web(cmd)) = cli.command else {
-        panic!("expected explicit web subcommand");
-    };
+        let Some(Commands::Web(cmd)) = cli.command else {
+            panic!("expected explicit web subcommand");
+        };
 
-    assert_eq!(cmd.host.to_string(), "127.0.0.1");
+        assert_eq!(cmd.host.to_string(), expected);
+    }
 }
 
 #[cfg(feature = "web")]
@@ -192,4 +187,26 @@ fn explicit_web_snapshot_subcommand_accepts_common_args() {
 
     assert_eq!(cmd.common.schema.as_deref(), Some("./schema.json"));
     assert_eq!(cmd.out_dir.to_str(), Some("./snapshots"));
+}
+
+#[test]
+fn version_flags_are_normalized_before_parsing() {
+    for flag in ["--version", "-V", "-v"] {
+        let exit = Cli::try_parse_from(["schemaui", flag])
+            .expect_err("version should short-circuit parsing");
+        assert!(exit.status.is_ok(), "{flag} should exit successfully");
+        assert!(
+            exit.output.contains(env!("CARGO_PKG_VERSION")),
+            "{flag} output should include package version: {}",
+            exit.output
+        );
+    }
+}
+
+#[test]
+fn version_like_option_values_do_not_trigger_version_exit() {
+    let cli = Cli::parse_from(["schemaui", "--title", "-v"]);
+
+    assert!(cli.command.is_none(), "expected implicit default TUI mode");
+    assert_eq!(cli.common.title.as_deref(), Some("-v"));
 }

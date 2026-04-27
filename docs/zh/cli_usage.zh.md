@@ -29,23 +29,22 @@ schemaui tui --schema ./schema.json
 
 ### Shell completion
 
-`schemaui-cli` 现在内置了基于 `argh_complete` 的补全脚本生成能力：
+`schemaui-cli` 现在内置了基于 `clap_complete` 的补全脚本生成能力：
 
 ```bash
 schemaui completion bash > ~/.local/share/bash-completion/completions/schemaui
 schemaui completion zsh > ~/.zfunc/_schemaui
 schemaui completion fish > ~/.config/fish/completions/schemaui.fish
-schemaui completion nushell > ~/.config/nushell/completions/schemaui.nu
+schemaui completion powershell > ~/.config/powershell/completions/_schemaui.ps1
 ```
 
-当前官方支持的 shell 是 `bash`、`zsh`、`fish`、`nushell`。PowerShell
-还没有接入，因为上游 `argh_complete` 目前没有提供 PowerShell generator。
+当前支持的 shell 是 `bash`、`zsh`、`fish`、`powershell`。
 
 ## 2. 执行流程
 
 ```
 ┌────────┐ args┌───────────────┐ schema/config ┌──────────────┐ result ┌────────────┐
-│  argh  ├────▶│ InputSource   ├──────────────▶│ SchemaUI     ├──────▶│ io::output │
+│  clap  ├────▶│ InputSource   ├──────────────▶│ SchemaUI     ├──────▶│ io::output │
 └────┬───┘     └─────────┬─────┘               │ (library)    │        └────┬───────┘
      │ diagnostics       │ format hint         └─────┬────────┘             │  writes
 ┌────▼─────────┐         │ DocumentFormat            │ validator            ▼  files/stdout

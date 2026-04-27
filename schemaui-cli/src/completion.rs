@@ -1,20 +1,25 @@
 use std::path::Path;
 
-use argh_complete::Generator;
+use clap_complete::{Shell, generate};
 use color_eyre::eyre::Result;
 
 use crate::cli::{CompletionCommand, CompletionShell, command_info};
 
 pub fn render_script(shell: CompletionShell) -> String {
     let command_name = command_name();
-    let info = command_info();
+    let mut command = command_info();
+    let mut bytes = Vec::new();
 
     match shell {
-        CompletionShell::Bash => argh_complete::bash::Bash::generate(&command_name, &info),
-        CompletionShell::Zsh => argh_complete::zsh::Zsh::generate(&command_name, &info),
-        CompletionShell::Fish => argh_complete::fish::Fish::generate(&command_name, &info),
-        CompletionShell::Nushell => argh_complete::nushell::Nushell::generate(&command_name, &info),
+        CompletionShell::Bash => generate(Shell::Bash, &mut command, command_name, &mut bytes),
+        CompletionShell::Zsh => generate(Shell::Zsh, &mut command, command_name, &mut bytes),
+        CompletionShell::Fish => generate(Shell::Fish, &mut command, command_name, &mut bytes),
+        CompletionShell::PowerShell => {
+            generate(Shell::PowerShell, &mut command, command_name, &mut bytes)
+        }
     }
+
+    String::from_utf8(bytes).expect("completion script should be utf-8")
 }
 
 pub fn run_cli(args: CompletionCommand) -> Result<()> {

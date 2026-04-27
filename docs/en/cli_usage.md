@@ -84,24 +84,22 @@ schemaui tui --schema ./schema.json
 
 ### Shell completion
 
-`schemaui-cli` now ships an `argh`-backed completion generator:
+`schemaui-cli` now ships a `clap_complete`-backed completion generator:
 
 ```bash
 schemaui completion bash > ~/.local/share/bash-completion/completions/schemaui
 schemaui completion zsh > ~/.zfunc/_schemaui
 schemaui completion fish > ~/.config/fish/completions/schemaui.fish
-schemaui completion nushell > ~/.config/nushell/completions/schemaui.nu
+schemaui completion powershell > ~/.config/powershell/completions/_schemaui.ps1
 ```
 
-Supported shells are `bash`, `zsh`, `fish`, and `nushell`. PowerShell is not
-listed yet because upstream `argh_complete` does not currently ship a PowerShell
-generator.
+Supported shells are `bash`, `zsh`, `fish`, and `powershell`.
 
 ## 2. Execution Flow
 
 ```
 ┌────────┐ args┌───────────────┐ schema/config ┌──────────────┐ result ┌────────────┐
-│  argh  ├────▶│ InputSource   ├──────────────▶│ SchemaUI     ├──────▶│ io::output │
+│  clap  ├────▶│ InputSource   ├──────────────▶│ SchemaUI     ├──────▶│ io::output │
 └────┬───┘     └─────────┬─────┘               │ (library)    │        └────┬───────┘
      │ diagnostics       │ format hint         └─────┬────────┘             │  writes
 ┌────▼─────────┐         │ DocumentFormat            │ validator            ▼  files/stdout
