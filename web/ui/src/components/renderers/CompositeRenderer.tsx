@@ -294,7 +294,7 @@ function MultiVariantRenderer({
         : (
           entries.map((entry, index) => {
             const activeVariant = determineVariant(entry, variants);
-            const entryType = inferValueType(entry);
+            const entryType = activeVariant?.title ?? inferValueType(entry);
             return (
               <Card
                 key={`${node.pointer}-variant-${index}`}

@@ -5,6 +5,9 @@ import {
   inferValueType,
   isSimpleKind,
 } from "../../utils/typeHelpers";
+import {
+  determineVariant,
+} from "../../utils/variantHelpers";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
@@ -264,7 +267,10 @@ function ComplexArrayRenderer({
         )
         : (
           entries.map((entry, index) => {
-            const entryType = inferValueType(entry);
+            const activeVariant = itemKind.type === "composite"
+              ? determineVariant(entry, itemKind.variants)
+              : undefined;
+            const entryType = activeVariant?.title ?? inferValueType(entry);
             return (
               <Card
                 key={`${node.pointer}-${index}`}
