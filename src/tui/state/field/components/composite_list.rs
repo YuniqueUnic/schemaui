@@ -43,7 +43,16 @@ impl FieldComponent for CompositeListComponent {
         format_collection_value(
             "List",
             self.state.len(),
-            self.state.selected_label(),
+            self.state.selected_compact_label(),
+            &list_hint_for(ComponentKind::CompositeList, &self.palette),
+        )
+    }
+
+    fn display_value_with_limit(&self, _schema: &FieldSchema, max_visible: usize) -> String {
+        format_collection_value(
+            "List",
+            self.state.len(),
+            self.state.selected_compact_label_with_limit(max_visible),
             &list_hint_for(ComponentKind::CompositeList, &self.palette),
         )
     }
@@ -64,8 +73,18 @@ impl FieldComponent for CompositeListComponent {
             .map(|idx| (self.state.summaries(), idx))
     }
 
+    fn collection_panel_with_limit(&self, max_visible: usize) -> Option<(Vec<String>, usize)> {
+        self.state
+            .selected_index()
+            .map(|idx| (self.state.summaries_with_limit(max_visible), idx))
+    }
+
     fn collection_selected_label(&self) -> Option<String> {
-        self.state.selected_label()
+        self.state.selected_compact_label()
+    }
+
+    fn collection_selected_label_with_limit(&self, max_visible: usize) -> Option<String> {
+        self.state.selected_compact_label_with_limit(max_visible)
     }
 
     fn collection_selected_index(&self) -> Option<usize> {

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use serde_json::{Map, Value};
+use unicode_width::UnicodeWidthStr;
 
 use crate::tui::model::{FieldKind, FieldSchema, KeyValueField};
 
@@ -9,7 +10,7 @@ use super::{
     field::{FieldState, components::ComponentPalette},
     form_state::FormState,
     section::SectionState,
-    value_summary::summarize_value,
+    value_summary::{summarize_value, summarize_value_with_limit},
 };
 
 #[derive(Debug, Clone)]
@@ -140,6 +141,17 @@ impl KeyValueState {
         Some(format!("{} = {}", entry.key, summarize_value(&entry.value)))
     }
 
+    pub fn selected_label_with_limit(&self, max_visible: usize) -> Option<String> {
+        let idx = self.selected_index()?;
+        let entry = self.entries.get(idx)?;
+        let prefix = format!("{} = ", entry.key);
+        let remaining = max_visible.saturating_sub(UnicodeWidthStr::width(prefix.as_str()));
+        Some(format!(
+            "{prefix}{}",
+            summarize_value_with_limit(&entry.value, remaining.max(1))
+        ))
+    }
+
     pub fn summaries(&self) -> Vec<String> {
         self.entries
             .iter()
@@ -147,9 +159,28 @@ impl KeyValueState {
             .collect()
     }
 
+    pub fn summaries_with_limit(&self, max_visible: usize) -> Vec<String> {
+        self.entries
+            .iter()
+            .map(|entry| {
+                let prefix = format!("{} = ", entry.key);
+                let remaining = max_visible.saturating_sub(UnicodeWidthStr::width(prefix.as_str()));
+                format!(
+                    "{prefix}{}",
+                    summarize_value_with_limit(&entry.value, remaining.max(1))
+                )
+            })
+            .collect()
+    }
+
     pub fn panel(&self) -> Option<(Vec<String>, usize)> {
         let idx = self.selected_index()?;
         Some((self.summaries(), idx))
+    }
+
+    pub fn panel_with_limit(&self, max_visible: usize) -> Option<(Vec<String>, usize)> {
+        let idx = self.selected_index()?;
+        Some((self.summaries_with_limit(max_visible), idx))
     }
 
     pub fn build_value(&self, required: bool) -> Result<Option<Value>, FieldCoercionError> {

@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use serde_json::Value;
+use unicode_width::UnicodeWidthStr;
 
 use crate::tui::model::CompositeField;
-use crate::tui::state::error::FieldCoercionError;
 use crate::tui::state::field::components::{
     ComponentPalette, CompositePopupData, CompositeSelectorView,
 };
+use crate::tui::state::{error::FieldCoercionError, value_summary::truncate_visible_text};
 
 use super::{CompositeEditorSession, CompositeState};
 
@@ -152,11 +153,39 @@ impl CompositeListState {
         ))
     }
 
+    pub fn selected_compact_label(&self) -> Option<String> {
+        let idx = self.selected_index()?;
+        let entry = self.entries.get(idx)?;
+        Some(format!("#{} {}", idx + 1, entry.state.summary()))
+    }
+
+    pub fn selected_compact_label_with_limit(&self, max_visible: usize) -> Option<String> {
+        let label = self.selected_compact_label()?;
+        Some(truncate_visible_text(&label, max_visible))
+    }
+
     pub fn summaries(&self) -> Vec<String> {
         self.entries
             .iter()
             .enumerate()
             .map(|(idx, entry)| format!("#{} {}", idx + 1, entry.state.summary_with_preview()))
+            .collect()
+    }
+
+    pub fn summaries_with_limit(&self, max_visible: usize) -> Vec<String> {
+        self.entries
+            .iter()
+            .enumerate()
+            .map(|(idx, entry)| {
+                let prefix = format!("#{} ", idx + 1);
+                let prefix_width = UnicodeWidthStr::width(prefix.as_str());
+                format!(
+                    "{prefix}{}",
+                    entry.state.summary_with_preview_limit(
+                        max_visible.saturating_sub(prefix_width).max(1)
+                    )
+                )
+            })
             .collect()
     }
 

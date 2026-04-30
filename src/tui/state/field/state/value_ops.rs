@@ -15,6 +15,11 @@ impl FieldState {
         self.component.display_value(&self.schema)
     }
 
+    pub fn display_value_with_limit(&self, max_visible: usize) -> String {
+        self.component
+            .display_value_with_limit(&self.schema, max_visible)
+    }
+
     pub fn cursor_offset(&self) -> Option<usize> {
         self.component.cursor_offset(&self.schema)
     }

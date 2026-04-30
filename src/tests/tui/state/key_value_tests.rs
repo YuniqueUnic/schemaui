@@ -1,4 +1,4 @@
-use crate::tui::state::value_summary::summarize_value;
+use crate::tui::state::value_summary::{summarize_value, summarize_value_with_limit};
 use serde_json::{Value, json};
 
 #[test]
@@ -25,4 +25,15 @@ fn summarize_value_renders_object_preview() {
     });
     let summary = summarize_value(&value);
     assert_eq!(summary, "{ Bar: on tui, Id: 0 }");
+}
+
+#[test]
+fn summarize_value_with_limit_preserves_multiple_object_fields_when_space_allows() {
+    let value = json!({
+        "Bar": "客服热线 400-820-8820 转人工服务",
+        "Id": 0
+    });
+    let summary = summarize_value_with_limit(&value, 42);
+    assert!(summary.contains("Bar:"), "summary: {summary}");
+    assert!(summary.contains("Id: 0"), "summary: {summary}");
 }

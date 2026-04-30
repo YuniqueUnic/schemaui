@@ -173,3 +173,61 @@ fn composite_list_summary_includes_object_preview() {
         entries[0]
     );
 }
+
+#[test]
+fn composite_list_summary_with_limit_keeps_bar_and_id_visible() {
+    let variants = vec![CompositeVariant {
+        id: "bar".to_string(),
+        title: "Bar Item".to_string(),
+        description: None,
+        schema: json!({
+            "type": "object",
+            "properties": {
+                "Bar": {"type": "string"},
+                "Id": {"type": "integer"}
+            }
+        }),
+        is_object: true,
+    }];
+    let template = CompositeField {
+        mode: CompositeMode::AnyOf,
+        variants,
+    };
+
+    let mut field = FieldState::from_schema(FieldSchema {
+        name: "blahList".to_string(),
+        path: vec!["blahList".to_string()],
+        pointer: "/blahList".to_string(),
+        title: "Blah List".to_string(),
+        description: None,
+        kind: FieldKind::Array(Box::new(FieldKind::Composite(Box::new(template)))),
+        required: false,
+        default: None,
+        metadata: HashMap::new(),
+    });
+    field.seed_value(&json!([{
+        "Bar": "客服热线 400-820-8820 转人工服务",
+        "Id": 0
+    }]));
+
+    let (entries, selected) = field
+        .composite_list_panel_with_limit(44)
+        .expect("panel state");
+    assert_eq!(selected, 0);
+    assert_eq!(entries.len(), 1);
+    assert!(
+        entries[0].contains("Bar:"),
+        "entry summary: {:?}",
+        entries[0]
+    );
+    assert!(
+        entries[0].contains("Id: 0"),
+        "entry summary: {:?}",
+        entries[0]
+    );
+    let compact = field
+        .composite_list_selected_label_with_limit(44)
+        .expect("compact selected label");
+    assert!(!compact.contains("Bar:"), "compact label: {compact}");
+    assert!(!compact.contains("Id: 0"), "compact label: {compact}");
+}
