@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.10.3](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.10.2...schemaui-v0.10.3) - 2026-04-30
+
+
+
+
+
+
+### Bug Fixes
+
+- show item titles for composite array in web ui([#117](https://github.com/YuniqueUnic/schemaui/pull/117), @cconverse711)
+
+- **cli:** improve file loading behavior for missing paths([#119](https://github.com/YuniqueUnic/schemaui/pull/119), @YuniqueUnic)
+
+- **tui:** add display value with limit functionality for collection components([#119](https://github.com/YuniqueUnic/schemaui/pull/119), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+- @cconverse711
+
+
 ## [0.10.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.10.1...schemaui-v0.10.2) - 2026-04-27
 
 

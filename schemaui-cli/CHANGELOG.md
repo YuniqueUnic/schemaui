@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.6.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.6.0...schemaui-cli-v0.6.1) - 2026-04-30
+
+
+
+
+
+
+### Bug Fixes
+
+- **cli:** improve file loading behavior for missing paths([#119](https://github.com/YuniqueUnic/schemaui/pull/119), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
+
+
 ## [0.6.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.5.3...schemaui-cli-v0.6.0) - 2026-04-27
 
 
