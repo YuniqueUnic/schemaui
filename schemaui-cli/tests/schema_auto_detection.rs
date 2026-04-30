@@ -1,10 +1,19 @@
 use std::fs;
-#[cfg(all(feature = "remote-schema", any(feature = "toml", feature = "tui")))]
+#[cfg(all(
+    feature = "remote-schema",
+    any(feature = "json", feature = "yaml", feature = "toml")
+))]
 use std::io::{Read, Write};
-#[cfg(all(feature = "remote-schema", any(feature = "toml", feature = "tui")))]
+#[cfg(all(
+    feature = "remote-schema",
+    any(feature = "json", feature = "yaml", feature = "toml")
+))]
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-#[cfg(all(feature = "remote-schema", any(feature = "toml", feature = "tui")))]
+#[cfg(all(
+    feature = "remote-schema",
+    any(feature = "json", feature = "yaml", feature = "toml")
+))]
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -12,7 +21,7 @@ use schemaui_cli::cli::CommonArgs;
 use schemaui_cli::session::prepare_session;
 use serde_json::{Value, json};
 
-#[cfg(all(feature = "remote-schema", feature = "tui"))]
+#[cfg(all(feature = "remote-schema", feature = "tui", feature = "json"))]
 use schemaui_cli::cli::TuiSnapshotCommand;
 #[cfg(feature = "web")]
 use schemaui_cli::cli::WebSnapshotCommand;
@@ -53,7 +62,10 @@ fn base_args(schema: Option<String>, config: Option<String>) -> CommonArgs {
     }
 }
 
-#[cfg(all(feature = "remote-schema", any(feature = "toml", feature = "tui")))]
+#[cfg(all(
+    feature = "remote-schema",
+    any(feature = "json", feature = "yaml", feature = "toml")
+))]
 fn spawn_schema_server(schema: Value) -> (String, thread::JoinHandle<()>) {
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind schema server");
     let addr = listener.local_addr().expect("local addr");
@@ -77,7 +89,11 @@ fn spawn_schema_server(schema: Value) -> (String, thread::JoinHandle<()>) {
     (url, handle)
 }
 
-#[cfg(all(feature = "web", feature = "remote-schema", feature = "toml"))]
+#[cfg(all(
+    feature = "web",
+    feature = "remote-schema",
+    any(feature = "json", feature = "yaml", feature = "toml")
+))]
 fn opaque_object_schema() -> Value {
     json!({
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -294,7 +310,78 @@ fn prepare_session_uses_remote_toml_schema_directive() {
     let _ = fs::remove_dir_all(temp);
 }
 
-#[cfg(all(feature = "remote-schema", feature = "tui"))]
+#[cfg(all(feature = "remote-schema", feature = "json"))]
+#[test]
+fn prepare_session_uses_remote_json_root_schema_directive() {
+    let temp = unique_temp_dir("json_remote");
+    let remote_schema = json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Remote JSON Schema",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" }
+        },
+        "required": ["name"]
+    });
+    let (schema_url, handle) = spawn_schema_server(remote_schema.clone());
+    let config_path = temp.join("config.json");
+    write_json(
+        &config_path,
+        &json!({
+            "$schema": schema_url,
+            "name": "alice"
+        }),
+    );
+
+    let session = prepare_session(&base_args(
+        None,
+        Some(config_path.to_string_lossy().into_owned()),
+    ))
+    .expect("prepare session");
+
+    handle.join().expect("schema server thread");
+
+    assert_eq!(session.schema, remote_schema);
+    assert_eq!(session.defaults, Some(json!({ "name": "alice" })));
+
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[cfg(all(feature = "remote-schema", feature = "yaml"))]
+#[test]
+fn prepare_session_uses_remote_yaml_schema_directive() {
+    let temp = unique_temp_dir("yaml_remote");
+    let remote_schema = json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Remote YAML Schema",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" }
+        }
+    });
+    let (schema_url, handle) = spawn_schema_server(remote_schema.clone());
+    let config_path = temp.join("config.yaml");
+    fs::write(
+        &config_path,
+        format!("# yaml-language-server: $schema={schema_url}\nname: alice\n"),
+    )
+    .expect("write yaml config");
+
+    let session = prepare_session(&base_args(
+        None,
+        Some(config_path.to_string_lossy().into_owned()),
+    ))
+    .expect("prepare session");
+
+    handle.join().expect("schema server thread");
+
+    assert_eq!(session.schema, remote_schema);
+    assert_eq!(session.defaults, Some(json!({ "name": "alice" })));
+
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[cfg(all(feature = "remote-schema", feature = "tui", feature = "json"))]
 #[test]
 fn tui_snapshot_accepts_explicit_remote_schema() {
     let temp = unique_temp_dir("tui_snapshot_remote");
@@ -427,6 +514,90 @@ fn web_snapshot_accepts_remote_schema_with_opaque_object_fields() {
         format!("#:schema {schema_url}\n[features]\napps = true\n"),
     )
     .expect("write toml config");
+
+    schemaui_cli::web::run_snapshot_cli(WebSnapshotCommand {
+        common: base_args(None, Some(config_path.to_string_lossy().into_owned())),
+        out_dir: out_dir.clone(),
+        ts_export: "SessionSnapshot".to_string(),
+    })
+    .expect("run web snapshot");
+
+    handle.join().expect("schema server thread");
+
+    let snapshot_path = out_dir.join("session_snapshot.json");
+    let snapshot: Value =
+        serde_json::from_str(&fs::read_to_string(&snapshot_path).expect("read web snapshot json"))
+            .expect("parse web snapshot json");
+
+    assert_eq!(snapshot["title"], "Opaque Object Schema");
+    assert_eq!(snapshot["data"], json!({ "features": { "apps": true } }));
+    assert!(
+        snapshot["ui_ast"]["roots"]
+            .as_array()
+            .expect("ui ast roots")
+            .iter()
+            .any(|node| node["pointer"] == "/permissions"),
+        "opaque object fields should remain representable in the generated UI AST",
+    );
+
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[cfg(all(feature = "web", feature = "remote-schema", feature = "json"))]
+#[test]
+fn web_snapshot_accepts_remote_json_schema_with_opaque_object_fields() {
+    let temp = unique_temp_dir("web_snapshot_remote_json_opaque_object");
+    let out_dir = temp.join("snapshots");
+    let (schema_url, handle) = spawn_schema_server(opaque_object_schema());
+    let config_path = temp.join("config.json");
+    write_json(
+        &config_path,
+        &json!({
+            "$schema": schema_url,
+            "features": { "apps": true }
+        }),
+    );
+
+    schemaui_cli::web::run_snapshot_cli(WebSnapshotCommand {
+        common: base_args(None, Some(config_path.to_string_lossy().into_owned())),
+        out_dir: out_dir.clone(),
+        ts_export: "SessionSnapshot".to_string(),
+    })
+    .expect("run web snapshot");
+
+    handle.join().expect("schema server thread");
+
+    let snapshot_path = out_dir.join("session_snapshot.json");
+    let snapshot: Value =
+        serde_json::from_str(&fs::read_to_string(&snapshot_path).expect("read web snapshot json"))
+            .expect("parse web snapshot json");
+
+    assert_eq!(snapshot["title"], "Opaque Object Schema");
+    assert_eq!(snapshot["data"], json!({ "features": { "apps": true } }));
+    assert!(
+        snapshot["ui_ast"]["roots"]
+            .as_array()
+            .expect("ui ast roots")
+            .iter()
+            .any(|node| node["pointer"] == "/permissions"),
+        "opaque object fields should remain representable in the generated UI AST",
+    );
+
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[cfg(all(feature = "web", feature = "remote-schema", feature = "yaml"))]
+#[test]
+fn web_snapshot_accepts_remote_yaml_schema_with_opaque_object_fields() {
+    let temp = unique_temp_dir("web_snapshot_remote_yaml_opaque_object");
+    let out_dir = temp.join("snapshots");
+    let (schema_url, handle) = spawn_schema_server(opaque_object_schema());
+    let config_path = temp.join("config.yaml");
+    fs::write(
+        &config_path,
+        format!("# yaml-language-server: $schema={schema_url}\nfeatures:\n  apps: true\n"),
+    )
+    .expect("write yaml config");
 
     schemaui_cli::web::run_snapshot_cli(WebSnapshotCommand {
         common: base_args(None, Some(config_path.to_string_lossy().into_owned())),

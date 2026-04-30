@@ -31,7 +31,7 @@ fn main() -> Result<()> {
         bail!("schema path {:?} does not exist", schema_path);
     }
 
-    let format = DocumentFormat::from_extension(&schema_path).unwrap_or(DocumentFormat::Json);
+    let format = DocumentFormat::from_extension(&schema_path).unwrap_or_default();
 
     // 2) Precompile the shared UI bundle plus TUI-specific derivatives.
     let artifact_bundle = build_ui_artifact_bundle_from_file(&schema_path, format, None)?;

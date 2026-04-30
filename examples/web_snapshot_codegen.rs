@@ -54,7 +54,7 @@ fn main() -> Result<()> {
     let out_dir = PathBuf::from(&out_dir_arg);
     fs::create_dir_all(&out_dir)?;
 
-    let format = DocumentFormat::from_extension(&schema_path).unwrap_or(DocumentFormat::Json);
+    let format = DocumentFormat::from_extension(&schema_path).unwrap_or_default();
 
     // 2) Build a SessionResponse snapshot from schema + defaults.
     let snapshot =

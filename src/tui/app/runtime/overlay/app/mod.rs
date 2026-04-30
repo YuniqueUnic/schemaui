@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "json"))]
 use crate::tui::app::runtime::overlay::state::OverlayFocusMode;
 
 use crate::tui::app::runtime::App;
@@ -214,7 +214,7 @@ impl App {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "json"))]
 impl App {
     pub(crate) fn overlay_depth_for_test(&self) -> usize {
         self.overlay_depth()

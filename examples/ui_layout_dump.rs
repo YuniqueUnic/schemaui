@@ -31,5 +31,5 @@ fn main() -> Result<()> {
 }
 
 fn infer_format(path: &Path) -> DocumentFormat {
-    DocumentFormat::from_extension(path).unwrap_or(DocumentFormat::Json)
+    DocumentFormat::from_extension(path).unwrap_or_default()
 }

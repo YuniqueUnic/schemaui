@@ -351,6 +351,7 @@ fn detect_toml_schema_directive(raw: &str) -> Option<String> {
     None
 }
 
+#[cfg(feature = "json")]
 fn strip_root_json_schema_declaration(value: Value) -> Value {
     match value {
         Value::Object(mut object) => {
