@@ -58,7 +58,7 @@ ratatui = { version = "0.30", default-features = false, features = ["crossterm"]
 serde = { version = "1", default-features = false, features = ["derive"] }
 percent-encoding = { version = "2", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.11", default-features = false }
-unicode-width = { version = "=0.2", optional = true }
+unicode-width = { version = "0.2", optional = true }
 regex = "1"
 include_dir = { version = "0.7", optional = true }
 axum = { version = "0.8", default-features = false, features = ["json", "http1", "tokio", "original-uri"], optional = true }
@@ -105,7 +105,7 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking", 
 [build-dependencies]
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = "1"
-unicode-width = "=0.2"
+unicode-width = "0.2"
 
 
 [profile.release]
