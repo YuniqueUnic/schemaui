@@ -11,6 +11,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.11.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.10.3...schemaui-v0.11.0) - 2026-04-30
+
+
+### Breaking Changes
+
+- **examples:** **BREAKING** use unwrap_or_default instead of explicit enum value([#121](https://github.com/YuniqueUnic/schemaui/pull/121), @YuniqueUnic)
+
+
+
+
+
+
+### Bug Fixes
+
+- add comprehensive feature flag support and TUI artifacts([#121](https://github.com/YuniqueUnic/schemaui/pull/121), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Other
+
+- **deps:** update core-foundation and remove unused dependencies([#121](https://github.com/YuniqueUnic/schemaui/pull/121), @YuniqueUnic)
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.10.3](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.10.2...schemaui-v0.10.3) - 2026-04-30
 
 
