@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
 use serde_json::{Number, Value, json};
+use unicode_width::UnicodeWidthStr;
 
 use crate::tui::model::{FieldKind, FieldSchema};
 
 use super::{
-    error::FieldCoercionError, field::FieldState, field::components::ComponentPalette,
-    form_state::FormState, section::SectionState, value_summary::summarize_value,
+    error::FieldCoercionError,
+    field::FieldState,
+    field::components::ComponentPalette,
+    form_state::FormState,
+    section::SectionState,
+    value_summary::{summarize_value, summarize_value_with_limit},
 };
 
 #[derive(Debug, Clone)]
@@ -151,6 +156,21 @@ impl ScalarArrayState {
         Some(format!("#{} {}", idx + 1, summarize_value(value)))
     }
 
+    pub fn selected_label_with_limit(&self, max_visible: usize) -> Option<String> {
+        let idx = self.selected_index()?;
+        let value = self.entries.get(idx)?;
+        let prefix = format!("#{} ", idx + 1);
+        Some(format!(
+            "{prefix}{}",
+            summarize_value_with_limit(
+                value,
+                max_visible
+                    .saturating_sub(UnicodeWidthStr::width(prefix.as_str()))
+                    .max(1),
+            )
+        ))
+    }
+
     pub fn summaries(&self) -> Vec<String> {
         self.entries
             .iter()
@@ -159,9 +179,33 @@ impl ScalarArrayState {
             .collect()
     }
 
+    pub fn summaries_with_limit(&self, max_visible: usize) -> Vec<String> {
+        self.entries
+            .iter()
+            .enumerate()
+            .map(|(idx, value)| {
+                let prefix = format!("#{} ", idx + 1);
+                format!(
+                    "{prefix}{}",
+                    summarize_value_with_limit(
+                        value,
+                        max_visible
+                            .saturating_sub(UnicodeWidthStr::width(prefix.as_str()))
+                            .max(1),
+                    )
+                )
+            })
+            .collect()
+    }
+
     pub fn panel(&self) -> Option<(Vec<String>, usize)> {
         let idx = self.selected_index()?;
         Some((self.summaries(), idx))
+    }
+
+    pub fn panel_with_limit(&self, max_visible: usize) -> Option<(Vec<String>, usize)> {
+        let idx = self.selected_index()?;
+        Some((self.summaries_with_limit(max_visible), idx))
     }
 
     pub fn seed_entries_from_array(&mut self, items: &[Value]) {

@@ -43,6 +43,15 @@ impl FieldComponent for KeyValueComponent {
         )
     }
 
+    fn display_value_with_limit(&self, _schema: &FieldSchema, max_visible: usize) -> String {
+        format_collection_value(
+            "Map",
+            self.state.len(),
+            self.state.selected_label_with_limit(max_visible),
+            &list_hint_for(ComponentKind::KeyValue, &self.palette),
+        )
+    }
+
     fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {
         if let Value::Object(map) = value {
             self.state.seed_entries_from_object(map);
@@ -57,8 +66,16 @@ impl FieldComponent for KeyValueComponent {
         self.state.panel()
     }
 
+    fn collection_panel_with_limit(&self, max_visible: usize) -> Option<(Vec<String>, usize)> {
+        self.state.panel_with_limit(max_visible)
+    }
+
     fn collection_selected_label(&self) -> Option<String> {
         self.state.selected_label()
+    }
+
+    fn collection_selected_label_with_limit(&self, max_visible: usize) -> Option<String> {
+        self.state.selected_label_with_limit(max_visible)
     }
 
     fn collection_selected_index(&self) -> Option<usize> {

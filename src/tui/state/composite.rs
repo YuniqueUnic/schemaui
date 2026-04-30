@@ -11,8 +11,11 @@ use crate::{
 };
 
 use super::{
-    LayoutNavModel, error::FieldCoercionError, field::components::ComponentPalette,
-    form_state::FormState, value_summary::summarize_inline_value,
+    LayoutNavModel,
+    error::FieldCoercionError,
+    field::components::ComponentPalette,
+    form_state::FormState,
+    value_summary::{summarize_inline_value, summarize_inline_value_with_limit},
 };
 
 mod composite_list;
@@ -123,6 +126,10 @@ impl CompositeState {
         }
     }
 
+    pub fn summary_with_preview_limit(&self, max_visible: usize) -> String {
+        truncate_summary_with_preview(self, max_visible)
+    }
+
     pub fn pointer(&self) -> &str {
         &self.pointer
     }
@@ -198,6 +205,32 @@ impl CompositeState {
                 continue;
             };
             previews.push(summarize_inline_value(&actual));
+        }
+
+        if previews.is_empty() {
+            None
+        } else {
+            Some(previews.join(" + "))
+        }
+    }
+
+    fn active_preview_with_limit(&self, max_visible: usize) -> Option<String> {
+        if max_visible == 0 {
+            return None;
+        }
+
+        let mut previews = Vec::new();
+        for variant in self.variants.iter().filter(|variant| variant.active) {
+            let Ok(form) = variant.borrow_form(self.pointer()) else {
+                continue;
+            };
+            let Ok(value) = form.try_build_value() else {
+                continue;
+            };
+            let Ok(actual) = variant.unwrap_overlay_value(value, self.pointer()) else {
+                continue;
+            };
+            previews.push(summarize_inline_value_with_limit(&actual, max_visible));
         }
 
         if previews.is_empty() {
@@ -403,6 +436,37 @@ impl CompositeState {
                 }
             }
         }
+    }
+}
+
+fn truncate_summary_with_preview(state: &CompositeState, max_visible: usize) -> String {
+    use super::value_summary::truncate_visible_text;
+    use unicode_width::UnicodeWidthStr;
+
+    if max_visible == 0 {
+        return String::new();
+    }
+
+    let summary = state.summary();
+    let summary_width = UnicodeWidthStr::width(summary.as_str());
+    let separator = " ";
+    let separator_width = 1usize;
+
+    if summary_width >= max_visible {
+        return truncate_visible_text(&summary, max_visible);
+    }
+
+    let preview_budget = max_visible.saturating_sub(summary_width + separator_width);
+    if preview_budget == 0 {
+        return truncate_visible_text(&summary, max_visible);
+    }
+
+    match state
+        .active_preview_with_limit(preview_budget)
+        .filter(|text| !text.is_empty())
+    {
+        Some(preview) => format!("{summary}{separator}{preview}"),
+        None => summary,
     }
 }
 

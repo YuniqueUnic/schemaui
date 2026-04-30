@@ -26,6 +26,9 @@ pub enum ComponentKind {
 pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
     fn kind(&self) -> ComponentKind;
     fn display_value(&self, schema: &FieldSchema) -> String;
+    fn display_value_with_limit(&self, schema: &FieldSchema, _max_visible: usize) -> String {
+        self.display_value(schema)
+    }
     fn handle_key(&mut self, schema: &FieldSchema, key: &KeyEvent) -> bool {
         let _ = (schema, key);
         false
@@ -102,8 +105,16 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
         None
     }
 
+    fn collection_panel_with_limit(&self, _max_visible: usize) -> Option<(Vec<String>, usize)> {
+        self.collection_panel()
+    }
+
     fn collection_selected_label(&self) -> Option<String> {
         None
+    }
+
+    fn collection_selected_label_with_limit(&self, _max_visible: usize) -> Option<String> {
+        self.collection_selected_label()
     }
 
     fn collection_selected_index(&self) -> Option<usize> {

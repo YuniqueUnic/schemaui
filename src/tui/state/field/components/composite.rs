@@ -38,6 +38,10 @@ impl FieldComponent for CompositeComponent {
         self.view.display_label(&self.state)
     }
 
+    fn display_value_with_limit(&self, _schema: &FieldSchema, max_visible: usize) -> String {
+        self.view.display_label_with_limit(&self.state, max_visible)
+    }
+
     fn handle_key(&mut self, _schema: &FieldSchema, key: &crossterm::event::KeyEvent) -> bool {
         match key.code {
             KeyCode::Left => self.state.rotate_single(-1),
@@ -110,6 +114,19 @@ impl CompositeViewAdapter {
         } else {
             label.push_str(self.palette.composite.single_variant_hint.as_ref());
         }
+        label
+    }
+
+    fn display_label_with_limit(&self, state: &CompositeState, max_visible: usize) -> String {
+        let hint = if state.is_multi() {
+            self.palette.composite.multi_variant_hint.as_ref()
+        } else {
+            self.palette.composite.single_variant_hint.as_ref()
+        };
+        let hint_width = unicode_width::UnicodeWidthStr::width(hint);
+        let summary_budget = max_visible.saturating_sub(hint_width).max(1);
+        let mut label = state.summary_with_preview_limit(summary_budget);
+        label.push_str(hint);
         label
     }
 

@@ -53,9 +53,13 @@ pub fn render_fields(
         return;
     }
 
-    let content_width = field_area
+    let value_panel_width = field_area
         .width
         .saturating_sub(8 + highlight_symbol_width());
+    let text_line_width = value_panel_width.saturating_add(
+        (UnicodeWidthStr::width(VALUE_BORDER_PREFIX) + UnicodeWidthStr::width(VALUE_BORDER_SUFFIX))
+            as u16,
+    );
     let mut items = Vec::with_capacity(section.fields.len());
     let mut cursor_hint: Option<CursorHint> = None;
     let mut field_heights = Vec::with_capacity(section.fields.len());
@@ -63,7 +67,12 @@ pub fn render_fields(
     let viewport_top = section.scroll_offset;
 
     for (idx, field) in section.fields.iter().enumerate() {
-        let render = build_field_render(field, idx == selected_index, content_width);
+        let render = build_field_render(
+            field,
+            idx == selected_index,
+            value_panel_width,
+            text_line_width,
+        );
         if idx == selected_index
             && let Some(hint) = render.cursor_hint
         {
@@ -157,12 +166,17 @@ struct CursorHint {
     column_offset: u16,
 }
 
-fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> FieldRender {
+fn build_field_render(
+    field: &FieldState,
+    is_selected: bool,
+    value_width: u16,
+    text_width: u16,
+) -> FieldRender {
     let mut lines = Vec::new();
     lines.push(info_line(field, is_selected));
-    let (value_panel, cursor_hint) = value_panel_lines(field, is_selected, max_width);
+    let (value_panel, cursor_hint) = value_panel_lines(field, is_selected, value_width);
     lines.extend(value_panel);
-    lines.extend(meta_lines(field, is_selected, max_width));
+    lines.extend(meta_lines(field, is_selected, text_width));
 
     if is_selected {
         if let Some(selector_lines) = composite_selector_lines(field) {
@@ -173,12 +187,12 @@ fn build_field_render(field: &FieldState, is_selected: bool, max_width: u16) -> 
             lines.extend(summary);
         }
 
-        if let Some(summary) = repeatable_summary_lines(field) {
+        if let Some(summary) = repeatable_summary_lines(field, text_width) {
             lines.extend(summary);
         }
     }
 
-    if let Some(error) = error_lines(field, max_width) {
+    if let Some(error) = error_lines(field, text_width) {
         lines.extend(error);
     }
 
@@ -222,7 +236,7 @@ fn value_panel_lines(
     max_width: u16,
 ) -> (Vec<Line<'static>>, Option<CursorHint>) {
     let clamp_width = max_width.max(4) as usize;
-    let value_text = field.display_value();
+    let value_text = field.display_value_with_limit(clamp_width.saturating_mul(3));
     let cursor_offset = field
         .cursor_offset()
         .unwrap_or_else(|| value_text.chars().count());
@@ -530,8 +544,13 @@ fn composite_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
     Some(lines)
 }
 
-fn repeatable_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
-    if let Some((entries, selected)) = field.composite_list_panel() {
+fn repeatable_summary_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>> {
+    let entry_prefix = "  » ";
+    let entry_width = max_width
+        .saturating_sub(UnicodeWidthStr::width(entry_prefix) as u16)
+        .max(1) as usize;
+
+    if let Some((entries, selected)) = field.composite_list_panel_with_limit(entry_width) {
         if entries.is_empty() {
             return None;
         }
@@ -540,7 +559,10 @@ fn repeatable_summary_lines(field: &FieldState) -> Option<Vec<Line<'static>>> {
         let max_render = 4usize;
         for (idx, entry) in entries.iter().enumerate().take(max_render) {
             let marker = if idx == selected { "»" } else { " " };
-            lines.push(Line::from(format!("  {marker} {entry}")));
+            lines.push(Line::from(format!(
+                "  {marker} {}",
+                truncate_line(entry, entry_width)
+            )));
         }
         if entries.len() > max_render {
             lines.push(Line::from(format!(
@@ -778,6 +800,16 @@ fn truncate_line_with_ellipsis(line: &mut String, max_width: usize) {
     }
 }
 
+fn truncate_line(line: &str, max_width: usize) -> String {
+    if UnicodeWidthStr::width(line) <= max_width {
+        return line.to_string();
+    }
+
+    let mut owned = line.to_string();
+    truncate_line_with_ellipsis(&mut owned, max_width);
+    owned
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -808,7 +840,7 @@ mod tests {
     #[test]
     fn cursor_hint_includes_border_and_highlight_width() {
         let field = field_with_value("汉字");
-        let render = build_field_render(&field, true, 10);
+        let render = build_field_render(&field, true, 10, 12);
         let hint = render
             .cursor_hint
             .expect("cursor hint present for selected field");

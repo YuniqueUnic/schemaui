@@ -80,12 +80,29 @@ impl FieldState {
         self.component.collection_selected_label()
     }
 
+    pub fn composite_list_selected_label_with_limit(&self, max_visible: usize) -> Option<String> {
+        self.component
+            .collection_selected_label_with_limit(max_visible)
+    }
+
     pub fn collection_selected_label(&self) -> Option<String> {
         self.component.collection_selected_label()
     }
 
+    pub fn collection_selected_label_with_limit(&self, max_visible: usize) -> Option<String> {
+        self.component
+            .collection_selected_label_with_limit(max_visible)
+    }
+
     pub fn composite_list_panel(&self) -> Option<(Vec<String>, usize)> {
         self.component.collection_panel()
+    }
+
+    pub fn composite_list_panel_with_limit(
+        &self,
+        max_visible: usize,
+    ) -> Option<(Vec<String>, usize)> {
+        self.component.collection_panel_with_limit(max_visible)
     }
 
     pub fn composite_list_selected_index(&self) -> Option<usize> {
