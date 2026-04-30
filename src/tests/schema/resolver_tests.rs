@@ -1,5 +1,4 @@
-use crate::schema::resolver::SchemaResolver;
-use schemars::schema::RootSchema;
+use crate::schema::{loader::load_root_schema, resolver::SchemaResolver};
 use serde_json::json;
 
 #[test]
@@ -18,10 +17,9 @@ fn resolves_definition_reference() {
             "timeout": {"$ref": "#/definitions/duration"}
         }
     });
-    let root: RootSchema = serde_json::from_value(raw.clone()).expect("valid root schema");
-    let resolver = SchemaResolver::new(&raw, &root);
+    let root = load_root_schema(&raw).expect("valid root schema");
+    let resolver = SchemaResolver::new(&raw);
     let timeout_schema = root
-        .schema
         .object
         .as_ref()
         .unwrap()
@@ -56,10 +54,9 @@ fn resolves_pointer_reference() {
             "clone": {"$ref": "#/properties/base"}
         }
     });
-    let root: RootSchema = serde_json::from_value(raw.clone()).expect("valid root schema");
-    let resolver = SchemaResolver::new(&raw, &root);
+    let root = load_root_schema(&raw).expect("valid root schema");
+    let resolver = SchemaResolver::new(&raw);
     let clone_schema = root
-        .schema
         .object
         .as_ref()
         .unwrap()
@@ -95,10 +92,9 @@ fn preserves_instance_metadata_and_extensions_when_resolving_reference() {
             }
         }
     });
-    let root: RootSchema = serde_json::from_value(raw.clone()).expect("valid root schema");
-    let resolver = SchemaResolver::new(&raw, &root);
+    let root = load_root_schema(&raw).expect("valid root schema");
+    let resolver = SchemaResolver::new(&raw);
     let timeout_schema = root
-        .schema
         .object
         .as_ref()
         .unwrap()
@@ -122,9 +118,8 @@ fn preserves_instance_metadata_and_extensions_when_resolving_reference() {
     );
     assert_eq!(
         resolved.instance_type,
-        root.definitions["duration"]
-            .clone()
-            .into_object()
+        load_root_schema(&raw["definitions"]["duration"])
+            .expect("definition schema")
             .instance_type
     );
 }
@@ -145,10 +140,9 @@ fn preserves_instance_metadata_for_pointer_references() {
             }
         }
     });
-    let root: RootSchema = serde_json::from_value(raw.clone()).expect("valid root schema");
-    let resolver = SchemaResolver::new(&raw, &root);
+    let root = load_root_schema(&raw).expect("valid root schema");
+    let resolver = SchemaResolver::new(&raw);
     let clone_schema = root
-        .schema
         .object
         .as_ref()
         .unwrap()
