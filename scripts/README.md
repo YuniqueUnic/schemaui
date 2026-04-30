@@ -18,6 +18,31 @@
 - 运行 pnpm build:embedded
 - 生成生产环境的静态文件
 
+#### feature-matrix.sh
+
+运行 Rust feature matrix 编译测试的脚本。
+
+```bash
+./scripts/feature-matrix.sh smoke
+./scripts/feature-matrix.sh exhaustive
+```
+
+- `smoke`：跑默认 smoke matrix
+- `exhaustive`：设置 `SCHEMAUI_EXHAUSTIVE_FEATURE_MATRIX=1` 跑全量合法组合
+- 优先使用 `uv run --with pytest`；若本机已安装 `python3 + pytest` 也可直接运行
+- 默认开启 live progress 输出，避免多轮 `cargo check` 时看起来像“卡住”
+
+#### deps-duplicates.sh
+
+查看 workspace 全量 feature 图中的重复依赖：
+
+```bash
+./scripts/deps-duplicates.sh
+```
+
+- 等价于 `cargo tree --duplicates --workspace --all-features`
+- 用于配合 compile-time 优化与依赖审计
+
 ### 更新脚本
 
 #### update-cli-dependency.sh
@@ -122,3 +147,5 @@ kill -9 <PID>  # 终止进程
 - [构建文档](../docs/en/structure_design.md)
 - [测试文档](../tests/README.md)
 - [justfile](../justfile) - Make 替代工具配置
+- `just feature-matrix` / `just feature-matrix-exhaustive`
+- `just deps-duplicates`

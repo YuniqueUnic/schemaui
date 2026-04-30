@@ -28,6 +28,18 @@ install-prek:
 test:
     cargo test --workspace -F full
 
+# run the Rust feature-matrix smoke test
+feature-matrix:
+    ./scripts/feature-matrix.sh smoke
+
+# run the exhaustive Rust feature-matrix test
+feature-matrix-exhaustive:
+    ./scripts/feature-matrix.sh exhaustive
+
+# inspect duplicate dependencies in the full workspace feature graph
+deps-duplicates:
+    ./scripts/deps-duplicates.sh
+
 # build the web ui into web/dist (Unix: bash, macOS, Linux)
 [unix]
 build-web:

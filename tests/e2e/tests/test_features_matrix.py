@@ -13,6 +13,7 @@ from __future__ import annotations
 import itertools
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -56,6 +57,16 @@ def feature_flags(features: tuple[str, ...]) -> list[str]:
     return ["--features", ",".join(features)]
 
 
+def feature_label(features: tuple[str, ...]) -> str:
+    if not features:
+        return "<none>"
+    return ",".join(features)
+
+
+def progress_label(index: int, total: int, package: str, features: tuple[str, ...]) -> str:
+    return f"[{index}/{total}] {package} {feature_label(features)}"
+
+
 def env_with_warnings_denied(package: str) -> dict[str, str]:
     env = os.environ.copy()
     env["CARGO_TARGET_DIR"] = str(target_dir(package))
@@ -64,7 +75,14 @@ def env_with_warnings_denied(package: str) -> dict[str, str]:
     return env
 
 
-def run_check(package: str, features: tuple[str, ...], *, no_default: bool) -> subprocess.CompletedProcess[str]:
+def run_check(
+    package: str,
+    features: tuple[str, ...],
+    *,
+    no_default: bool,
+    expect_failure: bool = False,
+    progress: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     cmd = [
         "cargo",
         "check",
@@ -76,17 +94,40 @@ def run_check(package: str, features: tuple[str, ...], *, no_default: bool) -> s
     if no_default:
         cmd.append("--no-default-features")
     cmd.extend(feature_flags(features))
-    return subprocess.run(
+    label = progress or f"{package} {feature_label(features)}"
+    print(f"[feature-matrix] {label} checking", flush=True)
+    started_at = time.perf_counter()
+    result = subprocess.run(
         cmd,
         cwd=project_root(),
         capture_output=True,
         text=True,
         env=env_with_warnings_denied(package),
     )
+    elapsed = time.perf_counter() - started_at
+    if expect_failure:
+        status = (
+            f"expected-failure({result.returncode})"
+            if result.returncode != 0
+            else "unexpected-success"
+        )
+    else:
+        status = "ok" if result.returncode == 0 else f"failed({result.returncode})"
+    print(
+        f"[feature-matrix] {label} finished status={status} duration={elapsed:.2f}s",
+        flush=True,
+    )
+    return result
 
 
-def assert_check_ok(package: str, features: tuple[str, ...], *, no_default: bool) -> None:
-    result = run_check(package, features, no_default=no_default)
+def assert_check_ok(
+    package: str,
+    features: tuple[str, ...],
+    *,
+    no_default: bool,
+    progress: str | None = None,
+) -> None:
+    result = run_check(package, features, no_default=no_default, progress=progress)
     assert result.returncode == 0, (
         f"cargo check failed for package={package}, no_default={no_default}, features={features}\n"
         f"stdout:\n{result.stdout}\n\n"
@@ -95,7 +136,12 @@ def assert_check_ok(package: str, features: tuple[str, ...], *, no_default: bool
 
 
 def assert_missing_format_error(package: str, features: tuple[str, ...]) -> None:
-    result = run_check(package, features, no_default=True)
+    result = run_check(
+        package,
+        features,
+        no_default=True,
+        expect_failure=True,
+    )
     combined = f"{result.stdout}\n{result.stderr}"
     assert result.returncode != 0, (
         f"expected missing-format failure for package={package}, features={features}, but cargo check succeeded"
@@ -134,6 +180,7 @@ def test_frontend_only_builds_require_document_formats(
 
 
 def test_smoke_feature_matrix_compiles() -> None:
+    print("[feature-matrix] running smoke matrix", flush=True)
     assert_check_ok("schemaui", (), no_default=False)
     assert_check_ok("schemaui", ("json",), no_default=True)
     assert_check_ok("schemaui", ("json", "tui"), no_default=True)
@@ -156,11 +203,31 @@ def test_exhaustive_feature_matrix_compiles() -> None:
             f"set {EXHAUSTIVE_ENV}=1 to enable exhaustive feature-matrix checks"
         )
 
+    schemaui_subsets = valid_feature_subsets(SCHEMAUI_BASE_FEATURES)
+    cli_subsets = valid_feature_subsets(SCHEMAUI_CLI_BASE_FEATURES)
+    print(
+        "[feature-matrix] running exhaustive matrix "
+        f"(schemaui={len(schemaui_subsets)} combos, "
+        f"schemaui-cli={len(cli_subsets)} combos)",
+        flush=True,
+    )
+    total_progress = len(schemaui_subsets) + len(cli_subsets)
+
     assert_check_ok("schemaui", (), no_default=False)
-    for combo in valid_feature_subsets(SCHEMAUI_BASE_FEATURES):
-        assert_check_ok("schemaui", combo, no_default=True)
-    for combo in valid_feature_subsets(SCHEMAUI_CLI_BASE_FEATURES):
-        assert_check_ok("schemaui-cli", combo, no_default=True)
+    for index, combo in enumerate(schemaui_subsets, start=1):
+        assert_check_ok(
+            "schemaui",
+            combo,
+            no_default=True,
+            progress=progress_label(index, total_progress, "schemaui", combo),
+        )
+    for index, combo in enumerate(cli_subsets, start=len(schemaui_subsets) + 1):
+        assert_check_ok(
+            "schemaui-cli",
+            combo,
+            no_default=True,
+            progress=progress_label(index, total_progress, "schemaui-cli", combo),
+        )
 
     assert_check_ok("schemaui", ("all_formats",), no_default=True)
     assert_check_ok("schemaui", ("full",), no_default=True)

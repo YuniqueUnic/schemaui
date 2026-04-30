@@ -56,11 +56,9 @@ jsonschema = "0.46"
 ratatui = "0.30"
 schemars = { version = "0.8.22", features = ["preserve_order"] }
 serde = { version = "1", features = ["derive"] }
-indexmap = "2"
 percent-encoding = "2"
 sha2 = "0.11"
 unicode-width = "=0.2"
-textwrap = "0.16"
 regex = "1"
 include_dir = { version = "0.7", optional = true }
 axum = { version = "0.8", features = ["macros", "json"], optional = true }
@@ -103,7 +101,7 @@ path = "examples/web_snapshot_codegen.rs"
 required-features = ["web", "precompile"]
 
 [dev-dependencies]
-reqwest = { version = "0.13", features = ["blocking", "json"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json"] }
 
 [build-dependencies]
 serde = { version = "1", features = ["derive"] }
