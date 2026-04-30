@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "remote-schema")]
 use std::time::Duration;
 
-use eyre::{Report, Result, WrapErr, eyre};
+use anyhow::{Context, Result, anyhow};
 use schemaui::{
     DocumentFormat, DocumentFormatProbe, looks_like_json_schema, parse_document_str,
     schema_from_data_value,
@@ -106,13 +106,11 @@ pub(crate) fn load_document(
                     origin: DocumentOrigin::Inline,
                 })
             } else {
-                Err(Report::new(err)
-                    .wrap_err(format!("failed to load {label} from {}", path.display())))
+                Err(anyhow!(err).context(format!("failed to load {label} from {}", path.display())))
             }
         }
         Err(err) => {
-            Err(Report::new(err)
-                .wrap_err(format!("failed to load {label} from {}", path.display())))
+            Err(anyhow!(err).context(format!("failed to load {label} from {}", path.display())))
         }
     }
 }
@@ -146,7 +144,7 @@ pub(crate) fn resolve_session_inputs(
     } else if let Some(config) = config.as_ref() {
         schema_from_data_value(&config.value)
     } else {
-        return Err(eyre!("provide at least --schema or --config"));
+        return Err(anyhow!("provide at least --schema or --config"));
     };
 
     Ok(ResolvedSessionInputs {
@@ -187,7 +185,7 @@ fn load_schema_reference(reference: &str, base: Option<&DocumentOrigin>) -> Resu
     match location {
         ReferenceLocation::File(path) => {
             let raw = fs::read_to_string(&path)
-                .wrap_err_with(|| format!("failed to read schema file {}", path.display()))?;
+                .with_context(|| format!("failed to read schema file {}", path.display()))?;
             parse_contents(&raw, format, "schema")
         }
         ReferenceLocation::Url(url) => {
@@ -206,7 +204,7 @@ fn resolve_schema_reference(
             "file" => {
                 let path = url
                     .to_file_path()
-                    .map_err(|_| eyre!("invalid file:// schema reference: {url}"))?;
+                    .map_err(|_| anyhow!("invalid file:// schema reference: {url}"))?;
                 Ok(ReferenceLocation::File(path))
             }
             _ => Ok(ReferenceLocation::Url(url)),
@@ -227,18 +225,18 @@ fn resolve_schema_reference(
         Some(DocumentOrigin::Url(url)) => {
             let joined = url
                 .join(reference)
-                .wrap_err_with(|| format!("failed to resolve schema reference '{reference}'"))?;
+                .with_context(|| format!("failed to resolve schema reference '{reference}'"))?;
             if joined.scheme() == "file" {
                 let path = joined
                     .to_file_path()
-                    .map_err(|_| eyre!("invalid file:// schema reference: {joined}"))?;
+                    .map_err(|_| anyhow!("invalid file:// schema reference: {joined}"))?;
                 Ok(ReferenceLocation::File(path))
             } else {
                 Ok(ReferenceLocation::Url(joined))
             }
         }
         Some(DocumentOrigin::Inline) | Some(DocumentOrigin::Stdin) | None => {
-            let cwd = env::current_dir().wrap_err("failed to resolve current working directory")?;
+            let cwd = env::current_dir().context("failed to resolve current working directory")?;
             Ok(ReferenceLocation::File(cwd.join(reference_path)))
         }
     }
@@ -261,7 +259,7 @@ fn format_for_reference_location(location: &ReferenceLocation) -> Result<Documen
         DocumentFormatProbe::UnsupportedFeature {
             format_name,
             feature_flag,
-        } => Err(eyre!(
+        } => Err(anyhow!(
             "schema reference {} requires {format_name} support, but this build lacks the '{feature_flag}' feature",
             reference_location_label(location)
         )),
@@ -367,9 +365,9 @@ fn load_document_from_url(url: Url, format: DocumentFormat, label: &str) -> Resu
         "file" => {
             let path = url
                 .to_file_path()
-                .map_err(|_| eyre!("invalid file:// URL for {label}: {url}"))?;
+                .map_err(|_| anyhow!("invalid file:// URL for {label}: {url}"))?;
             let raw = fs::read_to_string(&path)
-                .wrap_err_with(|| format!("failed to read {label} file {}", path.display()))?;
+                .with_context(|| format!("failed to read {label} file {}", path.display()))?;
             let value = parse_contents(&raw, format, label)?;
             Ok(LoadedDocument {
                 value,
@@ -391,10 +389,10 @@ fn load_document_from_url(url: Url, format: DocumentFormat, label: &str) -> Resu
             let mut response = client
                 .get(url.as_str())
                 .call()
-                .wrap_err_with(|| format!("failed to fetch {label} from {url}"))?;
+                .with_context(|| format!("failed to fetch {label} from {url}"))?;
             let status = response.status();
             if !status.is_success() {
-                return Err(eyre!(
+                return Err(anyhow!(
                     "failed to fetch {label} from {url}: HTTP {}",
                     status.as_u16()
                 ));
@@ -402,7 +400,7 @@ fn load_document_from_url(url: Url, format: DocumentFormat, label: &str) -> Resu
             let raw = response
                 .body_mut()
                 .read_to_string()
-                .wrap_err_with(|| format!("failed to read {label} response body from {url}"))?;
+                .with_context(|| format!("failed to read {label} response body from {url}"))?;
             let value = parse_contents(&raw, format, label)?;
             Ok(LoadedDocument {
                 value,
@@ -416,10 +414,10 @@ fn load_document_from_url(url: Url, format: DocumentFormat, label: &str) -> Resu
             })
         }
         #[cfg(not(feature = "remote-schema"))]
-        "http" | "https" => Err(eyre!(
+        "http" | "https" => Err(anyhow!(
             "remote schema support is disabled in this build; re-enable the 'remote-schema' feature to load {label} from {url}"
         )),
-        _ => Err(eyre!("unsupported URL scheme for {label}: {url}")),
+        _ => Err(anyhow!("unsupported URL scheme for {label}: {url}")),
     }
 }
 
@@ -468,7 +466,7 @@ fn read_stdin() -> Result<String> {
     let mut buffer = String::new();
     io::stdin()
         .read_to_string(&mut buffer)
-        .wrap_err("failed to read from stdin")?;
+        .context("failed to read from stdin")?;
     Ok(buffer)
 }
 
@@ -484,7 +482,7 @@ fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result
                     return Ok(value);
                 }
             }
-            Err(eyre!(
+            Err(anyhow!(
                 "failed to parse {label}: tried {} (first error: {primary})",
                 DocumentFormat::format_list()
             ))

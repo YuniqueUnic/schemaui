@@ -1,6 +1,6 @@
 use std::fs;
 
-use eyre::{Report, Result};
+use anyhow::Result;
 use schemaui::SchemaUI;
 use schemaui::precompile::web::{
     build_session_snapshot, write_session_snapshot_json, write_session_snapshot_ts_module,
@@ -44,9 +44,9 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
         port: cmd.port,
     };
 
-    let value = ui.run_web(serve).map_err(Report::msg)?;
+    let value = ui.run_web(serve)?;
     if let Some(options) = output {
-        options.write(&value).map_err(Report::msg)?;
+        options.write(&value)?;
     }
     Ok(())
 }
@@ -80,9 +80,8 @@ pub fn run_snapshot_cli(cmd: WebSnapshotCommand) -> Result<()> {
         &mut diagnostics,
     );
     diagnostics.into_result()?;
-    let resolved = resolve_session_inputs(schema_document, config_document).map_err(Report::msg)?;
-    let mut snapshot = build_session_snapshot(&resolved.schema, resolved.defaults.as_ref())
-        .map_err(Report::msg)?;
+    let resolved = resolve_session_inputs(schema_document, config_document)?;
+    let mut snapshot = build_session_snapshot(&resolved.schema, resolved.defaults.as_ref())?;
     if let Some(title) = cmd.common.title {
         snapshot.title = Some(title);
     }
@@ -94,8 +93,8 @@ pub fn run_snapshot_cli(cmd: WebSnapshotCommand) -> Result<()> {
     let json_out = cmd.out_dir.join("session_snapshot.json");
     let ts_out = cmd.out_dir.join("session_snapshot.ts");
 
-    write_session_snapshot_json(&snapshot, &json_out).map_err(Report::msg)?;
-    write_session_snapshot_ts_module(&snapshot, &ts_out, &cmd.ts_export).map_err(Report::msg)?;
+    write_session_snapshot_json(&snapshot, &json_out)?;
+    write_session_snapshot_ts_module(&snapshot, &ts_out, &cmd.ts_export)?;
 
     eprintln!("Generated Web precompile snapshots:");
     eprintln!("  JSON:      {:?}", json_out);

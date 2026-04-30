@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
-use eyre::{Report, Result, WrapErr};
+use anyhow::{Context, Result, anyhow};
 use schemaui::{DocumentFormat, parse_document_str};
 use serde_json::Value;
 
@@ -26,7 +26,7 @@ pub fn load_value(spec: &str, format: DocumentFormat, label: &str) -> Result<Val
                 let inline_label = format!("inline {label}");
                 return parse_contents(spec, format, &inline_label);
             }
-            Err(err.wrap_err(format!("failed to load {label} from {}", path.display())))
+            Err(err.context(format!("failed to load {label} from {}", path.display())))
         }
     }
 }
@@ -37,11 +37,11 @@ fn read_from_source(source: &InputSource) -> Result<String> {
             let mut buffer = String::new();
             io::stdin()
                 .read_to_string(&mut buffer)
-                .wrap_err("failed to read from stdin")?;
+                .context("failed to read from stdin")?;
             Ok(buffer)
         }
         InputSource::File(path) => fs::read_to_string(path)
-            .wrap_err_with(|| format!("failed to read file {}", path.display())),
+            .with_context(|| format!("failed to read file {}", path.display())),
     }
 }
 
@@ -57,15 +57,15 @@ fn parse_contents(contents: &str, format: DocumentFormat, label: &str) -> Result
                     return Ok(value);
                 }
             }
-            Err(Report::msg(format!(
+            Err(anyhow!(
                 "failed to parse {label}: tried {} (first error: {primary})",
                 DocumentFormat::format_list()
-            )))
+            ))
         }
     }
 }
 
-pub fn is_not_found(err: &Report) -> bool {
+pub fn is_not_found(err: &anyhow::Error) -> bool {
     err.downcast_ref::<io::Error>()
         .is_some_and(|io_err| io_err.kind() == io::ErrorKind::NotFound)
 }

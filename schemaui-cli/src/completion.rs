@@ -1,7 +1,7 @@
 use std::path::Path;
 
+use anyhow::Result;
 use clap_complete::{Shell, generate};
-use eyre::Result;
 
 use crate::cli::{CompletionCommand, CompletionShell, command_info};
 

@@ -1,4 +1,4 @@
-use eyre::{Result, eyre};
+use anyhow::{Result, anyhow};
 
 use crate::cli::CommonArgs;
 
@@ -51,7 +51,7 @@ pub fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
     diagnostics.into_result()?;
 
     if schema_document.is_none() && config_document.is_none() {
-        return Err(eyre!("provide at least --schema or --config"));
+        return Err(anyhow!("provide at least --schema or --config"));
     }
     let resolved = resolve_session_inputs(schema_document, config_document)?;
 

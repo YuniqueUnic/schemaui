@@ -1,6 +1,6 @@
 use std::fs;
 
-use eyre::{Report, Result};
+use anyhow::Result;
 use schemaui::SchemaUI;
 use schemaui::precompile::tui as pre_tui;
 
@@ -34,9 +34,9 @@ pub(crate) fn execute_session(session: SessionBundle) -> Result<()> {
     if let Some(description) = description {
         ui = ui.with_description(description);
     }
-    let value = ui.run_tui().map_err(Report::msg)?;
+    let value = ui.run_tui()?;
     if let Some(options) = output {
-        options.write(&value).map_err(Report::msg)?;
+        options.write(&value)?;
     }
     Ok(())
 }
@@ -70,7 +70,7 @@ pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {
         &mut diagnostics,
     );
     diagnostics.into_result()?;
-    let resolved = resolve_session_inputs(schema_document, config_document).map_err(Report::msg)?;
+    let resolved = resolve_session_inputs(schema_document, config_document)?;
 
     fs::create_dir_all(&cmd.out_dir)?;
     let tui_module = cmd.out_dir.join("tui_artifacts.rs");
@@ -82,22 +82,19 @@ pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {
         resolved.defaults.as_ref(),
         &tui_module,
         &cmd.tui_fn,
-    )
-    .map_err(Report::msg)?;
+    )?;
     pre_tui::generate_tui_form_schema_module_from_value(
         &resolved.schema,
         resolved.defaults.as_ref(),
         &form_module,
         &cmd.form_fn,
-    )
-    .map_err(Report::msg)?;
+    )?;
     pre_tui::generate_tui_layout_nav_module_from_value(
         &resolved.schema,
         resolved.defaults.as_ref(),
         &layout_module,
         &cmd.layout_fn,
-    )
-    .map_err(Report::msg)?;
+    )?;
 
     eprintln!("Generated TUI artifact modules:");
     eprintln!("  TuiArtifacts module:    {:?}", tui_module);

@@ -108,11 +108,11 @@ serde_json = "1"
 ```
 
 ```rust,ignore
+use anyhow::Result;
 use schemaui::prelude::*;
 use serde_json::json;
 
-fn main() -> color_eyre::Result<()> {
-    color_eyre::install()?;
+fn main() -> Result<()> {
     let schema = json!({
         "$schema": "http://json-schema.org/draft-07/schema#",
         "title": "Service Runtime",
@@ -545,7 +545,7 @@ schemaui \
 ```
 
 ```text
-┌────────┐  argh args   ┌──────────────┐ read stdin/files ┌─────────────┐
+┌────────┐  clap args   ┌──────────────┐ read stdin/files ┌─────────────┐
 │  CLI   ├─────────────▶│ InputSource  ├─────────────────▶│ io::input   │
 └────┬───┘              └──────┬───────┘                  └────┬────────┘
      │ diagnostics             │ schema/default Value          │
@@ -575,10 +575,8 @@ schemaui \
 - Flags – `--no-pretty` toggles compact output, `--force/--yes` allows
   overwriting files, and `--title` / `--description` wire through to
   `SchemaUI::with_title` / `SchemaUI::with_description`.
-- Shell completion – `schemaui completion <bash|zsh|fish|nushell>` emits
-  completion scripts from the same `argh` command graph. PowerShell is not
-  exposed yet because upstream `argh_complete` does not currently ship a
-  PowerShell generator.
+- Shell completion – `schemaui completion <bash|zsh|fish|powershell>` emits
+  completion scripts from the same `clap` command graph via `clap_complete`.
 
 ## Key Dependencies
 
@@ -591,7 +589,7 @@ schemaui \
 | `crossterm`                                 | Terminal events consumed by `InputRouter`.                     |
 | `indexmap`                                  | Order-preserving maps for schema traversal.                    |
 | `once_cell`                                 | Lazy parsing of the keymap JSON.                               |
-| `argh`, `argh_complete`, `color-eyre` (CLI) | Argument parsing, shell completion, and ergonomic diagnostics. |
+| `clap`, `clap_complete`, `anyhow` (CLI)     | Argument parsing, shell completion, and ergonomic diagnostics. |
 
 ## Documentation Map
 
