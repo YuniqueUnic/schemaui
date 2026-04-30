@@ -113,8 +113,7 @@ behaviour.
 File: `src/tui/app/validation.rs` + `tui::state::reducers`.
 
 1. The core pipeline (`SchemaPipeline` + `FrontendContext`) compiles a
-   `jsonschema::Validator` up front (panics become `color-eyre` reports with
-   context).
+   `jsonschema::Validator` up front (panics become `eyre` reports with context).
 2. Each edit emits `FormCommand::FieldEdited { pointer }`. The `FormEngine`
    reconstructs the JSON value via `FormState::try_build_value` and feeds it
    into the validator.

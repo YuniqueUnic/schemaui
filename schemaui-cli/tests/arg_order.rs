@@ -1,4 +1,8 @@
-use schemaui_cli::cli::{Cli, Commands, CompletionShell};
+use schemaui_cli::cli::Cli;
+#[cfg(any(feature = "completion", feature = "tui", feature = "web"))]
+use schemaui_cli::cli::Commands;
+#[cfg(feature = "completion")]
+use schemaui_cli::cli::CompletionShell;
 
 #[test]
 fn defaults_to_tui_when_no_subcommand_is_provided() {
@@ -73,6 +77,7 @@ fn subcommand_description_overrides_root_description_during_merge() {
     assert_eq!(merged.description.as_deref(), Some("local description"));
 }
 
+#[cfg(feature = "completion")]
 #[test]
 fn explicit_completion_subcommand_remains_completion() {
     let cli = Cli::parse_from(["schemaui", "completion", "bash"]);

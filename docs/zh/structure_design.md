@@ -100,7 +100,7 @@ schema 而不是遇到未定义的行为。
 文件：`src/tui/app/validation.rs` + `tui::state::reducers`。
 
 1. 核心管线（`SchemaPipeline` + `FrontendContext`）会预先编译
-   `jsonschema::Validator`（panic 成为带上下文的 `color-eyre` 报告）。
+   `jsonschema::Validator`（panic 成为带上下文的 `eyre` 报告）。
 2. 每次编辑发出 `FormCommand::FieldEdited { pointer }`。`FormEngine` 通过
    `FormState::try_build_value` 重建 JSON 值并将其馈送到验证器。
 3. `ValidationOutcome::Invalid` 清除旧错误，通过 `FormState::set_error`

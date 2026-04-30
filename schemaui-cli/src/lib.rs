@@ -1,4 +1,5 @@
 pub mod cli;
+#[cfg(feature = "completion")]
 pub mod completion;
 pub mod io;
 pub mod session;

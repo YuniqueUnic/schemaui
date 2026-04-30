@@ -2,10 +2,10 @@
 
 `schemaui-cli` is the official command-line wrapper around the `schemaui`
 library. It accepts JSON Schema + config snapshots, defaults to the interactive
-TUI when no mode subcommand is provided, and also exposes explicit `completion`,
-`tui`, `web`, `tui-snapshot`, and `web-snapshot` subcommands. This guide mirrors
-the actual code in `schemaui-cli/src/main.rs` so the behaviour stays
-predictable.
+TUI when no mode subcommand is provided, and can expose explicit `completion`
+(feature-gated), `tui`, `web`, `tui-snapshot`, and `web-snapshot` subcommands.
+This guide mirrors the actual code in `schemaui-cli/src/main.rs` so the
+behaviour stays predictable.
 
 ## 1. Install & Run
 
@@ -84,7 +84,14 @@ schemaui tui --schema ./schema.json
 
 ### Shell completion
 
-`schemaui-cli` now ships a `clap_complete`-backed completion generator:
+Builds with the `completion` feature include a `clap_complete`-backed completion
+generator. To keep the default binary slimmer, this subcommand is feature-gated:
+
+```bash
+cargo install schemaui-cli --features completion
+```
+
+Then you can generate shell completions with:
 
 ```bash
 schemaui completion bash > ~/.local/share/bash-completion/completions/schemaui
@@ -230,7 +237,7 @@ schemaui tui \
   --config ./config.json -o -
 ```
 
-### Generate a completion script
+### Generate a completion script (`completion` feature)
 
 ```bash
 schemaui completion bash
@@ -244,8 +251,8 @@ schemaui completion bash
 - **Format inference** – `resolve_format_hint` warns when an extension requires
   a disabled feature (e.g., `.yaml` without the `yaml` feature). The CLI stops
   immediately instead of failing later during serialization.
-- **Runtime errors** – everything else bubbles through `color-eyre`, so stack
-  traces include context like `failed to parse config as yaml` or
+- **Runtime errors** – everything else bubbles through `eyre`, so stack traces
+  include context like `failed to parse config as yaml` or
   `failed to compile JSON schema`.
 
 ## 8. Library Interop

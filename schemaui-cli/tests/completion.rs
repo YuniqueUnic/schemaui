@@ -1,3 +1,5 @@
+#![cfg(feature = "completion")]
+
 #[cfg(any(feature = "tui", feature = "web"))]
 use assert_cmd::cargo::cargo_bin_cmd;
 #[cfg(any(feature = "tui", feature = "web"))]

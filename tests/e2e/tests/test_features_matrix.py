@@ -33,6 +33,7 @@ SCHEMAUI_CLI_BASE_FEATURES = (
     "json",
     "yaml",
     "toml",
+    "completion",
     "tui",
     "web",
     "web-types",
@@ -194,6 +195,7 @@ def test_smoke_feature_matrix_compiles() -> None:
 
     assert_check_ok("schemaui-cli", (), no_default=False)
     assert_check_ok("schemaui-cli", ("json",), no_default=True)
+    assert_check_ok("schemaui-cli", ("json", "completion"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "tui"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "web"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "web", "web-types"), no_default=True)

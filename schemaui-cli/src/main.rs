@@ -4,9 +4,12 @@
 use clap::CommandFactory;
 use eyre::Result;
 
+use schemaui_cli::cli::Cli;
+#[cfg(any(feature = "completion", feature = "tui", feature = "web"))]
+use schemaui_cli::cli::Commands;
 #[cfg(feature = "tui")]
 use schemaui_cli::cli::TuiSnapshotCommand;
-use schemaui_cli::cli::{Cli, Commands};
+#[cfg(feature = "completion")]
 use schemaui_cli::completion;
 #[cfg(feature = "tui")]
 use schemaui_cli::tui;
@@ -22,6 +25,7 @@ fn main() -> Result<()> {
     let _ = &common;
 
     match command {
+        #[cfg(feature = "completion")]
         Some(Commands::Completion(args)) => completion::run_cli(args),
         #[cfg(feature = "tui")]
         Some(Commands::Tui(args)) => {
