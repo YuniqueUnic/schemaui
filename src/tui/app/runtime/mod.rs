@@ -69,7 +69,7 @@ struct HelpOverlayState {
     error_offset: usize,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "json"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct HelpOverlaySnapshot {
     pub total_shortcuts: usize,
@@ -780,7 +780,7 @@ impl App {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "json"))]
 impl App {
     pub(crate) fn form_state_mut_for_test(&mut self) -> &mut FormState {
         &mut self.form_state

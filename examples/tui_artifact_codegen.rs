@@ -57,7 +57,7 @@ fn main() -> Result<()> {
         bail!("defaults path {:?} does not exist", path);
     }
 
-    let format = DocumentFormat::from_extension(&schema_path).unwrap_or(DocumentFormat::Json);
+    let format = DocumentFormat::from_extension(&schema_path).unwrap_or_default();
 
     // 2) Decide output module paths and function names.
     let tui_module_path = out_dir.join("tui_artifacts.rs");

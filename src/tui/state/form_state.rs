@@ -85,7 +85,7 @@ impl FormState {
         state
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "json"))]
     pub(crate) fn from_roots_for_test(roots: Vec<RootSectionState>) -> Self {
         let mut state = Self {
             roots,
