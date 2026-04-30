@@ -81,6 +81,26 @@ toml = { version = "1", optional = true }
 [[example]]
 name = "demo"
 path = "examples/demo.rs"
+required-features = ["tui"]
+
+[[example]]
+name = "tui_artifact_codegen"
+path = "examples/tui_artifact_codegen.rs"
+required-features = ["tui", "precompile"]
+
+[[example]]
+name = "tui_artifact_demo"
+path = "examples/tui_artifact_demo.rs"
+required-features = ["tui", "precompile"]
+
+[[example]]
+name = "ui_layout_dump"
+path = "examples/ui_layout_dump.rs"
+
+[[example]]
+name = "web_snapshot_codegen"
+path = "examples/web_snapshot_codegen.rs"
+required-features = ["web", "precompile"]
 
 [dev-dependencies]
 reqwest = { version = "0.13", features = ["blocking", "json"] }

@@ -3,7 +3,7 @@ pub(crate) mod api;
 pub(crate) mod io;
 #[cfg(feature = "json")]
 pub(crate) mod schema;
-#[cfg(feature = "json")]
+#[cfg(all(feature = "json", feature = "tui"))]
 pub(crate) mod tui;
 #[cfg(feature = "json")]
 pub(crate) mod ui_ast;

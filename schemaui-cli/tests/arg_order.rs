@@ -38,6 +38,7 @@ fn inline_description_assignment_is_parsed_by_clap() {
     );
 }
 
+#[cfg(feature = "tui")]
 #[test]
 fn explicit_tui_subcommand_accepts_common_args() {
     let cli = Cli::parse_from(["schemaui", "tui", "--schema", "./schema.json", "-f"]);
@@ -50,6 +51,7 @@ fn explicit_tui_subcommand_accepts_common_args() {
     assert!(cmd.common.force);
 }
 
+#[cfg(feature = "tui")]
 #[test]
 fn subcommand_description_overrides_root_description_during_merge() {
     let cli = Cli::parse_from([
@@ -82,6 +84,7 @@ fn explicit_completion_subcommand_remains_completion() {
     assert_eq!(cmd.shell, CompletionShell::Bash);
 }
 
+#[cfg(feature = "tui")]
 #[test]
 fn explicit_tui_snapshot_subcommand_accepts_common_args() {
     let cli = Cli::parse_from([

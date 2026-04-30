@@ -1,3 +1,5 @@
+#![cfg(feature = "tui")]
+
 use std::{
     fs,
     time::{SystemTime, UNIX_EPOCH},

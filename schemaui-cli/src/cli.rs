@@ -25,6 +25,7 @@ pub struct Cli {
 pub enum Commands {
     #[command(about = "Generate shell completion scripts for the schemaui CLI")]
     Completion(CompletionCommand),
+    #[cfg(feature = "tui")]
     #[command(about = "Launch the interactive terminal UI")]
     Tui(TuiCommand),
     #[cfg(feature = "web")]
@@ -33,12 +34,14 @@ pub enum Commands {
     #[cfg(feature = "web")]
     #[command(about = "Precompute Web session snapshots instead of launching the UI")]
     WebSnapshot(WebSnapshotCommand),
+    #[cfg(feature = "tui")]
     #[command(
         about = "Precompute TUI FormSchema/LayoutNavModel modules instead of launching the UI"
     )]
     TuiSnapshot(TuiSnapshotCommand),
 }
 
+#[cfg(feature = "tui")]
 #[derive(Args, Debug, Clone, Default, PartialEq, Eq)]
 pub struct TuiCommand {
     #[command(flatten)]
@@ -111,6 +114,7 @@ pub struct WebSnapshotCommand {
     pub ts_export: String,
 }
 
+#[cfg(feature = "tui")]
 #[derive(Args, Debug, Clone, PartialEq, Eq)]
 pub struct TuiSnapshotCommand {
     #[command(flatten)]

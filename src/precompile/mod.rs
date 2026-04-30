@@ -7,7 +7,9 @@ use sha2::{Digest, Sha256};
 
 use crate::io::input::{parse_document_str, schema_with_defaults};
 use crate::io::{DocumentFormat, DocumentFormatProbe};
+#[cfg(feature = "tui")]
 use crate::tui::model::{FormSchema, form_schema_from_ui_ast};
+#[cfg(feature = "tui")]
 use crate::tui::state::LayoutNavModel;
 use crate::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
 
@@ -30,6 +32,7 @@ pub struct UiArtifactFingerprint {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg(feature = "tui")]
 pub struct TuiArtifacts {
     pub form_schema: FormSchema,
     pub layout_nav: LayoutNavModel,
@@ -40,6 +43,7 @@ pub struct UiArtifactBundle {
     pub artifact_version: u32,
     pub fingerprint: UiArtifactFingerprint,
     pub ui: UiAstBundle,
+    #[cfg(feature = "tui")]
     pub tui: TuiArtifacts,
 }
 
@@ -60,15 +64,18 @@ pub fn build_ui_artifact_bundle(
             ("defaults".to_string(), stable_value(&defaults)),
         ])))?),
     };
+    #[cfg(feature = "tui")]
+    let tui = TuiArtifacts {
+        form_schema: form_schema_from_ui_ast(&ui.ui_ast),
+        layout_nav: LayoutNavModel::from_uilayout(&ui.layout),
+    };
 
     Ok(UiArtifactBundle {
         artifact_version: UI_ARTIFACT_BUNDLE_VERSION,
         fingerprint,
-        tui: TuiArtifacts {
-            form_schema: form_schema_from_ui_ast(&ui.ui_ast),
-            layout_nav: LayoutNavModel::from_uilayout(&ui.layout),
-        },
         ui,
+        #[cfg(feature = "tui")]
+        tui,
     })
 }
 

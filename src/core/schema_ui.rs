@@ -8,8 +8,12 @@ use crate::io::{
     input::{looks_like_json_schema, parse_document_auto},
 };
 
-use super::options::UiOptions;
-use crate::precompile::{TuiArtifacts, UiArtifactBundle};
+#[cfg(feature = "tui")]
+use crate::precompile::TuiArtifacts;
+use crate::precompile::UiArtifactBundle;
+#[cfg(feature = "tui")]
+use crate::tui::app::UiOptions;
+#[cfg(feature = "tui")]
 use crate::tui::session::TuiFrontend;
 use crate::ui_ast::{UiAst, UiAstBundle};
 #[cfg(feature = "web")]
@@ -69,6 +73,7 @@ pub struct SchemaUI {
     ui_ast: Option<UiAst>,
     ui_bundle: Option<UiAstBundle>,
     ui_artifact_bundle: Option<UiArtifactBundle>,
+    #[cfg(feature = "tui")]
     tui_artifacts: Option<TuiArtifacts>,
 }
 
@@ -82,6 +87,7 @@ impl SchemaUI {
             ui_ast: None,
             ui_bundle: None,
             ui_artifact_bundle: None,
+            #[cfg(feature = "tui")]
             tui_artifacts: None,
         }
     }
@@ -134,6 +140,7 @@ impl SchemaUI {
     /// Provide prepared TUI artifacts. When set, the TUI frontend will use
     /// these instead of deriving TUI-specific structures from the UiAst at
     /// runtime.
+    #[cfg(feature = "tui")]
     pub fn with_tui_artifacts(mut self, artifacts: TuiArtifacts) -> Self {
         self.tui_artifacts = Some(artifacts);
         self
@@ -203,6 +210,7 @@ impl SchemaUI {
         }
     }
 
+    #[cfg(feature = "tui")]
     pub(crate) fn build_tui_frontend(&self, options: UiOptions) -> TuiFrontend {
         let tui_artifacts = self.tui_artifacts.clone().or_else(|| {
             self.ui_artifact_bundle
@@ -217,6 +225,7 @@ impl SchemaUI {
 
     pub fn run(self, frontend: FrontendOptions) -> Result<Value> {
         match frontend {
+            #[cfg(feature = "tui")]
             FrontendOptions::Tui(options) => {
                 let frontend = self.build_tui_frontend(options);
                 self.run_with_frontend(frontend)
@@ -227,6 +236,7 @@ impl SchemaUI {
     }
 
     /// Run explicitly in TUI mode using default `UiOptions`.
+    #[cfg(feature = "tui")]
     pub fn run_tui(self) -> Result<Value> {
         self.run(FrontendOptions::Tui(UiOptions::default()))
     }
@@ -263,7 +273,8 @@ impl SchemaUI {
             ui_ast,
             ui_bundle,
             ui_artifact_bundle,
-            tui_artifacts: _,
+            #[cfg(feature = "tui")]
+                tui_artifacts: _,
         } = self;
 
         let ui_bundle = ui_artifact_bundle.map(|bundle| bundle.ui).or(ui_bundle);

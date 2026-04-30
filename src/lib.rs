@@ -6,7 +6,8 @@ pub mod io;
 // #[cfg(feature = "precompile")]
 pub mod precompile;
 mod schema;
-mod tui;
+#[cfg(feature = "tui")]
+pub mod tui;
 pub mod ui_ast;
 #[cfg(feature = "web")]
 pub mod web;
@@ -14,8 +15,8 @@ pub mod web;
 #[cfg(test)]
 pub(crate) mod tests;
 
-// pub use app::{SchemaUI, UiOptions};
 pub use core::frontend::FrontendOptions;
+pub use core::schema_ui::{DocumentInput, SchemaUI};
 pub use io::{
     DocumentFormat, DocumentFormatProbe,
     input::{
@@ -24,9 +25,12 @@ pub use io::{
     },
     output::{OutputDestination, OutputOptions},
 };
-pub use precompile::{TuiArtifacts, UiArtifactBundle};
+#[cfg(feature = "tui")]
+pub use precompile::TuiArtifacts;
+pub use precompile::UiArtifactBundle;
+#[cfg(feature = "tui")]
 pub use tui::{
-    app::{SchemaUI, options::UiOptions, schema_ui::DocumentInput},
+    app::options::UiOptions,
     model::FormSchema,
     session::TuiFrontend,
     state::LayoutNavModel,
@@ -38,9 +42,13 @@ pub mod prelude {
     pub use super::DocumentInput;
     pub use super::FrontendOptions;
     pub use super::SchemaUI;
+    #[cfg(feature = "tui")]
     pub use super::TuiFrontend;
+    #[cfg(feature = "tui")]
     pub use super::UiOptions;
+    #[cfg(feature = "tui")]
     pub use super::draw;
+    #[cfg(feature = "tui")]
     pub use super::tui::view::{CompositeOverlay, PopupRender, UiContext};
 
     #[cfg(feature = "web")]
