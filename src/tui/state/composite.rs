@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     LayoutNavModel, error::FieldCoercionError, field::components::ComponentPalette,
-    form_state::FormState,
+    form_state::FormState, value_summary::summarize_inline_value,
 };
 
 mod composite_list;
@@ -115,6 +115,14 @@ impl CompositeState {
         }
     }
 
+    pub fn summary_with_preview(&self) -> String {
+        let summary = self.summary();
+        match self.active_preview() {
+            Some(preview) if !preview.is_empty() => format!("{summary} {preview}"),
+            _ => summary,
+        }
+    }
+
     pub fn pointer(&self) -> &str {
         &self.pointer
     }
@@ -175,6 +183,28 @@ impl CompositeState {
             }
         }
         summaries
+    }
+
+    fn active_preview(&self) -> Option<String> {
+        let mut previews = Vec::new();
+        for variant in self.variants.iter().filter(|variant| variant.active) {
+            let Ok(form) = variant.borrow_form(self.pointer()) else {
+                continue;
+            };
+            let Ok(value) = form.try_build_value() else {
+                continue;
+            };
+            let Ok(actual) = variant.unwrap_overlay_value(value, self.pointer()) else {
+                continue;
+            };
+            previews.push(summarize_inline_value(&actual));
+        }
+
+        if previews.is_empty() {
+            None
+        } else {
+            Some(previews.join(" + "))
+        }
     }
 
     pub fn option_titles(&self) -> Vec<String> {

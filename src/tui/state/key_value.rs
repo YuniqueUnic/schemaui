@@ -9,6 +9,7 @@ use super::{
     field::{FieldState, components::ComponentPalette},
     form_state::FormState,
     section::SectionState,
+    value_summary::summarize_value,
 };
 
 #[derive(Debug, Clone)]
@@ -335,33 +336,6 @@ impl KeyValueState {
                 return candidate;
             }
         }
-    }
-}
-
-pub(crate) fn summarize_value(value: &Value) -> String {
-    match value {
-        Value::Null => "null".to_string(),
-        Value::Bool(flag) => flag.to_string(),
-        Value::Number(num) => num.to_string(),
-        Value::String(text) => summarize_string(text),
-        Value::Array(items) => format!("array({})", items.len()),
-        Value::Object(map) => format!("object({})", map.len()),
-    }
-}
-
-fn summarize_string(text: &str) -> String {
-    use unicode_width::UnicodeWidthStr;
-    const MAX_VISIBLE: usize = 36;
-    const TRUNCATE_TO: usize = MAX_VISIBLE - 12;
-    let char_count = UnicodeWidthStr::width(text);
-    if char_count > MAX_VISIBLE {
-        let mut truncated = String::new();
-        for ch in text.chars().take(TRUNCATE_TO) {
-            truncated.push(ch);
-        }
-        format!("\"{}…\"", truncated)
-    } else {
-        format!("\"{text}\"")
     }
 }
 

@@ -104,7 +104,7 @@ struct CompositeViewAdapter {
 
 impl CompositeViewAdapter {
     fn display_label(&self, state: &CompositeState) -> String {
-        let mut label = state.summary();
+        let mut label = state.summary_with_preview();
         if state.is_multi() {
             label.push_str(self.palette.composite.multi_variant_hint.as_ref());
         } else {

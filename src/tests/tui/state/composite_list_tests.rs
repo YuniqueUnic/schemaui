@@ -127,3 +127,49 @@ fn composite_list_adds_entries_with_selected_variants() {
         entries[1]
     );
 }
+
+#[test]
+fn composite_list_summary_includes_object_preview() {
+    let variants = vec![CompositeVariant {
+        id: "bar".to_string(),
+        title: "Bar Item".to_string(),
+        description: None,
+        schema: json!({
+            "type": "object",
+            "properties": {
+                "Bar": {"type": "string"},
+                "Id": {"type": "integer"}
+            }
+        }),
+        is_object: true,
+    }];
+    let template = CompositeField {
+        mode: CompositeMode::AnyOf,
+        variants,
+    };
+
+    let mut field = FieldState::from_schema(FieldSchema {
+        name: "blahList".to_string(),
+        path: vec!["blahList".to_string()],
+        pointer: "/blahList".to_string(),
+        title: "Blah List".to_string(),
+        description: None,
+        kind: FieldKind::Array(Box::new(FieldKind::Composite(Box::new(template)))),
+        required: false,
+        default: None,
+        metadata: HashMap::new(),
+    });
+    field.seed_value(&json!([{
+        "Bar": "on tui",
+        "Id": 0
+    }]));
+
+    let (entries, selected) = field.composite_list_panel().expect("panel state");
+    assert_eq!(selected, 0);
+    assert_eq!(entries.len(), 1);
+    assert!(
+        entries[0].contains("Bar Item { Bar: on tui, Id: 0 }"),
+        "entry summary should include object preview: {:?}",
+        entries[0]
+    );
+}

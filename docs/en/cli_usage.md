@@ -289,9 +289,10 @@ least one of `json`, `yaml`, or `toml` must remain enabled.
 
 ## 10. Operational Tips
 
-- Pass one stream as literal text (a non-existent path is treated inline) when
-  both schema and config would otherwise require stdin; the executable only
-  reads stdin once.
+- Pass one stream as literal JSON/YAML/TOML text when both schema and config
+  would otherwise require stdin; the executable only reads stdin once. File-like
+  specs that miss on disk now report a file-loading error instead of silently
+  falling back to inline parsing.
 - Prefer explicit extensions for outputs—format inference uses the first file’s
   suffix, and mismatches across files are rejected.
 - Combine `-o -` with file outputs to tee the result into CI logs while still

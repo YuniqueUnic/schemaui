@@ -9,6 +9,7 @@ pub mod layout_nav;
 pub mod reducers;
 pub mod section;
 pub mod ui_store;
+pub mod value_summary;
 
 pub use actions::FormCommand;
 pub use array::ArrayEditorSession;

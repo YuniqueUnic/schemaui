@@ -221,8 +221,9 @@ if let Some(options) = output_settings.as_ref() {
 
 ## 10. 操作提示
 
-- 如果 schema 和 config 都想走
-  stdin，就把其中一个改为内联文本；可执行文件只会消费一次 stdin。
+- 如果 schema 和 config 都想走 stdin，就把其中一个改为内联
+  JSON/YAML/TOML 文本；可执行文件只会消费一次 stdin。像 `test.json`
+  这类“看起来就是文件路径”的 spec 若磁盘上不存在，现在会直接报文件加载错误，不再悄悄回退成内联解析。
 - 输出最好总是带扩展名；格式推断使用第一个文件的后缀，跨文件冲突会被直接拒绝。
 - 可以把 `-o -` 和文件输出同时使用，这样既能进 CI 日志，也能真正落盘。
 

@@ -6,7 +6,7 @@ use crate::tui::model::{FieldKind, FieldSchema};
 
 use super::{
     error::FieldCoercionError, field::FieldState, field::components::ComponentPalette,
-    form_state::FormState, section::SectionState,
+    form_state::FormState, section::SectionState, value_summary::summarize_value,
 };
 
 #[derive(Debug, Clone)]
@@ -322,22 +322,5 @@ fn default_value(kind: &FieldKind) -> Value {
             .unwrap_or_else(|| Value::String(String::new())),
         FieldKind::Nullable(_) => Value::Null,
         _ => Value::String(String::new()),
-    }
-}
-
-fn summarize_value(value: &Value) -> String {
-    match value {
-        Value::Null => "null".to_string(),
-        Value::Bool(flag) => flag.to_string(),
-        Value::Number(num) => num.to_string(),
-        Value::String(text) => {
-            if text.len() > 24 {
-                format!("\"{}…\"", &text[..24])
-            } else {
-                format!("\"{text}\"")
-            }
-        }
-        Value::Array(items) => format!("array({})", items.len()),
-        Value::Object(map) => format!("object({})", map.len()),
     }
 }
