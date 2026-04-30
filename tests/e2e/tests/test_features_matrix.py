@@ -25,6 +25,7 @@ SCHEMAUI_BASE_FEATURES = (
     "toml",
     "tui",
     "web",
+    "web-types",
     "precompile",
     "debug",
 )
@@ -34,6 +35,7 @@ SCHEMAUI_CLI_BASE_FEATURES = (
     "toml",
     "tui",
     "web",
+    "web-types",
     "remote-schema",
 )
 FORMAT_FEATURES = frozenset({"json", "yaml", "toml"})
@@ -185,6 +187,7 @@ def test_smoke_feature_matrix_compiles() -> None:
     assert_check_ok("schemaui", ("json",), no_default=True)
     assert_check_ok("schemaui", ("json", "tui"), no_default=True)
     assert_check_ok("schemaui", ("json", "web"), no_default=True)
+    assert_check_ok("schemaui", ("json", "web", "web-types"), no_default=True)
     assert_check_ok("schemaui", ("json", "precompile"), no_default=True)
     assert_check_ok("schemaui", ("all_formats",), no_default=True)
     assert_check_ok("schemaui", ("full",), no_default=True)
@@ -193,6 +196,7 @@ def test_smoke_feature_matrix_compiles() -> None:
     assert_check_ok("schemaui-cli", ("json",), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "tui"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "web"), no_default=True)
+    assert_check_ok("schemaui-cli", ("json", "web", "web-types"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "remote-schema"), no_default=True)
     assert_check_ok("schemaui-cli", ("full",), no_default=True)
 

@@ -36,7 +36,8 @@ include = [
 default = ["tui", "json"]
 full = ["all_formats", "tui", "web"]
 tui = ["dep:crossterm", "dep:ratatui", "dep:unicode-width"]
-web = ["dep:include_dir", "dep:axum", "dep:tokio", "dep:ts-rs"]
+web = ["dep:include_dir", "dep:axum", "dep:tokio"]
+web-types = ["dep:ts-rs"]
 
 all_formats = ["json", "yaml", "toml"]
 json = []
@@ -100,7 +101,7 @@ path = "examples/web_snapshot_codegen.rs"
 required-features = ["web", "precompile"]
 
 [dev-dependencies]
-reqwest = { version = "0.13", default-features = false, features = ["blocking", "json"] }
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 
 [build-dependencies]
 serde = { version = "1", default-features = false, features = ["derive"] }

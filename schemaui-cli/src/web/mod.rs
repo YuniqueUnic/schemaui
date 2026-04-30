@@ -1,6 +1,6 @@
 use std::fs;
 
-use color_eyre::eyre::{Report, Result};
+use eyre::{Report, Result};
 use schemaui::SchemaUI;
 use schemaui::precompile::web::{
     build_session_snapshot, write_session_snapshot_json, write_session_snapshot_ts_module,

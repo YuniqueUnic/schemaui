@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "web")]
+#[cfg(feature = "web-types")]
 use ts_rs::TS;
 
 use super::{UiAst, UiNode, UiNodeKind};
@@ -11,14 +11,17 @@ use super::{UiAst, UiNode, UiNodeKind};
 /// compile-time tooling. It is kept intentionally small and does not attempt
 /// to model all runtime behavior.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "web", derive(TS))]
-#[cfg_attr(feature = "web", ts(export, export_to = "web/types/ui-layout.ts"))]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(
+    feature = "web-types",
+    ts(export, export_to = "web/types/ui-layout.ts")
+)]
 pub struct UiLayout {
     pub roots: Vec<LayoutRoot>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "web", derive(TS))]
+#[cfg_attr(feature = "web-types", derive(TS))]
 pub struct LayoutRoot {
     pub id: String,
     pub title: Option<String>,
@@ -27,7 +30,7 @@ pub struct LayoutRoot {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "web", derive(TS))]
+#[cfg_attr(feature = "web-types", derive(TS))]
 pub struct LayoutSection {
     pub id: String,
     pub title: String,

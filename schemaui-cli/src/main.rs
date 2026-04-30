@@ -2,7 +2,7 @@
 
 #[cfg(not(feature = "tui"))]
 use clap::CommandFactory;
-use color_eyre::eyre::Result;
+use eyre::Result;
 
 #[cfg(feature = "tui")]
 use schemaui_cli::cli::TuiSnapshotCommand;
@@ -17,7 +17,6 @@ use schemaui_cli::cli::{WebCommand, WebSnapshotCommand};
 use schemaui_cli::web;
 
 fn main() -> Result<()> {
-    color_eyre::install()?;
     let Cli { common, command } = Cli::from_env_or_exit();
     #[cfg(not(any(feature = "tui", feature = "web")))]
     let _ = &common;
@@ -36,7 +35,7 @@ fn main() -> Result<()> {
             let mut cmd = Cli::command();
             cmd.print_help()?;
             println!();
-            Err(color_eyre::eyre::eyre!(
+            Err(eyre::eyre!(
                 "this schemaui-cli build does not include the `tui` feature; use a subcommand supported by the active feature set"
             ))
         }
