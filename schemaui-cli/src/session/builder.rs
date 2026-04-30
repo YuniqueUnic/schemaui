@@ -1,4 +1,4 @@
-use color_eyre::eyre::{Result, eyre};
+use eyre::{Result, eyre};
 
 use crate::cli::CommonArgs;
 

@@ -2,7 +2,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
 
-use color_eyre::eyre::{Report, Result, WrapErr};
+use eyre::{Report, Result, WrapErr};
 use schemaui::{DocumentFormat, parse_document_str};
 use serde_json::Value;
 

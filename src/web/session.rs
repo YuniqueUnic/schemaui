@@ -25,6 +25,7 @@ use tokio::{
     net::TcpListener,
     sync::{Mutex, oneshot},
 };
+#[cfg(feature = "web-types")]
 use ts_rs::TS;
 
 use crate::io::{DocumentFormat, input::schema_with_defaults};
@@ -339,13 +340,14 @@ impl FinishLine {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "web/types/")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub struct SessionResponse {
     pub title: Option<String>,
     pub description: Option<String>,
     pub ui_ast: UiAst,
-    #[ts(type = "Record<string, unknown>")]
+    #[cfg_attr(feature = "web-types", ts(type = "Record<string, unknown>"))]
     pub data: Value,
     pub formats: Vec<String>,
     pub layout: Option<UiLayout>,
@@ -385,10 +387,11 @@ async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
     payload
 }
 
-#[derive(Deserialize, TS)]
-#[ts(export, export_to = "web/types/")]
+#[derive(Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub(crate) struct SaveRequest {
-    #[ts(type = "Record<string, unknown>")]
+    #[cfg_attr(feature = "web-types", ts(type = "Record<string, unknown>"))]
     pub data: Value,
 }
 
@@ -406,10 +409,11 @@ async fn post_save(
     (StatusCode::OK, Json(json!({"status": "saved"})))
 }
 
-#[derive(Deserialize, TS)]
-#[ts(export, export_to = "web/types/")]
+#[derive(Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub(crate) struct ExitRequest {
-    #[ts(type = "Record<string, unknown>")]
+    #[cfg_attr(feature = "web-types", ts(type = "Record<string, unknown>"))]
     pub data: Value,
     #[serde(default = "crate::web::session::default_true")]
     pub commit: bool,
@@ -439,22 +443,25 @@ async fn post_exit(
     (StatusCode::OK, Json(json!({"status": "closing"})))
 }
 
-#[derive(Deserialize, TS)]
-#[ts(export, export_to = "web/types/")]
+#[derive(Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub(crate) struct ValidateRequest {
-    #[ts(type = "Record<string, unknown>")]
+    #[cfg_attr(feature = "web-types", ts(type = "Record<string, unknown>"))]
     pub data: Value,
 }
 
-#[derive(Serialize, TS)]
-#[ts(export, export_to = "web/types/")]
+#[derive(Serialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub(crate) struct ValidationResponse {
     pub ok: bool,
     pub errors: Vec<FieldError>,
 }
 
-#[derive(Serialize, TS)]
-#[ts(export, export_to = "web/types/")]
+#[derive(Serialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub(crate) struct FieldError {
     pub pointer: String,
     pub message: String,
@@ -477,18 +484,20 @@ async fn post_validate(
     })
 }
 
-#[derive(Deserialize, TS)]
-#[ts(export, export_to = "web/types/")]
+#[derive(Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub(crate) struct PreviewRequest {
-    #[ts(type = "Record<string, unknown>")]
+    #[cfg_attr(feature = "web-types", ts(type = "Record<string, unknown>"))]
     pub data: Value,
     pub format: String,
     #[serde(default = "crate::web::session::default_true")]
     pub pretty: bool,
 }
 
-#[derive(Serialize, TS)]
-#[ts(export, export_to = "web/types/")]
+#[derive(Serialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub(crate) struct PreviewResponse {
     pub payload: String,
 }

@@ -1,6 +1,6 @@
 use std::fs;
 
-use color_eyre::eyre::{Report, Result};
+use eyre::{Report, Result};
 use schemaui::SchemaUI;
 use schemaui::precompile::tui as pre_tui;
 

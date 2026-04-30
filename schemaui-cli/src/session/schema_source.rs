@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "remote-schema")]
 use std::time::Duration;
 
-use color_eyre::eyre::{Report, Result, WrapErr, eyre};
-#[cfg(feature = "remote-schema")]
-use reqwest::blocking::Client;
+use eyre::{Report, Result, WrapErr, eyre};
 use schemaui::{
     DocumentFormat, DocumentFormatProbe, looks_like_json_schema, parse_document_str,
     schema_from_data_value,
 };
 use serde_json::Value;
+#[cfg(feature = "remote-schema")]
+use ureq::Agent;
 use url::Url;
 
 use super::diagnostics::DiagnosticCollector;
@@ -381,16 +381,16 @@ fn load_document_from_url(url: Url, format: DocumentFormat, label: &str) -> Resu
         }
         #[cfg(feature = "remote-schema")]
         "http" | "https" => {
-            let mut client = Client::builder().timeout(Duration::from_secs(15));
+            let mut config = Agent::config_builder()
+                .http_status_as_error(false)
+                .timeout_global(Some(Duration::from_secs(15)));
             if should_bypass_proxy(&url) {
-                client = client.no_proxy();
+                config = config.proxy(None);
             }
-            let client = client
-                .build()
-                .wrap_err("failed to initialize HTTP client")?;
-            let response = client
-                .get(url.clone())
-                .send()
+            let client = Agent::new_with_config(config.build());
+            let mut response = client
+                .get(url.as_str())
+                .call()
                 .wrap_err_with(|| format!("failed to fetch {label} from {url}"))?;
             let status = response.status();
             if !status.is_success() {
@@ -400,7 +400,8 @@ fn load_document_from_url(url: Url, format: DocumentFormat, label: &str) -> Resu
                 ));
             }
             let raw = response
-                .text()
+                .body_mut()
+                .read_to_string()
                 .wrap_err_with(|| format!("failed to read {label} response body from {url}"))?;
             let value = parse_contents(&raw, format, label)?;
             Ok(LoadedDocument {

@@ -1,6 +1,6 @@
 use std::fmt::Write as FmtWrite;
 
-use color_eyre::eyre::{Result, eyre};
+use eyre::{Result, eyre};
 
 #[derive(Debug, Default)]
 pub struct DiagnosticCollector {

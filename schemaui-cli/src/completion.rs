@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use clap_complete::{Shell, generate};
-use color_eyre::eyre::Result;
+use eyre::Result;
 
 use crate::cli::{CompletionCommand, CompletionShell, command_info};
 
