@@ -1,14 +1,19 @@
 use std::fs;
+#[cfg(all(feature = "remote-schema", any(feature = "toml", feature = "tui")))]
 use std::io::{Read, Write};
+#[cfg(all(feature = "remote-schema", any(feature = "toml", feature = "tui")))]
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
+#[cfg(all(feature = "remote-schema", any(feature = "toml", feature = "tui")))]
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use schemaui_cli::cli::{CommonArgs, TuiSnapshotCommand};
+use schemaui_cli::cli::CommonArgs;
 use schemaui_cli::session::prepare_session;
 use serde_json::{Value, json};
 
+#[cfg(all(feature = "remote-schema", feature = "tui"))]
+use schemaui_cli::cli::TuiSnapshotCommand;
 #[cfg(feature = "web")]
 use schemaui_cli::cli::WebSnapshotCommand;
 
@@ -48,7 +53,7 @@ fn base_args(schema: Option<String>, config: Option<String>) -> CommonArgs {
     }
 }
 
-#[cfg(feature = "remote-schema")]
+#[cfg(all(feature = "remote-schema", any(feature = "toml", feature = "tui")))]
 fn spawn_schema_server(schema: Value) -> (String, thread::JoinHandle<()>) {
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind schema server");
     let addr = listener.local_addr().expect("local addr");
@@ -72,6 +77,7 @@ fn spawn_schema_server(schema: Value) -> (String, thread::JoinHandle<()>) {
     (url, handle)
 }
 
+#[cfg(all(feature = "web", feature = "remote-schema", feature = "toml"))]
 fn opaque_object_schema() -> Value {
     json!({
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -288,7 +294,7 @@ fn prepare_session_uses_remote_toml_schema_directive() {
     let _ = fs::remove_dir_all(temp);
 }
 
-#[cfg(feature = "remote-schema")]
+#[cfg(all(feature = "remote-schema", feature = "tui"))]
 #[test]
 fn tui_snapshot_accepts_explicit_remote_schema() {
     let temp = unique_temp_dir("tui_snapshot_remote");

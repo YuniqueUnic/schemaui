@@ -85,6 +85,10 @@ impl ScalarArrayState {
         self.entries.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
     pub fn selected_index(&self) -> Option<usize> {
         if self.entries.is_empty() {
             None

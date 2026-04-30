@@ -271,7 +271,7 @@ pub struct InputRouter {
 }
 
 impl InputRouter {
-    pub fn new(store: Arc<KeymapStore>) -> Self {
+    pub(crate) fn new(store: Arc<KeymapStore>) -> Self {
         Self { store }
     }
 
@@ -281,7 +281,7 @@ impl InputRouter {
         self.store.classify(key).unwrap_or(KeyAction::Input(*key))
     }
 
-    pub fn classify_for_contexts(
+    pub(crate) fn classify_for_contexts(
         &self,
         key: &KeyEvent,
         contexts: &[super::keymap::KeymapContext],

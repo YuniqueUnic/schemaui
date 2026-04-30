@@ -3,7 +3,9 @@ use serde_json::{Value, json};
 
 use crate::SchemaUI;
 use crate::core::frontend::{Frontend, FrontendContext};
+#[cfg(feature = "tui")]
 use crate::precompile::build_ui_artifact_bundle;
+#[cfg(feature = "tui")]
 use crate::tui::app::UiOptions;
 
 struct CaptureFrontend;
@@ -111,6 +113,7 @@ fn schema_ui_description_override_wins_over_schema_description() {
     assert_eq!(result["description"], "Manual description");
 }
 
+#[cfg(feature = "tui")]
 #[test]
 fn schema_ui_builds_tui_frontend_from_frontend_options_payload() {
     let schema = json!({
