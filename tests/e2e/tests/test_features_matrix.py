@@ -4,8 +4,9 @@ Reference inspiration:
 https://github.com/YuniqueCore/multiio/blob/main/e2e/tests/test_features_matrix.py
 
 This suite keeps a small always-on smoke matrix, and an opt-in exhaustive matrix
-for every valid feature subset. Invalid frontend-only combinations are asserted
-to fail with the expected document-format compile error.
+for every meaningful product feature subset. Invalid frontend-only combinations
+are asserted to fail with the expected document-format compile error, while
+hostless add-on combinations are filtered out before the expensive matrix runs.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import itertools
 import os
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -158,11 +160,40 @@ def has_document_format(features: tuple[str, ...]) -> bool:
     return any(feature in FORMAT_FEATURES for feature in features)
 
 
-def valid_feature_subsets(base_features: tuple[str, ...]) -> list[tuple[str, ...]]:
+def is_valid_schemaui_combo(features: tuple[str, ...]) -> bool:
+    feature_set = set(features)
+    if not has_document_format(features):
+        return False
+    if "web-types" in feature_set and "web" not in feature_set:
+        return False
+    if "precompile" in feature_set and not ({"tui", "web"} & feature_set):
+        return False
+    if "debug" in feature_set and "tui" not in feature_set:
+        return False
+    return True
+
+
+def is_valid_schemaui_cli_combo(features: tuple[str, ...]) -> bool:
+    feature_set = set(features)
+    if not has_document_format(features):
+        return False
+    if not ({"tui", "web"} & feature_set):
+        return False
+    if "web-types" in feature_set and "web" not in feature_set:
+        return False
+    if "completion" in feature_set and not ({"tui", "web"} & feature_set):
+        return False
+    return True
+
+
+def valid_feature_subsets(
+    base_features: tuple[str, ...],
+    validator: Callable[[tuple[str, ...]], bool],
+) -> list[tuple[str, ...]]:
     subsets: list[tuple[str, ...]] = []
     for size in range(len(base_features) + 1):
         for combo in itertools.combinations(base_features, size):
-            if has_document_format(combo):
+            if validator(combo):
                 subsets.append(combo)
     return subsets
 
@@ -182,24 +213,55 @@ def test_frontend_only_builds_require_document_formats(
     assert_missing_format_error(package, features)
 
 
+@pytest.mark.parametrize(
+    ("features", "reason"),
+    [
+        (("json", "web-types"), "web-types only makes sense when the web surface is present"),
+        (("json", "precompile"), "precompile artifacts are only meaningful for tui/web products"),
+        (("json", "debug"), "debug UI affordances only exist in the tui frontend"),
+    ],
+)
+def test_schemaui_invalid_product_combinations_are_filtered(
+    features: tuple[str, ...], reason: str
+) -> None:
+    assert not is_valid_schemaui_combo(features), reason
+
+
+@pytest.mark.parametrize(
+    ("features", "reason"),
+    [
+        (("json",), "a CLI build without tui/web cannot launch a meaningful product surface"),
+        (("json", "completion"), "completion is an add-on for an actual CLI mode"),
+        (("json", "remote-schema"), "remote schema loading is only useful when a CLI mode can consume it"),
+        (("json", "web-types"), "web-types only makes sense when the web surface is present"),
+    ],
+)
+def test_schemaui_cli_invalid_product_combinations_are_filtered(
+    features: tuple[str, ...], reason: str
+) -> None:
+    assert not is_valid_schemaui_cli_combo(features), reason
+
+
 def test_smoke_feature_matrix_compiles() -> None:
     print("[feature-matrix] running smoke matrix", flush=True)
     assert_check_ok("schemaui", (), no_default=False)
     assert_check_ok("schemaui", ("json",), no_default=True)
     assert_check_ok("schemaui", ("json", "tui"), no_default=True)
+    assert_check_ok("schemaui", ("json", "tui", "debug"), no_default=True)
+    assert_check_ok("schemaui", ("json", "tui", "precompile"), no_default=True)
     assert_check_ok("schemaui", ("json", "web"), no_default=True)
     assert_check_ok("schemaui", ("json", "web", "web-types"), no_default=True)
-    assert_check_ok("schemaui", ("json", "precompile"), no_default=True)
+    assert_check_ok("schemaui", ("json", "web", "precompile"), no_default=True)
     assert_check_ok("schemaui", ("all_formats",), no_default=True)
     assert_check_ok("schemaui", ("full",), no_default=True)
 
     assert_check_ok("schemaui-cli", (), no_default=False)
-    assert_check_ok("schemaui-cli", ("json",), no_default=True)
-    assert_check_ok("schemaui-cli", ("json", "completion"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "tui"), no_default=True)
+    assert_check_ok("schemaui-cli", ("json", "tui", "completion"), no_default=True)
+    assert_check_ok("schemaui-cli", ("json", "tui", "remote-schema"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "web"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "web", "web-types"), no_default=True)
-    assert_check_ok("schemaui-cli", ("json", "remote-schema"), no_default=True)
+    assert_check_ok("schemaui-cli", ("json", "web", "remote-schema"), no_default=True)
     assert_check_ok("schemaui-cli", ("full",), no_default=True)
 
 
@@ -209,8 +271,14 @@ def test_exhaustive_feature_matrix_compiles() -> None:
             f"set {EXHAUSTIVE_ENV}=1 to enable exhaustive feature-matrix checks"
         )
 
-    schemaui_subsets = valid_feature_subsets(SCHEMAUI_BASE_FEATURES)
-    cli_subsets = valid_feature_subsets(SCHEMAUI_CLI_BASE_FEATURES)
+    schemaui_subsets = valid_feature_subsets(
+        SCHEMAUI_BASE_FEATURES,
+        is_valid_schemaui_combo,
+    )
+    cli_subsets = valid_feature_subsets(
+        SCHEMAUI_CLI_BASE_FEATURES,
+        is_valid_schemaui_cli_combo,
+    )
     print(
         "[feature-matrix] running exhaustive matrix "
         f"(schemaui={len(schemaui_subsets)} combos, "

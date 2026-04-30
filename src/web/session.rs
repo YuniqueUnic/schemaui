@@ -1,4 +1,5 @@
 use std::{
+    fs,
     future::IntoFuture,
     net::{IpAddr, SocketAddr},
     path::PathBuf,
@@ -21,7 +22,6 @@ use jsonschema::{Validator, validator_for};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use tokio::{
-    fs,
     net::TcpListener,
     sync::{Mutex, oneshot},
 };
@@ -382,7 +382,7 @@ async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
     };
     if let Ok(serialized) = serde_json::to_vec_pretty(&payload) {
         let path = std::env::var("SCHEMAUI_SESSION_DUMP").unwrap_or_else(|_| DEFAULT_PATH.into());
-        let _ = fs::write(path, serialized).await;
+        let _ = tokio::task::spawn_blocking(move || fs::write(path, serialized)).await;
     }
     payload
 }
