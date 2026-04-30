@@ -3,7 +3,9 @@ use std::path::PathBuf;
 #[cfg(feature = "web")]
 use std::net::IpAddr;
 
-use clap::{ArgAction, Args, CommandFactory, Parser, Subcommand, ValueEnum, value_parser};
+#[cfg(feature = "completion")]
+use clap::ValueEnum;
+use clap::{ArgAction, Args, CommandFactory, Parser, Subcommand, value_parser};
 
 #[derive(Parser, Debug, Clone, Default, PartialEq, Eq)]
 #[command(
@@ -23,6 +25,7 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum Commands {
+    #[cfg(feature = "completion")]
     #[command(about = "Generate shell completion scripts for the schemaui CLI")]
     Completion(CompletionCommand),
     #[cfg(feature = "tui")]
@@ -48,12 +51,14 @@ pub struct TuiCommand {
     pub common: CommonArgs,
 }
 
+#[cfg(feature = "completion")]
 #[derive(Args, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CompletionCommand {
     #[arg(help = "target shell: bash, zsh, fish, or powershell")]
     pub shell: CompletionShell,
 }
 
+#[cfg(feature = "completion")]
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompletionShell {
     #[value(name = "bash")]

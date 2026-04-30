@@ -29,7 +29,14 @@ schemaui tui --schema ./schema.json
 
 ### Shell completion
 
-`schemaui-cli` 现在内置了基于 `clap_complete` 的补全脚本生成能力：
+带 `completion` feature 的构建会包含基于 `clap_complete` 的补全脚本生成能力。
+为了让默认二进制更轻，这个子命令现在按 feature gating 提供：
+
+```bash
+cargo install schemaui-cli --features completion
+```
+
+随后即可生成各 shell 的补全脚本：
 
 ```bash
 schemaui completion bash > ~/.local/share/bash-completion/completions/schemaui
@@ -168,7 +175,7 @@ schemaui tui \
   --config ./config.json -o -
 ```
 
-### 生成 completion 脚本
+### 生成 completion 脚本（需要 `completion` feature）
 
 ```bash
 schemaui completion bash
@@ -179,7 +186,7 @@ schemaui completion bash
 - **聚合报告**：`DiagnosticCollector` 会把冲突
   stdin、格式被禁用、输出文件已存在等问题 聚合成编号列表，再以非零状态退出。
 - **格式推断**：当扩展名要求的格式 feature 没开时，CLI 会在解析前直接停止。
-- **运行时错误**：其余错误经由 `color-eyre` 输出上下文，例如
+- **运行时错误**：其余错误经由 `eyre` 输出上下文，例如
   `failed to parse config as yaml` 或 `failed to compile JSON schema`。
 
 ## 8. 库互操作
