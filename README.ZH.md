@@ -97,11 +97,11 @@ serde_json = "1"
 ```
 
 ```rust
+use anyhow::Result;
 use schemaui::prelude::*;
 use serde_json::json;
 
-fn main() -> color_eyre::Result<()> {
-    color_eyre::install()?;
+fn main() -> Result<()> {
     let schema = json!({
         "$schema": "http://json-schema.org/draft-07/schema# ",
         "title": "服务运行时",
@@ -459,7 +459,7 @@ schemaui \
 ```
 
 ```
-┌────────┐  argh args   ┌──────────────┐ read stdin/files ┌─────────────┐
+┌────────┐  clap args   ┌──────────────┐ read stdin/files ┌─────────────┐
 │  CLI   ├─────────────▶│ InputSource  ├─────────────────▶│ io::input   │
 └────┬───┘              └──────┬───────┘                  └────┬────────┘
      │ diagnostics             │ schema/default Value          │
@@ -488,9 +488,8 @@ schemaui \
 - 标志 – `--no-pretty`切换紧凑输出，`--force/--yes`允许覆盖文件，`--title` /
   `--description`分别传递到`SchemaUI::with_title` /
   `SchemaUI::with_description`。
-- Shell completion – `schemaui completion <bash|zsh|fish|nushell>` 会从同一套
-  `argh` 命令树生成补全脚本。PowerShell 暂未暴露，因为上游 `argh_complete`
-  目前没有提供 PowerShell generator。
+- Shell completion – `schemaui completion <bash|zsh|fish|powershell>` 会通过
+  `clap_complete` 从同一套 `clap` 命令树生成补全脚本。
 
 ## 关键依赖项
 
@@ -503,7 +502,7 @@ schemaui \
 | `crossterm`                                 | 输入路由器消耗的终端事件。                |
 | `indexmap`                                  | 模式遍历的顺序保持映射。                  |
 | `once_cell`                                 | 懒解析快捷键 JSON。                       |
-| `argh`, `argh_complete`, `color-eyre` (CLI) | 参数解析、Shell 补全生成和友好的诊断。    |
+| `clap`, `clap_complete`, `anyhow` (CLI)     | 参数解析、Shell 补全生成和友好的诊断。    |
 
 ## 文档映射
 

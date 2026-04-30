@@ -1,8 +1,8 @@
 #![doc = include_str!("../cli_usage.md")]
 
+use anyhow::Result;
 #[cfg(not(feature = "tui"))]
 use clap::CommandFactory;
-use eyre::Result;
 
 use schemaui_cli::cli::Cli;
 #[cfg(any(feature = "completion", feature = "tui", feature = "web"))]
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
             let mut cmd = Cli::command();
             cmd.print_help()?;
             println!();
-            Err(eyre::eyre!(
+            Err(anyhow::anyhow!(
                 "this schemaui-cli build does not include the `tui` feature; use a subcommand supported by the active feature set"
             ))
         }

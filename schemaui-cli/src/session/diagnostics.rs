@@ -1,6 +1,6 @@
 use std::fmt::Write as FmtWrite;
 
-use eyre::{Result, eyre};
+use anyhow::{Result, anyhow};
 
 #[derive(Debug, Default)]
 pub struct DiagnosticCollector {
@@ -28,6 +28,6 @@ impl DiagnosticCollector {
         for (idx, msg) in self.messages.iter().enumerate() {
             let _ = writeln!(body, "  {}. {}", idx + 1, msg);
         }
-        Err(eyre!(body))
+        Err(anyhow!(body))
     }
 }
