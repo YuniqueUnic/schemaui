@@ -2,8 +2,9 @@
 
 use std::collections::HashMap;
 
-use schemars::schema::SchemaObject;
 use serde_json::Value;
+
+use super::model::SchemaObject;
 
 #[derive(Debug, Clone)]
 pub struct SectionInfo {

@@ -1,34 +1,29 @@
 use anyhow::{Context, Result, bail};
 use percent_encoding::percent_decode_str;
-use schemars::schema::{Metadata, RootSchema, Schema, SchemaObject};
 use serde_json::Value;
 
 use super::dialect::RootDialectContext;
+use super::model::{Schema, SchemaObject};
 
 #[derive(Debug)]
 pub struct SchemaResolver<'a> {
     raw: &'a Value,
-    root: &'a RootSchema,
 }
 
 impl<'a> SchemaResolver<'a> {
-    pub fn new(raw: &'a Value, root: &'a RootSchema) -> Self {
-        Self { raw, root }
-    }
-
-    pub fn root_object(&self) -> Option<&SchemaObject> {
-        Some(&self.root.schema)
+    pub fn new(raw: &'a Value) -> Self {
+        Self { raw }
     }
 
     pub fn resolve_schema(&self, schema: &Schema) -> Result<SchemaObject> {
         match schema {
-            Schema::Bool(value) => Ok(Schema::Bool(*value).into_object()),
+            Schema::Bool(_) => Ok(SchemaObject::default()),
             Schema::Object(object) => {
                 if let Some(reference) = &object.reference {
                     let resolved = self.follow_reference(reference)?;
-                    Ok(overlay_reference_annotations(resolved, object))
+                    Ok(overlay_reference_annotations(resolved, object.as_ref()))
                 } else {
-                    Ok(object.clone())
+                    Ok(object.as_ref().clone())
                 }
             }
         }
@@ -39,15 +34,6 @@ impl<'a> SchemaResolver<'a> {
     }
 
     fn follow_reference(&self, reference: &str) -> Result<SchemaObject> {
-        if let Some(key) = reference.strip_prefix("#/definitions/") {
-            let target = self
-                .root
-                .definitions
-                .get(key)
-                .with_context(|| format!("definition '{key}' not found"))?;
-            return self.resolve_schema(target);
-        }
-
         if let Some(fragment) = reference.strip_prefix('#') {
             let decoded = percent_decode_str(fragment)
                 .decode_utf8()
@@ -80,11 +66,30 @@ pub fn schema_reference(schema: &Schema) -> Option<&str> {
 }
 
 fn overlay_reference_annotations(mut target: SchemaObject, source: &SchemaObject) -> SchemaObject {
-    if source.metadata.is_some() {
-        target.metadata = Some(Box::new(merge_metadata(
-            target.metadata.as_deref(),
-            source.metadata.as_deref(),
-        )));
+    if let Some(source_metadata) = source.metadata.as_deref() {
+        let mut merged = target.metadata.as_deref().cloned().unwrap_or_default();
+        if let Some(title) = source_metadata.title.clone() {
+            merged.title = Some(title);
+        }
+        if let Some(description) = source_metadata.description.clone() {
+            merged.description = Some(description);
+        }
+        if source_metadata.default.is_some() {
+            merged.default = source_metadata.default.clone();
+        }
+        if source_metadata.deprecated {
+            merged.deprecated = true;
+        }
+        if source_metadata.read_only {
+            merged.read_only = true;
+        }
+        if source_metadata.write_only {
+            merged.write_only = true;
+        }
+        if !source_metadata.examples.is_empty() {
+            merged.examples = source_metadata.examples.clone();
+        }
+        target.metadata = Some(Box::new(merged));
     }
 
     if !source.extensions.is_empty() {
@@ -96,35 +101,4 @@ fn overlay_reference_annotations(mut target: SchemaObject, source: &SchemaObject
     }
 
     target
-}
-
-fn merge_metadata(target: Option<&Metadata>, source: Option<&Metadata>) -> Metadata {
-    let mut merged = target.cloned().unwrap_or_default();
-    let Some(source) = source else {
-        return merged;
-    };
-
-    if let Some(title) = source.title.clone() {
-        merged.title = Some(title);
-    }
-    if let Some(description) = source.description.clone() {
-        merged.description = Some(description);
-    }
-    if source.default.is_some() {
-        merged.default = source.default.clone();
-    }
-    if source.deprecated {
-        merged.deprecated = true;
-    }
-    if source.read_only {
-        merged.read_only = true;
-    }
-    if source.write_only {
-        merged.write_only = true;
-    }
-    if !source.examples.is_empty() {
-        merged.examples = source.examples.clone();
-    }
-
-    merged
 }

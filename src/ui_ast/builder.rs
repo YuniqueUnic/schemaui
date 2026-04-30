@@ -1,11 +1,9 @@
-use anyhow::{Context, Result, anyhow, bail};
-use schemars::schema::{
-    ArrayValidation, InstanceType, ObjectValidation, Schema, SchemaObject, SingleOrVec,
-};
+use anyhow::{Context, Result, bail};
 use serde_json::{Map, Value};
 
 use crate::schema::{
     loader::load_root_schema,
+    model::{ArrayValidation, InstanceType, ObjectValidation, Schema, SchemaObject, SingleOrVec},
     resolver::{SchemaResolver, schema_reference},
 };
 
@@ -15,11 +13,8 @@ use super::types::{
 
 pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
     let root_schema = load_root_schema(raw)?;
-    let resolver = SchemaResolver::new(raw, &root_schema);
-    let root_object = resolver
-        .root_object()
-        .cloned()
-        .ok_or_else(|| anyhow!("root schema must be an object"))?;
+    let resolver = SchemaResolver::new(raw);
+    let root_object = root_schema;
 
     if !is_object_schema(&root_object) {
         bail!("root schema must describe an object");
@@ -794,11 +789,12 @@ fn required_list(object: &ObjectValidation) -> Vec<String> {
     // Preserve the order in which required field names appear in the schema,
     // so that UI representations match the top-down order in the
     // config/schema file.
-    object.required.iter().cloned().collect()
+    object.required.to_vec()
 }
 
 fn schema_to_value(schema: &SchemaObject) -> Result<Value> {
-    serde_json::to_value(Schema::Object(schema.clone())).context("failed to serialize schema")
+    serde_json::to_value(Schema::Object(Box::new(schema.clone())))
+        .context("failed to serialize schema")
 }
 
 fn schema_to_value_with_defs(
@@ -968,6 +964,7 @@ fn default_variant_title(index: usize, schema: &SchemaObject) -> String {
             SingleOrVec::Single(item_schema) => {
                 // Try to get a meaningful name for the item type
                 if let Schema::Object(item_obj) = item_schema.as_ref() {
+                    let item_obj = item_obj.as_ref();
                     if let Some(item_ref) = item_obj.reference.as_ref()
                         && let Some(name) = item_ref.split('/').next_back()
                     {
@@ -1040,6 +1037,7 @@ fn humanize_identifier(s: &str) -> String {
 
 fn get_const_value(schema: &Schema) -> Option<&Value> {
     if let Schema::Object(obj) = schema {
+        let obj = obj.as_ref();
         if let Some(const_val) = obj.const_value.as_ref() {
             return Some(const_val);
         }
@@ -1102,7 +1100,7 @@ fn append_pointer(base: &str, segment: &str) -> String {
 #[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
-    use schemars::schema::SubschemaValidation;
+    use crate::schema::model::SubschemaValidation;
 
     #[test]
     fn variant_title_uses_kind_const() {
@@ -1112,7 +1110,7 @@ mod tests {
 
         let mut obj = ObjectValidation::default();
         obj.properties
-            .insert("kind".to_string(), Schema::Object(kind_schema));
+            .insert("kind".to_string(), Schema::Object(Box::new(kind_schema)));
 
         let mut schema = SchemaObject::default();
         schema.object = Some(Box::new(obj));
@@ -1128,7 +1126,9 @@ mod tests {
         item_schema.instance_type = Some(SingleOrVec::Single(Box::new(InstanceType::String)));
 
         let mut array = ArrayValidation::default();
-        array.items = Some(SingleOrVec::Single(Box::new(Schema::Object(item_schema))));
+        array.items = Some(SingleOrVec::Single(Box::new(Schema::Object(Box::new(
+            item_schema,
+        )))));
 
         let mut schema = SchemaObject::default();
         schema.array = Some(Box::new(array));
