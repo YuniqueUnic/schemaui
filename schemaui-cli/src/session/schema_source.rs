@@ -95,15 +95,20 @@ pub(crate) fn load_document(
             })
         }
         Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            let inline_label = format!("inline {label}");
-            let value = parse_contents(spec, format, &inline_label)?;
-            Ok(LoadedDocument {
-                value,
-                #[cfg(any(feature = "yaml", feature = "toml"))]
-                raw: spec.to_string(),
-                format,
-                origin: DocumentOrigin::Inline,
-            })
+            if should_treat_missing_path_as_inline_payload(spec) {
+                let inline_label = format!("inline {label}");
+                let value = parse_contents(spec, format, &inline_label)?;
+                Ok(LoadedDocument {
+                    value,
+                    #[cfg(any(feature = "yaml", feature = "toml"))]
+                    raw: spec.to_string(),
+                    format,
+                    origin: DocumentOrigin::Inline,
+                })
+            } else {
+                Err(Report::new(err)
+                    .wrap_err(format!("failed to load {label} from {}", path.display())))
+            }
         }
         Err(err) => {
             Err(Report::new(err)
@@ -422,6 +427,34 @@ fn parse_special_url(spec: &str) -> Option<Url> {
         "http" | "https" | "file" => Some(url),
         _ => None,
     }
+}
+
+fn should_treat_missing_path_as_inline_payload(spec: &str) -> bool {
+    let trimmed = spec.trim();
+    !trimmed.is_empty()
+        && (looks_like_structured_inline_payload(trimmed) || !looks_like_file_path(trimmed))
+}
+
+fn looks_like_structured_inline_payload(spec: &str) -> bool {
+    spec.contains('\n')
+        || spec.starts_with('{')
+        || spec.starts_with('[')
+        || spec.starts_with('"')
+        || spec.starts_with('\'')
+        || spec.starts_with("---")
+        || spec.starts_with('#')
+        || spec.contains(": ")
+        || spec.contains(":\n")
+        || spec.contains(" = ")
+        || spec.contains("=\n")
+}
+
+fn looks_like_file_path(spec: &str) -> bool {
+    let path = Path::new(spec);
+    spec.starts_with('.')
+        || spec.starts_with('~')
+        || spec.contains(std::path::MAIN_SEPARATOR)
+        || path.extension().is_some()
 }
 
 #[cfg(feature = "remote-schema")]

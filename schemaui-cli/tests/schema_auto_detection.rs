@@ -166,6 +166,60 @@ fn prepare_session_preserves_cli_description_override() {
     let _ = fs::remove_dir_all(temp);
 }
 
+#[test]
+fn prepare_session_reports_missing_file_like_config_instead_of_inlining_it() {
+    let temp = unique_temp_dir("missing_config");
+    let missing_path = temp.join("missing.json");
+
+    let err = prepare_session(&base_args(
+        None,
+        Some(missing_path.to_string_lossy().into_owned()),
+    ))
+    .expect_err("missing file-like config should fail");
+    let message = err.to_string();
+
+    assert!(
+        message.contains("failed to load config from"),
+        "missing file should be surfaced as a file-loading error: {message}"
+    );
+    assert!(
+        message.contains("missing.json"),
+        "error should include the missing file path: {message}"
+    );
+    assert!(
+        !message.contains("root schema must describe an object"),
+        "missing file should not fall back into bogus schema inference: {message}"
+    );
+
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[test]
+fn prepare_session_accepts_inline_config_payloads_that_look_like_documents() {
+    let temp = unique_temp_dir("inline_config_payload");
+    let schema_path = temp.join("schema.json");
+    write_json(
+        &schema_path,
+        &json!({
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {
+                "name": { "type": "string" }
+            }
+        }),
+    );
+
+    let session = prepare_session(&base_args(
+        Some(schema_path.to_string_lossy().into_owned()),
+        Some("name: alice".to_string()),
+    ))
+    .expect("inline yaml config should still be accepted");
+
+    assert_eq!(session.defaults, Some(json!({ "name": "alice" })));
+
+    let _ = fs::remove_dir_all(temp);
+}
+
 #[cfg(feature = "yaml")]
 #[test]
 fn prepare_session_prefers_explicit_local_schema_over_yaml_header_declaration() {

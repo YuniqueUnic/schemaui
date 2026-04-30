@@ -333,7 +333,7 @@ pub(crate) fn meta_lines(
     wrap_with_prefix(&content, "  ", max_width, style, style)
 }
 
-fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>> {
+pub(crate) fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>> {
     field.error.as_ref().map(|message| {
         let mut lines = Vec::new();
         lines.push(Line::from(Span::styled(
@@ -341,12 +341,13 @@ fn error_lines(field: &FieldState, max_width: u16) -> Option<Vec<Line<'static>>>
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         )));
         let error_style = Style::default().fg(Color::Red);
-        lines.extend(wrap_with_prefix(
+        lines.extend(wrap_with_prefix_limited(
             message,
             "    ",
             max_width,
             error_style,
             error_style,
+            3,
         ));
         lines
     })
@@ -718,6 +719,63 @@ fn wrap_with_prefix(
             ])
         })
         .collect()
+}
+
+fn wrap_with_prefix_limited(
+    text: &str,
+    prefix: &str,
+    max_width: u16,
+    prefix_style: Style,
+    content_style: Style,
+    max_lines: usize,
+) -> Vec<Line<'static>> {
+    let prefix_width = UnicodeWidthStr::width(prefix) as u16;
+    let available = max_width.saturating_sub(prefix_width).max(1) as usize;
+    let mut wrapped = wrap_preserving_spaces(text, available);
+    if wrapped.len() > max_lines {
+        wrapped.truncate(max_lines);
+        if let Some(last) = wrapped.last_mut() {
+            truncate_line_with_ellipsis(last, available);
+        }
+    }
+
+    wrapped
+        .into_iter()
+        .map(|segment| {
+            Line::from(vec![
+                Span::styled(prefix.to_string(), prefix_style),
+                Span::styled(segment, content_style),
+            ])
+        })
+        .collect()
+}
+
+fn truncate_line_with_ellipsis(line: &mut String, max_width: usize) {
+    if max_width == 0 {
+        line.clear();
+        line.push('…');
+        return;
+    }
+
+    let current_width = UnicodeWidthStr::width(line.as_str());
+    if current_width >= max_width {
+        let mut truncated = String::new();
+        let limit = max_width.saturating_sub(1);
+        let mut width = 0usize;
+        for ch in line.chars() {
+            let ch_width = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if width + ch_width > limit {
+                break;
+            }
+            truncated.push(ch);
+            width += ch_width;
+        }
+        *line = truncated;
+    }
+
+    if !line.ends_with('…') {
+        line.push('…');
+    }
 }
 
 #[cfg(test)]

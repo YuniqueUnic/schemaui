@@ -145,14 +145,18 @@ impl CompositeListState {
     pub fn selected_label(&self) -> Option<String> {
         let idx = self.selected_index()?;
         let entry = self.entries.get(idx)?;
-        Some(format!("#{} {}", idx + 1, entry.state.summary()))
+        Some(format!(
+            "#{} {}",
+            idx + 1,
+            entry.state.summary_with_preview()
+        ))
     }
 
     pub fn summaries(&self) -> Vec<String> {
         self.entries
             .iter()
             .enumerate()
-            .map(|(idx, entry)| format!("#{} {}", idx + 1, entry.state.summary()))
+            .map(|(idx, entry)| format!("#{} {}", idx + 1, entry.state.summary_with_preview()))
             .collect()
     }
 
@@ -193,7 +197,7 @@ impl CompositeListState {
             .take_editor_session(&entry.pointer, variant_index)?;
         Ok(CompositeListEditorContext {
             entry_index: idx,
-            entry_label: format!("#{} {}", idx + 1, entry.state.summary()),
+            entry_label: format!("#{} {}", idx + 1, entry.state.summary_with_preview()),
             session,
         })
     }
