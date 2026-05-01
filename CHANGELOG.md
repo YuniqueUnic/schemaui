@@ -15,6 +15,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.12.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.11.1...schemaui-v0.12.0) - 2026-05-01
+
+
+### Breaking Changes
+
+- **deps:** **BREAKING** remove schemars and h2 dependencies, update indexmap([#125](https://github.com/YuniqueUnic/schemaui/pull/125), @YuniqueUnic)
+
+
+
+
+
+
+### Bug Fixes
+
+- **web:** add configurable title to frontend output message([#127](https://github.com/YuniqueUnic/schemaui/pull/127), @YuniqueUnic)
+
+
+
+
+
+
+### Refactors
+
+- **ui_ast:** add builder tests and refactor module structure([#125](https://github.com/YuniqueUnic/schemaui/pull/125), @YuniqueUnic)
+
+- dependencies and features for web-types support([#125](https://github.com/YuniqueUnic/schemaui/pull/125), @YuniqueUnic)
+
+- **build:** remove unused tokio dependency from schemaui crate([#125](https://github.com/YuniqueUnic/schemaui/pull/125), @YuniqueUnic)
+
+- **cli:** replace eyre with anyhow for error handling([#126](https://github.com/YuniqueUnic/schemaui/pull/126), @YuniqueUnic)
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.11.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.11.0...schemaui-v0.11.1) - 2026-04-30
 
 
