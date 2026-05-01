@@ -63,8 +63,7 @@ impl WebAssetProvider for FilesystemAssets {
 }
 
 pub fn embedded_asset(path: &str) -> Option<AssetResponse> {
-    #[allow(clippy::default_constructed_unit_structs)]
-    EmbeddedAssets::default().load(path)
+    EmbeddedAssets.load(path)
 }
 
 fn normalize_path(raw: &str) -> &str {

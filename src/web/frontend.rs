@@ -17,11 +17,12 @@ pub struct WebFrontend {
 impl WebFrontend {
     pub async fn run_async(self, ctx: FrontendContext) -> Result<Value> {
         let config = web_session_config(ctx);
+        let title = &config.title.clone().unwrap_or_default();
         let bound = bind_session(config, self.serve)
             .await
             .context("failed to bind web session")?;
         let addr = bound.local_addr();
-        eprintln!("schemaui web UI available at http://{addr}/");
+        eprintln!("{title} schemaui UI available at http://{addr}/");
         eprintln!("Press Ctrl+C to abort the session.");
         bound.run().await.context("web UI session failed")
     }
