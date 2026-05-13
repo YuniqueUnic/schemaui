@@ -1,10 +1,10 @@
 use anyhow::{Result, anyhow};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::Deserialize;
-use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
 
 use super::input::KeyAction;
+use crate::keymap_spec;
 
 macro_rules! keymap_source {
     () => {
@@ -351,12 +351,10 @@ impl KeymapStore {
     }
 
     fn from_entries(entries: Vec<RawEntry>) -> Result<Self> {
+        keymap_spec::validate_unique_ids(entries.iter().map(|entry| entry.id.as_str()))
+            .map_err(|err| anyhow!(err))?;
         let mut bindings = Vec::with_capacity(entries.len());
-        let mut ids = HashSet::new();
         for entry in entries {
-            if !ids.insert(entry.id.clone()) {
-                return Err(anyhow!("duplicate keymap entry id {}", entry.id));
-            }
             bindings.push(KeyBinding::from_raw(entry)?);
         }
         Ok(Self {

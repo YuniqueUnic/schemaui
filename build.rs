@@ -1,10 +1,12 @@
-use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use unicode_width::UnicodeWidthStr;
+
+#[path = "src/keymap_spec.rs"]
+mod keymap_spec;
 
 const SHORTCUTS_BEGIN: &str = "<!-- AUTO-GENERATED:SHORTCUTS:BEGIN -->";
 const SHORTCUTS_END: &str = "<!-- AUTO-GENERATED:SHORTCUTS:END -->";
@@ -143,11 +145,8 @@ fn sync_shortcut_docs(root: &Path) -> Result<(), String> {
 }
 
 fn validate_entries(entries: &[KeymapDocEntry]) -> Result<(), String> {
-    let mut ids = HashSet::new();
+    keymap_spec::validate_unique_ids(entries.iter().map(|entry| entry.id.as_str()))?;
     for entry in entries {
-        if !ids.insert(entry.id.as_str()) {
-            return Err(format!("duplicate keymap entry id {}", entry.id));
-        }
         if entry.combos.is_empty() {
             return Err(format!(
                 "keymap entry {} must declare at least one combo",

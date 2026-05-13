@@ -4,6 +4,7 @@
 mod core;
 pub mod io;
 // #[cfg(feature = "precompile")]
+pub(crate) mod keymap_spec;
 pub mod precompile;
 mod schema;
 #[cfg(feature = "tui")]
