@@ -5,7 +5,7 @@ use crate::tui::view::{
     HelpShortcutRender, UiContext,
 };
 use anyhow::{Result, anyhow};
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
 use ratatui::layout::Rect;
 use serde_json::Value;
@@ -96,6 +96,10 @@ impl App {
     }
 
     fn current_help_contexts(&self) -> Vec<KeymapContext> {
+        if self.popup.is_some() {
+            return vec![KeymapContext::Popup];
+        }
+
         if self.overlay_depth() > 0 {
             let mut contexts = vec![KeymapContext::Overlay];
             if let Some(field) = self
@@ -128,13 +132,20 @@ impl App {
             ("Form".to_string(), vec![KeymapContext::Default]),
             ("List".to_string(), vec![KeymapContext::Collection]),
             ("Overlay".to_string(), vec![KeymapContext::Overlay]),
+            ("Popup".to_string(), vec![KeymapContext::Popup]),
             ("Help".to_string(), vec![KeymapContext::Help]),
         ];
 
         if let Some(context) = self.current_help_contexts().into_iter().find(|context| {
             matches!(
                 context,
-                KeymapContext::TextInput | KeymapContext::NumericInput
+                KeymapContext::TextInput
+                    | KeymapContext::NumericInput
+                    | KeymapContext::BooleanInput
+                    | KeymapContext::EnumInput
+                    | KeymapContext::MultiSelectInput
+                    | KeymapContext::CompositeInput
+                    | KeymapContext::ArrayBufferInput
             )
         }) {
             sections.push(("Field".to_string(), vec![context]));
@@ -146,18 +157,28 @@ impl App {
     fn handle_popup_key(&mut self, key: KeyEvent) -> Result<bool> {
         if let Some(app_popup) = &mut self.popup {
             let popup = &mut app_popup.state;
-            match key.code {
-                KeyCode::Esc => {
+            match self
+                .input_router
+                .classify_for_contexts(&key, &[KeymapContext::Popup])
+            {
+                super::input::KeyAction::PopupClose => {
                     self.popup = None;
                     self.status.ready();
                 }
-                KeyCode::Up => popup.select_previous(),
-                KeyCode::Down => popup.select_next(),
-                KeyCode::Char(' ') if popup.is_multi() => {
-                    popup.toggle_current();
-                    return Ok(true);
+                super::input::KeyAction::PopupSelect(delta) => {
+                    if delta < 0 {
+                        popup.select_previous();
+                    } else {
+                        popup.select_next();
+                    }
                 }
-                KeyCode::Enter => {
+                super::input::KeyAction::PopupToggle => {
+                    if popup.is_multi() {
+                        popup.toggle_current();
+                        return Ok(true);
+                    }
+                }
+                super::input::KeyAction::PopupApply => {
                     let (pointer, selection, multi_flags) = {
                         let pointer = popup.pointer().to_string();
                         let selection = popup.selection();
@@ -689,11 +710,10 @@ impl App {
             return false;
         };
         if let Some(popup) = PopupState::from_field(field) {
-            let message = if popup.is_multi() {
-                "Use ↑/↓ to move, Space to toggle, Enter to apply"
-            } else {
-                "Use ↑/↓ and Enter to choose"
-            };
+            let message = self
+                .keymap_store
+                .help_text(KeymapContext::Popup)
+                .unwrap_or_else(|| "Up/Down -> Select option • Enter -> Apply selection".into());
             self.status.set_raw(message);
             self.popup = Some(AppPopup {
                 owner,
@@ -833,7 +853,16 @@ fn field_help_context(kind: &FieldKind) -> Option<KeymapContext> {
             Some(KeymapContext::TextInput)
         }
         FieldKind::Integer | FieldKind::Number => Some(KeymapContext::NumericInput),
-        _ => None,
+        FieldKind::Boolean => Some(KeymapContext::BooleanInput),
+        FieldKind::Enum { .. } => Some(KeymapContext::EnumInput),
+        FieldKind::Composite(_) => Some(KeymapContext::CompositeInput),
+        FieldKind::Array(inner) => match inner.as_ref() {
+            FieldKind::Enum { .. } => Some(KeymapContext::MultiSelectInput),
+            FieldKind::String | FieldKind::Integer | FieldKind::Number | FieldKind::Boolean => None,
+            FieldKind::Composite(_) => None,
+            _ => Some(KeymapContext::ArrayBufferInput),
+        },
+        FieldKind::KeyValue(_) => None,
     }
 }
 

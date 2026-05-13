@@ -289,6 +289,187 @@
     ]
   },
   {
+    "id": "field.boolean.toggle",
+    "description": "Toggle boolean value",
+    "descriptionZh": "切换布尔值",
+    "contexts": [
+      "boolean"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Space",
+      "Left",
+      "Right"
+    ]
+  },
+  {
+    "id": "field.enum.prev",
+    "description": "Previous enum option",
+    "descriptionZh": "上一个枚举选项",
+    "contexts": [
+      "enum"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Up",
+      "Left"
+    ]
+  },
+  {
+    "id": "field.enum.next",
+    "description": "Next enum option",
+    "descriptionZh": "下一个枚举选项",
+    "contexts": [
+      "enum"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Down",
+      "Right"
+    ]
+  },
+  {
+    "id": "field.composite.prev",
+    "description": "Previous composite variant",
+    "descriptionZh": "上一个复合变体",
+    "contexts": [
+      "composite"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Left"
+    ]
+  },
+  {
+    "id": "field.composite.next",
+    "description": "Next composite variant",
+    "descriptionZh": "下一个复合变体",
+    "contexts": [
+      "composite"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Right"
+    ]
+  },
+  {
+    "id": "field.array-buffer.delete.backward",
+    "description": "Delete previous array buffer character",
+    "descriptionZh": "删除前一个数组缓冲字符",
+    "contexts": [
+      "arrayBuffer"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Backspace"
+    ]
+  },
+  {
+    "id": "field.array-buffer.clear",
+    "description": "Clear array buffer",
+    "descriptionZh": "清空数组缓冲",
+    "contexts": [
+      "arrayBuffer"
+    ],
+    "dispatch": false,
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Delete"
+    ]
+  },
+  {
+    "id": "popup.close",
+    "description": "Close popup",
+    "descriptionZh": "关闭弹窗",
+    "contexts": [
+      "popup"
+    ],
+    "action": {
+      "kind": "popupClose"
+    },
+    "combos": [
+      "Esc"
+    ]
+  },
+  {
+    "id": "popup.select.prev",
+    "description": "Select previous popup option",
+    "descriptionZh": "选择上一个弹窗选项",
+    "contexts": [
+      "popup"
+    ],
+    "action": {
+      "kind": "popupSelect",
+      "delta": -1
+    },
+    "combos": [
+      "Up"
+    ]
+  },
+  {
+    "id": "popup.select.next",
+    "description": "Select next popup option",
+    "descriptionZh": "选择下一个弹窗选项",
+    "contexts": [
+      "popup"
+    ],
+    "action": {
+      "kind": "popupSelect",
+      "delta": 1
+    },
+    "combos": [
+      "Down"
+    ]
+  },
+  {
+    "id": "popup.option.toggle",
+    "description": "Toggle popup option",
+    "descriptionZh": "切换弹窗选项",
+    "contexts": [
+      "popup"
+    ],
+    "action": {
+      "kind": "popupToggle"
+    },
+    "combos": [
+      "Space"
+    ]
+  },
+  {
+    "id": "popup.apply",
+    "description": "Apply popup selection",
+    "descriptionZh": "应用弹窗选择",
+    "contexts": [
+      "popup"
+    ],
+    "action": {
+      "kind": "popupApply"
+    },
+    "combos": [
+      "Enter"
+    ]
+  },
+  {
     "id": "help.close",
     "description": "Close help",
     "descriptionZh": "关闭帮助",
@@ -515,11 +696,15 @@
     ]
   },
   {
-    "id": "popup.toggle",
+    "id": "popup.activate",
     "description": "Open popup / apply selection",
     "descriptionZh": "打开弹窗 / 应用选择",
     "contexts": [
-      "default"
+      "default",
+      "boolean",
+      "enum",
+      "multiSelect",
+      "composite"
     ],
     "action": {
       "kind": "togglePopup"

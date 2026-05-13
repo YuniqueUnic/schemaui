@@ -45,17 +45,19 @@ fn help_only_text_bindings_do_not_override_raw_input() {
     let router = router();
 
     let left = router.classify(&key(KeyCode::Left, KeyModifiers::NONE));
+    let space = router.classify(&key(KeyCode::Char(' '), KeyModifiers::NONE));
     let backspace = router.classify(&key(KeyCode::Backspace, KeyModifiers::NONE));
     let ctrl_w = router.classify(&key(KeyCode::Char('w'), KeyModifiers::CONTROL));
 
     assert!(matches!(left, KeyAction::Input(event) if event.code == KeyCode::Left));
+    assert!(matches!(space, KeyAction::Input(event) if event.code == KeyCode::Char(' ')));
     assert!(matches!(backspace, KeyAction::Input(event) if event.code == KeyCode::Backspace));
     assert!(matches!(ctrl_w, KeyAction::Input(event)
         if event.code == KeyCode::Char('w') && event.modifiers == KeyModifiers::CONTROL));
 }
 
 #[test]
-fn default_keymap_exposes_text_and_numeric_help_contexts() {
+fn default_keymap_exposes_field_local_edit_help_contexts() {
     let store = keymap::default_store();
 
     let text_help = store
@@ -76,6 +78,29 @@ fn default_keymap_exposes_text_and_numeric_help_contexts() {
     assert!(numeric_help.contains("Shift+Right -> Fast step value up"));
     assert!(numeric_help.contains("Ctrl+Z -> Undo numeric edit"));
     assert!(numeric_help.contains("Ctrl+Y -> Redo numeric edit"));
+
+    let boolean_help = store
+        .help_text(KeymapContext::BooleanInput)
+        .expect("boolean input help");
+    assert!(boolean_help.contains("Space/Left/Right -> Toggle boolean value"));
+
+    let enum_help = store
+        .help_text(KeymapContext::EnumInput)
+        .expect("enum input help");
+    assert!(enum_help.contains("Up/Left -> Previous enum option"));
+    assert!(enum_help.contains("Down/Right -> Next enum option"));
+
+    let composite_help = store
+        .help_text(KeymapContext::CompositeInput)
+        .expect("composite input help");
+    assert!(composite_help.contains("Left -> Previous composite variant"));
+    assert!(composite_help.contains("Right -> Next composite variant"));
+
+    let array_help = store
+        .help_text(KeymapContext::ArrayBufferInput)
+        .expect("array buffer input help");
+    assert!(array_help.contains("Backspace -> Delete previous array buffer character"));
+    assert!(array_help.contains("Delete -> Clear array buffer"));
 }
 
 #[test]
@@ -88,4 +113,57 @@ fn help_context_bindings_are_only_classified_when_requested() {
         store.classify_for_contexts(&esc, &[KeymapContext::Help]),
         Some(KeyAction::HelpClose)
     ));
+}
+
+#[test]
+fn popup_context_bindings_are_only_classified_when_requested() {
+    let store = keymap::default_store();
+    let esc = key(KeyCode::Esc, KeyModifiers::NONE);
+    let space = key(KeyCode::Char(' '), KeyModifiers::NONE);
+
+    assert!(!matches!(store.classify(&esc), Some(KeyAction::PopupClose)));
+    assert!(!matches!(
+        store.classify(&space),
+        Some(KeyAction::PopupToggle)
+    ));
+    assert!(matches!(
+        store.classify_for_contexts(&esc, &[KeymapContext::Popup]),
+        Some(KeyAction::PopupClose)
+    ));
+    assert!(matches!(
+        store.classify_for_contexts(&space, &[KeymapContext::Popup]),
+        Some(KeyAction::PopupToggle)
+    ));
+}
+
+#[test]
+fn custom_keymap_rejects_duplicate_ids() {
+    let raw = r#"
+[
+  {
+    "id": "duplicate",
+    "description": "First",
+    "descriptionZh": "第一个",
+    "contexts": ["default"],
+    "action": { "kind": "none" },
+    "combos": ["x"]
+  },
+  {
+    "id": "duplicate",
+    "description": "Second",
+    "descriptionZh": "第二个",
+    "contexts": ["default"],
+    "action": { "kind": "none" },
+    "combos": ["y"]
+  }
+]
+"#;
+
+    let error = keymap::KeymapStore::from_json(raw).expect_err("duplicate id should fail");
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate keymap entry id duplicate"),
+        "unexpected error: {error}"
+    );
 }

@@ -383,6 +383,16 @@ management and validation can map errors back precisely.
 | `Esc`               | Cancel / clear status (overlays: pop current level) | `command` |
 | `Ctrl+?` / `Ctrl+H` | Show help and error summary                         | `command` |
 
+#### Popup context
+
+| Shortcut | Action                       | Kind      |
+| -------- | ---------------------------- | --------- |
+| `Esc`    | Close popup                  | `command` |
+| `Up`     | Select previous popup option | `command` |
+| `Down`   | Select next popup option     | `command` |
+| `Space`  | Toggle popup option          | `command` |
+| `Enter`  | Apply popup selection        | `command` |
+
 #### Help context
 
 | Shortcut                    | Action                   | Kind      |
@@ -426,6 +436,42 @@ management and validation can map errors back precisely.
 | `Ctrl+Z`      | Undo numeric edit         | `local edit` |
 | `Ctrl+Y`      | Redo numeric edit         | `local edit` |
 
+#### Boolean field context
+
+| Shortcut                   | Action                       | Kind         |
+| -------------------------- | ---------------------------- | ------------ |
+| `Space` / `Left` / `Right` | Toggle boolean value         | `local edit` |
+| `Enter`                    | Open popup / apply selection | `command`    |
+
+#### Enum field context
+
+| Shortcut         | Action                       | Kind         |
+| ---------------- | ---------------------------- | ------------ |
+| `Up` / `Left`    | Previous enum option         | `local edit` |
+| `Down` / `Right` | Next enum option             | `local edit` |
+| `Enter`          | Open popup / apply selection | `command`    |
+
+#### Multi-select field context
+
+| Shortcut | Action                       | Kind      |
+| -------- | ---------------------------- | --------- |
+| `Enter`  | Open popup / apply selection | `command` |
+
+#### Composite field context
+
+| Shortcut | Action                       | Kind         |
+| -------- | ---------------------------- | ------------ |
+| `Left`   | Previous composite variant   | `local edit` |
+| `Right`  | Next composite variant       | `local edit` |
+| `Enter`  | Open popup / apply selection | `command`    |
+
+#### Array buffer field context
+
+| Shortcut    | Action                                 | Kind         |
+| ----------- | -------------------------------------- | ------------ |
+| `Backspace` | Delete previous array buffer character | `local edit` |
+| `Delete`    | Clear array buffer                     | `local edit` |
+
 <!-- AUTO-GENERATED:SHORTCUTS:END -->
 
 ### Keymap system
@@ -436,8 +482,9 @@ of truth.
 
 - **Format** – each JSON object declares an `id`, human-readable `description`,
   bilingual `descriptionZh`, `contexts` (any of `"default"`, `"collection"`,
-  `"overlay"`, `"help"`, `"text"`, `"numeric"`), an `action` discriminated
-  union, and a list of textual `combos`. For example:
+  `"overlay"`, `"popup"`, `"help"`, `"text"`, `"numeric"`, `"boolean"`,
+  `"enum"`, `"multiSelect"`, `"composite"`, `"arrayBuffer"`), an `action`
+  discriminated union, and a list of textual `combos`. For example:
 
   ```json
   {

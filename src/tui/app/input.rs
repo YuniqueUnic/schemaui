@@ -22,6 +22,10 @@ pub enum KeyAction {
     HelpShortcutHome,
     HelpShortcutEnd,
     HelpErrorScroll(i32),
+    PopupClose,
+    PopupSelect(i32),
+    PopupToggle,
+    PopupApply,
     FieldStep(i32),
     SectionStep(i32),
     RootStep(i32),
@@ -253,7 +257,11 @@ impl KeyBindingMap {
             | KeyAction::HelpShortcutPage(_)
             | KeyAction::HelpShortcutHome
             | KeyAction::HelpShortcutEnd
-            | KeyAction::HelpErrorScroll(_) => CommandDispatch::None,
+            | KeyAction::HelpErrorScroll(_)
+            | KeyAction::PopupClose
+            | KeyAction::PopupSelect(_)
+            | KeyAction::PopupToggle
+            | KeyAction::PopupApply => CommandDispatch::None,
             KeyAction::Input(event) => CommandDispatch::Input(event),
             KeyAction::None => CommandDispatch::None,
         }
