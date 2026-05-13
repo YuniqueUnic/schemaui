@@ -17,6 +17,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.12.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.12.0...schemaui-v0.12.1) - 2026-05-13
+
+
+
+
+
+
+### Bug Fixes
+
+- **keymap:** add new shortcut contexts and actions for enhanced UI interaction([#135](https://github.com/YuniqueUnic/schemaui/pull/135), @YuniqueUnic)
+
+
+
+
+
+
+### Refactors
+
+- **build:** move validate_unique_ids to shared module([#135](https://github.com/YuniqueUnic/schemaui/pull/135), @YuniqueUnic)
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.12.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.11.1...schemaui-v0.12.0) - 2026-05-01
 
 
