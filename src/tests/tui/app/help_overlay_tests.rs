@@ -233,6 +233,56 @@ fn footer_help_includes_numeric_shortcuts_for_number_fields() {
 }
 
 #[test]
+fn footer_help_includes_boolean_shortcuts_for_boolean_fields() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "enabled": {"type": "boolean"}
+        }
+    });
+    let app = build_app(schema);
+
+    let help = app.current_help_text_for_test().expect("boolean help");
+    assert!(help.contains("Tab/Down -> Next field"));
+    assert!(help.contains("Space/Left/Right -> Toggle boolean value"));
+}
+
+#[test]
+fn footer_help_includes_enum_shortcuts_for_enum_fields() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "mode": {"type": "string", "enum": ["alpha", "beta"]}
+        }
+    });
+    let app = build_app(schema);
+
+    let help = app.current_help_text_for_test().expect("enum help");
+    assert!(help.contains("Tab/Down -> Next field"));
+    assert!(help.contains("Up/Left -> Previous enum option"));
+    assert!(help.contains("Down/Right -> Next enum option"));
+}
+
+#[test]
+fn popup_help_uses_popup_keymap_context() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "mode": {"type": "string", "enum": ["alpha", "beta"]}
+        }
+    });
+    let mut app = build_app(schema);
+
+    app.handle_key_for_test(key(KeyCode::Enter, KeyModifiers::NONE))
+        .expect("open enum popup");
+    let help = app.current_help_text_for_test().expect("popup help");
+    assert!(help.contains("Esc -> Close popup"));
+    assert!(help.contains("Up -> Select previous popup option"));
+    assert!(help.contains("Down -> Select next popup option"));
+    assert!(help.contains("Enter -> Apply popup selection"));
+}
+
+#[test]
 fn help_overlay_error_column_supports_horizontal_scroll_with_h_and_l() {
     let schema = json!({
         "type": "object",

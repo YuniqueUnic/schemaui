@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -8,13 +9,19 @@ use unicode_width::UnicodeWidthStr;
 const SHORTCUTS_BEGIN: &str = "<!-- AUTO-GENERATED:SHORTCUTS:BEGIN -->";
 const SHORTCUTS_END: &str = "<!-- AUTO-GENERATED:SHORTCUTS:END -->";
 
-const CONTEXT_ORDER: [&str; 6] = [
+const CONTEXT_ORDER: [&str; 12] = [
     "default",
     "collection",
     "overlay",
+    "popup",
     "help",
     "text",
     "numeric",
+    "boolean",
+    "enum",
+    "multiSelect",
+    "composite",
+    "arrayBuffer",
 ];
 
 fn default_dispatch() -> bool {
@@ -52,15 +59,27 @@ impl Locale {
             (Locale::En, "default") => "Default context",
             (Locale::En, "collection") => "Collection context",
             (Locale::En, "overlay") => "Overlay context",
+            (Locale::En, "popup") => "Popup context",
             (Locale::En, "help") => "Help context",
             (Locale::En, "text") => "Text field context",
             (Locale::En, "numeric") => "Numeric field context",
+            (Locale::En, "boolean") => "Boolean field context",
+            (Locale::En, "enum") => "Enum field context",
+            (Locale::En, "multiSelect") => "Multi-select field context",
+            (Locale::En, "composite") => "Composite field context",
+            (Locale::En, "arrayBuffer") => "Array buffer field context",
             (Locale::Zh, "default") => "默认上下文",
             (Locale::Zh, "collection") => "集合上下文",
             (Locale::Zh, "overlay") => "覆盖层上下文",
+            (Locale::Zh, "popup") => "弹窗上下文",
             (Locale::Zh, "help") => "帮助上下文",
             (Locale::Zh, "text") => "文本字段上下文",
             (Locale::Zh, "numeric") => "数值字段上下文",
+            (Locale::Zh, "boolean") => "布尔字段上下文",
+            (Locale::Zh, "enum") => "枚举字段上下文",
+            (Locale::Zh, "multiSelect") => "多选字段上下文",
+            (Locale::Zh, "composite") => "复合字段上下文",
+            (Locale::Zh, "arrayBuffer") => "数组缓冲字段上下文",
             _ => "Unknown context",
         }
     }
@@ -124,7 +143,11 @@ fn sync_shortcut_docs(root: &Path) -> Result<(), String> {
 }
 
 fn validate_entries(entries: &[KeymapDocEntry]) -> Result<(), String> {
+    let mut ids = HashSet::new();
     for entry in entries {
+        if !ids.insert(entry.id.as_str()) {
+            return Err(format!("duplicate keymap entry id {}", entry.id));
+        }
         if entry.combos.is_empty() {
             return Err(format!(
                 "keymap entry {} must declare at least one combo",

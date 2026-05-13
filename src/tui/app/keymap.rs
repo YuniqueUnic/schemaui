@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
 
 use super::input::KeyAction;
@@ -21,9 +22,15 @@ pub(crate) enum KeymapContext {
     Default,
     Collection,
     Overlay,
+    Popup,
     Help,
     TextInput,
     NumericInput,
+    BooleanInput,
+    EnumInput,
+    MultiSelectInput,
+    CompositeInput,
+    ArrayBufferInput,
 }
 
 impl KeymapContext {
@@ -32,9 +39,21 @@ impl KeymapContext {
             "default" => Some(KeymapContext::Default),
             "collection" => Some(KeymapContext::Collection),
             "overlay" => Some(KeymapContext::Overlay),
+            "popup" => Some(KeymapContext::Popup),
             "help" => Some(KeymapContext::Help),
             "text" | "textInput" | "text-input" => Some(KeymapContext::TextInput),
             "numeric" | "numericInput" | "numeric-input" => Some(KeymapContext::NumericInput),
+            "boolean" | "booleanInput" | "boolean-input" => Some(KeymapContext::BooleanInput),
+            "enum" | "enumInput" | "enum-input" => Some(KeymapContext::EnumInput),
+            "multiSelect" | "multi-select" | "multiSelectInput" | "multi-select-input" => {
+                Some(KeymapContext::MultiSelectInput)
+            }
+            "composite" | "compositeInput" | "composite-input" => {
+                Some(KeymapContext::CompositeInput)
+            }
+            "arrayBuffer" | "array-buffer" | "arrayBufferInput" | "array-buffer-input" => {
+                Some(KeymapContext::ArrayBufferInput)
+            }
             _ => None,
         }
     }
@@ -67,6 +86,10 @@ enum RawAction {
     HelpShortcutHome,
     HelpShortcutEnd,
     HelpErrorScroll { delta: i32 },
+    PopupClose,
+    PopupSelect { delta: i32 },
+    PopupToggle,
+    PopupApply,
     FieldStep { delta: i32 },
     SectionStep { delta: i32 },
     RootStep { delta: i32 },
@@ -131,7 +154,12 @@ impl KeyBinding {
         if !self.dispatch {
             return None;
         }
-        if self.contexts.contains(&KeymapContext::Help) {
+        if !self.contexts.iter().any(|context| {
+            matches!(
+                context,
+                KeymapContext::Default | KeymapContext::Collection | KeymapContext::Overlay
+            )
+        }) {
             return None;
         }
         self.combos
@@ -233,6 +261,7 @@ impl CodeMatcher {
         let matcher = match normalized.as_str() {
             "tab" => CodeMatcher::Literal(KeyCode::Tab),
             "backtab" | "shift+tab" => CodeMatcher::Literal(KeyCode::BackTab),
+            "space" => CodeMatcher::Literal(KeyCode::Char(' ')),
             "enter" => CodeMatcher::Literal(KeyCode::Enter),
             "esc" | "escape" => CodeMatcher::Literal(KeyCode::Esc),
             "left" => CodeMatcher::Literal(KeyCode::Left),
@@ -290,6 +319,10 @@ impl RawAction {
             RawAction::HelpShortcutHome => KeyAction::HelpShortcutHome,
             RawAction::HelpShortcutEnd => KeyAction::HelpShortcutEnd,
             RawAction::HelpErrorScroll { delta } => KeyAction::HelpErrorScroll(delta),
+            RawAction::PopupClose => KeyAction::PopupClose,
+            RawAction::PopupSelect { delta } => KeyAction::PopupSelect(delta),
+            RawAction::PopupToggle => KeyAction::PopupToggle,
+            RawAction::PopupApply => KeyAction::PopupApply,
             RawAction::FieldStep { delta } => KeyAction::FieldStep(delta),
             RawAction::SectionStep { delta } => KeyAction::SectionStep(delta),
             RawAction::RootStep { delta } => KeyAction::RootStep(delta),
@@ -319,7 +352,11 @@ impl KeymapStore {
 
     fn from_entries(entries: Vec<RawEntry>) -> Result<Self> {
         let mut bindings = Vec::with_capacity(entries.len());
+        let mut ids = HashSet::new();
         for entry in entries {
+            if !ids.insert(entry.id.clone()) {
+                return Err(anyhow!("duplicate keymap entry id {}", entry.id));
+            }
             bindings.push(KeyBinding::from_raw(entry)?);
         }
         Ok(Self {
