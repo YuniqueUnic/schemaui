@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "mydef": {
+      "type": "integer",
+      "default": 20
+    }
+  },
+  "type": "object",
+  "properties": {
+    "first": {
+      "$ref": "#/$defs/mydef"
+    },
+    "second": {
+      "$ref": "#/$defs/mydef"
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

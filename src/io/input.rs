@@ -73,8 +73,12 @@ pub fn schema_from_data_value(value: &Value) -> Value {
 /// Merge user-provided data into an existing schema as `default` values.
 pub fn schema_with_defaults(schema: &Value, defaults: &Value) -> Value {
     let mut enriched = schema.clone();
-    DefaultApplier::new().apply(&mut enriched, defaults);
+    apply_schema_defaults(&mut enriched, defaults);
     enriched
+}
+
+pub(crate) fn apply_schema_defaults(schema: &mut Value, defaults: &Value) {
+    apply_defaults_at(schema, "", defaults);
 }
 
 /// Heuristic used when callers pass a single document and expect SchemaUI to
@@ -123,171 +127,129 @@ pub fn looks_like_json_schema(value: &Value) -> bool {
     false
 }
 
-struct DefaultApplier {
-    active_refs: HashSet<String>,
-}
+fn apply_defaults_at(root: &mut Value, pointer: &str, defaults: &Value) {
+    let Some(schema) = root.pointer_mut(pointer) else {
+        return;
+    };
+    let Some(schema_obj) = schema.as_object_mut() else {
+        return;
+    };
 
-impl DefaultApplier {
-    fn new() -> Self {
-        Self {
-            active_refs: HashSet::new(),
-        }
-    }
+    schema_obj.insert("default".to_string(), defaults.clone());
 
-    fn apply(&mut self, root: &mut Value, defaults: &Value) {
-        self.apply_at(root, "", defaults);
-    }
+    let mut tasks: Vec<(String, Cow<'_, Value>)> = Vec::new();
 
-    fn apply_at(&mut self, root: &mut Value, pointer: &str, defaults: &Value) {
-        let Some(schema) = root.pointer_mut(pointer) else {
-            return;
-        };
-        let Some(schema_obj) = schema.as_object_mut() else {
-            return;
-        };
-
-        schema_obj.insert("default".to_string(), defaults.clone());
-
-        let mut tasks: Vec<(String, Cow<'_, Value>)> = Vec::new();
-
-        if let Some(default_map) = defaults.as_object() {
-            if let Some(properties) = schema_obj.get("properties").and_then(Value::as_object) {
-                for key in properties.keys() {
-                    if let Some(value) = default_map.get(key) {
-                        tasks.push((
-                            child_pointer(pointer, &["properties", key]),
-                            Cow::Borrowed(value),
-                        ));
-                    }
-                }
-            }
-
-            if let Some(patterns) = schema_obj
-                .get("patternProperties")
-                .and_then(Value::as_object)
-            {
-                for (pattern, _) in patterns {
-                    if let Some(matched) = pattern_defaults(pattern, default_map) {
-                        tasks.push((
-                            child_pointer(pointer, &["patternProperties", pattern]),
-                            Cow::Owned(Value::Object(matched)),
-                        ));
-                    }
-                }
-            }
-
-            if let Some(additional_schema) = schema_obj.get("additionalProperties")
-                && additional_schema.is_object()
-            {
-                let excluded: HashSet<&str> = schema_obj
-                    .get("properties")
-                    .and_then(Value::as_object)
-                    .map(|props| props.keys().map(|k| k.as_str()).collect())
-                    .unwrap_or_default();
-                let extras = default_map
-                    .iter()
-                    .filter(|(key, _)| !excluded.contains(key.as_str()))
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect::<Map<_, _>>();
-                if !extras.is_empty() {
+    if let Some(default_map) = defaults.as_object() {
+        if let Some(properties) = schema_obj.get("properties").and_then(Value::as_object) {
+            for key in properties.keys() {
+                if let Some(value) = default_map.get(key) {
                     tasks.push((
-                        child_pointer(pointer, &["additionalProperties"]),
-                        Cow::Owned(Value::Object(extras)),
+                        child_pointer(pointer, &["properties", key]),
+                        Cow::Borrowed(value),
                     ));
                 }
             }
-
-            if let Some(deps) = schema_obj.get("dependencies").and_then(Value::as_object) {
-                for (prop, dep_schema) in deps {
-                    if default_map.contains_key(prop) && dep_schema.is_object() {
-                        tasks.push((
-                            child_pointer(pointer, &["dependencies", prop]),
-                            Cow::Borrowed(defaults),
-                        ));
-                    }
-                }
-            }
-
-            if let Some(deps) = schema_obj
-                .get("dependentSchemas")
-                .and_then(Value::as_object)
-            {
-                for (prop, dep_schema) in deps {
-                    if default_map.contains_key(prop) && dep_schema.is_object() {
-                        tasks.push((
-                            child_pointer(pointer, &["dependentSchemas", prop]),
-                            Cow::Borrowed(defaults),
-                        ));
-                    }
-                }
-            }
         }
 
-        if let Some(default_array) = defaults.as_array()
-            && let Some(items) = schema_obj.get("items")
+        if let Some(patterns) = schema_obj
+            .get("patternProperties")
+            .and_then(Value::as_object)
         {
-            match items {
-                Value::Array(tuple) => {
-                    for (idx, _) in tuple.iter().enumerate() {
-                        if let Some(value) = default_array.get(idx) {
-                            let idx_str = idx.to_string();
-                            tasks.push((
-                                child_pointer(pointer, &["items", &idx_str]),
-                                Cow::Borrowed(value),
-                            ));
-                        }
-                    }
+            for (pattern, _) in patterns {
+                if let Some(matched) = pattern_defaults(pattern, default_map) {
+                    tasks.push((
+                        child_pointer(pointer, &["patternProperties", pattern]),
+                        Cow::Owned(Value::Object(matched)),
+                    ));
                 }
-                Value::Object(_) => {
-                    if let Some(first) = default_array.first() {
-                        tasks.push((child_pointer(pointer, &["items"]), Cow::Borrowed(first)));
-                    }
-                }
-                _ => {}
             }
         }
 
-        for keyword in ["oneOf", "anyOf", "allOf"] {
-            if let Some(Value::Array(branches)) = schema_obj.get(keyword) {
-                for idx in 0..branches.len() {
-                    let idx_str = idx.to_string();
+        if let Some(additional_schema) = schema_obj.get("additionalProperties")
+            && additional_schema.is_object()
+        {
+            let excluded: HashSet<&str> = schema_obj
+                .get("properties")
+                .and_then(Value::as_object)
+                .map(|props| props.keys().map(|k| k.as_str()).collect())
+                .unwrap_or_default();
+            let extras = default_map
+                .iter()
+                .filter(|(key, _)| !excluded.contains(key.as_str()))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<Map<_, _>>();
+            if !extras.is_empty() {
+                tasks.push((
+                    child_pointer(pointer, &["additionalProperties"]),
+                    Cow::Owned(Value::Object(extras)),
+                ));
+            }
+        }
+
+        if let Some(deps) = schema_obj.get("dependencies").and_then(Value::as_object) {
+            for (prop, dep_schema) in deps {
+                if default_map.contains_key(prop) && dep_schema.is_object() {
                     tasks.push((
-                        child_pointer(pointer, &[keyword, &idx_str]),
+                        child_pointer(pointer, &["dependencies", prop]),
                         Cow::Borrowed(defaults),
                     ));
                 }
             }
         }
 
-        let mut ref_targets = Vec::new();
-        if let Some(Value::String(reference)) = schema_obj.get("$ref")
-            && let Some(target_pointer) = pointer_from_reference(reference)
-            && self.active_refs.insert(target_pointer.clone())
+        if let Some(deps) = schema_obj
+            .get("dependentSchemas")
+            .and_then(Value::as_object)
         {
-            ref_targets.push(target_pointer.clone());
-            tasks.push((target_pointer, Cow::Borrowed(defaults)));
-        }
-        for (child_pointer, value) in tasks {
-            self.apply_at(root, &child_pointer, value.as_ref());
-        }
-
-        for pointer in ref_targets {
-            self.active_refs.remove(&pointer);
+            for (prop, dep_schema) in deps {
+                if default_map.contains_key(prop) && dep_schema.is_object() {
+                    tasks.push((
+                        child_pointer(pointer, &["dependentSchemas", prop]),
+                        Cow::Borrowed(defaults),
+                    ));
+                }
+            }
         }
     }
-}
 
-fn pointer_from_reference(reference: &str) -> Option<String> {
-    if let Some(path) = reference.strip_prefix('#') {
-        if path.is_empty() {
-            Some(String::new())
-        } else if path.starts_with('/') {
-            Some(path.to_string())
-        } else {
-            Some(format!("/{}", path))
+    if let Some(default_array) = defaults.as_array()
+        && let Some(items) = schema_obj.get("items")
+    {
+        match items {
+            Value::Array(tuple) => {
+                for (idx, _) in tuple.iter().enumerate() {
+                    if let Some(value) = default_array.get(idx) {
+                        let idx_str = idx.to_string();
+                        tasks.push((
+                            child_pointer(pointer, &["items", &idx_str]),
+                            Cow::Borrowed(value),
+                        ));
+                    }
+                }
+            }
+            Value::Object(_) => {
+                if let Some(first) = default_array.first() {
+                    tasks.push((child_pointer(pointer, &["items"]), Cow::Borrowed(first)));
+                }
+            }
+            _ => {}
         }
-    } else {
-        None
+    }
+
+    for keyword in ["oneOf", "anyOf", "allOf"] {
+        if let Some(Value::Array(branches)) = schema_obj.get(keyword) {
+            for idx in 0..branches.len() {
+                let idx_str = idx.to_string();
+                tasks.push((
+                    child_pointer(pointer, &[keyword, &idx_str]),
+                    Cow::Borrowed(defaults),
+                ));
+            }
+        }
+    }
+
+    for (child_pointer, value) in tasks {
+        apply_defaults_at(root, &child_pointer, value.as_ref());
     }
 }
 
@@ -501,37 +463,6 @@ mod tests {
         assert_eq!(
             enriched["items"]["properties"]["tag"]["default"],
             json!("api")
-        );
-    }
-
-    #[test]
-    fn propagates_defaults_through_refs() {
-        let schema = json!({
-            "definitions": {
-                "endpoint": {
-                    "type": "object",
-                    "properties": {
-                        "host": {"type": "string"},
-                        "port": {"type": "integer"}
-                    }
-                }
-            },
-            "type": "object",
-            "properties": {
-                "service": {"$ref": "#/definitions/endpoint"}
-            }
-        });
-        let defaults = json!({
-            "service": {"host": "localhost", "port": 8080}
-        });
-        let enriched = schema_with_defaults(&schema, &defaults);
-        assert_eq!(
-            enriched["properties"]["service"]["default"]["host"],
-            json!("localhost")
-        );
-        assert_eq!(
-            enriched["definitions"]["endpoint"]["properties"]["port"]["default"],
-            json!(8080)
         );
     }
 

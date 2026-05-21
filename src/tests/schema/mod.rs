@@ -4,4 +4,5 @@ mod dialect_tests;
 #[cfg(feature = "tui")]
 mod layout_tests;
 mod pipeline_artifact_tests;
+mod ref_default_tests;
 mod resolver_tests;
