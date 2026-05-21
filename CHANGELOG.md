@@ -19,6 +19,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.12.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.12.1...schemaui-v0.12.2) - 2026-05-21
+
+
+
+
+
+
+### Bug Fixes
+
+- implement scoped default value application for JSON Schema references([#139](https://github.com/YuniqueUnic/schemaui/pull/139), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.12.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.12.0...schemaui-v0.12.1) - 2026-05-13
 
 
