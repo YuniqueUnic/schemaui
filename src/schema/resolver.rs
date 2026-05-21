@@ -2,6 +2,8 @@ use anyhow::{Context, Result, bail};
 use percent_encoding::percent_decode_str;
 use serde_json::Value;
 
+use crate::io::input::apply_schema_defaults;
+
 use super::dialect::RootDialectContext;
 use super::model::{Schema, SchemaObject};
 
@@ -21,6 +23,7 @@ impl<'a> SchemaResolver<'a> {
             Schema::Object(object) => {
                 if let Some(reference) = &object.reference {
                     let resolved = self.follow_reference(reference)?;
+                    let resolved = apply_reference_default(resolved, object.as_ref())?;
                     Ok(overlay_reference_annotations(resolved, object.as_ref()))
                 } else {
                     Ok(object.as_ref().clone())
@@ -56,6 +59,26 @@ impl<'a> SchemaResolver<'a> {
 
         bail!("unsupported reference {reference}")
     }
+}
+
+fn apply_reference_default(
+    mut target: SchemaObject,
+    source: &SchemaObject,
+) -> Result<SchemaObject> {
+    let Some(default) = source
+        .metadata
+        .as_deref()
+        .and_then(|metadata| metadata.default.as_ref())
+    else {
+        return Ok(target);
+    };
+
+    let mut value = serde_json::to_value(&target)
+        .context("failed to serialize resolved reference schema for scoped defaults")?;
+    apply_schema_defaults(&mut value, default);
+    target = serde_json::from_value(value)
+        .context("failed to deserialize resolved reference schema with scoped defaults")?;
+    Ok(target)
 }
 
 pub fn schema_reference(schema: &Schema) -> Option<&str> {

@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "mydef": {
+      "type": "integer",
+      "default": 20
+    }
+  },
+  "type": "object",
+  "properties": {
+    "first": {
+      "$ref": "#/definitions/mydef"
+    },
+    "second": {
+      "$ref": "#/definitions/mydef"
+    }
+  },
+  "propertyNames": true,
+  "required": [],
+  "additionalProperties": false
+}
