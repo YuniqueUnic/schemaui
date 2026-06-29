@@ -91,7 +91,7 @@ jobs:
         run: pnpm install --frozen-lockfile && pnpm run build:embedded
 
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.17.0
 
       - uses: taiki-e/setup-cross-toolchain-action@v1.41.0
         with:
