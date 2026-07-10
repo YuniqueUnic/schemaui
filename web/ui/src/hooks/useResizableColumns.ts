@@ -15,6 +15,7 @@ type DragTarget = "nav" | "preview" | null;
 
 export function useResizableColumns(initial: ColumnSizes) {
   const [sizes, setSizes] = useState<ColumnSizes>(initial);
+  const [isDragging, setIsDragging] = useState(false);
   const dragTarget = useRef<DragTarget>(null);
   const dragOrigin = useRef<{ startX: number; width: number }>({
     startX: 0,
@@ -30,6 +31,7 @@ export function useResizableColumns(initial: ColumnSizes) {
       };
       (event.target as HTMLElement).setPointerCapture(event.pointerId);
       document.body.classList.add("select-none", "cursor-col-resize");
+      setIsDragging(true);
     },
     [sizes.nav, sizes.preview],
   );
@@ -37,6 +39,7 @@ export function useResizableColumns(initial: ColumnSizes) {
   const stopDrag = useCallback(() => {
     dragTarget.current = null;
     document.body.classList.remove("select-none", "cursor-col-resize");
+    setIsDragging(false);
   }, []);
 
   useEffect(() => {
@@ -73,7 +76,7 @@ export function useResizableColumns(initial: ColumnSizes) {
     };
   }, [stopDrag]);
 
-  return { sizes, startDrag, stopDrag };
+  return { sizes, startDrag, stopDrag, isDragging };
 }
 
 function clamp(value: number, min: number, max: number) {

@@ -20,13 +20,18 @@ import { useSessionState } from "./hooks/useSessionState";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
-import { FileText, ListTree } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  ListTree,
+} from "lucide-react";
 
 type PanelView = "nav" | "editor" | "preview";
 
 export default function App() {
   const { state, actions, dirtyRef } = useSessionState();
-  const { sizes, startDrag } = useResizableColumns({ nav: 280, preview: 380 });
+  const { sizes, startDrag, isDragging } = useResizableColumns({ nav: 280, preview: 380 });
 
   const {
     initializeSession,
@@ -40,6 +45,8 @@ export default function App() {
   const [navMode, setNavMode] = useState<"schema" | "layout">("schema");
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [mobileView, setMobileView] = useState<PanelView>("editor");
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  const [previewCollapsed, setPreviewCollapsed] = useState(false);
 
   // Initialize session on mount (empty deps to run only once)
   useEffect(() => {
@@ -139,51 +146,72 @@ export default function App() {
             as="aside"
             className={cn(
               "lg:flex lg:border-r border-theme",
+              !isDragging && "transition-[width] duration-150",
               !isDesktop && mobileView === "nav" && "flex flex-1 border-b",
               !isDesktop && mobileView !== "nav" && "hidden",
+              isDesktop && navCollapsed && "!w-10 overflow-hidden",
             )}
-            style={isDesktop ? { width: sizes.nav } : undefined}
+            style={isDesktop && !navCollapsed ? { width: sizes.nav } : undefined}
           >
             <PanelHeader
               icon={<ListTree className="h-3.5 w-3.5" />}
-              label="Navigation"
-              actions={hasLayout
-                ? (
-                  <SegmentedControl<"schema" | "layout">
-                    value={navMode}
-                    onChange={(v) => setNavMode(v)}
-                    options={[
-                      { id: "schema", label: "Schema" },
-                      { id: "layout", label: "Layout" },
-                    ]}
-                  />
-                )
-                : undefined}
+              label={(isDesktop && navCollapsed) ? undefined : "Navigation"}
+              actions={
+                <div className="flex items-center gap-1">
+                  {(!isDesktop || !navCollapsed) && hasLayout && (
+                    <SegmentedControl<"schema" | "layout">
+                      value={navMode}
+                      onChange={(v) => setNavMode(v)}
+                      options={[
+                        { id: "schema", label: "Schema" },
+                        { id: "layout", label: "Layout" },
+                      ]}
+                    />
+                  )}
+                  {isDesktop && (
+                    <button
+                      type="button"
+                      onClick={() => setNavCollapsed((v) => !v)}
+                      aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+                      className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                      {navCollapsed
+                        ? <ChevronRight className="h-3.5 w-3.5" />
+                        : <ChevronLeft className="h-3.5 w-3.5" />}
+                    </button>
+                  )}
+                </div>
+              }
             />
-            {(!hasLayout || navMode === "schema") && (
-              <TreeView
-                ast={session?.ui_ast}
-                selectedPointer={selectedPointer}
-                errors={errors}
-                onSelect={(pointer) => {
-                  actions.setSelectedPointer(pointer);
-                  if (!isDesktop) setMobileView("editor");
-                }}
-              />
-            )}
-            {hasLayout && navMode === "layout" && (
-              <div className="flex-1 min-h-0 px-1 pb-2">
-                <LayoutExplorer
-                  layout={session.layout}
-                  ast={session?.ui_ast}
-                  selectedPointer={selectedPointer}
-                  rootLabel={virtualRootTitle}
-                  onSelect={(pointer) => {
-                    actions.setSelectedPointer(pointer);
-                    if (!isDesktop) setMobileView("editor");
-                  }}
-                />
-              </div>
+            {/* Show content when: on mobile (always), or on desktop when not collapsed */}
+            {(!isDesktop || !navCollapsed) && (
+              <>
+                {(!hasLayout || navMode === "schema") && (
+                  <TreeView
+                    ast={session?.ui_ast}
+                    selectedPointer={selectedPointer}
+                    errors={errors}
+                    onSelect={(pointer) => {
+                      actions.setSelectedPointer(pointer);
+                      if (!isDesktop) setMobileView("editor");
+                    }}
+                  />
+                )}
+                {hasLayout && navMode === "layout" && (
+                  <div className="flex-1 min-h-0 px-1 pb-2">
+                    <LayoutExplorer
+                      layout={session.layout}
+                      ast={session?.ui_ast}
+                      selectedPointer={selectedPointer}
+                      rootLabel={virtualRootTitle}
+                      onSelect={(pointer) => {
+                        actions.setSelectedPointer(pointer);
+                        if (!isDesktop) setMobileView("editor");
+                      }}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </Panel>
           {/* Resizer */}
@@ -243,26 +271,21 @@ export default function App() {
             className="app-resizer hidden lg:block"
             onPointerDown={(event) => startDrag(event, "preview")}
           />
-          {/* Preview Panel */}
-          <Panel
-            as="section"
-            className={cn(
-              "lg:flex lg:h-full lg:border-l border-theme",
-              !isDesktop && mobileView === "preview" && "flex flex-1 border-t",
-              !isDesktop && mobileView !== "preview" && "hidden",
-            )}
-            style={isDesktop ? { width: sizes.preview } : undefined}
-          >
-            <PreviewPane
-              formats={formats}
-              format={previewFormat}
-              onFormatChange={handlePreviewFormatChange}
-              pretty={previewPretty}
-              onPrettyChange={handlePreviewPrettyChange}
-              payload={previewPayload}
-              loading={false}
-            />
-          </Panel>
+          {/* Preview Panel — outer Panel provided by PreviewPane internally */}
+          <PreviewPaneWithToggle
+            collapsed={previewCollapsed}
+            onToggle={() => setPreviewCollapsed((v) => !v)}
+            isDesktop={isDesktop}
+            isDragging={isDragging}
+            mobileVisible={!isDesktop && mobileView === "preview"}
+            previewWidth={sizes.preview}
+            formats={formats}
+            format={previewFormat}
+            onFormatChange={handlePreviewFormatChange}
+            pretty={previewPretty}
+            onPrettyChange={handlePreviewPrettyChange}
+            payload={previewPayload}
+          />
         </div>
         <StatusBar
           status={status}
@@ -566,5 +589,66 @@ function MobilePanelSwitch({ value, onChange }: MobilePanelSwitchProps) {
         ]}
       />
     </div>
+  );
+}
+
+interface PreviewPaneWithToggleProps {
+  collapsed: boolean;
+  onToggle: () => void;
+  isDesktop: boolean;
+  isDragging: boolean;
+  mobileVisible: boolean;
+  previewWidth: number;
+  formats: string[];
+  format: string;
+  onFormatChange: (value: string) => void;
+  pretty: boolean;
+  onPrettyChange: (value: boolean) => void;
+  payload: string;
+}
+
+function PreviewPaneWithToggle({
+  collapsed,
+  onToggle,
+  isDesktop,
+  isDragging,
+  mobileVisible,
+  previewWidth,
+  ...previewProps
+}: PreviewPaneWithToggleProps) {
+  if (!isDesktop) {
+    // On mobile: show/hide via className, no collapse toggle
+    if (!mobileVisible) return null;
+    return (
+      <section className="flex flex-1 flex-col overflow-hidden border-t border-theme">
+        <PreviewPane {...previewProps} loading={false} />
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className={cn(
+        "lg:flex lg:h-full lg:border-l border-theme flex flex-col overflow-hidden",
+        !isDragging && "transition-[width] duration-150",
+        collapsed && "!w-10",
+      )}
+      style={!collapsed ? { width: previewWidth } : undefined}
+    >
+      {collapsed
+        ? (
+          <div className="flex h-full flex-col items-center pt-3">
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label="Expand preview"
+              className="flex flex-col items-center gap-1.5 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )
+        : <PreviewPane {...previewProps} loading={false} onToggleCollapse={onToggle} />}
+    </section>
   );
 }

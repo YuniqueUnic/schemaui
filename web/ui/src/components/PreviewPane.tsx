@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Check, Copy, Eye } from "lucide-react";
+import { Check, ChevronRight, Copy, Eye } from "lucide-react";
 import { highlightSyntax, normalizedLanguage } from "../utils/highlight";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -15,6 +15,7 @@ interface PreviewPaneProps {
   onPrettyChange: (value: boolean) => void;
   payload: string;
   loading?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const PreviewPane = memo(function PreviewPane({
@@ -25,6 +26,7 @@ export const PreviewPane = memo(function PreviewPane({
   onPrettyChange,
   payload,
   loading = false,
+  onToggleCollapse,
 }: PreviewPaneProps) {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<number | null>(null);
@@ -53,18 +55,30 @@ export const PreviewPane = memo(function PreviewPane({
         icon={<Eye className="h-3.5 w-3.5" />}
         label="Preview"
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopy}
-            disabled={!payload}
-            className="h-7 rounded-full text-xs"
-          >
-            {copied
-              ? <Check className="h-3.5 w-3.5 text-emerald-500" />
-              : <Copy className="h-3.5 w-3.5" />}
-            <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              disabled={!payload}
+              className="h-7 rounded-full text-xs"
+            >
+              {copied
+                ? <Check className="h-3.5 w-3.5 text-emerald-500" />
+                : <Copy className="h-3.5 w-3.5" />}
+              <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
+            </Button>
+            {onToggleCollapse && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                aria-label="Collapse preview"
+                className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         }
       />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-theme px-4 py-2.5">
