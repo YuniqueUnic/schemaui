@@ -103,7 +103,7 @@ References:
 
 ```toml
 [dependencies]
-schemaui = "0.12.2"
+schemaui = "0.12.3"
 serde_json = "1"
 ```
 
