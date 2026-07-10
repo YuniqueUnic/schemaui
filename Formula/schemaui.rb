@@ -1,8 +1,8 @@
 class Schemaui < Formula
   desc "Render JSON Schemas as TUIs and embedded web editors"
   homepage "https://github.com/YuniqueUnic/schemaui"
-  url "https://github.com/YuniqueUnic/schemaui/archive/refs/tags/schemaui-cli-v0.7.4.tar.gz"
-  sha256 "485a198b09d232ce4f1cf1b1b360f93a15e920034dcd1199c7118187f7e9161f"
+  url "https://github.com/YuniqueUnic/schemaui/archive/refs/tags/schemaui-cli-v0.7.5.tar.gz"
+  sha256 "dec0e82917857249060693dc175f1ebae8787423121b8a5bef45cc7a4de9f677"
   license "MIT OR Apache-2.0"
   head "https://github.com/YuniqueUnic/schemaui.git", branch: "main"
 
