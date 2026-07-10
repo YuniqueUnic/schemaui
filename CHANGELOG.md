@@ -21,6 +21,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.12.3](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.12.2...schemaui-v0.12.3) - 2026-07-10
+
+
+
+
+
+
+### Bug Fixes
+
+- add resizable columns and collapsible panels in App component([#152](https://github.com/YuniqueUnic/schemaui/pull/152), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.12.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.12.1...schemaui-v0.12.2) - 2026-05-21
 
 
