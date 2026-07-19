@@ -20,13 +20,15 @@
 
 </div>
 
-`schemaui` turns JSON Schema documents into fully interactive terminal UIs
-powered by `ratatui`, `crossterm`, and `jsonschema`.
+`schemaui` turns JSON Schema documents into interactive **TUI** and **Web**
+editors. The terminal path is powered by `ratatui`, `crossterm`, and
+`jsonschema`; the browser path ships as an embedded SPA behind the same schema →
+form → validate pipeline.
 
 The library parses rich schemas (nested sections, `$ref`, arrays, key/value
 maps, pattern properties…) into a navigable form tree, renders it as a
-keyboard-first editor, and validates the result after every edit so users always
-see the full list of issues before saving.
+keyboard-first TUI or a browser form, and validates after every edit so users
+always see the full list of issues before saving.
 
 <!-- AUTO-GENERATED:CLI-QUICKLINK:BEGIN -->
 
@@ -34,6 +36,22 @@ see the full list of issues before saving.
 > Jump to [CLI installation and usage](#cli-schemaui-cli).
 
 <!-- AUTO-GENERATED:CLI-QUICKLINK:END -->
+
+## Surfaces at a Glance
+
+| Surface                    | Who uses it                            | How to start                                                 |
+| -------------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| **TUI** (default CLI mode) | Terminal workflows, SSH, scripts       | `schemaui -s schema.json -c config.yaml` or `schemaui tui …` |
+| **Web UI**                 | Browser editing with live JSON preview | `schemaui web -s schema.json -c config.yaml`                 |
+| **Library API**            | Embed in your Rust app                 | `SchemaUI::run` (TUI) or `schemaui::web::session` (Web)      |
+
+**Terminal demo** (asciinema above) and **Web UI** (schema tree + form + live
+JSON side-by-side):
+
+<div align="center">
+  <img src="./docs/web.mix.png" alt="schemaui Web UI: schema navigation, form editor, and live JSON preview" width="920" />
+  <p><em>Web UI — left: nested schema navigation & form; right: live JSON preview with validation.</em></p>
+</div>
 
 ## Feature Highlights
 
@@ -221,8 +239,46 @@ code change to its architectural responsibility.
 
 ## Web UI Mode
 
-The optional `web` feature bundles the files under `web/dist/` directly into the
-crate and exposes high-level helpers for hosting the browser UI. Basic usage:
+Enable the `web` feature to ship a browser UI (static assets under `web/dist/`
+are embedded in the crate). The same schema/config pipeline used by the TUI
+feeds a three-pane experience:
+
+1. **Navigation** – nested schema tree / breadcrumbs for multi-level objects
+2. **Form editor** – required flags, enums, numbers, arrays, live field errors
+3. **JSON preview** – pretty-printed document that updates as you edit
+
+Screenshot: see [Surfaces at a Glance](#surfaces-at-a-glance)
+(`docs/web.mix.png`).
+
+### CLI (fastest path)
+
+`schemaui-cli` enables `web` by default. Same I/O flags as TUI; only host/port
+are Web-specific:
+
+```bash
+# random free port on 127.0.0.1; print final JSON to stdout
+schemaui web \
+  --schema ./schema.json \
+  --config ./defaults.json \
+  --host 127.0.0.1 --port 0 \
+  -o -
+
+# fixed port + write result to disk
+schemaui web -s ./schema.json -c ./config.yaml -p 8787 -o ./out.json
+```
+
+| Flag            | Default     | Meaning                                      |
+| --------------- | ----------- | -------------------------------------------- |
+| `--host` / `-l` | `127.0.0.1` | Bind address (`--bind` / `--listen` aliases) |
+| `--port` / `-p` | `0`         | Bind port (`0` = ephemeral free port)        |
+
+Workflow in the browser: edit fields → **Save** keeps the session open → **Save
+& Exit** (or Exit) shuts down the temporary server and emits the value through
+configured `-o` destinations.
+
+Full CLI manual: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md#11-web-mode).
+
+### Library (embed in your app)
 
 ```rust,no_run
 use schemaui::web::session::{
@@ -253,12 +309,13 @@ async fn run() -> anyhow::Result<()> {
 }
 ```
 
-The helper spawns an Axum router that exposes `/api/session`, `/api/save`, and
-`/api/exit` alongside the embedded static assets. Library users can either call
-`bind_session`/`serve_session` for a turnkey flow or reuse
-`session_router/WebSessionBuilder` to integrate the UI into an existing HTTP
-stack. The official CLI (`schemaui-cli web …`) is merely a thin wrapper around
-these APIs.
+`bind_session` / `serve_session` spawn an Axum router with `/api/session`,
+`/api/save`, `/api/exit` plus embedded static assets. For custom HTTP stacks,
+reuse `session_router` / `WebSessionBuilder` instead of the turnkey helpers. The
+CLI `schemaui web …` command is a thin wrapper around these APIs.
+
+Architecture notes:
+[`docs/en/web-ui-architecture-and-refactor-spec.md`](./docs/en/web-ui-architecture-and-refactor-spec.md).
 
 ## JSON Schema → TUI Mapping
 
@@ -583,6 +640,30 @@ repository.
 
 <!-- AUTO-GENERATED:CLI-INSTALL:END -->
 
+### Modes (subcommands)
+
+The installed binary is `schemaui`. If you omit a mode subcommand, it defaults
+to the **TUI**. Explicit modes:
+
+| Command                       | Purpose                                            |
+| ----------------------------- | -------------------------------------------------- |
+| `schemaui` / `schemaui tui`   | Interactive terminal editor (default)              |
+| `schemaui web`                | Interactive browser editor (embedded HTTP server)  |
+| `schemaui tui-snapshot`       | Precompute TUI FormSchema/layout artifacts (no UI) |
+| `schemaui web-snapshot`       | Precompute Web session snapshots JSON/TS (no UI)   |
+| `schemaui completion <shell>` | Shell completions (`completion` feature)           |
+
+```bash
+# equivalent TUI launches
+schemaui --schema ./schema.json --config ./defaults.yaml
+schemaui tui --schema ./schema.json --config ./defaults.yaml
+
+# Web UI (see also Web UI Mode above)
+schemaui web --schema ./schema.json --config ./defaults.yaml --port 0 -o -
+```
+
+### Typical TUI pipeline
+
 ```bash
 schemaui \
   --schema ./schema.json \
@@ -610,20 +691,27 @@ schemaui \
                                                      └────────────┘
 ```
 
-- Inputs – `--schema` / `--config` accept file paths, inline payloads, or `-`
-  for stdin (but not both simultaneously). If only config is provided the CLI
-  infers a schema via `schema_from_data_value`.
-- Diagnostics – `DiagnosticCollector` accumulates format issues, feature flag
-  mismatches, stdin conflicts, and existing output files before execution.
-- Outputs – `-o/--output` is repeatable and may mix file paths with `-` for
-  stdout. When no destination is set, the tool writes to stdout; pass
-  `--temp-file <PATH>` if you explicitly want a fallback file. Extensions
-  dictate formats; conflicting extensions are rejected.
-- Flags – `--no-pretty` toggles compact output, `--force/--yes` allows
-  overwriting files, and `--title` / `--description` wire through to
-  `SchemaUI::with_title` / `SchemaUI::with_description`.
-- Shell completion – `schemaui completion <bash|zsh|fish|powershell>` emits
-  completion scripts from the same `clap` command graph via `clap_complete`.
+### Shared I/O contract (TUI and Web)
+
+- **Inputs** – `--schema` / `--config` accept file paths, `file://` or `http(s)`
+  URLs (CLI `remote-schema`), inline payloads, or `-` for stdin (not both schema
+  and config on stdin at once). Config-only runs infer a schema via
+  `schema_from_data_value` (or embedded `$schema` / `#:schema` / YAML modeline).
+- **Diagnostics** – `DiagnosticCollector` gathers format issues, feature-flag
+  mismatches, stdin conflicts, and existing output files **before** the UI runs.
+- **Outputs** – `-o/--output` is repeatable and may mix file paths with `-` for
+  stdout. With no destination, the tool writes to stdout; use
+  `--temp-file <PATH>` for an explicit fallback file. Extensions pick the
+  format; conflicting extensions are rejected.
+- **Common flags** – `--no-pretty` (compact), `--force` / `--yes` (overwrite),
+  `--title` / `--description` (forwarded to the UI).
+- **Web-only flags** – `--host` / `-l` (default `127.0.0.1`), `--port` / `-p`
+  (default `0` = free port).
+- **Shell completion** – `schemaui completion <bash|zsh|fish|powershell>`
+  (requires the `completion` feature).
+
+Deep dive: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md) · Chinese:
+[`docs/zh/cli_usage.zh.md`](./docs/zh/cli_usage.zh.md).
 
 ## Key Dependencies
 
@@ -645,9 +733,11 @@ schemaui \
 - `docs/en/structure_design.md` – detailed schema/layout/runtime design with
   flow diagrams.
 - `docs/zh/structure_design.md` – Chinese mirror of the architecture guide.
-- `docs/en/cli_usage.md` – CLI-specific manual (inputs, outputs, piping,
-  samples).
+- `docs/en/cli_usage.md` – CLI-specific manual (inputs, outputs, piping, TUI/Web
+  modes, samples).
 - `docs/zh/cli_usage.zh.md` – Chinese mirror of the CLI usage guide.
+- `docs/en/web-ui-architecture-and-refactor-spec.md` – Web UI architecture.
+- `docs/web.mix.png` – Web UI screenshot (schema form + live JSON preview).
 
 ## Development
 
