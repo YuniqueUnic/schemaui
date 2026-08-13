@@ -112,7 +112,7 @@ stdin/内联文本，则回退到当前工作目录。对于 JSON 配置，根�
 
 ```toml
 [dependencies]
-schemaui = "0.12.3"
+schemaui = "0.12.4"
 serde_json = "1"
 ```
 
