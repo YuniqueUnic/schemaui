@@ -69,6 +69,7 @@ export default function App() {
     previewFormat,
     previewPretty,
     previewPayload,
+    previewError,
     showErrorsDialog,
     status,
   } = state;
@@ -285,6 +286,7 @@ export default function App() {
             pretty={previewPretty}
             onPrettyChange={handlePreviewPrettyChange}
             payload={previewPayload}
+            error={previewError}
           />
         </div>
         <StatusBar
@@ -605,6 +607,7 @@ interface PreviewPaneWithToggleProps {
   pretty: boolean;
   onPrettyChange: (value: boolean) => void;
   payload: string;
+  error?: string | null;
 }
 
 function PreviewPaneWithToggle({

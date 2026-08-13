@@ -32,6 +32,7 @@ export interface SessionState {
   previewFormat: string;
   previewPretty: boolean;
   previewPayload: string;
+  previewError: string | null;
 
   // Dialogs
   showErrorsDialog: boolean;
@@ -65,6 +66,7 @@ type Action =
   | { type: "SET_PREVIEW_FORMAT"; payload: string }
   | { type: "SET_PREVIEW_PRETTY"; payload: boolean }
   | { type: "SET_PREVIEW_PAYLOAD"; payload: string }
+  | { type: "SET_PREVIEW_ERROR"; payload: string | null }
   | { type: "SET_SHOW_ERRORS_DIALOG"; payload: boolean }
   | { type: "SET_STATUS"; payload: string }
   | { type: "MARK_SAVED" }
@@ -88,6 +90,7 @@ const initialState: SessionState = {
   previewFormat: "json",
   previewPretty: true,
   previewPayload: "{}",
+  previewError: null,
   showErrorsDialog: false,
   status: "Loading schema…",
 };
@@ -108,6 +111,7 @@ function sessionReducer(state: SessionState, action: Action): SessionState {
         previewFormat: action.payload.formats.includes("json")
           ? "json"
           : action.payload.formats[0],
+        previewError: null,
         loading: false,
         status: "Ready",
       };
@@ -146,7 +150,10 @@ function sessionReducer(state: SessionState, action: Action): SessionState {
       return { ...state, previewPretty: action.payload };
 
     case "SET_PREVIEW_PAYLOAD":
-      return { ...state, previewPayload: action.payload };
+      return { ...state, previewPayload: action.payload, previewError: null };
+
+    case "SET_PREVIEW_ERROR":
+      return { ...state, previewError: action.payload, previewPayload: "" };
 
     case "SET_SHOW_ERRORS_DIALOG":
       return { ...state, showErrorsDialog: action.payload };
@@ -241,6 +248,10 @@ export function useSessionState() {
 
     setPreviewPayload: useCallback((payload: string) => {
       dispatch({ type: "SET_PREVIEW_PAYLOAD", payload: payload });
+    }, []),
+
+    setPreviewError: useCallback((error: string | null) => {
+      dispatch({ type: "SET_PREVIEW_ERROR", payload: error });
     }, []),
 
     setShowErrorsDialog: useCallback((show: boolean) => {

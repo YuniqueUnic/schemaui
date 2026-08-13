@@ -14,6 +14,7 @@ interface PreviewPaneProps {
   pretty: boolean;
   onPrettyChange: (value: boolean) => void;
   payload: string;
+  error?: string | null;
   loading?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -25,6 +26,7 @@ export const PreviewPane = memo(function PreviewPane({
   pretty,
   onPrettyChange,
   payload,
+  error = null,
   loading = false,
   onToggleCollapse,
 }: PreviewPaneProps) {
@@ -60,7 +62,7 @@ export const PreviewPane = memo(function PreviewPane({
               variant="outline"
               size="sm"
               onClick={handleCopy}
-              disabled={!payload}
+              disabled={!payload || !!error}
               className="h-7 rounded-full text-xs"
             >
               {copied
@@ -122,14 +124,23 @@ export const PreviewPane = memo(function PreviewPane({
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         )}
-        <pre className="relative h-full overflow-auto whitespace-pre-wrap break-words rounded-xl border border-theme bg-card px-4 py-3 font-mono text-xs leading-relaxed shadow-inner">
-          <code
-            className={`language-${normalizedLanguage(format)}`}
-            dangerouslySetInnerHTML={{
-              __html: highlightSyntax(payload, format),
-            }}
-          />
-        </pre>
+        {error
+          ? (
+            <div className="relative h-full overflow-auto whitespace-pre-wrap break-words rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs leading-relaxed shadow-inner">
+              <p className="font-medium text-destructive">Preview failed</p>
+              <p className="mt-1 font-mono text-foreground">{error}</p>
+            </div>
+          )
+          : (
+            <pre className="relative h-full overflow-auto whitespace-pre-wrap break-words rounded-xl border border-theme bg-card px-4 py-3 font-mono text-xs leading-relaxed shadow-inner">
+              <code
+                className={`language-${normalizedLanguage(format)}`}
+                dangerouslySetInnerHTML={{
+                  __html: highlightSyntax(payload, format),
+                }}
+              />
+            </pre>
+          )}
       </PanelBody>
     </Panel>
   );
