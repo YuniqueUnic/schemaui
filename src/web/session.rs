@@ -28,7 +28,7 @@ use tokio::{
 #[cfg(feature = "web-types")]
 use ts_rs::TS;
 
-use crate::io::{DocumentFormat, input::schema_with_defaults};
+use crate::io::{DocumentFormat, input::schema_with_defaults, output::OutputOptions};
 use crate::precompile::UiArtifactBundle;
 use crate::schema::metadata::root_schema_header;
 
@@ -529,32 +529,7 @@ fn encode_value(
     format: DocumentFormat,
     pretty: bool,
 ) -> Result<String, anyhow::Error> {
-    #[cfg(all(not(feature = "json"), not(feature = "toml")))]
-    let _ = pretty;
-
-    match format {
-        #[cfg(feature = "json")]
-        DocumentFormat::Json => {
-            if pretty {
-                Ok(serde_json::to_string_pretty(value)?)
-            } else {
-                Ok(serde_json::to_string(value)?)
-            }
-        }
-        #[cfg(feature = "yaml")]
-        DocumentFormat::Yaml => Ok(serde_yaml::to_string(value)?),
-        #[cfg(feature = "toml")]
-        DocumentFormat::Toml => {
-            if pretty {
-                Ok(toml::to_string_pretty(value)?)
-            } else {
-                Ok(toml::to_string(value)?)
-            }
-        }
-        #[allow(unreachable_patterns)]
-        #[cfg(all(not(feature = "yaml"), not(feature = "toml")))]
-        _ => Err(anyhow!("unsupported format")),
-    }
+    OutputOptions::new(format).with_pretty(pretty).render(value)
 }
 
 async fn static_assets(State(state): State<SharedState>, uri: OriginalUri) -> impl IntoResponse {

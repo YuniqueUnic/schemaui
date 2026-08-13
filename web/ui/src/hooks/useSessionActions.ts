@@ -92,7 +92,10 @@ export function useSessionActions(
         if (seq !== previewSeq.current) return;
         actions.setPreviewPayload(result.payload);
       } catch (error) {
+        if (seq !== previewSeq.current) return;
+        const message = previewErrorMessage(error);
         console.error("Preview failed", error);
+        actions.setPreviewError(message);
       }
     },
     [actions],
@@ -292,7 +295,7 @@ export function useSessionActions(
 
   const handlePreviewFormatChange = useCallback((format: string) => {
     actions.setPreviewFormat(format);
-    updatePreview(state.data, state.previewPretty, format);
+    return updatePreview(state.data, state.previewPretty, format);
   }, [state.data, state.previewPretty, actions, updatePreview]);
 
   const handlePreviewPrettyChange = useCallback((pretty: boolean) => {
@@ -333,4 +336,19 @@ function resolveInitialPointer(
   ast: { roots: { pointer: string }[] } | null | undefined,
 ): string {
   return ast?.roots?.[0]?.pointer ?? "";
+}
+
+function previewErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    try {
+      const parsed = JSON.parse(error.message) as { error?: unknown };
+      if (typeof parsed.error === "string" && parsed.error.trim()) {
+        return parsed.error;
+      }
+    } catch {
+      return error.message;
+    }
+    return error.message;
+  }
+  return "Preview failed";
 }

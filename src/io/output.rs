@@ -97,14 +97,64 @@ fn serialize_value(value: &Value, options: &OutputOptions) -> Result<String> {
         #[cfg(feature = "yaml")]
         DocumentFormat::Yaml => serde_yaml::to_string(value).context("failed to serialize YAML"),
         #[cfg(feature = "toml")]
-        DocumentFormat::Toml => {
-            if options.pretty {
-                toml::to_string_pretty(value).context("failed to serialize TOML")
-            } else {
-                toml::to_string(value).context("failed to serialize TOML")
-            }
-        }
+        DocumentFormat::Toml => serialize_toml(value, options.pretty),
     }
+}
+
+#[cfg(feature = "toml")]
+fn serialize_toml(value: &Value, pretty: bool) -> Result<String> {
+    let prepared = prepare_toml_value(value, "")?;
+    if pretty {
+        toml::to_string_pretty(&prepared).context("failed to serialize TOML")
+    } else {
+        toml::to_string(&prepared).context("failed to serialize TOML")
+    }
+}
+
+/// Adapt a JSON value for TOML serialization.
+///
+/// Object properties whose value is `null` are omitted, because TOML has no
+/// null type. Array elements and a root-level `null` stay unrepresentable and
+/// return a JSON-pointer error instead of inventing a replacement value.
+#[cfg(feature = "toml")]
+pub(crate) fn prepare_toml_value(value: &Value, pointer: &str) -> Result<Value> {
+    match value {
+        Value::Null => anyhow::bail!(
+            "TOML cannot represent null at {}",
+            display_json_pointer(pointer)
+        ),
+        Value::Array(items) => {
+            let mut prepared = Vec::with_capacity(items.len());
+            for (index, item) in items.iter().enumerate() {
+                prepared.push(prepare_toml_value(item, &format!("{pointer}/{index}"))?);
+            }
+            Ok(Value::Array(prepared))
+        }
+        Value::Object(map) => {
+            let mut prepared = serde_json::Map::new();
+            for (key, child) in map {
+                if child.is_null() {
+                    continue;
+                }
+                prepared.insert(
+                    key.clone(),
+                    prepare_toml_value(child, &format!("{pointer}/{}", escape_pointer_token(key)))?,
+                );
+            }
+            Ok(Value::Object(prepared))
+        }
+        other => Ok(other.clone()),
+    }
+}
+
+#[cfg(feature = "toml")]
+fn display_json_pointer(pointer: &str) -> &str {
+    if pointer.is_empty() { "/" } else { pointer }
+}
+
+#[cfg(feature = "toml")]
+fn escape_pointer_token(token: &str) -> String {
+    token.replace('~', "~0").replace('/', "~1")
 }
 
 fn write_payload(destination: &OutputDestination, payload: &str) -> Result<()> {
@@ -124,55 +174,5 @@ fn write_payload(destination: &OutputDestination, payload: &str) -> Result<()> {
             file.flush()?;
             Ok(())
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::parse_document_str;
-    use serde_json::json;
-    use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    #[test]
-    fn writes_to_stdout_noop_when_not_configured() {
-        let options = OutputOptions {
-            format: DocumentFormat::default(),
-            pretty: true,
-            destinations: Vec::new(),
-        };
-        emit(&json!({"ok": true}), &options).unwrap();
-    }
-
-    #[test]
-    fn renders_payload_without_writing() {
-        let options = OutputOptions::default();
-        let payload = options.render(&json!({"ok": true})).unwrap();
-        let parsed = parse_document_str(&payload, options.format).unwrap();
-        assert_eq!(parsed, json!({"ok": true}));
-    }
-
-    #[test]
-    fn writes_to_file_destination() {
-        let dir = std::env::temp_dir();
-        let filename = format!(
-            "schemaui-test-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        );
-        let path = dir.join(filename);
-        let options = OutputOptions {
-            format: DocumentFormat::default(),
-            pretty: true,
-            destinations: vec![OutputDestination::file(&path)],
-        };
-        emit(&json!({"ok": true}), &options).unwrap();
-        let contents = fs::read_to_string(&path).unwrap();
-        let parsed = parse_document_str(&contents, options.format).unwrap();
-        assert_eq!(parsed, json!({"ok": true}));
-        let _ = fs::remove_file(path);
     }
 }

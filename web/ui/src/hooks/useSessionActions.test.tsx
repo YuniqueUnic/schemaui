@@ -77,6 +77,7 @@ describe("useSessionActions", () => {
     toast.success.mockReset();
     toast.warning.mockReset();
     apiMocks.renderPreview.mockResolvedValue({ payload: "{}" });
+    localStorage.clear();
   });
 
   it("revalidates before save and blocks stale invalid data", async () => {
@@ -105,5 +106,41 @@ describe("useSessionActions", () => {
     expect(result.current.state.errors.get("/field")).toBe("must match schema");
     expect(result.current.state.showErrorsDialog).toBe(true);
     expect(toast.error).toHaveBeenCalledOnce();
+  });
+
+  it("shows a preview error instead of keeping the previous payload", async () => {
+    apiMocks.fetchSession.mockResolvedValue({
+      ...session,
+      formats: ["json", "toml"],
+    });
+    apiMocks.validateData.mockResolvedValue({ errors: [] });
+    apiMocks.renderPreview
+      .mockResolvedValueOnce({ payload: '{\n  "field": ""\n}' })
+      .mockRejectedValueOnce(
+        new Error(JSON.stringify({ error: "TOML cannot represent null at /items/1" })),
+      );
+
+    const { result } = renderHook(() => useHarness());
+
+    await act(async () => {
+      await result.current.initializeSession();
+    });
+
+    expect(result.current.state.previewPayload).toContain("field");
+    expect(result.current.state.previewError).toBeNull();
+
+    await act(async () => {
+      await result.current.handlePreviewFormatChange("toml");
+    });
+
+    expect(apiMocks.renderPreview).toHaveBeenLastCalledWith(
+      { field: "" },
+      "toml",
+      true,
+    );
+    expect(result.current.state.previewPayload).toBe("");
+    expect(result.current.state.previewError).toBe(
+      "TOML cannot represent null at /items/1",
+    );
   });
 });
