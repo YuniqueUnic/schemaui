@@ -12,20 +12,32 @@
 <!-- ![Deps.rs Crate Dependencies (latest)](https://img.shields.io/deps-rs/schemaui/latest) -->
 
 <div align="center">
-  <a href="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE" target="_blank">
-    <img src="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE.svg" width="500" />
-  </a>
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="./docs/web.mix.png" alt="schemaui Web UI：schema 导航、表单编辑与实时 JSON 预览" width="100%" />
+        <br /><em>Web UI — schema 树 + 表单 + 实时 JSON 预览</em>
+      </td>
+      <td align="center" width="50%">
+        <a href="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE" target="_blank">
+          <img src="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE.svg" width="100%" />
+        </a>
+        <br /><em>TUI — 终端演示（asciinema）</em>
+      </td>
+    </tr>
+  </table>
 
 [English](./README.md) | [中文文档](./README.ZH.md)
 
 </div>
 
-`schemaui` 把 JSON Schema 文档变成可交互的 **TUI** 与 **Web** 编辑器。
-终端路径由 `ratatui`、`crossterm`、`jsonschema` 驱动；浏览器路径是同一套 schema
-→ 表单 → 校验 流水线背后的内嵌 SPA。
+`schemaui` 把 JSON Schema 文档变成可交互的 **Web** 与 **TUI** 编辑器——也是 AI
+agent 的结构化提问界面。浏览器路径是内嵌 SPA；终端路径由
+`ratatui`、`crossterm`、`jsonschema` 驱动；两者共用同一套 schema → 表单 → 校验
+流水线。
 
-该库解析丰富的模式（嵌套部分、`$ref`、数组、键值映射、模式属性等），转换为可导航的表单树，以键盘优先的
-TUI 或浏览器表单呈现，并在每次编辑后验证，确保保存前能看到完整错误列表。
+该库解析丰富的模式（嵌套部分、`$ref`、数组、键值映射、模式属性等），转换为可导航的表单树，以浏览器表单或键盘优先的
+TUI 呈现，并在每次编辑后验证，确保保存前能看到完整错误列表。
 
 <!-- AUTO-GENERATED:CLI-QUICKLINK:BEGIN -->
 
@@ -34,24 +46,64 @@ TUI 或浏览器表单呈现，并在每次编辑后验证，确保保存前能�
 
 <!-- AUTO-GENERATED:CLI-QUICKLINK:END -->
 
+## AI Agent 集成
+
+`schemaui` 同时是 **AI coding agent 的交互式提问 UI**（Claude Code、
+Codex、zcode 等）。Agent 进程没有 TTY,TUI 无处渲染且会永久阻塞——因此 agent
+改为拉起 `schemaui web --host 0.0.0.0`,把带实时校验的浏览器表单交 给用户，并从
+`.schemaui/answers/` 下的稳定 JSON 文件读取答案。
+
+面向 agent 的 skill 在独立仓库：
+**[a2ui-ask](https://github.com/YuniqueUnic/a2ui-ask)** —— _给 AI agent
+一个真正的界面：把结构化问题变成浏览器表单。_ 内含 `SKILL.md`、prompt 模
+板、跨平台辅助脚本（Python / Bash / PowerShell）和五个可直接运行的示例表 单。
+
+三种安装方式任选：
+
+```bash
+# 方式一:一行安装(推荐,走 skills.sh)
+npx skills add YuniqueUnic/a2ui-ask
+
+# 方式二:直接对你的 agent 说:
+#   “请帮我安装 https://github.com/YuniqueUnic/a2ui-ask 这个 skill”
+
+# 方式三:手动 clone(全局 / 按项目)
+git clone https://github.com/YuniqueUnic/a2ui-ask.git ~/.claude/skills/a2ui-ask
+```
+
+在 `a2ui-ask` 的 clone 里、且 `schemaui` 已在 PATH 上，5 分钟冒烟（打开浏
+览器，阻塞直到 **Save & Exit**):
+
+```bash
+python3 scripts/ask.py \
+  --schema examples/env-schema.json \
+  --config examples/env-defaults.json \
+  --title "部署配置确认"
+```
+
+脚本会打印 `SCHEMAUI_URL=…` 与 `SCHEMAUI_ANSWER=…`，唤醒浏览器，并把答案 写入
+`.schemaui/answers/<主题>-<时间戳>.json`——agent 和用户都能事后回顾
+的审计轨迹。完整接入指南见
+[a2ui-ask README](https://github.com/YuniqueUnic/a2ui-ask#readme)。
+
 ## 界面一览
 
-| 界面                | 适用场景                    | 启动方式                                                     |
-| ------------------- | --------------------------- | ------------------------------------------------------------ |
-| **TUI**（CLI 默认） | 终端 / SSH / 脚本           | `schemaui -s schema.json -c config.yaml` 或 `schemaui tui …` |
-| **Web UI**          | 浏览器编辑 + 实时 JSON 预览 | `schemaui web -s schema.json -c config.yaml`                 |
-| **库 API**          | 嵌入你的 Rust 应用          | `SchemaUI::run`（TUI）或 `schemaui::web::session`（Web）     |
+| 界面                | 适用场景                             | 启动方式                                                     |
+| ------------------- | ------------------------------------ | ------------------------------------------------------------ |
+| **Web UI**          | 浏览器编辑、AI agent、局域网任意设备 | `schemaui web -s schema.json -c config.yaml`                 |
+| **库 API**          | 嵌入你的 Rust 应用                   | `schemaui::web::session`（Web）或 `SchemaUI::run`（TUI）     |
+| **TUI**（CLI 默认） | 终端 / SSH / 脚本                    | `schemaui -s schema.json -c config.yaml` 或 `schemaui tui …` |
 
-上方 asciinema 为终端演示；下面是 **Web UI**（左侧 schema 导航与表单，右侧实时
-JSON）：
-
-<div align="center">
-  <img src="./docs/web.mix.png" alt="schemaui Web UI：schema 导航、表单编辑与实时 JSON 预览" width="920" />
-  <p><em>Web UI — 左：嵌套 schema 导航与表单；右：带校验的实时 JSON 预览。</em></p>
-</div>
+**Web UI** 与 **TUI** 演示在页首左右并放：浏览器端是 schema 树 + 表单 + 实时
+JSON 预览，终端端是同一套流水线跑出的键盘优先 TUI(asciinema)。
 
 ## 功能亮点
 
+- **AI-agent 就绪** – [a2ui-ask](https://github.com/YuniqueUnic/a2ui-ask) skill
+  提供 prompt、`SKILL.md` 与辅助脚本，让 coding agent 通过 Web UI
+  提结构化问题、从文件读取答案（见 [AI Agent 集成](#ai-agent-集成)）。
+- **内嵌 Web UI** – 启用 `web` feature 后会打包浏览器界面，并暴露
+  `schemaui::web::session` 等辅助 API，宿主应用无需重写整套栈即可提供同一体验。
 - **模式保真度** –
   `draft-07`，包括`$ref`、`definitions`、`patternProperties`、枚举、数值范围以及嵌套的对象/数组。
 - **部分和覆盖层** –
@@ -63,8 +115,85 @@ JSON）：
   JSON/YAML/TOML（通过功能标志），而`io::output`可以输出到标准输出和/或任何启用格式的多个文件。
 - **内置 CLI** –
   `schemaui-cli`提供了与库相同的流程，包括多目标输出、stdin/内联规范和聚合诊断。
-- **内嵌 Web UI** – 启用 `web` feature 后会打包浏览器界面，并暴露
-  `schemaui::web::session` 等辅助 API，宿主应用无需重写整套栈即可提供同一体验。
+
+## Web UI 模式
+
+启用 `web` feature 后，会把 `web/dist/` 下的静态资源直接嵌入
+crate，并提供托管浏览器 UI 的高层 API。Web 与 TUI 共用同一套 schema/config
+流水线，浏览器端是三栏体验：
+
+1. **导航** – 多层对象的 schema 树 / 面包屑
+2. **表单编辑** – required、枚举、数值、数组，以及字段级实时错误
+3. **JSON 预览** – 随编辑更新的 pretty-print 文档
+
+截图见页首（`docs/web.mix.png`）。要从 AI agent 驱动 schemaui？见
+[AI Agent 集成](#ai-agent-集成)——agent 进程没有 TTY,Web UI 是唯一可用 的界面。
+
+### CLI（最快上手）
+
+`schemaui-cli` 默认开启 `web`。I/O 参数与 TUI 相同，仅 host/port 为 Web 专属：
+
+```bash
+# 在 127.0.0.1 上选随机空闲端口，最终 JSON 打到 stdout
+schemaui web \
+  --schema ./schema.json \
+  --config ./defaults.json \
+  --host 127.0.0.1 --port 0 \
+  -o -
+
+# 固定端口，并把结果写盘
+schemaui web -s ./schema.json -c ./config.yaml -p 8787 -o ./out.json
+```
+
+| 标志            | 默认        | 含义                                   |
+| --------------- | ----------- | -------------------------------------- |
+| `--host` / `-l` | `127.0.0.1` | 绑定地址（`--bind` / `--listen` 别名） |
+| `--port` / `-p` | `0`         | 绑定端口（`0` = 随机空闲端口）         |
+
+浏览器内流程：改字段 → **Save** 保持会话 → **Save & Exit**（或
+Exit）关闭临时服务，并把结果写到配置的 `-o` 目标。注意 `-o` 是贪婪解析：其它
+flag 必须放在 `-o` 之前，多个目的地在同一个 `-o` 后空格分隔
+（`-o ./out.json -`)，不要重复写 `-o`。
+
+完整 CLI 说明见 [`docs/zh/cli_usage.zh.md`](./docs/zh/cli_usage.zh.md)。
+
+### 库（嵌入你的应用）
+
+```rust,no_run
+use schemaui::web::session::{
+    ServeOptions,
+    WebSessionBuilder,
+    bind_session,
+};
+
+async fn run() -> anyhow::Result<()> {
+  let schema = serde_json::json!({
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+          "host": {"type": "string", "default": "127.0.0.1"},
+          "port": {"type": "integer", "default": 8080}
+      },
+      "required": ["host", "port"]
+  });
+
+  let config = WebSessionBuilder::new(schema)
+      .with_title("Service Config")
+      .build()?;
+  let session = bind_session(config, ServeOptions::default()).await?;
+  println!("visit http://{}/", session.local_addr());
+  let value = session.run().await?;
+  println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
+  Ok(())
+}
+```
+
+`bind_session` / `serve_session` 会拉起 Axum，暴露
+`/api/session`、`/api/save`、`/api/exit` 以及内嵌静态资源。若要挂进现有 HTTP
+栈，可复用 `session_router` / `WebSessionBuilder`。官方 CLI 的 `schemaui web …`
+只是这些 API 的薄封装。
+
+架构说明：[`docs/en/web-ui-architecture-and-refactor-spec.md`](./docs/en/web-ui-architecture-and-refactor-spec.md)。
 
 ## Config Schema 自动检测
 
@@ -219,82 +348,6 @@ fn main() -> Result<()> {
 - `OutputOptions::render` 负责把最终的 `serde_json::Value` 渲染成 JSON/YAML/TOML
   文本，`OutputOptions::write` 则在 `SchemaUI::run*` 返回后显式输出到 stdout /
   文件。
-
-## Web UI 模式
-
-启用 `web` feature 后，会把 `web/dist/` 下的静态资源直接嵌入
-crate，并提供托管浏览器 UI 的高层 API。Web 与 TUI 共用同一套 schema/config
-流水线，浏览器端是三栏体验：
-
-1. **导航** – 多层对象的 schema 树 / 面包屑
-2. **表单编辑** – required、枚举、数值、数组，以及字段级实时错误
-3. **JSON 预览** – 随编辑更新的 pretty-print 文档
-
-截图见 [界面一览](#界面一览)（`docs/web.mix.png`）。
-
-### CLI（最快上手）
-
-`schemaui-cli` 默认开启 `web`。I/O 参数与 TUI 相同，仅 host/port 为 Web 专属：
-
-```bash
-# 在 127.0.0.1 上选随机空闲端口，最终 JSON 打到 stdout
-schemaui web \
-  --schema ./schema.json \
-  --config ./defaults.json \
-  --host 127.0.0.1 --port 0 \
-  -o -
-
-# 固定端口，并把结果写盘
-schemaui web -s ./schema.json -c ./config.yaml -p 8787 -o ./out.json
-```
-
-| 标志            | 默认        | 含义                                   |
-| --------------- | ----------- | -------------------------------------- |
-| `--host` / `-l` | `127.0.0.1` | 绑定地址（`--bind` / `--listen` 别名） |
-| `--port` / `-p` | `0`         | 绑定端口（`0` = 随机空闲端口）         |
-
-浏览器内流程：改字段 → **Save** 保持会话 → **Save & Exit**（或
-Exit）关闭临时服务，并把结果写到配置的 `-o` 目标。
-
-完整 CLI 说明见 [`docs/zh/cli_usage.zh.md`](./docs/zh/cli_usage.zh.md)。
-
-### 库（嵌入你的应用）
-
-```rust,no_run
-use schemaui::web::session::{
-    ServeOptions,
-    WebSessionBuilder,
-    bind_session,
-};
-
-async fn run() -> anyhow::Result<()> {
-  let schema = serde_json::json!({
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "type": "object",
-      "properties": {
-          "host": {"type": "string", "default": "127.0.0.1"},
-          "port": {"type": "integer", "default": 8080}
-      },
-      "required": ["host", "port"]
-  });
-
-  let config = WebSessionBuilder::new(schema)
-      .with_title("Service Config")
-      .build()?;
-  let session = bind_session(config, ServeOptions::default()).await?;
-  println!("visit http://{}/", session.local_addr());
-  let value = session.run().await?;
-  println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
-  Ok(())
-}
-```
-
-`bind_session` / `serve_session` 会拉起 Axum，暴露
-`/api/session`、`/api/save`、`/api/exit` 以及内嵌静态资源。若要挂进现有 HTTP
-栈，可复用 `session_router` / `WebSessionBuilder`。官方 CLI 的 `schemaui web …`
-只是这些 API 的薄封装。
-
-架构说明：[`docs/en/web-ui-architecture-and-refactor-spec.md`](./docs/en/web-ui-architecture-and-refactor-spec.md)。
 
 ## JSON Schema → TUI 映射
 
@@ -598,19 +651,19 @@ scoop install https://raw.githubusercontent.com/YuniqueUnic/schemaui/main/packag
 
 | 命令                          | 用途                                         |
 | ----------------------------- | -------------------------------------------- |
-| `schemaui` / `schemaui tui`   | 交互式终端编辑器（默认）                     |
 | `schemaui web`                | 交互式浏览器编辑器（内嵌临时 HTTP 服务）     |
-| `schemaui tui-snapshot`       | 预计算 TUI FormSchema/布局产物（不启动 UI）  |
+| `schemaui` / `schemaui tui`   | 交互式终端编辑器（默认）                     |
 | `schemaui web-snapshot`       | 预计算 Web session 快照 JSON/TS（不启动 UI） |
+| `schemaui tui-snapshot`       | 预计算 TUI FormSchema/布局产物（不启动 UI）  |
 | `schemaui completion <shell>` | Shell 补全（需 `completion` feature）        |
 
 ```bash
+# Web UI（详见上方 Web UI 模式）
+schemaui web --schema ./schema.json --config ./defaults.yaml --port 0 -o -
+
 # 等价的 TUI 启动方式
 schemaui --schema ./schema.json --config ./defaults.yaml
 schemaui tui --schema ./schema.json --config ./defaults.yaml
-
-# Web UI（详见上方 Web UI 模式）
-schemaui web --schema ./schema.json --config ./defaults.yaml --port 0 -o -
 ```
 
 ### 典型 TUI 流水线
@@ -619,8 +672,7 @@ schemaui web --schema ./schema.json --config ./defaults.yaml --port 0 -o -
 schemaui \
   --schema ./schema.json \
   --config ./defaults.yaml \
-  -o - \
-  -o ./config.toml ./config.json
+  -o - ./config.toml ./config.json
 ```
 
 ```
@@ -650,8 +702,9 @@ schemaui \
   `$schema` / `#:schema` / YAML modeline）推断 schema。
 - **诊断** – `DiagnosticCollector` 在 UI 启动前汇总格式问题、feature
   不匹配、stdin 冲突、已存在输出文件等。
-- **输出** – `-o/--output` 可重复，可混合文件路径与
-  `-`（stdout）。未指定目标时写 stdout；需要明确回退文件时用
+- **输出** – `-o/--output` 在单次出现中接受一个或多个空格分隔的目标，可混合
+  文件路径与 `-`（stdout)。由于该 flag 是贪婪解析，请把它放在所有其它 flag
+  之后，且不要重复书写。未指定目标时写 stdout；需要明确回退文件时用
   `--temp-file <PATH>`。扩展名决定格式，冲突会被拒绝。
 - **通用标志** – `--no-pretty`（紧凑）、`--force` / `--yes`（覆盖）、`--title` /
   `--description`（传给 UI）。
@@ -680,6 +733,9 @@ schemaui \
 
 - `README.md` – 概述 + 架构快照（英文版本为事实来源）。
 - `README.ZH.md` – 本中文概览文档（尽量与英文保持同步）。
+- [a2ui-ask](https://github.com/YuniqueUnic/a2ui-ask) – AI agent 集成
+  skill:prompt 模板、辅助脚本、示例与测试（见
+  [AI Agent 集成](#ai-agent-集成)）。
 - `docs/en/structure_design.md` – 英文版模式/布局/运行时设计，带有流程图。
 - `docs/zh/structure_design.md` – 本中文架构指南，与英文版对应。
 - `docs/en/cli_usage.md` – 英文 CLI 使用手册（输入、输出、管道、TUI/Web

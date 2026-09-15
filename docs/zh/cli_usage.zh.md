@@ -107,7 +107,8 @@ schemaui completion powershell > ~/.config/powershell/completions/_schemaui.ps1
 
 ## 4. 输出与持久化
 
-- `-o, --output <DEST>` 可重复传递；`-` 表示写到 stdout。
+- `-o, --output <DEST>` 在单次出现中接受一个或多个空格分隔的目标；`-` 表示写到
+  stdout。该 flag 为贪婪解析：请放在所有其它 flag 之后，且不要重复书写。
 - 输出扩展名（`.json`、`.yaml`、`.toml`）决定 `DocumentFormat`。
 - 当未指定任何目标时，CLI 默认写到 stdout；如果你明确想走回退文件，再显式传
   `--temp-file <PATH>`。
@@ -137,8 +138,7 @@ schemaui completion powershell > ~/.config/powershell/completions/_schemaui.ps1
 schemaui tui \
   --schema ./schema.json \
   --config ./config.yaml \
-  -o - \
-  -o ./edited.toml
+  -o - ./edited.toml
 ```
 
 ### 仅 config（推断 schema）

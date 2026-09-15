@@ -3,6 +3,10 @@ instructions.txt
 *.log
 web-server.log
 
+# a2ui-ask / agent question-answer runtime artifacts (audit trail).
+# Delete the line below to commit answers as persistent config decisions.
+.schemaui/
+
 bindings/
 docs/**/*.md
 docs/**/*.txt

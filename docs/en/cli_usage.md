@@ -168,8 +168,10 @@ from the in-memory defaults before validation/output.
 
 ## 4. Output & Persistence
 
-- `-o, --output <DEST>` is repeatable; pass `-` to include stdout alongside
-  files. Extensions (`.json`, `.yaml`, `.toml`) drive `DocumentFormat`.
+- `-o, --output <DEST>` takes one or more space-separated destinations in a
+  single occurrence; pass `-` to include stdout alongside files. The flag is
+  greedy: place it after all other flags and do not repeat it. Extensions
+  (`.json`, `.yaml`, `.toml`) drive `DocumentFormat`.
 - When no destination is set, the CLI writes to stdout. Pass
   `--temp-file <PATH>` if you explicitly want a fallback file instead.
 - `--no-pretty` toggles compact serialization; pretty output is the default.
@@ -199,8 +201,7 @@ can reuse the exact same serialization logic.
 schemaui tui \
   --schema ./schema.json \
   --config ./config.yaml \
-  -o - \
-  -o ./edited.toml
+  -o - ./edited.toml
 ```
 
 ### Config only (schema inferred)

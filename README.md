@@ -12,23 +12,35 @@
 <!-- ![Deps.rs Crate Dependencies (latest)](https://img.shields.io/deps-rs/schemaui/latest) -->
 
 <div align="center">
-  <a href="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE" target="_blank">
-    <img src="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE.svg" width="500" />
-  </a>
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="./docs/web.mix.png" alt="schemaui Web UI: schema navigation, form editor, and live JSON preview" width="100%" />
+        <br /><em>Web UI — schema tree + form + live JSON preview</em>
+      </td>
+      <td align="center" width="50%">
+        <a href="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE" target="_blank">
+          <img src="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE.svg" width="100%" />
+        </a>
+        <br /><em>TUI — terminal demo (asciinema)</em>
+      </td>
+    </tr>
+  </table>
 
 [English](./README.md) | [中文文档](./README.ZH.md)
 
 </div>
 
-`schemaui` turns JSON Schema documents into interactive **TUI** and **Web**
-editors. The terminal path is powered by `ratatui`, `crossterm`, and
-`jsonschema`; the browser path ships as an embedded SPA behind the same schema →
-form → validate pipeline.
+`schemaui` turns JSON Schema documents into interactive **Web** and **TUI**
+editors — and into a structured question UI for AI agents. The browser path
+ships as an embedded SPA; the terminal path is powered by `ratatui`,
+`crossterm`, and `jsonschema`; both share the same schema → form → validate
+pipeline.
 
 The library parses rich schemas (nested sections, `$ref`, arrays, key/value
-maps, pattern properties…) into a navigable form tree, renders it as a
-keyboard-first TUI or a browser form, and validates after every edit so users
-always see the full list of issues before saving.
+maps, pattern properties…) into a navigable form tree, renders it as a browser
+form or a keyboard-first TUI, and validates after every edit so users always see
+the full list of issues before saving.
 
 <!-- AUTO-GENERATED:CLI-QUICKLINK:BEGIN -->
 
@@ -37,24 +49,69 @@ always see the full list of issues before saving.
 
 <!-- AUTO-GENERATED:CLI-QUICKLINK:END -->
 
+## AI Agent Integration
+
+`schemaui` doubles as an **interactive question UI for AI coding agents**
+(Claude Code, Codex, zcode, …). Agent processes have no TTY, so a TUI would
+render nowhere and hang — instead the agent spawns a Web UI bound to `0.0.0.0`,
+hands you a browser form with live validation, and reads your answers from a
+stable JSON file under `.schemaui/answers/`.
+
+The agent-facing skill lives in its own repository:
+**[a2ui-ask](https://github.com/YuniqueUnic/a2ui-ask)** — _Interactive UI for AI
+agents: turn structured questions into browser forms._ It ships the `SKILL.md`,
+prompt templates, cross-platform helper scripts (Python / Bash / PowerShell),
+and five runnable example forms.
+
+Install it any of three ways:
+
+```bash
+# 1. one line, via skills.sh (recommended)
+npx skills add YuniqueUnic/a2ui-ask
+
+# 2. or just tell your agent:
+#    "install the skill at https://github.com/YuniqueUnic/a2ui-ask"
+
+# 3. or clone manually (global / per-project)
+git clone https://github.com/YuniqueUnic/a2ui-ask.git ~/.claude/skills/a2ui-ask
+```
+
+5-minute smoke test from an `a2ui-ask` clone, with `schemaui` on your PATH
+(opens your browser, blocks until **Save & Exit**):
+
+```bash
+python3 scripts/ask.py \
+  --schema examples/env-schema.json \
+  --config examples/env-defaults.json \
+  --title "Deployment Config"
+```
+
+The script prints `SCHEMAUI_URL=…` and `SCHEMAUI_ANSWER=…`, wakes your browser,
+and writes the answer to `.schemaui/answers/<topic>-<timestamp>.json` — an audit
+trail both the agent and you can re-read later. Full wiring guide:
+[a2ui-ask README](https://github.com/YuniqueUnic/a2ui-ask#readme).
+
 ## Surfaces at a Glance
 
-| Surface                    | Who uses it                            | How to start                                                 |
-| -------------------------- | -------------------------------------- | ------------------------------------------------------------ |
-| **TUI** (default CLI mode) | Terminal workflows, SSH, scripts       | `schemaui -s schema.json -c config.yaml` or `schemaui tui …` |
-| **Web UI**                 | Browser editing with live JSON preview | `schemaui web -s schema.json -c config.yaml`                 |
-| **Library API**            | Embed in your Rust app                 | `SchemaUI::run` (TUI) or `schemaui::web::session` (Web)      |
+| Surface                    | Who uses it                                       | How to start                                                 |
+| -------------------------- | ------------------------------------------------- | ------------------------------------------------------------ |
+| **Web UI**                 | Browser editing, AI agents, any device on the LAN | `schemaui web -s schema.json -c config.yaml`                 |
+| **Library API**            | Embed in your Rust app                            | `schemaui::web::session` (Web) or `SchemaUI::run` (TUI)      |
+| **TUI** (default CLI mode) | Terminal workflows, SSH, scripts                  | `schemaui -s schema.json -c config.yaml` or `schemaui tui …` |
 
-**Terminal demo** (asciinema above) and **Web UI** (schema tree + form + live
-JSON side-by-side):
-
-<div align="center">
-  <img src="./docs/web.mix.png" alt="schemaui Web UI: schema navigation, form editor, and live JSON preview" width="920" />
-  <p><em>Web UI — left: nested schema navigation & form; right: live JSON preview with validation.</em></p>
-</div>
+The **Web UI** and **TUI** demos sit side-by-side in the header above: schema
+tree + form + live JSON preview in the browser, and the same pipeline running as
+a keyboard-first terminal UI (asciinema).
 
 ## Feature Highlights
 
+- **AI-agent ready** – the [a2ui-ask](https://github.com/YuniqueUnic/a2ui-ask)
+  skill ships prompts, a `SKILL.md`, and helper scripts so coding agents ask
+  structured questions through the Web UI and read answers from files (see
+  [AI Agent Integration](#ai-agent-integration)).
+- **Embedded Web UI** – enabling the `web` feature bundles a browser UI and
+  exposes helpers under `schemaui::web::session` so host applications can serve
+  the experience without reimplementing the stack.
 - **Schema fidelity** – draft-07 compatible, including `$ref`, `definitions`,
   `patternProperties`, enums, numeric ranges, and nested objects/arrays.
 - **Sections & overlays** – top-level properties become root tabs, nested
@@ -68,9 +125,89 @@ JSON side-by-side):
 - **Batteries-included CLI** – `schemaui-cli` offers the same pipeline as the
   library, including multi-destination output, stdin/inline specs, and
   aggregated diagnostics.
-- **Embedded Web UI** – enabling the `web` feature bundles a browser UI and
-  exposes helpers under `schemaui::web::session` so host applications can serve
-  the experience without reimplementing the stack.
+
+## Web UI Mode
+
+Enable the `web` feature to ship a browser UI (static assets under `web/dist/`
+are embedded in the crate). The same schema/config pipeline used by the TUI
+feeds a three-pane experience:
+
+1. **Navigation** – nested schema tree / breadcrumbs for multi-level objects
+2. **Form editor** – required flags, enums, numbers, arrays, live field errors
+3. **JSON preview** – pretty-printed document that updates as you edit
+
+Screenshot: see the header above (`docs/web.mix.png`). Driving schemaui from an
+AI agent? Use [AI Agent Integration](#ai-agent-integration) — agent processes
+have no TTY, so the Web UI is the only surface that works for them.
+
+### CLI (fastest path)
+
+`schemaui-cli` enables `web` by default. Same I/O flags as TUI; only host/port
+are Web-specific:
+
+```bash
+# random free port on 127.0.0.1; print final JSON to stdout
+schemaui web \
+  --schema ./schema.json \
+  --config ./defaults.json \
+  --host 127.0.0.1 --port 0 \
+  -o -
+
+# fixed port + write result to disk
+schemaui web -s ./schema.json -c ./config.yaml -p 8787 -o ./out.json
+```
+
+| Flag            | Default     | Meaning                                      |
+| --------------- | ----------- | -------------------------------------------- |
+| `--host` / `-l` | `127.0.0.1` | Bind address (`--bind` / `--listen` aliases) |
+| `--port` / `-p` | `0`         | Bind port (`0` = ephemeral free port)        |
+
+Workflow in the browser: edit fields → **Save** keeps the session open → **Save
+& Exit** (or Exit) shuts down the temporary server and emits the value through
+configured `-o` destinations. Note that `-o` is greedy: put every other flag
+before it, and pass multiple destinations space-separated in one occurrence
+(`-o ./out.json -`) rather than repeating the flag.
+
+Full CLI manual: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md#11-web-mode).
+
+### Library (embed in your app)
+
+```rust,no_run
+use schemaui::web::session::{
+    ServeOptions,
+    WebSessionBuilder,
+    bind_session,
+};
+
+async fn run() -> anyhow::Result<()> {
+  let schema = serde_json::json!({
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+          "host": {"type": "string", "default": "127.0.0.1"},
+          "port": {"type": "integer", "default": 8080}
+      },
+      "required": ["host", "port"]
+  });
+
+  let config = WebSessionBuilder::new(schema)
+      .with_title("Service Config")
+      .build()?;
+  let session = bind_session(config, ServeOptions::default()).await?;
+  println!("visit http://{}/", session.local_addr());
+  let value = session.run().await?;
+  println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
+  Ok(())
+}
+```
+
+`bind_session` / `serve_session` spawn an Axum router with `/api/session`,
+`/api/save`, `/api/exit` plus embedded static assets. For custom HTTP stacks,
+reuse `session_router` / `WebSessionBuilder` instead of the turnkey helpers. The
+CLI `schemaui web …` command is a thin wrapper around these APIs.
+
+Architecture notes:
+[`docs/en/web-ui-architecture-and-refactor-spec.md`](./docs/en/web-ui-architecture-and-refactor-spec.md).
 
 ## Config Schema Auto-Detection
 
@@ -236,86 +373,6 @@ code change to its architectural responsibility.
 - `OutputOptions::render` turns the final `serde_json::Value` into
   JSON/YAML/TOML text, and `OutputOptions::write` sends that payload to
   stdout/files explicitly after `SchemaUI::run*` returns.
-
-## Web UI Mode
-
-Enable the `web` feature to ship a browser UI (static assets under `web/dist/`
-are embedded in the crate). The same schema/config pipeline used by the TUI
-feeds a three-pane experience:
-
-1. **Navigation** – nested schema tree / breadcrumbs for multi-level objects
-2. **Form editor** – required flags, enums, numbers, arrays, live field errors
-3. **JSON preview** – pretty-printed document that updates as you edit
-
-Screenshot: see [Surfaces at a Glance](#surfaces-at-a-glance)
-(`docs/web.mix.png`).
-
-### CLI (fastest path)
-
-`schemaui-cli` enables `web` by default. Same I/O flags as TUI; only host/port
-are Web-specific:
-
-```bash
-# random free port on 127.0.0.1; print final JSON to stdout
-schemaui web \
-  --schema ./schema.json \
-  --config ./defaults.json \
-  --host 127.0.0.1 --port 0 \
-  -o -
-
-# fixed port + write result to disk
-schemaui web -s ./schema.json -c ./config.yaml -p 8787 -o ./out.json
-```
-
-| Flag            | Default     | Meaning                                      |
-| --------------- | ----------- | -------------------------------------------- |
-| `--host` / `-l` | `127.0.0.1` | Bind address (`--bind` / `--listen` aliases) |
-| `--port` / `-p` | `0`         | Bind port (`0` = ephemeral free port)        |
-
-Workflow in the browser: edit fields → **Save** keeps the session open → **Save
-& Exit** (or Exit) shuts down the temporary server and emits the value through
-configured `-o` destinations.
-
-Full CLI manual: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md#11-web-mode).
-
-### Library (embed in your app)
-
-```rust,no_run
-use schemaui::web::session::{
-    ServeOptions,
-    WebSessionBuilder,
-    bind_session,
-};
-
-async fn run() -> anyhow::Result<()> {
-  let schema = serde_json::json!({
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "type": "object",
-      "properties": {
-          "host": {"type": "string", "default": "127.0.0.1"},
-          "port": {"type": "integer", "default": 8080}
-      },
-      "required": ["host", "port"]
-  });
-
-  let config = WebSessionBuilder::new(schema)
-      .with_title("Service Config")
-      .build()?;
-  let session = bind_session(config, ServeOptions::default()).await?;
-  println!("visit http://{}/", session.local_addr());
-  let value = session.run().await?;
-  println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
-  Ok(())
-}
-```
-
-`bind_session` / `serve_session` spawn an Axum router with `/api/session`,
-`/api/save`, `/api/exit` plus embedded static assets. For custom HTTP stacks,
-reuse `session_router` / `WebSessionBuilder` instead of the turnkey helpers. The
-CLI `schemaui web …` command is a thin wrapper around these APIs.
-
-Architecture notes:
-[`docs/en/web-ui-architecture-and-refactor-spec.md`](./docs/en/web-ui-architecture-and-refactor-spec.md).
 
 ## JSON Schema → TUI Mapping
 
@@ -647,19 +704,19 @@ to the **TUI**. Explicit modes:
 
 | Command                       | Purpose                                            |
 | ----------------------------- | -------------------------------------------------- |
-| `schemaui` / `schemaui tui`   | Interactive terminal editor (default)              |
 | `schemaui web`                | Interactive browser editor (embedded HTTP server)  |
-| `schemaui tui-snapshot`       | Precompute TUI FormSchema/layout artifacts (no UI) |
+| `schemaui` / `schemaui tui`   | Interactive terminal editor (default)              |
 | `schemaui web-snapshot`       | Precompute Web session snapshots JSON/TS (no UI)   |
+| `schemaui tui-snapshot`       | Precompute TUI FormSchema/layout artifacts (no UI) |
 | `schemaui completion <shell>` | Shell completions (`completion` feature)           |
 
 ```bash
+# Web UI (see also Web UI Mode above)
+schemaui web --schema ./schema.json --config ./defaults.yaml --port 0 -o -
+
 # equivalent TUI launches
 schemaui --schema ./schema.json --config ./defaults.yaml
 schemaui tui --schema ./schema.json --config ./defaults.yaml
-
-# Web UI (see also Web UI Mode above)
-schemaui web --schema ./schema.json --config ./defaults.yaml --port 0 -o -
 ```
 
 ### Typical TUI pipeline
@@ -668,8 +725,7 @@ schemaui web --schema ./schema.json --config ./defaults.yaml --port 0 -o -
 schemaui \
   --schema ./schema.json \
   --config ./defaults.yaml \
-  -o - \
-  -o ./config.toml ./config.json
+  -o - ./config.toml ./config.json
 ```
 
 ```text
@@ -699,10 +755,12 @@ schemaui \
   `schema_from_data_value` (or embedded `$schema` / `#:schema` / YAML modeline).
 - **Diagnostics** – `DiagnosticCollector` gathers format issues, feature-flag
   mismatches, stdin conflicts, and existing output files **before** the UI runs.
-- **Outputs** – `-o/--output` is repeatable and may mix file paths with `-` for
-  stdout. With no destination, the tool writes to stdout; use
-  `--temp-file <PATH>` for an explicit fallback file. Extensions pick the
-  format; conflicting extensions are rejected.
+- **Outputs** – `-o/--output` takes one or more space-separated destinations in
+  a single occurrence and may mix file paths with `-` for stdout (because the
+  flag is greedy, place it after all other flags and do not repeat it). With no
+  destination, the tool writes to stdout; use `--temp-file <PATH>` for an
+  explicit fallback file. Extensions pick the format; conflicting extensions are
+  rejected.
 - **Common flags** – `--no-pretty` (compact), `--force` / `--yes` (overwrite),
   `--title` / `--description` (forwarded to the UI).
 - **Web-only flags** – `--host` / `-l` (default `127.0.0.1`), `--port` / `-p`
@@ -730,6 +788,9 @@ Deep dive: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md) · Chinese:
 
 - `README.md` – overview + architecture snapshot (source of truth).
 - `README.ZH.md` – Chinese overview kept in sync with this README.
+- [a2ui-ask](https://github.com/YuniqueUnic/a2ui-ask) – the AI-agent skill:
+  prompt templates, helper scripts, examples, and tests (see
+  [AI Agent Integration](#ai-agent-integration)).
 - `docs/en/structure_design.md` – detailed schema/layout/runtime design with
   flow diagrams.
 - `docs/zh/structure_design.md` – Chinese mirror of the architecture guide.
