@@ -20,7 +20,38 @@ pub struct UiNode {
     pub required: bool,
     #[cfg_attr(feature = "web-types", ts(type = "Record<string, unknown> | null"))]
     pub default_value: Option<Value>,
+    pub visible_when: Option<VisibleWhen>,
     pub kind: UiNodeKind,
+}
+
+/// Conditional visibility for a node, tested against a sibling property of the
+/// object that owns it.
+///
+/// Authored with the `x-visible-when` extension:
+/// `{"x-visible-when": {"field": "mode", "op": "equals", "value": "custom"}}`
+/// keeps the node hidden until the sibling `mode` holds the value `custom`,
+/// while `"op": "contains"` does the same for a sibling array that has to
+/// include the value. This is what lets the escape-hatch pattern — an enum with
+/// an "other" option plus a companion free-text field — stop rendering a
+/// permanently empty input.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+pub struct VisibleWhen {
+    pub field: String,
+    pub op: VisibleWhenOp,
+    #[cfg_attr(feature = "web-types", ts(type = "unknown"))]
+    pub value: Value,
+}
+
+/// How a [`VisibleWhen`] rule compares the sibling property with its value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[serde(rename_all = "snake_case")]
+pub enum VisibleWhenOp {
+    /// The sibling value is exactly `value`.
+    Equals,
+    /// The sibling value is an array holding `value` as one of its members.
+    Contains,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -33,6 +64,7 @@ pub enum UiNodeKind {
         #[cfg_attr(feature = "web-types", ts(type = "unknown[] | null"))]
         enum_values: Option<Vec<Value>>,
         nullable: bool,
+        multiline: bool,
     },
     Array {
         item: Box<UiNodeKind>,

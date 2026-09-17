@@ -16,6 +16,7 @@ import {
   resolveNavigablePointer,
 } from "./utils/nodeLookup";
 import { useResizableColumns } from "./hooks/useResizableColumns";
+import { pruneHiddenNodes } from "./utils/visibility";
 import { useSessionState } from "./hooks/useSessionState";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useMediaQuery } from "./hooks/useMediaQuery";
@@ -74,7 +75,14 @@ export default function App() {
     status,
   } = state;
 
-  const roots = session?.ui_ast?.roots ?? [];
+  // Visibility is derived, not stored: pruning once here keeps the tree, the
+  // layout explorer and the editor in agreement about what the form shows.
+  const uiAst = useMemo(
+    () => pruneHiddenNodes(session?.ui_ast, data),
+    [session?.ui_ast, data],
+  );
+
+  const roots = uiAst?.roots ?? [];
 
   const virtualRootTitle = session?.layout?.roots?.[0]?.title ?? "General";
 
@@ -189,7 +197,7 @@ export default function App() {
               <>
                 {(!hasLayout || navMode === "schema") && (
                   <TreeView
-                    ast={session?.ui_ast}
+                    ast={uiAst}
                     selectedPointer={selectedPointer}
                     errors={errors}
                     onSelect={(pointer) => {
@@ -202,7 +210,7 @@ export default function App() {
                   <div className="flex-1 min-h-0 px-1 pb-2">
                     <LayoutExplorer
                       layout={session.layout}
-                      ast={session?.ui_ast}
+                      ast={uiAst}
                       selectedPointer={selectedPointer}
                       rootLabel={virtualRootTitle}
                       onSelect={(pointer) => {

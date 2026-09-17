@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use serde_json::{Map, Value};
 
 use super::{
@@ -18,16 +19,43 @@ pub(super) fn visit_schema_entry(
         schema,
         active_refs,
         move |resolved| {
-            Ok(recursive_boundary_node(
-                &resolved,
-                recursive_pointer,
-                required,
-            ))
+            let mut node = recursive_boundary_node(&resolved, recursive_pointer, required)?;
+            node.visible_when = super::hints::visible_when(&resolved)?;
+            Ok(node)
         },
         move |resolved, active_refs| {
-            visit_schema(resolver, &resolved, pointer, required, active_refs)
+            let mut node = visit_schema(resolver, &resolved, pointer, required, active_refs)?;
+            node.visible_when = super::hints::visible_when(&resolved)?;
+            Ok(node)
         },
     )
+}
+
+/// Visits the properties of an object schema: every child gets its pointer and
+/// required flag, and its visibility rule is checked against the sibling set it
+/// was written for.
+pub(super) fn visit_object_children(
+    resolver: &SchemaResolver<'_>,
+    properties: &IndexMap<String, Schema>,
+    required_fields: &[String],
+    parent_pointer: &str,
+    active_refs: &mut Vec<String>,
+) -> Result<Vec<UiNode>> {
+    let mut children = Vec::with_capacity(properties.len());
+    for (name, child_schema) in properties {
+        let child = visit_schema_entry(
+            resolver,
+            child_schema,
+            super::naming::append_pointer(parent_pointer, name),
+            required_fields.contains(name),
+            active_refs,
+        )?;
+        if let Some(rule) = &child.visible_when {
+            super::hints::check_sibling(rule, properties, &child.pointer)?;
+        }
+        children.push(child);
+    }
+    Ok(children)
 }
 
 pub(super) fn visit_schema(
@@ -79,6 +107,7 @@ pub(super) fn visit_schema(
             description: super::schema_helpers::schema_description(schema),
             required,
             default_value: super::defaults::schema_default_or_const(schema),
+            visible_when: None,
             kind: UiNodeKind::KeyValue {
                 template: Box::new(template),
             },
@@ -101,6 +130,7 @@ pub(super) fn visit_schema(
             description: super::schema_helpers::schema_description(schema),
             required,
             default_value,
+            visible_when: None,
             kind: UiNodeKind::Array {
                 item: Box::new(item_node),
                 min_items: array.and_then(|inner| inner.min_items).map(u64::from),
@@ -113,18 +143,13 @@ pub(super) fn visit_schema(
         let fallback_object = ObjectValidation::default();
         let object = schema.object.as_ref().map_or(&fallback_object, Box::as_ref);
         let required_fields = super::schema_helpers::required_list(object);
-        let mut children = Vec::new();
-        for (name, child_schema) in &object.properties {
-            let child_pointer = super::naming::append_pointer(&pointer, name);
-            let child = visit_schema_entry(
-                resolver,
-                child_schema,
-                child_pointer,
-                required_fields.contains(name),
-                active_refs,
-            )?;
-            children.push(child);
-        }
+        let children = visit_object_children(
+            resolver,
+            &object.properties,
+            &required_fields,
+            &pointer,
+            active_refs,
+        )?;
         let default_value =
             super::defaults::schema_default_or_const(schema).or(Some(Value::Object(Map::new())));
         return Ok(UiNode {
@@ -133,6 +158,7 @@ pub(super) fn visit_schema(
             description: super::schema_helpers::schema_description(schema),
             required,
             default_value,
+            visible_when: None,
             kind: UiNodeKind::Object {
                 children,
                 required: required_fields,
@@ -149,11 +175,13 @@ pub(super) fn visit_schema(
         description: super::schema_helpers::schema_description(schema),
         required,
         default_value,
+        visible_when: None,
         kind: UiNodeKind::Field {
             scalar,
             enum_options,
             enum_values,
             nullable,
+            multiline: super::hints::is_multiline(schema)?,
         },
     })
 }
@@ -217,18 +245,13 @@ pub(super) fn visit_kind(
         let fallback_object = ObjectValidation::default();
         let object = schema.object.as_ref().map_or(&fallback_object, Box::as_ref);
         let required_fields = super::schema_helpers::required_list(object);
-        let mut children = Vec::new();
-        for (name, child_schema) in &object.properties {
-            let pointer = super::naming::append_pointer("", name);
-            let node = visit_schema_entry(
-                resolver,
-                child_schema,
-                pointer,
-                required_fields.contains(name),
-                active_refs,
-            )?;
-            children.push(node);
-        }
+        let children = visit_object_children(
+            resolver,
+            &object.properties,
+            &required_fields,
+            "",
+            active_refs,
+        )?;
         return Ok(UiNodeKind::Object {
             children,
             required: required_fields,
@@ -241,6 +264,7 @@ pub(super) fn visit_kind(
         enum_options,
         enum_values,
         nullable,
+        multiline: super::hints::is_multiline(schema)?,
     })
 }
 
@@ -254,7 +278,10 @@ pub(super) fn visit_array_item_kind(
         resolver,
         item_schema,
         active_refs,
-        |resolved| normalize_embedded_kind(resolver, &resolved, recursive_boundary_kind(&resolved)),
+        |resolved| {
+            let kind = recursive_boundary_kind(&resolved)?;
+            normalize_embedded_kind(resolver, &resolved, kind)
+        },
         |resolved, active_refs| {
             if super::schema_helpers::is_object_schema(&resolved)
                 && !super::schema_helpers::has_composite_subschemas(&resolved)
@@ -285,31 +312,32 @@ pub(super) fn normalize_embedded_kind(
     }
 }
 
-pub(super) fn recursive_boundary_kind(schema: &SchemaObject) -> UiNodeKind {
+pub(super) fn recursive_boundary_kind(schema: &SchemaObject) -> Result<UiNodeKind> {
     if super::schema_helpers::is_array_schema(schema) {
         let array = schema.array.as_ref();
-        return UiNodeKind::Array {
+        return Ok(UiNodeKind::Array {
             item: Box::new(array_boundary_item_kind()),
             min_items: array.and_then(|inner| inner.min_items).map(u64::from),
             max_items: array.and_then(|inner| inner.max_items).map(u64::from),
-        };
+        });
     }
 
     if let Ok((scalar, enum_options, enum_values, nullable)) =
         super::defaults::detect_scalar(schema)
     {
-        return UiNodeKind::Field {
+        return Ok(UiNodeKind::Field {
             scalar,
             enum_options,
             enum_values,
             nullable,
-        };
+            multiline: super::hints::is_multiline(schema)?,
+        });
     }
 
-    UiNodeKind::Object {
+    Ok(UiNodeKind::Object {
         children: Vec::new(),
         required: Vec::new(),
-    }
+    })
 }
 
 pub(super) fn with_resolved_schema<T, F, R>(
@@ -344,8 +372,12 @@ fn array_boundary_item_kind() -> UiNodeKind {
     }
 }
 
-fn recursive_boundary_node(schema: &SchemaObject, pointer: String, required: bool) -> UiNode {
-    let kind = recursive_boundary_kind(schema);
+fn recursive_boundary_node(
+    schema: &SchemaObject,
+    pointer: String,
+    required: bool,
+) -> Result<UiNode> {
+    let kind = recursive_boundary_kind(schema)?;
     let default_value = match &kind {
         UiNodeKind::Field {
             scalar,
@@ -367,12 +399,13 @@ fn recursive_boundary_node(schema: &SchemaObject, pointer: String, required: boo
             .or_else(|| super::defaults::infer_default_for_composite(variants, *allow_multiple)),
     };
 
-    UiNode {
+    Ok(UiNode {
         pointer,
         title: super::schema_helpers::schema_title(schema),
         description: super::schema_helpers::schema_description(schema),
         required,
         default_value,
+        visible_when: None,
         kind,
-    }
+    })
 }

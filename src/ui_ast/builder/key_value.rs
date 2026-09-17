@@ -41,11 +41,8 @@ pub(super) fn build_key_value_template(
         value_schema_ref,
         active_refs,
         |resolved| {
-            let kind = super::visit::normalize_embedded_kind(
-                resolver,
-                &resolved,
-                super::visit::recursive_boundary_kind(&resolved),
-            )?;
+            let kind = super::visit::recursive_boundary_kind(&resolved)?;
+            let kind = super::visit::normalize_embedded_kind(resolver, &resolved, kind)?;
             Ok((resolved, kind))
         },
         |resolved, active_refs| {

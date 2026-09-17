@@ -60,6 +60,7 @@ export type UiNodeKind =
     enum_options?: string[] | null;
     enum_values?: JsonValue[] | null;
     nullable?: boolean;
+    multiline?: boolean;
   }
   | {
     type: "array";
@@ -79,12 +80,26 @@ export type UiNodeKind =
   }
   | { type: "object"; children: UiNode[]; required: string[] };
 
+/**
+ * Conditional visibility, tested against a sibling property of the object that
+ * owns the node. Declared in the schema with `x-visible-when`.
+ *
+ * `equals` compares the sibling value as a whole; `contains` asks whether an
+ * array-valued sibling holds the value as one of its members.
+ */
+export interface VisibleWhen {
+  field: string;
+  op: "equals" | "contains";
+  value: JsonValue;
+}
+
 export interface UiNode {
   pointer: string;
   title?: string | null;
   description?: string | null;
   required: boolean;
   default_value?: JsonValue | null;
+  visible_when?: VisibleWhen | null;
   kind: UiNodeKind;
 }
 
