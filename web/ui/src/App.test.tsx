@@ -174,6 +174,93 @@ const session: SessionResponse = {
   layout: null,
 };
 
+/** A field whose visibility is driven by a sibling boolean. */
+const conditionalSession: SessionResponse = {
+  title: "Conditional Session",
+  description: null,
+  data: {},
+  formats: ["json"],
+  layout: null,
+  ui_ast: {
+    roots: [
+      {
+        pointer: "/brief",
+        title: "Brief",
+        description: null,
+        required: false,
+        default_value: {},
+        kind: {
+          type: "object",
+          required: [],
+          children: [
+            {
+              pointer: "/brief/advanced",
+              title: "Advanced mode",
+              description: null,
+              required: false,
+              default_value: false,
+              kind: {
+                type: "field",
+                scalar: "boolean",
+                enum_options: null,
+                enum_values: null,
+              },
+            },
+            {
+              pointer: "/brief/notes",
+              title: "Advanced notes",
+              description: null,
+              required: false,
+              default_value: "",
+              visible_when: { field: "advanced", op: "equals", value: true },
+              kind: {
+                type: "field",
+                scalar: "string",
+                enum_options: null,
+                enum_values: null,
+              },
+            },
+          ],
+        },
+      },
+    ],
+  },
+};
+
+const multilineSession: SessionResponse = {
+  title: "Multiline Session",
+  description: null,
+  data: {},
+  formats: ["json"],
+  layout: null,
+  ui_ast: {
+    roots: [
+      {
+        pointer: "/notes",
+        title: "Notes",
+        description: null,
+        required: false,
+        default_value: "line one\nline two",
+        kind: {
+          type: "field",
+          scalar: "string",
+          enum_options: null,
+          enum_values: null,
+          multiline: true,
+        },
+      },
+    ],
+  },
+};
+
+function renderApp() {
+  return render(
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>,
+  );
+}
+
 describe("App web interactions", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -196,11 +283,7 @@ describe("App web interactions", () => {
 
   it("keeps composite radio selection aligned with rendered content after switching variants", async () => {
     const user = userEvent.setup();
-    render(
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>,
-    );
+    renderApp();
 
     const listRadio = await screen.findByRole("radio", {
       name: /list config/i,
@@ -223,11 +306,7 @@ describe("App web interactions", () => {
   });
 
   it("uses session-level title and description in the page header", async () => {
-    render(
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>,
-    );
+    renderApp();
 
     expect(
       await screen.findByRole("heading", { name: "Complex Composite Session" }),
@@ -276,14 +355,35 @@ describe("App web interactions", () => {
       },
     } satisfies SessionResponse);
 
-    render(
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>,
-    );
+    renderApp();
 
     expect(await screen.findByText("Foobar description")).toBeTruthy();
     expect(screen.getByText("Comment description")).toBeTruthy();
     expect(screen.getAllByText("Comment title").length).toBeGreaterThan(0);
+  });
+
+  it("hides a conditional field until its controlling sibling matches", async () => {
+    apiMocks.fetchSession.mockResolvedValue(conditionalSession);
+
+    const user = userEvent.setup();
+    renderApp();
+
+    const toggle = await screen.findByRole("switch");
+    // Hidden everywhere: navigation pills, tree and editor all read the same pruned AST.
+    expect(screen.queryAllByText("Advanced notes")).toHaveLength(0);
+
+    await user.click(toggle);
+
+    expect(await screen.findAllByText("Advanced notes")).not.toHaveLength(0);
+  });
+
+  it("renders a multiline field as a textarea", async () => {
+    apiMocks.fetchSession.mockResolvedValue(multilineSession);
+
+    renderApp();
+
+    const control = await screen.findByRole("textbox");
+    expect(control.tagName).toBe("TEXTAREA");
+    expect(control).toHaveValue("line one\nline two");
   });
 });

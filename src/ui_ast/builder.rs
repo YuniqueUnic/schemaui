@@ -3,6 +3,7 @@ use serde_json::{Map, Value};
 
 mod composite;
 mod defaults;
+mod hints;
 mod key_value;
 mod naming;
 mod schema_helpers;
@@ -15,7 +16,7 @@ use crate::schema::{
 };
 
 use super::types::{
-    CompositeMode, ScalarKind, UiAst, UiKeyValueNode, UiNode, UiNodeKind, UiVariant,
+    CompositeMode, ScalarKind, UiAst, UiKeyValueNode, UiNode, UiNodeKind, UiVariant, VisibleWhen,
 };
 
 pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
@@ -34,18 +35,13 @@ pub fn build_ui_ast(raw: &Value) -> Result<UiAst> {
     let required = schema_helpers::required_list(object);
 
     let mut active_refs = Vec::new();
-    let mut roots = Vec::new();
-    for (name, schema) in &object.properties {
-        let pointer = naming::append_pointer("", name);
-        let node = visit::visit_schema_entry(
-            &resolver,
-            schema,
-            pointer,
-            required.contains(name),
-            &mut active_refs,
-        )?;
-        roots.push(node);
-    }
+    let roots = visit::visit_object_children(
+        &resolver,
+        &object.properties,
+        &required,
+        "",
+        &mut active_refs,
+    )?;
 
     Ok(UiAst { roots })
 }

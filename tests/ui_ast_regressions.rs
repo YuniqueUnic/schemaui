@@ -1,4 +1,4 @@
-use schemaui::ui_ast::{UiNode, UiNodeKind, build_ui_ast};
+use schemaui::ui_ast::{UiNode, UiNodeKind, VisibleWhenOp, build_ui_ast};
 use serde_json::json;
 
 fn find_node<'a>(nodes: &'a [UiNode], pointer: &str) -> Option<&'a UiNode> {
@@ -219,4 +219,134 @@ fn ui_ast_wraps_nested_array_items_as_editable_single_variant_composites() {
         },
         other => panic!("expected matrix to remain an array, got {other:?}"),
     }
+}
+
+fn field_is_multiline(nodes: &[UiNode], pointer: &str) -> bool {
+    match &find_node(nodes, pointer).expect("field node").kind {
+        UiNodeKind::Field { multiline, .. } => *multiline,
+        other => panic!("expected {pointer} to be a field, got {other:?}"),
+    }
+}
+
+#[test]
+fn ui_ast_attaches_visible_when_from_extension() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "delivery": { "type": "string", "enum": ["file", "other"] },
+            "delivery_custom": {
+                "type": "string",
+                "x-visible-when": { "field": "delivery", "op": "equals", "value": "other" }
+            }
+        }
+    });
+
+    let ast = build_ui_ast(&schema).expect("ui ast");
+
+    let controller = find_node(&ast.roots, "/delivery").expect("delivery field");
+    assert!(
+        controller.visible_when.is_none(),
+        "a node without the extension is always visible"
+    );
+
+    let dependent = find_node(&ast.roots, "/delivery_custom").expect("custom field");
+    let rule = dependent.visible_when.as_ref().expect("visibility rule");
+    assert_eq!(rule.field, "delivery");
+    assert_eq!(rule.op, VisibleWhenOp::Equals);
+    assert_eq!(rule.value, json!("other"));
+}
+
+#[test]
+fn ui_ast_reads_contains_rules_for_multi_select_escape_hatches() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "features": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["mount", "other"] },
+                "uniqueItems": true
+            },
+            "features_custom": {
+                "type": "string",
+                "x-visible-when": { "field": "features", "op": "contains", "value": "other" }
+            }
+        }
+    });
+
+    let ast = build_ui_ast(&schema).expect("ui ast");
+    let dependent = find_node(&ast.roots, "/features_custom").expect("custom field");
+    let rule = dependent.visible_when.as_ref().expect("visibility rule");
+    assert_eq!(rule.op, VisibleWhenOp::Contains);
+    assert_eq!(rule.value, json!("other"));
+}
+
+#[test]
+fn ui_ast_rejects_malformed_visible_when() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "mode": { "type": "string" },
+            "detail": {
+                "type": "string",
+                "x-visible-when": { "field": "mode", "equals": "custom" }
+            }
+        }
+    });
+
+    let error = build_ui_ast(&schema).expect_err("a rule without `op` must be rejected");
+    assert!(
+        error.to_string().contains("x-visible-when"),
+        "error should name the keyword, got: {error}"
+    );
+}
+
+#[test]
+fn ui_ast_rejects_visible_when_pointing_at_an_unknown_sibling() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "mode": { "type": "string" },
+            "detail": {
+                "type": "string",
+                "x-visible-when": { "field": "modes", "op": "equals", "value": "custom" }
+            }
+        }
+    });
+
+    let error = build_ui_ast(&schema).expect_err("a typo'd sibling must be rejected");
+    assert!(
+        error.to_string().contains("modes"),
+        "error should name the unknown sibling, got: {error}"
+    );
+}
+
+#[test]
+fn ui_ast_marks_multiline_string_fields() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "summary": { "type": "string" },
+            "notes": { "type": "string", "x-multiline": true }
+        }
+    });
+
+    let ast = build_ui_ast(&schema).expect("ui ast");
+    assert!(!field_is_multiline(&ast.roots, "/summary"));
+    assert!(field_is_multiline(&ast.roots, "/notes"));
+}
+
+#[test]
+fn ui_ast_rejects_non_boolean_multiline() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "notes": { "type": "string", "x-multiline": "yes" }
+        }
+    });
+
+    let error = build_ui_ast(&schema).expect_err("a non-boolean hint must be rejected");
+    assert!(
+        error.to_string().contains("x-multiline"),
+        "error should name the keyword, got: {error}"
+    );
 }

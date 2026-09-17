@@ -43,6 +43,7 @@ pub(super) fn build_composite_node(
         description: super::schema_helpers::schema_description(schema),
         required,
         default_value,
+        visible_when: None,
         kind,
     })
 }
@@ -62,7 +63,7 @@ pub(super) fn build_variant(
                 resolver,
                 index,
                 &resolved,
-                super::visit::recursive_boundary_kind(&resolved),
+                super::visit::recursive_boundary_kind(&resolved)?,
             )
         },
         |resolved, active_refs| {

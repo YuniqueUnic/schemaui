@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { defaultForKind } from "../../ui-ast";
+import { Textarea } from "../ui/textarea";
 import type { InlineFieldKind } from "../../utils/typeHelpers";
 
 type FieldNode = UiNode & {
@@ -114,18 +115,27 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
         </div>
       );
     case "string":
-    default:
+    default: {
+      const text = (resolved as string) ?? "";
+      const commit = (next: string) =>
+        onChange(node.pointer, next === "" && nullable ? null : next);
+      if (node.kind.multiline) {
+        return (
+          <Textarea
+            rows={4}
+            value={text}
+            onChange={(event) => commit(event.target.value)}
+          />
+        );
+      }
       return (
         <Input
           type="text"
-          value={(resolved as string) ?? ""}
-          onChange={(event) =>
-            onChange(
-              node.pointer,
-              event.target.value === "" && nullable ? null : event.target.value,
-            )}
+          value={text}
+          onChange={(event) => commit(event.target.value)}
         />
       );
+    }
   }
 }
 
@@ -174,15 +184,27 @@ export function renderSimpleFieldInline(
         </div>
       );
     case "string":
-    default:
+    default: {
+      const text = (resolved as string) ?? "";
+      const commit = (next: string) =>
+        onChange(next === "" && nullable ? null : next);
+      if (fieldKind.multiline) {
+        return (
+          <Textarea
+            rows={3}
+            value={text}
+            onChange={(event) => commit(event.target.value)}
+          />
+        );
+      }
       return (
         <Input
           type="text"
-          value={(resolved as string) ?? ""}
-          onChange={(event) =>
-            onChange(event.target.value === "" && nullable ? null : event.target.value)}
+          value={text}
+          onChange={(event) => commit(event.target.value)}
           className="h-9"
         />
       );
+    }
   }
 }

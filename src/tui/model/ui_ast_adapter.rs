@@ -134,6 +134,7 @@ fn field_kind_from_node_kind(kind: &UiNodeKind) -> FieldKind {
             enum_options,
             enum_values,
             nullable,
+            ..
         } => {
             let kind = match enum_options {
                 Some(options) if !options.is_empty() => FieldKind::Enum {
