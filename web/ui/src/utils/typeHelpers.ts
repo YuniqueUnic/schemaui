@@ -5,11 +5,39 @@ import type { JsonValue, UiNodeKind } from "../types";
  */
 
 /**
+ * A field kind backed by a closed set of options.
+ *
+ * Enum fields own a dedicated control (a select for a single value, a
+ * multi-select for an array of them), so they are never rendered inline as a
+ * plain text/number input.
+ */
+export type EnumFieldKind = Extract<UiNodeKind, { type: "field" }> & {
+  enum_options: string[];
+};
+
+/**
+ * A field kind that renders as a plain inline control.
+ *
+ * This is the complement of {@link EnumFieldKind}: primitives only, which is
+ * exactly what can be edited in place without a select or an overlay.
+ */
+export type InlineFieldKind = Extract<UiNodeKind, { type: "field" }> & {
+  enum_options?: null;
+};
+
+/**
  * Determines if a UI node kind represents a simple, primitive type
  * that can be rendered inline without requiring a dialog/overlay.
  */
-export function isSimpleKind(kind: UiNodeKind): boolean {
+export function isSimpleKind(kind: UiNodeKind): kind is InlineFieldKind {
   return kind.type === "field" && !kind.enum_options;
+}
+
+/**
+ * Determines if a UI node kind is a field backed by enum options.
+ */
+export function isEnumFieldKind(kind: UiNodeKind): kind is EnumFieldKind {
+  return kind.type === "field" && !!kind.enum_options?.length;
 }
 
 /**

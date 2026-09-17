@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { defaultForKind } from "../../ui-ast";
+import type { InlineFieldKind } from "../../utils/typeHelpers";
 
 type FieldNode = UiNode & {
   kind: Extract<import("../../types").UiNodeKind, { type: "field" }>;
@@ -129,45 +130,19 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
 }
 
 /**
- * Renders a simple field control inline (for use in arrays)
- * Returns just the input control without labels or error messages
+ * Renders a primitive field control inline (for use in array entries).
+ * Returns just the input control without labels or error messages.
+ *
+ * Enum items never reach this helper: a single value is a select, a set of
+ * values is a multi-select.
  */
 export function renderSimpleFieldInline(
-  fieldKind: Extract<import("../../types").UiNodeKind, { type: "field" }>,
+  fieldKind: InlineFieldKind,
   value: JsonValue | undefined,
   onChange: (value: JsonValue) => void,
 ): React.ReactNode {
   const resolved = value === undefined ? defaultForKind(fieldKind) : value;
   const nullable = fieldKind.nullable === true;
-
-  if (fieldKind.enum_options?.length) {
-    const enumValues = fieldKind.enum_values ?? fieldKind.enum_options;
-    const selectedIndex = enumValues.findIndex((option) =>
-      sameJsonValue(option as JsonValue, resolved)
-    );
-    return (
-      <Select
-        value={selectedIndex >= 0 ? String(selectedIndex) : ""}
-        onValueChange={(newValue) => {
-          const next = enumValues[Number(newValue)];
-          if (next !== undefined) {
-            onChange(cloneJsonValue(next as JsonValue));
-          }
-        }}
-      >
-        <SelectTrigger className="h-9 w-full">
-          <SelectValue placeholder="Select an option" />
-        </SelectTrigger>
-        <SelectContent>
-          {fieldKind.enum_options.map((option, index) => (
-            <SelectItem key={`${option}-${index}`} value={String(index)}>
-              {option}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
 
   switch (fieldKind.scalar) {
     case "integer":

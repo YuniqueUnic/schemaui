@@ -3,7 +3,9 @@ import { defaultForKind } from "../../ui-ast";
 import {
   formatValueSummary,
   inferValueType,
+  isEnumFieldKind,
   isSimpleKind,
+  type InlineFieldKind,
 } from "../../utils/typeHelpers";
 import {
   determineVariant,
@@ -11,17 +13,10 @@ import {
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
-import { Input } from "../ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { Switch } from "../ui/switch";
 import { useOverlay } from "../Overlay";
 import { materializeCompositeKind } from "../../utils/schemaToUiKind";
+import { renderSimpleFieldInline } from "./FieldRenderer";
+import { MultiSelectRenderer } from "./MultiSelectRenderer";
 import { EntryEditor } from "./shared/EntryEditor";
 
 /**
@@ -56,15 +51,26 @@ export function ArrayRenderer({
   const overlay = useOverlay();
   const entries = Array.isArray(value) ? (value as JsonValue[]) : [];
   const itemKind = node.kind.item;
-  const isSimpleItemType = isSimpleKind(itemKind);
 
   const removeEntry = (index: number) => {
     const next = entries.filter((_, idx) => idx !== index);
     onChange(node.pointer, next);
   };
 
-  // Simple Type Array (Inline Editing)
-  if (isSimpleItemType && itemKind.type === "field") {
+  // Array of enum options: a set of choices, so a single multi-select control.
+  if (isEnumFieldKind(itemKind)) {
+    return (
+      <MultiSelectRenderer
+        node={node}
+        itemKind={itemKind}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  }
+
+  // Array of primitives: edit each entry inline.
+  if (isSimpleKind(itemKind)) {
     return (
       <SimpleArrayRenderer
         node={node}
@@ -76,7 +82,7 @@ export function ArrayRenderer({
     );
   }
 
-  // Complex Type Array (Dialog Editing)
+  // Array of structured entries: one overlay per entry.
   return (
     <ComplexArrayRenderer
       node={node}
@@ -97,7 +103,7 @@ export function ArrayRenderer({
 interface SimpleArrayRendererProps {
   node: ArrayNode;
   entries: JsonValue[];
-  itemKind: Extract<import("../../types").UiNodeKind, { type: "field" }>;
+  itemKind: InlineFieldKind;
   onChange: (pointer: string, value: JsonValue) => void;
   removeEntry: (index: number) => void;
 }
@@ -326,79 +332,4 @@ function ComplexArrayRenderer({
       </Button>
     </div>
   );
-}
-
-/**
- * Helper: Render simple field inline
- */
-function renderSimpleFieldInline(
-  fieldKind: Extract<import("../../types").UiNodeKind, { type: "field" }>,
-  value: JsonValue | undefined,
-  onChange: (value: JsonValue) => void,
-): React.ReactNode {
-  const resolved = value ?? defaultForKind(fieldKind);
-
-  if (fieldKind.enum_options?.length) {
-    const enumValues = fieldKind.enum_values ?? fieldKind.enum_options;
-    const selectedIndex = enumValues.findIndex((option) =>
-      JSON.stringify(option) === JSON.stringify(resolved)
-    );
-    return (
-      <Select
-        value={selectedIndex >= 0 ? String(selectedIndex) : ""}
-        onValueChange={(newValue) => {
-          const next = enumValues[Number(newValue)];
-          if (next !== undefined) {
-            onChange(JSON.parse(JSON.stringify(next)) as JsonValue);
-          }
-        }}
-      >
-        <SelectTrigger className="h-9 w-full">
-          <SelectValue placeholder="Select an option" />
-        </SelectTrigger>
-        <SelectContent>
-          {fieldKind.enum_options.map((option, index) => (
-            <SelectItem key={`${option}-${index}`} value={String(index)}>
-              {option}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
-
-  switch (fieldKind.scalar) {
-    case "integer":
-    case "number":
-      return (
-        <Input
-          type="number"
-          value={typeof resolved === "number" ? resolved : 0}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className="h-9"
-        />
-      );
-    case "boolean":
-      return (
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={Boolean(resolved)}
-            onCheckedChange={(checked) => onChange(checked)}
-          />
-          <span className="text-xs text-muted-foreground">
-            {resolved ? "true" : "false"}
-          </span>
-        </div>
-      );
-    case "string":
-    default:
-      return (
-        <Input
-          type="text"
-          value={(resolved as string) ?? ""}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-9"
-        />
-      );
-  }
 }
