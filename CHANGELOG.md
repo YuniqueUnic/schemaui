@@ -25,6 +25,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.13.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.12.4...schemaui-v0.13.0) - 2026-09-17
+
+
+
+
+### Features
+
+- **ui-ast:** add x-visible-when and x-multiline presentation hints([#173](https://github.com/YuniqueUnic/schemaui/pull/173), @YuniqueUnic)
+
+
+
+
+
+
+### Documentation
+
+- move agent skill to a2ui-ask repo, promote Web UI, fix -o usage
+
+
+
+
+
+
+
+
+### Build and CI
+
+- **web:** rebuild embedded bundle([#173](https://github.com/YuniqueUnic/schemaui/pull/173), @YuniqueUnic)
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.12.4](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.12.3...schemaui-v0.12.4) - 2026-08-13
 
 
