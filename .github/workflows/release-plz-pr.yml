@@ -42,6 +42,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_PAT }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          # release-plz runs cargo-semver-checks to pick the next version, and
+          # that tool declares its own MSRV, which has moved past the toolchain
+          # pinned in rust-toolchain.toml for building the crate. Without this
+          # the repo pin silently downgrades the job and the release fails with
+          # "rustc version is not high enough". Release tooling tracks stable;
+          # the pin keeps describing what the crate is built with.
+          RUSTUP_TOOLCHAIN: stable
 
       - name: Setup Python 3
         uses: actions/setup-python@v7
