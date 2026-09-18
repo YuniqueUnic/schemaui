@@ -12,6 +12,8 @@ export const PrecompiledSession: SessionResponse = {
         "required": true,
         "default_value": "unic@me",
         "visible_when": null,
+        "control": null,
+        "bounds": null,
         "kind": {
           "type": "field",
           "scalar": "string",
@@ -28,6 +30,8 @@ export const PrecompiledSession: SessionResponse = {
         "required": true,
         "default_value": "",
         "visible_when": null,
+        "control": null,
+        "bounds": null,
         "kind": {
           "type": "field",
           "scalar": "string",
@@ -44,6 +48,13 @@ export const PrecompiledSession: SessionResponse = {
         "required": true,
         "default_value": 0,
         "visible_when": null,
+        "control": null,
+        "bounds": {
+          "minimum": 18.0,
+          "maximum": 120.0,
+          "step": null,
+          "marks": []
+        },
         "kind": {
           "type": "field",
           "scalar": "integer",
@@ -60,6 +71,8 @@ export const PrecompiledSession: SessionResponse = {
         "required": false,
         "default_value": "",
         "visible_when": null,
+        "control": null,
+        "bounds": null,
         "kind": {
           "type": "field",
           "scalar": "string",
@@ -76,6 +89,8 @@ export const PrecompiledSession: SessionResponse = {
         "required": false,
         "default_value": "https://www.yunique.top",
         "visible_when": null,
+        "control": null,
+        "bounds": null,
         "kind": {
           "type": "field",
           "scalar": "string",
@@ -92,6 +107,8 @@ export const PrecompiledSession: SessionResponse = {
         "required": false,
         "default_value": [],
         "visible_when": null,
+        "control": null,
+        "bounds": null,
         "kind": {
           "type": "array",
           "item": {

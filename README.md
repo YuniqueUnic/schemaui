@@ -15,7 +15,10 @@
   <table>
     <tr>
       <td align="center" width="50%">
-        <img src="./docs/web.mix.png" alt="schemaui Web UI: schema navigation, form editor, and live JSON preview" width="100%" />
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="./docs/web.mix.dark.png" />
+          <img src="./docs/web.mix.png" alt="schemaui Web UI: schema navigation, form editor, and live JSON preview" width="100%" />
+        </picture>
         <br /><em>Web UI — schema tree + form + live JSON preview</em>
       </td>
       <td align="center" width="50%">
@@ -23,6 +26,29 @@
           <img src="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE.svg" width="100%" />
         </a>
         <br /><em>TUI — terminal demo (asciinema)</em>
+      </td>
+    </tr>
+  </table>
+
+<table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="./docs/web.controls.sliders.png" alt="Sliders: stepped, fractional, marked" width="100%" />
+        <br /><em>Sliders — integer & fractional steps, <code>x-slider-marks</code></em>
+      </td>
+      <td align="center" width="50%">
+        <img src="./docs/web.controls.ranges.png" alt="Range sliders with two handles" width="100%" />
+        <br /><em>Range sliders — two handles, one shared track</em>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" width="50%">
+        <img src="./docs/web.controls.choices.png" alt="Select, segmented control, radio group, switch" width="100%" />
+        <br /><em>Choices — select, segmented, radio, switch</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="./docs/web.controls.appearance.png" alt="Custom color picker" width="100%" />
+        <br /><em>Appearance — custom color picker via <code>x-control: "color"</code></em>
       </td>
     </tr>
   </table>
@@ -172,7 +198,10 @@ Full CLI manual: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md#11-web-mode).
 
 ### Library (embed in your app)
 
-```rust,no_run
+Requires the `web` feature (`cargo add schemaui --features web`), which is why
+this example is `ignore`d — doctests build against the default feature set.
+
+```rust,ignore
 use std::time::{Duration, Instant};
 
 use schemaui::SessionOutcome;
@@ -809,8 +838,15 @@ Deep dive: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md) · Chinese:
 - `docs/en/cli_usage.md` – CLI-specific manual (inputs, outputs, piping, TUI/Web
   modes, samples).
 - `docs/zh/cli_usage.zh.md` – Chinese mirror of the CLI usage guide.
+- `docs/en/control-hints.md` – the `x-control` / `x-slider-marks` /
+  `x-visible-when` presentation hints that choose a field's control from the
+  schema.
 - `docs/en/web-ui-architecture-and-refactor-spec.md` – Web UI architecture.
-- `docs/web.mix.png` – Web UI screenshot (schema form + live JSON preview).
+- `docs/web.mix.png` – Web UI screenshot (schema form + live JSON preview);
+  `web.mix.dark.png` is the dark-mode variant used automatically by the README.
+- `docs/web.controls.*.png` – per-control-family screenshots (sliders, ranges,
+  choices, appearance) captured from
+  [`examples/controls-gallery.schema.json`](./examples/controls-gallery.schema.json).
 
 ## Development
 
@@ -847,6 +883,10 @@ Licensed under either of
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
+
+## links
+
+- [Linux.do](https://linux.do)
 
 ### Contributing
 

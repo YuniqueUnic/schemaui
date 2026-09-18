@@ -1,0 +1,336 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Control gallery",
+  "description": "Every control this build can draw, with the schema that selects it. Use `schemaui web --schema examples/controls-gallery.schema.json` and compare each card against its `x-control` below.",
+  "type": "object",
+  "properties": {
+    "text_inputs": {
+      "title": "Text",
+      "description": "Strings, with and without an explicit control.",
+      "type": "object",
+      "properties": {
+        "plain": {
+          "title": "Single line",
+          "description": "No hint at all: a string falls back to a text input.",
+          "type": "string",
+          "default": "schemaui"
+        },
+        "explicit_text": {
+          "title": "Single line, explicit",
+          "description": "`x-control: \"text\"` states what the fallback already picks. Useful when a hint elsewhere on the node would otherwise change it.",
+          "type": "string",
+          "x-control": "text",
+          "default": "same thing, said out loud"
+        },
+        "notes": {
+          "title": "Multi-line",
+          "description": "`x-control: \"textarea\"` for a long answer.",
+          "type": "string",
+          "x-control": "textarea",
+          "default": "One line\nand another."
+        },
+        "legacy_notes": {
+          "title": "Multi-line, legacy hint",
+          "description": "`x-multiline: true` is the older spelling of the same thing and still works.",
+          "type": "string",
+          "x-multiline": true,
+          "default": "Still honoured."
+        }
+      }
+    },
+    "numbers": {
+      "title": "Numbers",
+      "description": "Numbers without a slider, to show that bounds alone do not change the control. Note that a control the schema asks for but that cannot render the value is a load error with a pointer, not a silent downgrade — so a refusal cannot be demonstrated in a file that has to load.",
+      "type": "object",
+      "properties": {
+        "unbounded": {
+          "title": "Plain number",
+          "description": "A number with no bounds at all.",
+          "type": "number",
+          "default": 42
+        },
+        "bounded_but_plain": {
+          "title": "Bounded, still plain",
+          "description": "`minimum`/`maximum` are validation keywords first. Without `x-control` this stays a number box — bounds do not imply a slider.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8080
+        },
+        "constrained": {
+          "title": "Bounded and stepped",
+          "description": "`multipleOf` is read as the step, but only a `slider`/`range` has a track to apply it to. Here it constrains validation and nothing more.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440,
+          "multipleOf": 15,
+          "default": 30
+        }
+      }
+    },
+    "sliders": {
+      "title": "Sliders",
+      "description": "One handle. Needs `minimum` and `maximum`, because a track with one end would mean inventing the other.",
+      "type": "object",
+      "properties": {
+        "replicas": {
+          "title": "Integer slider",
+          "description": "An integer steps by whole units by default, so the slider only offers values the schema accepts.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "x-control": "slider",
+          "default": 3
+        },
+        "timeout_seconds": {
+          "title": "Stepped slider",
+          "description": "`multipleOf` becomes the step, so this moves in 15-second jumps.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 300,
+          "multipleOf": 15,
+          "x-control": "slider",
+          "default": 90
+        },
+        "sample_rate": {
+          "title": "Fractional slider",
+          "description": "A `number` with no `multipleOf` gets a step that divides the span into about a hundred stops: 0.01 here, not a whole unit that would leave two positions.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "x-control": "slider",
+          "default": 0.25
+        },
+        "threshold": {
+          "title": "Fractional slider, declared step",
+          "description": "`multipleOf: 0.05` overrides the guess.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "multipleOf": 0.05,
+          "x-control": "slider",
+          "default": 0.8
+        },
+        "log_level": {
+          "title": "Slider with marks",
+          "description": "`x-slider-marks` takes bare numbers when the values speak for themselves.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4,
+          "x-control": "slider",
+          "x-slider-marks": [0, 1, 2, 3, 4],
+          "default": 2
+        },
+        "scale": {
+          "title": "Slider with labelled marks",
+          "description": "Or `{\"value\": n, \"label\": \"text\"}` when they do not.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "x-control": "slider",
+          "x-slider-marks": [
+            { "value": 1, "label": "tiny" },
+            { "value": 3, "label": "medium" },
+            { "value": 5, "label": "huge" }
+          ],
+          "default": 3
+        },
+        "opacity": {
+          "title": "Percentage slider",
+          "description": "Marks may carry their own unit in the label.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "multipleOf": 5,
+          "x-control": "slider",
+          "x-slider-marks": [
+            { "value": 0, "label": "0%" },
+            { "value": 50, "label": "50%" },
+            { "value": 100, "label": "100%" }
+          ],
+          "default": 100
+        }
+      }
+    },
+    "ranges": {
+      "title": "Ranges",
+      "description": "Two handles. The value is an array of exactly two numbers, so `minItems` and `maxItems` are both required — the parser rejects a `range` without them. `minimum`/`maximum` sit on the array itself, which is where the track reads its ends from.",
+      "type": "object",
+      "properties": {
+        "business_hours": {
+          "title": "Hour range",
+          "description": "An integer interval, stepped by whole hours.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 24 },
+          "minItems": 2,
+          "maxItems": 2,
+          "minimum": 0,
+          "maximum": 24,
+          "x-control": "range",
+          "default": [9, 17]
+        },
+        "bandwidth": {
+          "title": "Range with marks",
+          "description": "`x-slider-marks` works the same way on a range as on a slider.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "minItems": 2,
+          "maxItems": 2,
+          "minimum": 0,
+          "maximum": 1000,
+          "multipleOf": 50,
+          "x-control": "range",
+          "x-slider-marks": [
+            { "value": 0, "label": "0" },
+            { "value": 500, "label": "500" },
+            { "value": 1000, "label": "1k" }
+          ],
+          "default": [200, 800]
+        },
+        "confidence": {
+          "title": "Fractional range",
+          "description": "A `number` interval, so the step is derived.",
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 1 },
+          "minItems": 2,
+          "maxItems": 2,
+          "minimum": 0,
+          "maximum": 1,
+          "x-control": "range",
+          "default": [0.05, 0.95]
+        }
+      }
+    },
+    "choices": {
+      "title": "Choices",
+      "description": "Every enum control needs an `enum`; the difference between them is only how many options there are and how much room they need.",
+      "type": "object",
+      "properties": {
+        "region": {
+          "title": "Select",
+          "description": "The default for an enum, and the only one that stays tidy with a long list.",
+          "type": "string",
+          "enum": [
+            "us-east-1",
+            "us-west-2",
+            "eu-central-1",
+            "eu-west-1",
+            "ap-southeast-1",
+            "ap-northeast-1",
+            "sa-east-1"
+          ],
+          "default": "eu-central-1"
+        },
+        "strategy": {
+          "title": "Segmented control",
+          "description": "`x-control: \"segmented\"` — for a handful of short options, where seeing them all beats opening a dropdown.",
+          "type": "string",
+          "enum": ["rolling", "blue-green", "canary"],
+          "x-control": "segmented",
+          "default": "rolling"
+        },
+        "tier": {
+          "title": "Radio group",
+          "description": "`x-control: \"radio\"` — stacked instead of inline, so each option has room for a longer label.",
+          "type": "string",
+          "enum": ["free", "pro", "enterprise"],
+          "x-control": "radio",
+          "default": "pro"
+        },
+        "priority": {
+          "title": "Integer enum, segmented",
+          "description": "The enum values may be numbers; they are rendered by their labels.",
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "x-control": "segmented",
+          "default": 2
+        },
+        "verbose": {
+          "title": "Switch",
+          "description": "The default for a boolean, and the right control when the change takes effect immediately.",
+          "type": "boolean",
+          "default": true
+        },
+        "enabled": {
+          "title": "Checkbox",
+          "description": "`x-control: \"checkbox\"` — the same value, but it reads as part of a set of things being chosen rather than as an on/off switch.",
+          "type": "boolean",
+          "x-control": "checkbox",
+          "default": false
+        }
+      }
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Colour values. The picker is drawn by the UI, not by the browser's native colour input.",
+      "type": "object",
+      "properties": {
+        "accent": {
+          "title": "Accent colour",
+          "description": "`x-control: \"color\"` on a string. The value is stored as a hex string.",
+          "type": "string",
+          "x-control": "color",
+          "default": "#6366f1"
+        },
+        "background": {
+          "title": "Background colour",
+          "description": "`format: \"color\"` alone is not enough — it is documentation, not a rendering instruction. Without `x-control` this stays a text input, which is deliberate: a schema can carry a format this build has no picker for.",
+          "type": "string",
+          "format": "color",
+          "default": "#0f172a"
+        }
+      }
+    },
+    "conditional": {
+      "title": "Conditional",
+      "description": "`x-visible-when` composes with any control: the field appears only while a sibling matches.",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "title": "Delivery mode",
+          "description": "Pick \"scheduled\" to reveal the window below.",
+          "type": "string",
+          "enum": ["immediate", "scheduled"],
+          "x-control": "segmented",
+          "default": "immediate"
+        },
+        "window": {
+          "title": "Scheduled window",
+          "description": "Only shown when `mode` is \"scheduled\".",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 24 },
+          "minItems": 2,
+          "maxItems": 2,
+          "minimum": 0,
+          "maximum": 24,
+          "x-control": "range",
+          "x-visible-when": {
+            "field": "mode",
+            "op": "equals",
+            "value": "scheduled"
+          },
+          "default": [2, 6]
+        },
+        "canary_percent": {
+          "title": "Canary share",
+          "description": "Only shown when `mode` is not \"immediate\".",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "multipleOf": 5,
+          "x-control": "slider",
+          "x-slider-marks": [
+            { "value": 0, "label": "0%" },
+            { "value": 100, "label": "100%" }
+          ],
+          "x-visible-when": {
+            "field": "mode",
+            "op": "equals",
+            "value": "scheduled"
+          },
+          "default": 10
+        }
+      }
+    }
+  }
+}

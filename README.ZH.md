@@ -15,7 +15,10 @@
   <table>
     <tr>
       <td align="center" width="50%">
-        <img src="./docs/web.mix.png" alt="schemaui Web UI：schema 导航、表单编辑与实时 JSON 预览" width="100%" />
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="./docs/web.mix.dark.png" />
+          <img src="./docs/web.mix.png" alt="schemaui Web UI：schema 导航、表单编辑与实时 JSON 预览" width="100%" />
+        </picture>
         <br /><em>Web UI — schema 树 + 表单 + 实时 JSON 预览</em>
       </td>
       <td align="center" width="50%">
@@ -23,6 +26,29 @@
           <img src="https://asciinema.org/a/7IBbhRJAUBlIQaPWSrspEgZtE.svg" width="100%" />
         </a>
         <br /><em>TUI — 终端演示（asciinema）</em>
+      </td>
+    </tr>
+  </table>
+
+<table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="./docs/web.controls.sliders.png" alt="滑块：整数/分数步进、带刻度" width="100%" />
+        <br /><em>滑块 — 整数与分数步进、<code>x-slider-marks</code> 刻度</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="./docs/web.controls.ranges.png" alt="双柄范围滑块" width="100%" />
+        <br /><em>范围滑块 — 双手柄共享一条轨道</em>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" width="50%">
+        <img src="./docs/web.controls.choices.png" alt="下拉、分段控件、单选组、开关" width="100%" />
+        <br /><em>选项 — 下拉、分段、单选、开关</em>
+      </td>
+      <td align="center" width="50%">
+        <img src="./docs/web.controls.appearance.png" alt="自定义取色器" width="100%" />
+        <br /><em>外观 — <code>x-control: "color"</code> 自定义取色器</em>
       </td>
     </tr>
   </table>
@@ -753,8 +779,13 @@ schemaui \
 - `docs/en/cli_usage.md` – 英文 CLI 使用手册（输入、输出、管道、TUI/Web
   模式、示例）。
 - `docs/zh/cli_usage.zh.md` – 中文 CLI 使用手册，与英文版对应。
+- `docs/en/control-hints.md` – `x-control` / `x-slider-marks` / `x-visible-when`
+  等展示提示，用于从 schema 决定字段使用哪种控件。
 - `docs/en/web-ui-architecture-and-refactor-spec.md` – Web UI 架构说明。
-- `docs/web.mix.png` – Web UI 截图（schema 表单 + 实时 JSON 预览）。
+- `docs/web.mix.png` – Web UI 截图（schema 表单 + 实时 JSON 预览）；
+  `web.mix.dark.png` 为深色模式版本，README 会按系统主题自动切换。
+- `docs/web.controls.*.png` – 各控件家族截图（滑块、范围、选项、外观），来自
+  [`examples/controls-gallery.schema.json`](./examples/controls-gallery.schema.json)。
 
 ## 开发
 
@@ -778,6 +809,10 @@ schemaui \
 - [x] 在编译时解析 JSON Schema，然后生成 Web UI 代码，为运行时暴露必要的 API
 - [ ] 在运行时解析 JSON Schema 并生成交互式 CLI
 - [ ] 在编译时解析 JSON Schema，然后生成交互式 CLI 代码，为运行时暴露必要的 API
+
+## 社区链接
+
+- [Linux.do](https://linux.do)
 
 ## 许可证
 

@@ -66,7 +66,7 @@ export const PreviewPane = memo(function PreviewPane({
               className="h-7 rounded-full text-xs"
             >
               {copied
-                ? <Check className="h-3.5 w-3.5 text-emerald-500" />
+                ? <Check className="h-3.5 w-3.5" />
                 : <Copy className="h-3.5 w-3.5" />}
               <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
             </Button>
