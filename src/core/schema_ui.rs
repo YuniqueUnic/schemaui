@@ -1,7 +1,9 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::core::frontend::{Frontend, FrontendOptions};
+use crate::core::frontend::{Frontend, FrontendOptions, SessionOutcome};
 use crate::core::pipeline::SchemaPipeline;
 use crate::io::{
     self, DocumentFormat,
@@ -75,6 +77,7 @@ pub struct SchemaUI {
     ui_artifact_bundle: Option<UiArtifactBundle>,
     #[cfg(feature = "tui")]
     tui_artifacts: Option<TuiArtifacts>,
+    timeout: Option<Duration>,
 }
 
 impl SchemaUI {
@@ -89,6 +92,7 @@ impl SchemaUI {
             ui_artifact_bundle: None,
             #[cfg(feature = "tui")]
             tui_artifacts: None,
+            timeout: None,
         }
     }
 
@@ -153,6 +157,14 @@ impl SchemaUI {
 
     pub fn with_description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
+        self
+    }
+
+    /// Give the interactive session a deadline. When it passes, the frontend
+    /// stops the session and reports [`SessionOutcome::TimedOut`] instead of a
+    /// value, so a half-filled session is never mistaken for a real save.
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
         self
     }
 
@@ -223,7 +235,7 @@ impl SchemaUI {
         }
     }
 
-    pub fn run(self, frontend: FrontendOptions) -> Result<Value> {
+    pub fn run(self, frontend: FrontendOptions) -> Result<SessionOutcome> {
         match frontend {
             #[cfg(feature = "tui")]
             FrontendOptions::Tui(options) => {
@@ -237,25 +249,25 @@ impl SchemaUI {
 
     /// Run explicitly in TUI mode using default `UiOptions`.
     #[cfg(feature = "tui")]
-    pub fn run_tui(self) -> Result<Value> {
+    pub fn run_tui(self) -> Result<SessionOutcome> {
         self.run(FrontendOptions::Tui(UiOptions::default()))
     }
 
     /// Run in Web mode, using the given serve options to configure the
     /// temporary HTTP server.
     #[cfg(feature = "web")]
-    pub fn run_web(self, serve: WebServeOptions) -> Result<Value> {
+    pub fn run_web(self, serve: WebServeOptions) -> Result<SessionOutcome> {
         self.run_with_frontend(WebFrontend { serve })
     }
 
     /// Run in Web mode from an existing async runtime.
     #[cfg(feature = "web")]
-    pub async fn run_web_async(self, serve: WebServeOptions) -> Result<Value> {
+    pub async fn run_web_async(self, serve: WebServeOptions) -> Result<SessionOutcome> {
         let ctx = self.into_frontend_context()?;
         WebFrontend { serve }.run_async(ctx).await
     }
 
-    pub fn run_with_frontend<F>(self, frontend: F) -> Result<Value>
+    pub fn run_with_frontend<F>(self, frontend: F) -> Result<SessionOutcome>
     where
         F: Frontend,
     {
@@ -275,6 +287,7 @@ impl SchemaUI {
             ui_artifact_bundle,
             #[cfg(feature = "tui")]
                 tui_artifacts: _,
+            timeout,
         } = self;
 
         let ui_bundle = ui_artifact_bundle.map(|bundle| bundle.ui).or(ui_bundle);
@@ -282,6 +295,7 @@ impl SchemaUI {
             .with_title(title)
             .with_description(description)
             .with_defaults(inputs.defaults)
+            .with_timeout(timeout)
             .with_prepared_ui_ast(ui_ast)
             .with_prepared_ui_bundle(ui_bundle);
         pipeline.build_frontend_context()

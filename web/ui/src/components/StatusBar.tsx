@@ -9,7 +9,6 @@ import {
   LocateFixed,
   Save,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface ShortcutHint {
@@ -94,6 +93,24 @@ function compactStatus(status: string, fallback: string) {
   return trimmed;
 }
 
+const TONE_CLASS: Record<StatusTone, string> = {
+  ready:
+    "border-emerald-500/30 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+  dirty:
+    "border-amber-500/30 bg-amber-500/12 text-amber-700 dark:text-amber-300",
+  error: "border-rose-500/30 bg-rose-500/12 text-rose-700 dark:text-rose-300",
+  busy: "border-sky-500/30 bg-sky-500/12 text-sky-700 dark:text-sky-300",
+};
+
+/**
+ * The one status line for the whole app.
+ *
+ * Everything the session can be doing — ready, unsaved, saving, validating,
+ * exiting — collapses into a single tone-coloured pill, because they are
+ * mutually exclusive and a row of badges saying the same thing in different
+ * words is what made this bar noisy. The keyboard reference stays folded away
+ * behind the chevron: it is a reference, not a status.
+ */
 export function StatusBar({
   status,
   dirty,
@@ -116,16 +133,7 @@ export function StatusBar({
     errorCount,
   });
 
-  const toneClass = {
-    ready:
-      "border-emerald-500/30 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-    dirty:
-      "border-amber-500/30 bg-amber-500/12 text-amber-700 dark:text-amber-300",
-    error:
-      "border-rose-500/30 bg-rose-500/12 text-rose-700 dark:text-rose-300",
-    busy:
-      "border-sky-500/30 bg-sky-500/12 text-sky-700 dark:text-sky-300",
-  }[statusModel.tone];
+  const toneClass = TONE_CLASS[statusModel.tone];
 
   const statusIcon = statusModel.tone === "error"
     ? <AlertCircle className="h-3.5 w-3.5" />
@@ -135,26 +143,36 @@ export function StatusBar({
     ? <Save className="h-3.5 w-3.5" />
     : <CheckCircle2 className="h-3.5 w-3.5" />;
 
-  // Compact single-row status pill — used on mobile always, and on md+ when collapsed
-  const CompactRow = (
-    <div className="flex w-full items-center gap-2">
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em]",
-          toneClass,
-        )}
-      >
-        {statusIcon}
-        <span>{statusModel.badge}</span>
-      </span>
-      {focusLabel && (
-        <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-          <LocateFixed className="mr-1 inline h-3 w-3" />
-          <span className="text-foreground">{focusLabel}</span>
+  return (
+    <footer className="shrink-0 border-t border-border/60 bg-background px-3 py-1.5 text-xs md:px-4 lg:px-6">
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]",
+            toneClass,
+          )}
+        >
+          {statusIcon}
+          <span>{statusModel.badge}</span>
         </span>
-      )}
-      {errorCount > 0 && onErrorsClick
-        ? (
+
+        {/* One secondary line, never two: where the caret is beats how the
+            document is doing, which the pill already said. */}
+        {focusLabel ? (
+          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+            <LocateFixed className="mr-1 inline h-3 w-3 align-[-2px]" />
+            <span className="text-foreground/80">{focusLabel}</span>
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+            {statusModel.message}
+          </span>
+        )}
+
+        {/* Only rendered when there is something to act on. A green "OK" badge
+            next to a green "Ready" pill was two ways of saying "nothing is
+            wrong", and silence says it better. */}
+        {errorCount > 0 && onErrorsClick && (
           <button
             type="button"
             onClick={onErrorsClick}
@@ -163,145 +181,39 @@ export function StatusBar({
             <AlertCircle className="h-3 w-3" />
             <span>{errorCount}</span>
           </button>
-        )
-        : (
-          <Badge
-            variant="secondary"
-            className="shrink-0 border border-emerald-500/20 bg-emerald-500/10 text-[10px] text-emerald-700 dark:text-emerald-300"
-          >
-            OK
-          </Badge>
         )}
-    </div>
-  );
 
-  return (
-    <footer className="border-t border-border/60 bg-background/95 px-3 py-2 text-xs backdrop-blur md:px-4 lg:px-6">
-      {/* Mobile: always compact single row */}
-      <div className="flex items-center gap-2 md:hidden">
-        {CompactRow}
-      </div>
-
-      {/* md+: compact row with toggle, or expanded full view */}
-      <div className="hidden md:block">
-        {/* Always-visible compact row with expand toggle */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 min-w-0">
-            {CompactRow}
-          </div>
-          {/* Shortcuts inline hint when collapsed (lg+) */}
-          {!expanded && shortcuts.length > 0 && (
-            <div className="hidden lg:flex items-center gap-1.5 overflow-x-hidden">
-              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
-                <Keyboard className="h-3 w-3 shrink-0" />
-              </span>
-              {shortcuts.slice(0, 2).map((shortcut) => (
-                <span
-                  key={shortcut.combo}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border/60 bg-muted/30 px-2 py-0.5"
-                >
-                  <kbd className="font-mono text-[9px] font-semibold text-primary/80">
-                    {shortcut.combo}
-                  </kbd>
-                  <span className="text-[10px] text-foreground/60">
-                    {shortcut.label}
-                  </span>
-                </span>
-              ))}
-            </div>
-          )}
+        {shortcuts.length > 0 && (
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            aria-label={expanded ? "Collapse status bar" : "Expand status bar"}
-            className="ml-auto shrink-0 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            aria-expanded={expanded}
+            aria-label={expanded ? "Hide shortcuts" : "Show shortcuts"}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
+            <Keyboard className="h-3 w-3" />
             {expanded
               ? <ChevronDown className="h-3 w-3" />
               : <ChevronUp className="h-3 w-3" />}
           </button>
-        </div>
-
-        {/* Expanded full view — two-column layout */}
-        {expanded && (
-          <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(16rem,0.85fr)]">
-            <section className="rounded-xl border border-border/60 bg-muted/25 px-3 py-2">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-                <Keyboard className="h-3 w-3" />
-                <span>Shortcuts</span>
-                <span className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[9px] tracking-[0.18em] text-foreground/70">
-                  Context aware
-                </span>
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {shortcuts.map((shortcut) => (
-                  <span
-                    key={shortcut.combo}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-background/90 px-2 py-0.5 shadow-sm"
-                  >
-                    <kbd className="rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-primary">
-                      {shortcut.combo}
-                    </kbd>
-                    <span className="text-[10px] font-medium text-foreground/90">
-                      {shortcut.label}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-border/60 bg-card/70 px-3 py-2 shadow-sm">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.22em]",
-                    toneClass,
-                  )}
-                >
-                  {statusIcon}
-                  <span>{statusModel.badge}</span>
-                </span>
-
-                {focusLabel && (
-                  <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                    <LocateFixed className="h-3 w-3 shrink-0" />
-                    <span className="truncate">
-                      Focus
-                      <span className="ml-1 normal-case tracking-normal text-foreground">
-                        {focusLabel}
-                      </span>
-                    </span>
-                  </span>
-                )}
-
-                {errorCount > 0 && onErrorsClick
-                  ? (
-                    <button
-                      type="button"
-                      onClick={onErrorsClick}
-                      className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition hover:bg-rose-500/15 dark:text-rose-300"
-                    >
-                      <AlertCircle className="h-3 w-3" />
-                      <span>Open errors</span>
-                    </button>
-                  )
-                  : (
-                    <Badge
-                      variant="secondary"
-                      className="border border-emerald-500/20 bg-emerald-500/10 text-[10px] uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300"
-                    >
-                      Validated
-                    </Badge>
-                  )}
-              </div>
-
-              <p className="mt-1.5 text-[11px] leading-5 text-foreground/80">
-                {statusModel.message}
-              </p>
-            </section>
-          </div>
         )}
       </div>
+
+      {expanded && shortcuts.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/50 pt-1.5">
+          {shortcuts.map((shortcut) => (
+            <span
+              key={shortcut.combo}
+              className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground"
+            >
+              <kbd className="rounded border border-border/70 bg-muted/50 px-1.5 py-px font-mono text-[9px] font-semibold text-foreground/80">
+                {shortcut.combo}
+              </kbd>
+              <span>{shortcut.label}</span>
+            </span>
+          ))}
+        </div>
+      )}
     </footer>
   );
 }

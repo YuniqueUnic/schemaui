@@ -51,7 +51,14 @@ fn main() -> anyhow::Result<()> {
     let result =
         schemaui::SchemaUI::from_schema(schema).run(schemaui::FrontendOptions::Tui(options))?;
 
-    let json = serde_json::to_string_pretty(&result)?;
-    println!("{}", json);
+    match result {
+        schemaui::SessionOutcome::Completed(value) => {
+            let json = serde_json::to_string_pretty(&value)?;
+            println!("{}", json);
+        }
+        schemaui::SessionOutcome::TimedOut => {
+            eprintln!("demo: session timed out");
+        }
+    }
     Ok(())
 }

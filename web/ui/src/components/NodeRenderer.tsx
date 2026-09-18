@@ -32,6 +32,15 @@ export interface NodeRendererProps {
   errors: Map<string, string>;
   onChange: (pointer: string, value: JsonValue) => void;
   renderMode?: "stack" | "inline";
+  /**
+   * Render the control only, without the title/description block.
+   *
+   * The editor already shows the selected node's title and description above the
+   * card, so a leaf card that repeated them would state the same heading twice
+   * in two different styles. Object children keep their headers: each card needs
+   * its own label to be readable.
+   */
+  hideHeader?: boolean;
 }
 
 /**
@@ -44,18 +53,22 @@ export function NodeRenderer({
   errors,
   onChange,
   renderMode = "stack",
+  hideHeader = false,
 }: NodeRendererProps) {
   const error = errors.get(node.pointer);
 
+  // Spacing is owned by the caller: cards already carry their own padding, and
+  // a trailing `pb-4` here used to stack on top of it, making every card taller
+  // than it looked.
   const chromeClass = renderMode === "inline"
     ? "space-y-2"
     : node.kind.type === "object"
     ? "space-y-3"
-    : "space-y-2 pb-4";
+    : "space-y-1.5";
 
   return (
     <div className={chromeClass}>
-      <NodeHeader node={node} />
+      {!hideHeader && <NodeHeader node={node} />}
       <NodeBody
         node={node}
         value={value}
@@ -75,17 +88,20 @@ export function NodeRenderer({
  * Renders the node header with title, required badge, and description
  */
 function NodeHeader({ node }: { node: UiNode }) {
+  const title = node.title?.trim();
   return (
-    <header className="space-y-0.5">
+    <header className="space-y-1">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-foreground">
-          {node.title ?? node.pointer}
+        <span
+          className={
+            title
+              ? "text-[13px] font-medium leading-5 text-foreground"
+              : "font-mono text-xs leading-5 text-muted-foreground"
+          }
+        >
+          {title || node.pointer}
         </span>
-        {node.required && (
-          <span className="text-[10px] font-medium uppercase tracking-wider text-destructive">
-            required
-          </span>
-        )}
+        {node.required && <RequiredTag />}
       </div>
       {node.description && (
         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -93,6 +109,15 @@ function NodeHeader({ node }: { node: UiNode }) {
         </p>
       )}
     </header>
+  );
+}
+
+/** The one way this app marks a field as required. */
+export function RequiredTag() {
+  return (
+    <span className="shrink-0 rounded border border-destructive/25 bg-destructive/8 px-1.5 py-px text-[10px] font-medium leading-4 text-destructive">
+      Required
+    </span>
   );
 }
 

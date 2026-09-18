@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction, useMemo, useState } from "react";
-import { AlertCircle, ChevronDown, ChevronRight, File } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import type { UiAst, UiNode } from "../types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,7 @@ export function TreeView(
 
   return (
     <ScrollArea className="h-full">
-      <div className="px-3 py-4 text-sm">
+      <div className="px-2 py-3 text-sm">
         {items.map((item) => (
           <TreeRow
             key={item.pointer}
@@ -92,24 +92,28 @@ function TreeRow({
         type="button"
         onClick={() => onSelect(item.pointer)}
         className={cn(
-          "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+          "group flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors",
           "hover:bg-accent hover:text-accent-foreground",
           isActive && "bg-accent text-accent-foreground font-medium",
         )}
-        style={{ paddingLeft: 8 + item.depth * 16 }}
+        style={{ paddingLeft: 8 + item.depth * 14 }}
       >
+        {/* Leaves get a blank column rather than an icon: every leaf shared the
+            same page glyph, so it carried no information and just added a stripe
+            of identical marks down the panel. The spacer keeps labels aligned
+            with their siblings under an expandable parent. */}
         {item.hasChildren
           ? (
             <span
               onClick={toggle}
-              className="flex items-center justify-center"
+              className="flex h-4 w-4 items-center justify-center"
             >
               {isCollapsed
-                ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
             </span>
           )
-          : <File className="h-4 w-4 text-muted-foreground" />}
+          : <span className="h-4 w-4 shrink-0" aria-hidden="true" />}
         <span className="truncate text-left flex items-center gap-2">
           {item.label}
           {itemHasError && (

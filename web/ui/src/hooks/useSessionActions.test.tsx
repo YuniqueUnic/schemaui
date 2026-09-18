@@ -45,6 +45,7 @@ const session: SessionResponse = {
   description: "Session description",
   data: {},
   formats: ["json"],
+  expires_in_ms: null,
   ui_ast: {
     roots: [
       {
@@ -64,6 +65,23 @@ const session: SessionResponse = {
   },
   layout: null,
 };
+
+/** Two forms whose titles differ only in the non-ASCII part. */
+function sessionWithTitleAndField(pointer: string): SessionResponse {
+  return {
+    ...session,
+    title: "种田游戏 · 第 1 轮：定位与边界",
+    ui_ast: {
+      roots: [
+        {
+          ...session.ui_ast.roots[0],
+          pointer,
+          title: pointer,
+        },
+      ],
+    },
+  };
+}
 
 describe("useSessionActions", () => {
   beforeEach(() => {
@@ -142,5 +160,41 @@ describe("useSessionActions", () => {
     expect(result.current.state.previewError).toBe(
       "TOML cannot represent null at /items/1",
     );
+  });
+
+  it("keys drafts by form identity, so titles that slug alike cannot collide", async () => {
+    apiMocks.validateData.mockResolvedValue({ errors: [] });
+
+    apiMocks.fetchSession.mockResolvedValue(sessionWithTitleAndField("/field"));
+    const first = renderHook(() => useHarness());
+
+    await act(async () => {
+      await first.result.current.initializeSession();
+    });
+    act(() => {
+      first.result.current.handleChange("/field", "draft-from-first-form");
+    });
+
+    expect(Object.keys(localStorage)).toHaveLength(1);
+
+    // A different form whose title slugifies to the same string must start
+    // empty rather than inherit the first form's draft.
+    apiMocks.fetchSession.mockResolvedValue(
+      sessionWithTitleAndField("/other_field"),
+    );
+    const second = renderHook(() => useHarness());
+
+    await act(async () => {
+      await second.result.current.initializeSession();
+    });
+
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(second.result.current.state.data).not.toHaveProperty("field");
+
+    act(() => {
+      second.result.current.handleChange("/other_field", "draft-from-second-form");
+    });
+
+    expect(Object.keys(localStorage)).toHaveLength(2);
   });
 });

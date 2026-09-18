@@ -1,3 +1,4 @@
+use crate::core::frontend::SessionOutcome;
 use crate::tui::model::FieldKind;
 use crate::tui::state::{FormCommand, FormEngine, FormState};
 use crate::tui::view::{
@@ -9,9 +10,14 @@ use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
 use jsonschema::Validator;
 use ratatui::layout::Rect;
 use serde_json::Value;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use super::{
+    deadline,
     input::{AppCommand, CommandDispatch, InputRouter},
     keymap::{KeymapContext, KeymapStore},
     options::UiOptions,
@@ -53,6 +59,8 @@ pub(crate) struct App {
     exit_armed: bool,
     should_quit: bool,
     result: Option<Value>,
+    deadline: Option<Instant>,
+    timed_out: bool,
     popup: Option<AppPopup>,
     overlay_stack: Vec<CompositeEditorOverlay>,
     overlay_validator_cache: HashMap<String, Arc<Validator>>,
@@ -512,6 +520,8 @@ impl App {
             exit_armed: false,
             should_quit: false,
             result: None,
+            deadline: None,
+            timed_out: false,
             popup: None,
             overlay_stack: Vec::new(),
             overlay_validator_cache: HashMap::new(),
@@ -525,12 +535,30 @@ impl App {
         self.session_title = title;
     }
 
-    pub fn run(&mut self) -> Result<Value> {
+    /// Arm the session deadline. The loop below both enforces it and feeds the
+    /// remaining time to the footer, so the countdown the user sees is the same
+    /// clock that ends the session.
+    pub fn set_deadline(&mut self, deadline: Option<Instant>) {
+        self.deadline = deadline;
+    }
+
+    /// Time left before the deadline, or `None` when the session is unbounded.
+    fn time_remaining(&self) -> Option<Duration> {
+        deadline::remaining(self.deadline, Instant::now())
+    }
+
+    pub fn run(&mut self) -> Result<SessionOutcome> {
         let mut terminal = TerminalGuard::new()?;
         while !self.should_quit {
             terminal.autoresize()?;
             terminal.draw(|frame| self.draw(frame))?;
             if !event::poll(self.options.tick_rate)? {
+                // Idle tick: the only moment the deadline can be noticed
+                // without user input, so it is checked here and nowhere else.
+                if deadline::has_passed(self.deadline, Instant::now()) {
+                    self.timed_out = true;
+                    self.should_quit = true;
+                }
                 continue;
             }
             match event::read()? {
@@ -544,8 +572,11 @@ impl App {
             }
         }
 
+        if self.timed_out {
+            return Ok(SessionOutcome::TimedOut);
+        }
         if let Some(value) = self.result.take() {
-            Ok(value)
+            Ok(SessionOutcome::Completed(value))
         } else {
             Err(anyhow!("user exited without saving"))
         }
@@ -554,6 +585,8 @@ impl App {
     fn draw(&mut self, frame: &mut ratatui::Frame<'_>) {
         let help = self.current_help_text();
         let form_dirty = self.form_state.is_dirty();
+        // Read the clock before borrowing the form/overlay mutably below.
+        let time_remaining = self.time_remaining();
         self.refresh_help_overlay_pages(frame.area());
 
         let help_overlay_render = self.help_overlay.as_ref().and_then(|state| {
@@ -603,6 +636,7 @@ impl App {
                     popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
                     composite_overlay: Some(overlay_meta),
                     help_overlay: help_overlay_render,
+                    time_remaining,
                 },
             );
             return;
@@ -628,6 +662,7 @@ impl App {
                 popup: self.popup.as_ref().map(|popup| popup.state.as_render()),
                 composite_overlay: None,
                 help_overlay: help_overlay_render,
+                time_remaining,
             },
         );
     }

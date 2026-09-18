@@ -192,6 +192,7 @@ can reuse the exact same serialization logic.
 | `--no-temp-file`       | Compatibility no-op; stdout is already the default. | `build_output_options`              |
 | `--no-pretty`          | Emit compact JSON/TOML/YAML.                        | `OutputOptions::with_pretty(false)` |
 | `--force`, `--yes`     | Allow overwriting files.                            | `ensure_output_paths_available`     |
+| `--timeout <SECONDS>`  | End the session after SECONDS and exit with code 4. | `SchemaUI::with_timeout`            |
 
 ## 6. Usage Examples
 
@@ -255,6 +256,20 @@ schemaui completion bash
 - **Runtime errors** – everything else bubbles through `eyre`, so stack traces
   include context like `failed to parse config as yaml` or
   `failed to compile JSON schema`.
+- **Timeouts** – `--timeout SECONDS` ends the session once the deadline passes.
+  Both the TUI and the Web UI count the remaining time down in place, so the
+  deadline never arrives unannounced; the Web command also states the budget on
+  stderr when it announces the URL, for whoever is watching the terminal rather
+  than the browser. A timed-out session **writes no output** (a half-filled form
+  is not an answer) and exits with **code 4**, which is deliberately distinct
+  from the generic `1` so a wrapper script can tell "nobody answered" apart from
+  "the run failed". `--timeout 0` means no deadline; the snapshot subcommands
+  ignore the flag entirely.
+
+  ```bash
+  # Give the user 10 minutes, then give up without writing anything.
+  schemaui web --schema ./schema.json -o ./answer.json --timeout 600
+  ```
 
 ## 8. Library Interop
 
@@ -269,15 +284,32 @@ let mut ui = if let Some(defaults) = config_value {
 if let Some(title) = cli.title.as_ref() {
     ui = ui.with_title(title.clone());
 }
-let value = ui.run_tui()?;
-if let Some(options) = output_settings.as_ref() {
-    options.write(&value)?;
+if let Some(seconds) = cli.timeout.filter(|seconds| *seconds > 0) {
+    ui = ui.with_timeout(Duration::from_secs(seconds));
+}
+
+// `run_tui`/`run_web` report *how* the session ended, not just a value: a
+// deadline firing carries no answer, and conflating the two would let a caller
+// persist a half-filled form.
+match ui.run_tui()? {
+    SessionOutcome::Completed(value) => {
+        if let Some(options) = output_settings.as_ref() {
+            options.write(&value)?;
+        }
+    }
+    SessionOutcome::TimedOut => std::process::exit(4),
 }
 ```
 
 This means embedding projects can reproduce the CLI flow verbatim or replace the
 front-end entirely (e.g., build a custom CLI or GUI) while reusing the same I/O
 and validation pipeline.
+
+A custom `Frontend` receives the deadline as `FrontendContext::deadline` and
+must enforce it itself — the core prepares the context but cannot interrupt a
+frontend's own event loop. `FrontendContext::time_remaining()` returns the
+remaining budget (saturating at zero) for the countdown display, and
+`format_budget()` renders a duration the way the announcements do.
 
 ## 9. Feature Flags
 

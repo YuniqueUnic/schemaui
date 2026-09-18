@@ -13,7 +13,7 @@ import {
   renderPreview,
   validateData,
 } from "../api";
-import type { JsonValue } from "../types";
+import type { JsonValue, UiAst } from "../types";
 import { applyUiDefaults } from "../ui-ast";
 import { deepClone, setPointerValue } from "../utils/jsonPointer";
 import type { useSessionState } from "./useSessionState";
@@ -32,33 +32,29 @@ export function useSessionActions(
 ) {
   const validationSeq = useRef(0);
   const previewSeq = useRef(0);
-  const sessionIdRef = useRef("");
+  const draftKeyRef = useRef("");
 
   // ============================================
   // localStorage Helpers
   // ============================================
 
-  const getStorageKey = useCallback(() => {
-    return `schemaui-session-${sessionIdRef.current}`;
-  }, []);
-
   const saveToLocalStorage = useCallback((data: JsonValue) => {
+    if (!draftKeyRef.current) return;
     try {
-      const key = getStorageKey();
-      localStorage.setItem(key, JSON.stringify(data));
+      localStorage.setItem(draftKeyRef.current, JSON.stringify(data));
     } catch (err) {
       console.error("Failed to save to localStorage", err);
     }
-  }, [getStorageKey]);
+  }, []);
 
   const clearLocalStorage = useCallback(() => {
+    if (!draftKeyRef.current) return;
     try {
-      const key = getStorageKey();
-      localStorage.removeItem(key);
+      localStorage.removeItem(draftKeyRef.current);
     } catch (err) {
       console.error("Failed to clear localStorage", err);
     }
-  }, [getStorageKey]);
+  }, []);
 
   // ============================================
   // Validation & Preview
@@ -109,15 +105,12 @@ export function useSessionActions(
     try {
       const payload = staticSession ?? await fetchSession();
 
-      // Generate session ID from title
-      const titleKey =
-        payload.title?.replace(/\s+/g, "_").replace(/[^\w-]/g, "") || "default";
-      sessionIdRef.current = titleKey;
+      draftKeyRef.current = draftStorageKey(payload.ui_ast);
 
       // Try to restore from localStorage
       let restoredData: JsonValue | null = null;
       try {
-        const stored = localStorage.getItem(getStorageKey());
+        const stored = localStorage.getItem(draftKeyRef.current);
         if (stored) {
           restoredData = JSON.parse(stored);
           toast.info("Restored previous session data");
@@ -150,7 +143,7 @@ export function useSessionActions(
       actions.setStatus("Failed to load session");
       actions.setLoading(false);
     }
-  }, [actions, getStorageKey, runValidation, updatePreview]);
+  }, [actions, runValidation, updatePreview]);
 
   // ============================================
   // Handle Data Change
@@ -331,6 +324,35 @@ export function useSessionActions(
 // ============================================
 // Helpers
 // ============================================
+
+/**
+ * localStorage key for this session's unsaved draft.
+ *
+ * Keyed by the UI AST rather than the title. Titles are human-facing and
+ * routinely non-ASCII, and any slug that keeps only `\w` characters strips
+ * them entirely, so every distinct form whose title shares a digit ("… 第 1
+ * 轮：…") collapses onto one key and restores another form's draft. The AST is
+ * what actually identifies the form.
+ */
+function draftStorageKey(ast: UiAst | null | undefined): string {
+  return `schemaui-draft-${fnv1a64(JSON.stringify(ast ?? null))}`;
+}
+
+const FNV_OFFSET = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
+
+/** Two independently seeded FNV-1a lanes, joined into a 64-bit hex digest. */
+function fnv1a64(text: string): string {
+  let low = FNV_OFFSET;
+  let high = FNV_OFFSET ^ text.length;
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    low = Math.imul(low ^ code, FNV_PRIME);
+    high = Math.imul(high ^ code, FNV_PRIME) ^ i;
+  }
+  return (low >>> 0).toString(16).padStart(8, "0")
+    + (high >>> 0).toString(16).padStart(8, "0");
+}
 
 function resolveInitialPointer(
   ast: { roots: { pointer: string }[] } | null | undefined,

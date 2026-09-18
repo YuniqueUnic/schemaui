@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { AppHeader } from "./components/AppHeader";
-import { NodeRenderer } from "./components/NodeRenderer";
+import { NodeRenderer, RequiredTag } from "./components/NodeRenderer";
 import { PreviewPane } from "./components/PreviewPane";
 import { StatusBar } from "./components/StatusBar";
 import { TreeView } from "./components/TreeView";
@@ -20,12 +21,15 @@ import { pruneHiddenNodes } from "./utils/visibility";
 import { useSessionState } from "./hooks/useSessionState";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useMediaQuery } from "./hooks/useMediaQuery";
+import { useCountdown } from "./hooks/useCountdown";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
   ChevronRight,
   FileText,
   ListTree,
+  TimerOff,
+  TriangleAlert,
 } from "lucide-react";
 
 type PanelView = "nav" | "editor" | "preview";
@@ -47,7 +51,19 @@ export default function App() {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const [mobileView, setMobileView] = useState<PanelView>("editor");
   const [navCollapsed, setNavCollapsed] = useState(false);
-  const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  // Below ~1150px the editor is the column that loses when the preview is open:
+  // measured against the widest label in the demo schema, the editor needs about
+  // 440px before select labels start clipping (at 1024px it gets 356px and three
+  // of five clip; at 1100px it gets 432px and none do). 1152 leaves a margin for
+  // longer labels. Below that the preview starts folded — still one click away
+  // in its own rail, and the user can widen it if they disagree.
+  // Seeded once, deliberately not kept in sync: re-collapsing on every resize
+  // would fight someone who just opened it.
+  const [previewCollapsed, setPreviewCollapsed] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      !window.matchMedia("(min-width: 1152px)").matches,
+  );
 
   // Initialize session on mount (empty deps to run only once)
   useEffect(() => {
@@ -82,7 +98,7 @@ export default function App() {
     [session?.ui_ast, data],
   );
 
-  const roots = uiAst?.roots ?? [];
+  const roots = useMemo(() => uiAst?.roots ?? [], [uiAst]);
 
   const virtualRootTitle = session?.layout?.roots?.[0]?.title ?? "General";
 
@@ -106,6 +122,12 @@ export default function App() {
     ? (selectedNode.title?.trim() || selectedNode.pointer)
     : (selectedPointer || undefined);
 
+  // Ticks against the duration the backend handed out. Reaching zero is a
+  // terminal state: the server has already stopped answering, so there is
+  // nothing left to save to and no point offering the form.
+  const secondsLeft = useCountdown(session?.expires_in_ms);
+  const timedOut = secondsLeft === 0;
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
@@ -117,17 +139,37 @@ export default function App() {
     );
   }
 
+  // Checked before the countdown: saving at the last second closes the session
+  // legitimately, and that success must not be relabelled as a timeout.
   if (sessionEnded) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-foreground">
-        <div className="text-center space-y-4">
-          <div className="text-4xl">✓</div>
-          <h1 className="text-xl font-semibold">Session Ended</h1>
-          <p className="text-sm text-muted-foreground">
-            You can close this browser tab.
-          </p>
-        </div>
-      </div>
+      <SessionNotice
+        icon={<span className="text-4xl">✓</span>}
+        title="Session Ended"
+        message="You can close this browser tab."
+      />
+    );
+  }
+
+  if (timedOut) {
+    return (
+      <SessionNotice
+        icon={<TimerOff className="h-9 w-9 text-rose-500" aria-hidden="true" />}
+        title="Session Timed Out"
+        message="This session closed itself when its deadline passed, so nothing was saved. Ask whoever started it to run it again."
+      />
+    );
+  }
+
+  if (!session) {
+    return (
+      <SessionNotice
+        icon={
+          <TriangleAlert className="h-9 w-9 text-amber-500" aria-hidden="true" />
+        }
+        title="Session Unavailable"
+        message="This session is no longer being served. It may have timed out or already been closed — ask whoever started it to run it again."
+      />
     );
   }
 
@@ -137,9 +179,9 @@ export default function App() {
         <AppHeader
           title={session?.title}
           description={session?.description}
-          dirty={dirty}
           saving={saving}
           exiting={exiting}
+          secondsLeft={secondsLeft}
           onSave={handleSave}
           onExit={() => handleExit()}
         />
@@ -164,7 +206,10 @@ export default function App() {
           >
             <PanelHeader
               icon={<ListTree className="h-3.5 w-3.5" />}
-              label={(isDesktop && navCollapsed) ? undefined : "Navigation"}
+              // No text label: this panel is the narrowest column, and
+              // "Navigation" was being clipped to "NAVIGA…" by the Schema/Layout
+              // switch sitting next to it. The icon and the tree below say the
+              // same thing without the collision.
               actions={
                 <div className="flex items-center gap-1">
                   {(!isDesktop || !navCollapsed) && hasLayout && (
@@ -237,29 +282,30 @@ export default function App() {
               !isDesktop && mobileView !== "editor" && "hidden",
             )}
           >
-            <div className="flex flex-1 flex-col overflow-hidden px-4 py-4 md:px-6">
-              <LayoutSectionNav
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <SectionTabs
                 roots={roots}
-                rootLabel={virtualRootTitle}
                 selectedPointer={selectedPointer}
                 onSelect={actions.setSelectedPointer}
               />
-              <EditorBreadcrumbs
-                node={selectedNode}
-                pointer={selectedPointer}
-              />
-              <div
-                className="mt-4 flex-1 min-h-0 overflow-y-auto text-sm [scrollbar-gutter:stable_both-edges]"
-              >
-                <div className="px-1 py-1 pr-3 pb-8">
+              <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
+                <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6">
                   {selectedNode
                     ? (
-                      <EditorBody
-                        node={selectedNode}
-                        data={data}
-                        errors={errors}
-                        onChange={handleChange}
-                      />
+                      <>
+                        <EditorHeading
+                          node={selectedNode}
+                          isRoot={roots.some((root) =>
+                            root.pointer === selectedNode.pointer
+                          )}
+                        />
+                        <EditorBody
+                          node={selectedNode}
+                          data={data}
+                          errors={errors}
+                          onChange={handleChange}
+                        />
+                      </>
                     )
                     : (
                       <div className="flex h-full items-center justify-center py-16">
@@ -321,29 +367,140 @@ export default function App() {
   );
 }
 
-function EditorBreadcrumbs(
-  { node, pointer }: { node?: UiNode; pointer?: string },
-) {
-  const segments = pointerSegments(pointer);
-  if (!segments.length) {
-    return null;
-  }
+/**
+ * Full-screen terminal state: the session is over and there is no form left to
+ * show. Shared by "saved", "timed out" and "server gone" so the three read as
+ * one family rather than three different apps.
+ */
+function SessionNotice({
+  icon,
+  title,
+  message,
+}: {
+  icon: ReactNode;
+  title: string;
+  message: string;
+}) {
   return (
-    <nav className="mb-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-      {segments.map((segment, index) => (
-        <span key={`${segment}-${index}`} className="flex items-center gap-1">
-          {index > 0 && <span className="opacity-40">/</span>}
-          <span className="rounded-md bg-muted/60 px-2 py-0.5 font-mono text-[11px] text-foreground/80">
-            {segment}
-          </span>
-        </span>
-      ))}
-      {node?.required && (
-        <span className="ml-2 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-destructive">
-          Required
-        </span>
-      )}
+    <div
+      data-testid="session-notice"
+      role="alert"
+      className="flex h-screen items-center justify-center bg-background px-6 text-foreground"
+    >
+      <div className="max-w-md text-center space-y-4">
+        <div className="flex justify-center">{icon}</div>
+        <h1 className="text-xl font-semibold">{title}</h1>
+        <p className="text-sm text-muted-foreground">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The editor's one navigation band: the top-level sections, as underlined tabs.
+ *
+ * It used to be two rows of pill chips — one per level of the path — plus a
+ * breadcrumb and a section heading, which named the same section up to four
+ * times. One stable row is enough: it answers "which part of the form am I in",
+ * and the tree on the left remains the full hierarchy. Hidden when there is
+ * only one section, since a single tab navigates nowhere.
+ */
+function SectionTabs({
+  roots,
+  selectedPointer,
+  onSelect,
+}: {
+  roots: UiNode[];
+  selectedPointer?: string;
+  onSelect(pointer: string): void;
+}) {
+  if (roots.length < 2) return null;
+
+  const activePointer = roots.find(
+    (root) =>
+      selectedPointer === root.pointer ||
+      selectedPointer?.startsWith(`${root.pointer}/`),
+  )?.pointer;
+
+  return (
+    <nav
+      aria-label="Sections"
+      className="shrink-0 border-b border-theme px-4 md:px-6"
+    >
+      <div className="mx-auto flex w-full max-w-3xl gap-1 overflow-x-auto">
+        {roots.map((root) => {
+          const active = root.pointer === activePointer;
+          return (
+            <button
+              key={root.pointer}
+              type="button"
+              onClick={() => onSelect(root.pointer)}
+              aria-current={active ? "true" : undefined}
+              className={cn(
+                "shrink-0 whitespace-nowrap border-b-2 px-2.5 pb-2.5 pt-3 text-xs transition-colors",
+                active
+                  ? "border-primary font-medium text-foreground"
+                  : "border-transparent text-muted-foreground hover:border-theme-strong hover:text-foreground",
+              )}
+            >
+              {nodeLabel(root)}
+            </button>
+          );
+        })}
+      </div>
     </nav>
+  );
+}
+
+/**
+ * The heading for whatever is selected: title, required marker, description.
+ *
+ * A root section is already named by the tab above it, so its title is
+ * suppressed here — printing the same words one line apart was the last of the
+ * four places this screen used to name the same thing. Its description stays,
+ * because that is the part the tab cannot carry.
+ *
+ * A titleless node falls back to its pointer, rendered in mono so it reads as a
+ * machine name rather than a title someone wrote.
+ */
+function EditorHeading({ node, isRoot }: { node: UiNode; isRoot: boolean }) {
+  const title = node.title?.trim();
+  const description = node.description?.trim();
+
+  // The virtual root has no pointer of its own, so its heading would only
+  // restate the session title in the header above; it earns one only when it
+  // has something of its own to say.
+  if (!node.pointer && !description) return null;
+
+  const showTitle = !isRoot && Boolean(title || node.pointer);
+  if (!showTitle && !description) return null;
+
+  return (
+    <header className="mb-4">
+      {showTitle && (
+        <div className="flex items-center gap-2">
+          <h2
+            className={cn(
+              "text-[15px] font-semibold tracking-tight",
+              title ? "text-foreground" : "font-mono text-sm text-muted-foreground",
+            )}
+          >
+            {title || node.pointer}
+          </h2>
+          {node.required && <RequiredTag />}
+        </div>
+      )}
+      {description && (
+        <p
+          className={cn(
+            "max-w-[68ch] text-xs leading-relaxed text-muted-foreground",
+            showTitle && "mt-1",
+          )}
+        >
+          {description}
+        </p>
+      )}
+    </header>
   );
 }
 
@@ -358,15 +515,17 @@ function EditorBody({
   errors: Map<string, string>;
   onChange: (pointer: string, value: JsonValue) => void;
 }) {
+  // One card style for every field. A solid surface on the muted panel is what
+  // makes the divisions legible; the old translucent fill plus drop shadow made
+  // the cards read as floating chips rather than a list.
+  const card =
+    "rounded-lg border border-theme bg-card px-4 py-3.5 transition-colors hover:border-theme-strong";
+
   if (node.kind.type === "object") {
     return (
-      <div className="space-y-3">
-        <EditorSectionIntro node={node} />
+      <div className="space-y-2.5">
         {(node.kind.children ?? []).map((child) => (
-          <div
-            key={child.pointer}
-            className="rounded-xl border border-theme bg-card/60 px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:border-theme-strong"
-          >
+          <div key={child.pointer} className={card}>
             <NodeRenderer
               node={child}
               value={getPointerValue(data, child.pointer)}
@@ -379,192 +538,16 @@ function EditorBody({
     );
   }
   return (
-    <div className="rounded-xl border border-theme bg-card/60 px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+    <div className={card}>
       <NodeRenderer
         node={node}
         value={getPointerValue(data, node.pointer)}
         errors={errors}
         onChange={onChange}
+        hideHeader
       />
     </div>
   );
-}
-
-function EditorSectionIntro({ node }: { node: UiNode }) {
-  const title = node.title?.trim();
-  const description = node.description?.trim();
-  const showHeader = node.pointer.length > 0 || !!description || node.required;
-
-  if (!showHeader || (!title && !description && !node.required)) {
-    return null;
-  }
-
-  return (
-    <header className="space-y-1 px-1">
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-foreground">
-          {title || node.pointer}
-        </h2>
-        {node.required && (
-          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-destructive">
-            Required
-          </span>
-        )}
-      </div>
-      {description && (
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {description}
-        </p>
-      )}
-    </header>
-  );
-}
-
-function pointerSegments(pointer?: string) {
-  if (!pointer || pointer === "/") return [];
-  return pointer
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => segment.replace(/~1/g, "/").replace(/~0/g, "~"));
-}
-
-interface LayoutSectionNavProps {
-  roots: UiNode[];
-  rootLabel: string;
-  selectedPointer?: string;
-  onSelect(pointer: string): void;
-}
-
-interface TopbarRow {
-  containerPointer: string;
-  containerTitle: string;
-  children: Array<{ pointer: string; title: string }>;
-  activePointer: string;
-}
-
-function LayoutSectionNav(
-  { roots, rootLabel, selectedPointer, onSelect }: LayoutSectionNavProps,
-) {
-  const rows = useMemo<TopbarRow[]>(
-    () => buildTopbarRows(roots, rootLabel, selectedPointer ?? ""),
-    [roots, rootLabel, selectedPointer],
-  );
-
-  if (rows.length === 0) return null;
-
-  return (
-    <div className="mb-4 space-y-3 text-xs">
-      {rows.map((row: TopbarRow, idx: number) => (
-        <div
-          key={`${row.containerPointer}|${idx}`}
-          className={cn(
-            "flex items-center gap-1.5 overflow-x-auto whitespace-nowrap rounded-xl px-1.5 py-0.5",
-            "scrollbar-thin [scrollbar-width:thin] [&::-webkit-scrollbar]:h-0.5",
-            idx === 0 ? "bg-muted/30" : "bg-transparent",
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => onSelect(row.containerPointer)}
-            className={cn("shrink-0", navPillClass(
-              row.activePointer === row.containerPointer,
-              true,
-            ))}
-          >
-            {row.containerTitle}
-          </button>
-          {row.children.length > 0 && (
-            <span className="shrink-0 text-muted-foreground/50">/</span>
-          )}
-          {row.children.map((child: { pointer: string; title: string }) => (
-            <button
-              key={child.pointer}
-              type="button"
-              onClick={() => onSelect(child.pointer)}
-              className={cn("shrink-0", navPillClass(
-                row.activePointer === child.pointer,
-                false,
-              ))}
-            >
-              {child.title}
-            </button>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function navPillClass(active: boolean, isContainer: boolean): string {
-  if (active) {
-    return "app-pill app-pill-active font-medium";
-  }
-  if (isContainer) {
-    return "app-pill app-pill-muted font-medium";
-  }
-  return "app-pill text-muted-foreground hover:bg-muted hover:text-foreground";
-}
-
-function buildTopbarRows(
-  roots: UiNode[],
-  rootLabel: string,
-  selectedPointer: string,
-): TopbarRow[] {
-  if (roots.length === 0) return [];
-
-  const rows: TopbarRow[] = [];
-  let containerPointer = "";
-  let containerTitle = rootLabel;
-  let containerChildren: UiNode[] = roots;
-
-  // Safety: bound iterations to tree depth
-  for (let depth = 0; depth < 32; depth++) {
-    const matching = containerChildren.find((child) =>
-      child.pointer === selectedPointer ||
-      (selectedPointer.length > 0 &&
-        selectedPointer.startsWith(`${child.pointer}/`))
-    );
-
-    const activePointer = matching
-      ? matching.pointer
-      : selectedPointer === containerPointer
-      ? containerPointer
-      : "";
-
-    rows.push({
-      containerPointer,
-      containerTitle,
-      children: containerChildren.map((child) => ({
-        pointer: child.pointer,
-        title: nodeLabel(child),
-      })),
-      activePointer,
-    });
-
-    if (!matching) break;
-    if (matching.kind.type !== "object") break;
-    const nextChildren = matching.kind.children ?? [];
-    if (nextChildren.length === 0) break;
-
-    containerPointer = matching.pointer;
-    containerTitle = nodeLabel(matching);
-    containerChildren = nextChildren;
-
-    if (matching.pointer === selectedPointer) {
-      rows.push({
-        containerPointer,
-        containerTitle,
-        children: nextChildren.map((child) => ({
-          pointer: child.pointer,
-          title: nodeLabel(child),
-        })),
-        activePointer: containerPointer,
-      });
-      break;
-    }
-  }
-
-  return rows;
 }
 
 function nodeLabel(node: UiNode): string {

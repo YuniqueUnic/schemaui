@@ -1,8 +1,10 @@
+use std::time::{Duration, Instant};
+
 use anyhow::Result;
 use jsonschema::validator_for;
 use serde_json::{Map, Value};
 
-use crate::core::frontend::{Frontend, FrontendContext};
+use crate::core::frontend::{Frontend, FrontendContext, SessionOutcome};
 use crate::core::io::input::schema_with_defaults;
 use crate::core::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
 use crate::schema::metadata::root_schema_header;
@@ -28,6 +30,7 @@ pub struct SchemaPipeline {
     description: Option<String>,
     defaults: Option<Value>,
     ui_ast_source: UiAstSource,
+    timeout: Option<Duration>,
 }
 
 impl SchemaPipeline {
@@ -38,6 +41,7 @@ impl SchemaPipeline {
             description: None,
             defaults: None,
             ui_ast_source: UiAstSource::Runtime,
+            timeout: None,
         }
     }
 
@@ -53,6 +57,13 @@ impl SchemaPipeline {
 
     pub fn with_defaults(mut self, defaults: Option<Value>) -> Self {
         self.defaults = defaults;
+        self
+    }
+
+    /// Give the session a deadline, counted from the moment the context is
+    /// built so the budget covers startup as well as the user's editing time.
+    pub fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.timeout = timeout;
         self
     }
 
@@ -83,6 +94,7 @@ impl SchemaPipeline {
             description,
             defaults,
             ui_ast_source,
+            timeout,
         } = self;
 
         let data = defaults.unwrap_or_else(|| Value::Object(Map::new()));
@@ -104,11 +116,12 @@ impl SchemaPipeline {
             initial_data: data,
             schema: enriched,
             validator,
+            deadline: timeout.map(|timeout| Instant::now() + timeout),
         })
     }
 
     #[allow(dead_code)]
-    pub fn run_with_frontend<F>(self, frontend: F) -> Result<Value>
+    pub fn run_with_frontend<F>(self, frontend: F) -> Result<SessionOutcome>
     where
         F: Frontend,
     {

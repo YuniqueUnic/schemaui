@@ -222,6 +222,14 @@ pub struct CommonArgs {
         action = ArgAction::SetTrue
     )]
     pub force: bool,
+    #[arg(
+        long = "timeout",
+        value_name = "SECONDS",
+        help = "abort the interactive session after SECONDS and exit with code 4 \
+                (0 = no deadline). Ignored by the snapshot subcommands",
+        value_parser = value_parser!(u64)
+    )]
+    pub timeout: Option<u64>,
 }
 
 impl CommonArgs {
@@ -242,6 +250,7 @@ impl CommonArgs {
             no_temp_file: self.no_temp_file || local.no_temp_file,
             no_pretty: self.no_pretty || local.no_pretty,
             force: self.force || local.force,
+            timeout: local.timeout.or(self.timeout),
         }
     }
 }

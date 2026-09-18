@@ -2,46 +2,50 @@ import { memo } from "react";
 import { Moon, Power, Save, Sun } from "lucide-react";
 import { useTheme } from "../theme";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { CountdownBadge } from "./CountdownBadge";
 
 interface AppHeaderProps {
   title?: string | null;
   description?: string | null;
-  dirty: boolean;
   saving: boolean;
   exiting?: boolean;
+  /** Whole seconds until the session closes, or null when unbounded. */
+  secondsLeft?: number | null;
   onSave(): void;
   onExit(): void;
 }
 
+/**
+ * The session's identity bar: what is being edited, and how long is left.
+ *
+ * Deliberately carries no save state. The status bar at the bottom owns that,
+ * and it knows more than a badge could — "saving", "3 errors", "exiting" all
+ * collapse into one tone there. Showing "Unsaved" in both places meant the same
+ * fact appeared twice in two different styles.
+ */
 export const AppHeader = memo(function AppHeader({
   title,
   description,
-  dirty,
   saving,
   exiting = false,
+  secondsLeft = null,
   onSave,
   onExit,
 }: AppHeaderProps) {
   const { theme, toggle } = useTheme();
   return (
-    <header className="bg-background border-b border-border/50 px-4 md:px-6 py-3 md:py-4">
+    <header className="border-b border-border/50 bg-background px-4 py-3 md:px-6 md:py-3.5">
       <div className="flex items-center justify-between gap-4">
         {/* Left: Title & Description */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-sm md:text-base font-semibold text-foreground">
+            <h1 className="truncate text-sm font-semibold text-foreground md:text-[15px]">
               {title || "Configuration session"}
             </h1>
-            <Badge
-              variant={dirty ? "default" : "secondary"}
-              className="text-[10px] uppercase tracking-wide shrink-0"
-            >
-              {dirty ? "Unsaved" : "Saved"}
-            </Badge>
+            {secondsLeft != null && <CountdownBadge secondsLeft={secondsLeft} />}
           </div>
           {description && (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground hidden sm:block">
+            <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block">
               {description}
             </p>
           )}

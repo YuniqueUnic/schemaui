@@ -11,4 +11,9 @@ export interface SessionResponse {
     formats: Array<string>;
     // Optional UiLayout tree; the web UI also reinterprets this locally.
     layout: Record<string, unknown> | null;
+    // Milliseconds until the backend aborts the session, or null when the
+    // session is unbounded. A duration, not a deadline, so a client whose clock
+    // is off still counts down correctly. The client owns the visible countdown
+    // because the server stops answering once the deadline passes.
+    expires_in_ms: number | null;
 }

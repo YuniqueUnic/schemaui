@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use crate::core::frontend::{Frontend, FrontendContext};
+use crate::core::frontend::{Frontend, FrontendContext, SessionOutcome};
 use crate::core::pipeline::SchemaPipeline;
 use crate::io::{DocumentFormat, input::parse_document_str};
 use crate::precompile::build_ui_artifact_bundle;
@@ -67,13 +67,15 @@ struct CapturedFrontendContext {
 struct CaptureFrontend;
 
 impl Frontend for CaptureFrontend {
-    fn run(self, ctx: FrontendContext) -> Result<Value> {
-        Ok(serde_json::to_value(CapturedFrontendContext {
-            ui_ast: ctx.ui_ast,
-            layout: ctx.layout,
-            schema: ctx.schema,
-            initial_data: ctx.initial_data,
-        })?)
+    fn run(self, ctx: FrontendContext) -> Result<SessionOutcome> {
+        Ok(SessionOutcome::Completed(serde_json::to_value(
+            CapturedFrontendContext {
+                ui_ast: ctx.ui_ast,
+                layout: ctx.layout,
+                schema: ctx.schema,
+                initial_data: ctx.initial_data,
+            },
+        )?))
     }
 }
 
@@ -81,9 +83,13 @@ fn capture_pipeline_output(schema: Value, defaults: Value, bundle: Option<UiAstB
     let pipeline = SchemaPipeline::new(schema)
         .with_defaults(Some(defaults))
         .with_prepared_ui_bundle(bundle);
-    pipeline
+    match pipeline
         .run_with_frontend(CaptureFrontend)
         .expect("pipeline capture succeeds")
+    {
+        SessionOutcome::Completed(value) => value,
+        SessionOutcome::TimedOut => panic!("capture pipeline has no deadline"),
+    }
 }
 
 #[test]

@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use ureq::Agent;
 
 use crate::web::session::ServeOptions;
-use crate::{FrontendOptions, SchemaUI};
+use crate::{FrontendOptions, SchemaUI, SessionOutcome};
 
 fn reserve_port() -> u16 {
     let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind ephemeral port");
@@ -44,7 +44,9 @@ fn wait_until_ready(agent: &Agent, base_url: &str) {
     }
 }
 
-fn start_preview_session(schema: Value) -> (u16, thread::JoinHandle<anyhow::Result<Value>>) {
+fn start_preview_session(
+    schema: Value,
+) -> (u16, thread::JoinHandle<anyhow::Result<SessionOutcome>>) {
     let port = reserve_port();
     let handle = thread::spawn(move || {
         SchemaUI::from_schema(schema).run(FrontendOptions::Web(ServeOptions {
@@ -75,7 +77,11 @@ fn post_preview(
         .expect("post preview request")
 }
 
-fn close_session(agent: &Agent, base_url: &str, handle: thread::JoinHandle<anyhow::Result<Value>>) {
+fn close_session(
+    agent: &Agent,
+    base_url: &str,
+    handle: thread::JoinHandle<anyhow::Result<SessionOutcome>>,
+) {
     let response = agent
         .post(format!("{base_url}/api/exit"))
         .content_type("application/json")

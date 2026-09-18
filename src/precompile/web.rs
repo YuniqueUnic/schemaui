@@ -34,6 +34,8 @@ pub fn build_session_snapshot(
         data: defaults_value,
         formats,
         layout: Some(layout),
+        // A precompiled snapshot has no live session behind it, so no deadline.
+        expires_in_ms: None,
     })
 }
 

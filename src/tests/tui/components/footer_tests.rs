@@ -45,6 +45,7 @@ fn footer_status_model_prioritizes_error_tone_and_focus_context() {
         popup: None,
         composite_overlay: None,
         help_overlay: None,
+        time_remaining: None,
     };
 
     let status = footer_status_model(&ctx);
@@ -86,6 +87,7 @@ fn footer_status_model_compacts_ready_message() {
         popup: None,
         composite_overlay: None,
         help_overlay: None,
+        time_remaining: None,
     };
 
     let status = footer_status_model(&ctx);
@@ -96,4 +98,111 @@ fn footer_status_model_compacts_ready_message() {
     assert!(status.meta.is_empty());
     assert!(status.alert.is_none());
     assert_eq!(status.session_title.as_deref(), Some("SchemaUI Demo"));
+}
+
+#[test]
+fn footer_status_model_surfaces_the_timeout_countdown_first() {
+    let ctx = UiContext {
+        status_message: "Ready for input",
+        dirty: false,
+        error_count: 0,
+        help: None,
+        global_errors: &[],
+        focus_label: Some("General › Name".to_string()),
+        session_title: Some("SchemaUI Demo"),
+        popup: None,
+        composite_overlay: None,
+        help_overlay: None,
+        time_remaining: Some(std::time::Duration::from_secs(90)),
+    };
+
+    let status = footer_status_model(&ctx);
+
+    // First, so the deadline is read before the incidental focus hint.
+    assert_eq!(
+        status.meta.first().map(String::as_str),
+        Some("Timeout in 1:30")
+    );
+    assert!(
+        status
+            .meta
+            .iter()
+            .any(|entry| entry == "Focus General › Name"),
+        "the countdown must not crowd out the focus label"
+    );
+}
+
+#[test]
+fn footer_status_model_widens_the_countdown_past_an_hour() {
+    let ctx = UiContext {
+        status_message: "Ready for input",
+        dirty: false,
+        error_count: 0,
+        help: None,
+        global_errors: &[],
+        focus_label: None,
+        session_title: None,
+        popup: None,
+        composite_overlay: None,
+        help_overlay: None,
+        time_remaining: Some(std::time::Duration::from_secs(3_661)),
+    };
+
+    let status = footer_status_model(&ctx);
+
+    assert_eq!(status.meta, vec!["Timeout in 1:01:01".to_string()]);
+}
+
+#[test]
+fn footer_status_model_shows_no_countdown_for_an_unbounded_session() {
+    let ctx = UiContext {
+        status_message: "Ready for input",
+        dirty: false,
+        error_count: 0,
+        help: None,
+        global_errors: &[],
+        focus_label: None,
+        session_title: None,
+        popup: None,
+        composite_overlay: None,
+        help_overlay: None,
+        time_remaining: None,
+    };
+
+    let status = footer_status_model(&ctx);
+
+    assert!(status.meta.is_empty(), "got {:?}", status.meta);
+}
+
+#[test]
+fn footer_status_model_rounds_the_countdown_up() {
+    // Sub-second remainders must not read as 0:00 while the session is still
+    // open, and a fresh `--timeout 4` must open on 0:04 rather than 0:03.
+    let label = |millis: u64| {
+        let ctx = UiContext {
+            status_message: "Ready for input",
+            dirty: false,
+            error_count: 0,
+            help: None,
+            global_errors: &[],
+            focus_label: None,
+            session_title: None,
+            popup: None,
+            composite_overlay: None,
+            help_overlay: None,
+            time_remaining: Some(std::time::Duration::from_millis(millis)),
+        };
+        footer_status_model(&ctx)
+            .meta
+            .first()
+            .cloned()
+            .unwrap_or_default()
+    };
+
+    assert_eq!(label(4_000), "Timeout in 0:04");
+    assert_eq!(label(3_999), "Timeout in 0:04");
+    assert_eq!(label(1_001), "Timeout in 0:02");
+    assert_eq!(label(1_000), "Timeout in 0:01");
+    assert_eq!(label(1), "Timeout in 0:01");
+    assert_eq!(label(0), "Timeout in 0:00");
 }

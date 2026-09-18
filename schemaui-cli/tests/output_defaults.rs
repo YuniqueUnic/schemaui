@@ -33,13 +33,7 @@ fn base_args(schema: String, config: String) -> CommonArgs {
     CommonArgs {
         schema: Some(schema),
         config: Some(config),
-        title: None,
-        description: None,
-        outputs: vec![],
-        temp_file: None,
-        no_temp_file: false,
-        no_pretty: false,
-        force: false,
+        ..CommonArgs::default()
     }
 }
 

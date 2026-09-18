@@ -52,13 +52,8 @@ fn base_args(schema: Option<String>, config: Option<String>) -> CommonArgs {
     CommonArgs {
         schema,
         config,
-        title: None,
-        description: None,
-        outputs: vec![],
-        temp_file: None,
         no_temp_file: true,
-        no_pretty: false,
-        force: false,
+        ..CommonArgs::default()
     }
 }
 

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
@@ -20,6 +22,8 @@ pub struct UiContext<'a> {
     pub popup: Option<PopupRender<'a>>,
     pub composite_overlay: Option<CompositeOverlay>,
     pub help_overlay: Option<HelpOverlayRender<'a>>,
+    /// Time left before the session is aborted; `None` when unbounded.
+    pub time_remaining: Option<Duration>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

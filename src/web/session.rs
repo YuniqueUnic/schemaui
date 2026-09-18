@@ -7,6 +7,7 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
+    time::Instant,
 };
 
 use anyhow::{Context, Result, anyhow};
@@ -33,6 +34,7 @@ use crate::precompile::UiArtifactBundle;
 use crate::schema::metadata::root_schema_header;
 
 use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
+use crate::core::frontend::SessionOutcome;
 use crate::ui_ast::{UiAst, UiAstBundle, UiLayout, build_ui_ast_bundle};
 
 pub struct WebSessionBuilder {
@@ -43,6 +45,7 @@ pub struct WebSessionBuilder {
     asset_provider: Arc<dyn WebAssetProvider>,
     ui_bundle: Option<UiAstBundle>,
     ui_artifact_bundle: Option<UiArtifactBundle>,
+    deadline: Option<Instant>,
 }
 
 impl WebSessionBuilder {
@@ -56,6 +59,7 @@ impl WebSessionBuilder {
             asset_provider: Arc::new(EmbeddedAssets::default()),
             ui_bundle: None,
             ui_artifact_bundle: None,
+            deadline: None,
         }
     }
 
@@ -102,6 +106,12 @@ impl WebSessionBuilder {
         self
     }
 
+    /// Stop the session at `deadline`, reporting [`SessionOutcome::TimedOut`].
+    pub fn with_deadline(mut self, deadline: Option<Instant>) -> Self {
+        self.deadline = deadline;
+        self
+    }
+
     pub fn build(mut self) -> Result<WebSessionConfig> {
         let data = self
             .defaults
@@ -125,6 +135,7 @@ impl WebSessionBuilder {
             data,
             schema,
             asset_provider: self.asset_provider,
+            deadline: self.deadline,
         })
     }
 }
@@ -138,6 +149,7 @@ pub struct WebSessionConfig {
     pub data: Value,
     pub schema: Value,
     pub asset_provider: Arc<dyn WebAssetProvider>,
+    pub deadline: Option<Instant>,
 }
 
 impl WebSessionConfig {
@@ -152,8 +164,19 @@ impl WebSessionConfig {
                 .map(|format| format.to_string())
                 .collect(),
             layout: Some(self.layout.clone()),
+            expires_in_ms: remaining_ms(self.deadline),
         }
     }
+}
+
+/// Milliseconds left before `deadline`, or `None` when the session is unbounded.
+fn remaining_ms(deadline: Option<Instant>) -> Option<u64> {
+    deadline.map(|deadline| {
+        deadline
+            .saturating_duration_since(Instant::now())
+            .as_millis()
+            .min(u64::MAX as u128) as u64
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -183,17 +206,24 @@ impl BoundSession {
         self.addr
     }
 
-    pub async fn run(self) -> Result<Value> {
-        let (result_rx, shutdown_rx) = self.handles.into_parts();
-        let server = axum::serve(self.listener, self.router.into_make_service())
+    pub async fn run(self) -> Result<SessionOutcome> {
+        let Self {
+            router,
+            handles,
+            listener,
+            addr: _,
+        } = self;
+        let (result_rx, shutdown_rx) = handles.into_parts();
+
+        let server = axum::serve(listener, router.into_make_service())
             .with_graceful_shutdown(async move {
                 let _ = shutdown_rx.await;
             })
             .into_future();
         let server = tokio::spawn(server);
 
-        let value = match result_rx.await {
-            Ok(value) => value,
+        let outcome = match result_rx.await {
+            Ok(outcome) => outcome,
             Err(_) => match server.await {
                 Ok(Ok(())) => {
                     return Err(anyhow!("web session closed before emitting a value"));
@@ -217,14 +247,18 @@ impl BoundSession {
                 return Err(anyhow!(err)).context("web server task panicked");
             }
         }
-        Ok(value)
+        Ok(outcome)
     }
 }
 
 pub async fn bind_session(config: WebSessionConfig, options: ServeOptions) -> Result<BoundSession> {
-    let (router, handles) = tokio::task::spawn_blocking(move || session_router(config))
+    // Captured here rather than inside the blocking task so the timer lands on
+    // the caller's runtime, which is the one that will drive the server.
+    let runtime = tokio::runtime::Handle::current();
+    let wiring = tokio::task::spawn_blocking(move || build_session_wiring(config))
         .await
         .context("failed to build web session state")??;
+    wiring.arm_deadline(runtime);
     let listener = TcpListener::bind(SocketAddr::new(options.host, options.port))
         .await
         .context("failed to bind web listener")?;
@@ -232,18 +266,60 @@ pub async fn bind_session(config: WebSessionConfig, options: ServeOptions) -> Re
         .local_addr()
         .context("failed to read bound address")?;
     Ok(BoundSession {
-        router,
-        handles,
+        router: wiring.router,
+        handles: wiring.handles,
         listener,
         addr,
     })
 }
 
-pub async fn serve_session(config: WebSessionConfig, options: ServeOptions) -> Result<Value> {
+pub async fn serve_session(
+    config: WebSessionConfig,
+    options: ServeOptions,
+) -> Result<SessionOutcome> {
     bind_session(config, options).await?.run().await
 }
 
+/// Build the session's routes and shared state.
+///
+/// Custom HTTP stacks can mount the returned router instead of going through
+/// [`bind_session`]. The deadline is armed here, on the calling runtime, so a
+/// session wired up this way expires exactly like a bound one: a session that
+/// silently never times out would be worse than one with no timeout at all,
+/// because the caller would believe the deadline was in force.
+///
+/// # Panics
+///
+/// Panics if called outside a Tokio runtime, since there would be nowhere to
+/// schedule the deadline on.
 pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandles)> {
+    let wiring = build_session_wiring(config)?;
+    wiring.arm_deadline(tokio::runtime::Handle::current());
+    Ok((wiring.router, wiring.handles))
+}
+
+/// The pieces a wired-up session is made of, before it is bound to a listener.
+struct SessionWiring {
+    router: Router,
+    handles: SessionHandles,
+    state: SharedState,
+}
+
+impl SessionWiring {
+    /// Schedule the deadline. Does nothing when the session is unbounded.
+    fn arm_deadline(&self, runtime: tokio::runtime::Handle) {
+        let Some(deadline) = self.state.deadline else {
+            return;
+        };
+        let state = self.state.clone();
+        runtime.spawn(async move {
+            tokio::time::sleep_until(deadline.into()).await;
+            state.time_out().await;
+        });
+    }
+}
+
+fn build_session_wiring(config: WebSessionConfig) -> Result<SessionWiring> {
     let WebSessionConfig {
         title,
         description,
@@ -252,6 +328,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
         data,
         schema,
         asset_provider,
+        deadline,
     } = config;
     let validator = Arc::new(validator_for(&schema).context("failed to compile JSON schema")?);
     let (result_tx, result_rx) = oneshot::channel();
@@ -270,6 +347,7 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
         }),
         finished: Arc::new(AtomicBool::new(false)),
         asset_provider,
+        deadline,
     };
 
     let router = Router::new()
@@ -280,24 +358,25 @@ pub fn session_router(config: WebSessionConfig) -> Result<(Router, SessionHandle
         .route("/api/validate", post(post_validate))
         .route("/api/preview", post(post_preview))
         .fallback(static_assets)
-        .with_state(shared);
+        .with_state(shared.clone());
 
-    Ok((
+    Ok(SessionWiring {
         router,
-        SessionHandles {
+        handles: SessionHandles {
             result_rx: Some(result_rx),
             shutdown_rx: Some(shutdown_rx),
         },
-    ))
+        state: shared,
+    })
 }
 
 pub struct SessionHandles {
-    result_rx: Option<oneshot::Receiver<Value>>,
+    result_rx: Option<oneshot::Receiver<SessionOutcome>>,
     shutdown_rx: Option<oneshot::Receiver<()>>,
 }
 
 impl SessionHandles {
-    pub fn into_parts(mut self) -> (oneshot::Receiver<Value>, oneshot::Receiver<()>) {
+    pub fn into_parts(mut self) -> (oneshot::Receiver<SessionOutcome>, oneshot::Receiver<()>) {
         let result = self
             .result_rx
             .take()
@@ -322,17 +401,30 @@ struct SharedState {
     finish_line: Arc<FinishLine>,
     finished: Arc<AtomicBool>,
     asset_provider: Arc<dyn WebAssetProvider>,
+    deadline: Option<Instant>,
+}
+
+impl SharedState {
+    /// End the session because its deadline passed. Reports `TimedOut` rather
+    /// than the data collected so far: a half-filled form is not an answer, and
+    /// conflating the two would let a caller persist one as if it were real.
+    async fn time_out(&self) {
+        if self.finished.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        self.finish_line.complete(SessionOutcome::TimedOut).await;
+    }
 }
 
 struct FinishLine {
-    result: Mutex<Option<oneshot::Sender<Value>>>,
+    result: Mutex<Option<oneshot::Sender<SessionOutcome>>>,
     shutdown: Mutex<Option<oneshot::Sender<()>>>,
 }
 
 impl FinishLine {
-    async fn complete(&self, value: Value) {
+    async fn complete(&self, outcome: SessionOutcome) {
         if let Some(tx) = self.result.lock().await.take() {
-            let _ = tx.send(value);
+            let _ = tx.send(outcome);
         }
         if let Some(tx) = self.shutdown.lock().await.take() {
             let _ = tx.send(());
@@ -351,6 +443,11 @@ pub struct SessionResponse {
     pub data: Value,
     pub formats: Vec<String>,
     pub layout: Option<UiLayout>,
+    /// Milliseconds until the session is aborted, or `None` when unbounded.
+    /// A duration rather than a timestamp so a client on a skewed clock (a
+    /// phone on the LAN, say) still counts down correctly.
+    #[cfg_attr(feature = "web-types", ts(type = "number | null"))]
+    pub expires_in_ms: Option<u64>,
 }
 
 async fn get_session(State(state): State<SharedState>) -> impl IntoResponse {
@@ -379,6 +476,7 @@ async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
         data: state.data.lock().await.clone(),
         formats: state.formats.iter().map(|f| f.to_string()).collect(),
         layout: Some(layout),
+        expires_in_ms: remaining_ms(state.deadline),
     };
     if let Ok(serialized) = serde_json::to_vec_pretty(&payload) {
         let path = std::env::var("SCHEMAUI_SESSION_DUMP").unwrap_or_else(|_| DEFAULT_PATH.into());
@@ -439,7 +537,10 @@ async fn post_exit(
     } else {
         state.data.lock().await.clone()
     };
-    state.finish_line.complete(final_value).await;
+    state
+        .finish_line
+        .complete(SessionOutcome::Completed(final_value))
+        .await;
     (StatusCode::OK, Json(json!({"status": "closing"})))
 }
 

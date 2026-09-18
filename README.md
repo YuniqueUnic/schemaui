@@ -173,6 +173,9 @@ Full CLI manual: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md#11-web-mode).
 ### Library (embed in your app)
 
 ```rust,no_run
+use std::time::{Duration, Instant};
+
+use schemaui::SessionOutcome;
 use schemaui::web::session::{
     ServeOptions,
     WebSessionBuilder,
@@ -192,11 +195,20 @@ async fn run() -> anyhow::Result<()> {
 
   let config = WebSessionBuilder::new(schema)
       .with_title("Service Config")
+      // Optional: close the session if nobody answers within 10 minutes.
+      .with_deadline(Some(Instant::now() + Duration::from_secs(600)))
       .build()?;
   let session = bind_session(config, ServeOptions::default()).await?;
   println!("visit http://{}/", session.local_addr());
-  let value = session.run().await?;
-  println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
+
+  match session.run().await? {
+      SessionOutcome::Completed(value) => {
+          println!("final JSON: {}", serde_json::to_string_pretty(&value)?);
+      }
+      SessionOutcome::TimedOut => {
+          eprintln!("session timed out; nothing was saved");
+      }
+  }
   Ok(())
 }
 ```

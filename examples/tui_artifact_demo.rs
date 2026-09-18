@@ -4,7 +4,9 @@ use std::path::PathBuf;
 
 use anyhow::{Result, bail};
 use schemaui::precompile::build_ui_artifact_bundle_from_file;
-use schemaui::{DocumentFormat, FrontendOptions, SchemaUI, UiOptions, parse_document_str};
+use schemaui::{
+    DocumentFormat, FrontendOptions, SchemaUI, SessionOutcome, UiOptions, parse_document_str,
+};
 
 /// Run the TUI using a prepared UI artifact bundle.
 ///
@@ -55,8 +57,14 @@ fn main() -> Result<()> {
         .run(FrontendOptions::Tui(options))?;
 
     // 6) Print the resulting JSON document on exit.
-    let json = serde_json::to_string_pretty(&result)?;
-    println!("{}", json);
+    match result {
+        SessionOutcome::Completed(value) => {
+            println!("{}", serde_json::to_string_pretty(&value)?);
+        }
+        SessionOutcome::TimedOut => {
+            eprintln!("tui_artifact_demo: session timed out before saving");
+        }
+    }
 
     Ok(())
 }

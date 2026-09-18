@@ -37,6 +37,7 @@ const session: SessionResponse = {
   description: "Schema-level description should appear in the header.",
   data: {},
   formats: ["json"],
+  expires_in_ms: null,
   ui_ast: {
     roots: [
       {
@@ -180,6 +181,7 @@ const conditionalSession: SessionResponse = {
   description: null,
   data: {},
   formats: ["json"],
+  expires_in_ms: null,
   layout: null,
   ui_ast: {
     roots: [
@@ -232,6 +234,7 @@ const multilineSession: SessionResponse = {
   description: null,
   data: {},
   formats: ["json"],
+  expires_in_ms: null,
   layout: null,
   ui_ast: {
     roots: [
@@ -322,6 +325,7 @@ describe("App web interactions", () => {
       description: "My description",
       data: {},
       formats: ["json"],
+      expires_in_ms: null,
       layout: null,
       ui_ast: {
         roots: [
@@ -385,5 +389,46 @@ describe("App web interactions", () => {
     const control = await screen.findByRole("textbox");
     expect(control.tagName).toBe("TEXTAREA");
     expect(control).toHaveValue("line one\nline two");
+  });
+
+  it("shows the remaining time when the session carries a deadline", async () => {
+    apiMocks.fetchSession.mockResolvedValue({
+      ...session,
+      expires_in_ms: 90_000,
+    });
+
+    renderApp();
+
+    const countdown = await screen.findByRole("timer");
+    expect(countdown.textContent).toContain("01:30");
+  });
+
+  it("shows no countdown when the session is unbounded", async () => {
+    renderApp();
+
+    // Wait for the form itself, so the assertion is about the loaded shell.
+    await screen.findByText("Complex Composite Session");
+    expect(screen.queryByRole("timer")).toBeNull();
+  });
+
+  it("closes the form and says nothing was saved once the deadline passes", async () => {
+    apiMocks.fetchSession.mockResolvedValue({ ...session, expires_in_ms: 400 });
+
+    renderApp();
+
+    expect(await screen.findByText("Session Timed Out", {}, { timeout: 4_000 }))
+      .toBeTruthy();
+    expect(screen.getByTestId("session-notice").textContent)
+      .toContain("nothing was saved");
+    // The form is gone, so nothing can be typed into a session that is over.
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("explains that the session is gone when it cannot be loaded", async () => {
+    apiMocks.fetchSession.mockRejectedValue(new Error("connection refused"));
+
+    renderApp();
+
+    expect(await screen.findByText("Session Unavailable")).toBeTruthy();
   });
 });

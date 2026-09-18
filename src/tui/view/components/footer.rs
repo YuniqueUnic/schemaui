@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -82,6 +84,9 @@ pub(crate) fn footer_status_model(ctx: &UiContext<'_>) -> FooterStatusModel {
     };
 
     let mut meta = Vec::new();
+    if let Some(remaining) = ctx.time_remaining {
+        meta.push(countdown_label(remaining));
+    }
     if ctx.error_count > 0 && ctx.dirty {
         meta.push("Unsaved changes".to_string());
     }
@@ -245,6 +250,22 @@ fn build_status_line(status: &FooterStatusModel) -> Line<'static> {
 
 fn footer_chip(text: impl Into<String>, style: Style) -> Span<'static> {
     Span::styled(text.into(), style)
+}
+
+/// `Timeout in 4:32` — the hour field only appears when there is one, so the
+/// footer stays narrow for the common short-budget case.
+fn countdown_label(remaining: Duration) -> String {
+    // Rounded up, matching the web UI: the clock reads 0:01 through the final
+    // second and only reaches 0:00 at the deadline. Truncating would show 0:00
+    // for a whole second while the session was still open, and would make
+    // `--timeout 4` open on 0:03 as if a second had already been spent.
+    let seconds = remaining.as_millis().div_ceil(1_000) as u64;
+    let (hours, minutes, seconds) = (seconds / 3600, (seconds % 3600) / 60, seconds % 60);
+    if hours > 0 {
+        format!("Timeout in {hours}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("Timeout in {minutes}:{seconds:02}")
+    }
 }
 
 fn compact_status_message(message: &str) -> String {

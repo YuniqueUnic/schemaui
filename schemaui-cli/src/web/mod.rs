@@ -10,6 +10,7 @@ use schemaui::web::session::ServeOptions as WebServeOptions;
 use crate::cli::{WebCommand, WebSnapshotCommand};
 use crate::session::diagnostics::DiagnosticCollector;
 use crate::session::format::resolve_format_hint;
+use crate::session::lifecycle;
 use crate::session::schema_source::{load_optional_document, resolve_session_inputs};
 use crate::session::{SessionBundle, prepare_session};
 
@@ -38,17 +39,16 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
     if let Some(description) = description {
         ui = ui.with_description(description);
     }
+    if let Some(deadline) = lifecycle::deadline_from_seconds(cmd.common.timeout) {
+        ui = ui.with_timeout(deadline);
+    }
 
     let serve = WebServeOptions {
         host: cmd.host,
         port: cmd.port,
     };
 
-    let value = ui.run_web(serve)?;
-    if let Some(options) = output {
-        options.write(&value)?;
-    }
-    Ok(())
+    lifecycle::finish(ui.run_web(serve)?, output)
 }
 
 pub fn run_snapshot_cli(cmd: WebSnapshotCommand) -> Result<()> {

@@ -1,20 +1,24 @@
 import type { SessionResponse } from '@schemaui/types/SessionResponse';
 
 export const PrecompiledSession: SessionResponse = {
-  "title": null,
+  "title": "用户注册信息",
   "description": null,
   "ui_ast": {
     "roots": [
       {
-        "pointer": "/age",
+        "pointer": "/username",
         "title": null,
-        "description": "年龄",
+        "description": "用户名，只允许字母、数字和下划线",
         "required": true,
-        "default_value": 0,
+        "default_value": "unic@me",
+        "visible_when": null,
         "kind": {
           "type": "field",
-          "scalar": "integer",
-          "enum_options": null
+          "scalar": "string",
+          "enum_options": null,
+          "enum_values": null,
+          "nullable": false,
+          "multiline": false
         }
       },
       {
@@ -23,10 +27,30 @@ export const PrecompiledSession: SessionResponse = {
         "description": "电子邮箱地址",
         "required": true,
         "default_value": "",
+        "visible_when": null,
         "kind": {
           "type": "field",
           "scalar": "string",
-          "enum_options": null
+          "enum_options": null,
+          "enum_values": null,
+          "nullable": false,
+          "multiline": false
+        }
+      },
+      {
+        "pointer": "/age",
+        "title": null,
+        "description": "年龄",
+        "required": true,
+        "default_value": 0,
+        "visible_when": null,
+        "kind": {
+          "type": "field",
+          "scalar": "integer",
+          "enum_options": null,
+          "enum_values": null,
+          "nullable": false,
+          "multiline": false
         }
       },
       {
@@ -35,39 +59,14 @@ export const PrecompiledSession: SessionResponse = {
         "description": "手机号（可选）",
         "required": false,
         "default_value": "",
+        "visible_when": null,
         "kind": {
           "type": "field",
           "scalar": "string",
-          "enum_options": null
-        }
-      },
-      {
-        "pointer": "/tags",
-        "title": null,
-        "description": "用户标签（可选）",
-        "required": false,
-        "default_value": [],
-        "kind": {
-          "type": "array",
-          "item": {
-            "type": "field",
-            "scalar": "string",
-            "enum_options": null
-          },
-          "min_items": 1,
-          "max_items": 10
-        }
-      },
-      {
-        "pointer": "/username",
-        "title": null,
-        "description": "用户名，只允许字母、数字和下划线",
-        "required": true,
-        "default_value": "unic@me",
-        "kind": {
-          "type": "field",
-          "scalar": "string",
-          "enum_options": null
+          "enum_options": null,
+          "enum_values": null,
+          "nullable": false,
+          "multiline": false
         }
       },
       {
@@ -76,10 +75,35 @@ export const PrecompiledSession: SessionResponse = {
         "description": "个人网站（可选）",
         "required": false,
         "default_value": "https://www.yunique.top",
+        "visible_when": null,
         "kind": {
           "type": "field",
           "scalar": "string",
-          "enum_options": null
+          "enum_options": null,
+          "enum_values": null,
+          "nullable": false,
+          "multiline": false
+        }
+      },
+      {
+        "pointer": "/tags",
+        "title": null,
+        "description": "用户标签（可选）",
+        "required": false,
+        "default_value": [],
+        "visible_when": null,
+        "kind": {
+          "type": "array",
+          "item": {
+            "type": "field",
+            "scalar": "string",
+            "enum_options": null,
+            "enum_values": null,
+            "nullable": false,
+            "multiline": false
+          },
+          "min_items": 1,
+          "max_items": 10
         }
       }
     ]
@@ -104,17 +128,18 @@ export const PrecompiledSession: SessionResponse = {
             "pointer": "",
             "path": [],
             "field_pointers": [
-              "/age",
-              "/email",
-              "/phone",
-              "/tags",
               "/username",
-              "/website"
+              "/email",
+              "/age",
+              "/phone",
+              "/website",
+              "/tags"
             ],
             "children": []
           }
         ]
       }
     ]
-  }
+  },
+  "expires_in_ms": null
 } as const;

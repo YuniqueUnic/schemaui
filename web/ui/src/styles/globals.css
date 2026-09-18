@@ -215,15 +215,12 @@
     box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
   }
 
-  /* Unified shell + panel surfaces used by the 3-column app layout */
+  /* Unified shell + panel surfaces used by the 3-column app layout.
+     A flat fill on purpose: the primary-tinted radial gradient that used to sit
+     here read as decoration behind the content, which is the opposite of what a
+     form wants. */
   .app-shell {
-    background:
-      radial-gradient(
-        ellipse at top,
-        color-mix(in oklch, var(--color-primary) 6%, transparent) 0%,
-        transparent 55%
-      ),
-      var(--color-background);
+    background-color: var(--color-background);
   }
 
   .app-panel {
@@ -256,53 +253,6 @@
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--color-muted-foreground);
-  }
-
-  /* Chip / pill base styles */
-  .app-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    border-radius: 9999px;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.75rem;
-    line-height: 1rem;
-    transition: background-color 0.15s ease, color 0.15s ease,
-      border-color 0.15s ease;
-    border: 1px solid transparent;
-  }
-
-  .app-pill-muted {
-    background-color: color-mix(
-      in oklch,
-      var(--color-muted) 70%,
-      transparent
-    );
-    color: var(--color-muted-foreground);
-  }
-
-  .app-pill-muted:hover {
-    background-color: var(--color-muted);
-    color: var(--color-foreground);
-  }
-
-  .app-pill-active {
-    background-color: color-mix(
-      in oklch,
-      var(--color-primary) 14%,
-      transparent
-    );
-    border-color: color-mix(
-      in oklch,
-      var(--color-primary) 40%,
-      transparent
-    );
-    color: var(--color-foreground);
-    box-shadow: 0 1px 2px -1px color-mix(
-      in oklch,
-      var(--color-primary) 50%,
-      transparent
-    );
   }
 
   /* Resizer handle */

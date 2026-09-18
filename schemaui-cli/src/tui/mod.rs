@@ -7,15 +7,19 @@ use schemaui::precompile::tui as pre_tui;
 use crate::cli::{CommonArgs, TuiSnapshotCommand};
 use crate::session::diagnostics::DiagnosticCollector;
 use crate::session::format::resolve_format_hint;
+use crate::session::lifecycle;
 use crate::session::schema_source::{load_optional_document, resolve_session_inputs};
 use crate::session::{SessionBundle, prepare_session};
 
 pub fn run_cli(args: &CommonArgs) -> Result<()> {
     let session = prepare_session(args)?;
-    execute_session(session)
+    execute_session(session, lifecycle::deadline_from_seconds(args.timeout))
 }
 
-pub(crate) fn execute_session(session: SessionBundle) -> Result<()> {
+pub(crate) fn execute_session(
+    session: SessionBundle,
+    deadline: Option<std::time::Duration>,
+) -> Result<()> {
     let SessionBundle {
         schema,
         defaults,
@@ -34,11 +38,10 @@ pub(crate) fn execute_session(session: SessionBundle) -> Result<()> {
     if let Some(description) = description {
         ui = ui.with_description(description);
     }
-    let value = ui.run_tui()?;
-    if let Some(options) = output {
-        options.write(&value)?;
+    if let Some(deadline) = deadline {
+        ui = ui.with_timeout(deadline);
     }
-    Ok(())
+    lifecycle::finish(ui.run_tui()?, output)
 }
 
 pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {

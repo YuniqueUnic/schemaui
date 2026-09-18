@@ -16,7 +16,7 @@ pub mod web;
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub use core::frontend::FrontendOptions;
+pub use core::frontend::{FrontendOptions, SessionOutcome, format_budget};
 pub use core::schema_ui::{DocumentInput, SchemaUI};
 pub use io::{
     DocumentFormat, DocumentFormatProbe,
@@ -43,6 +43,7 @@ pub mod prelude {
     pub use super::DocumentInput;
     pub use super::FrontendOptions;
     pub use super::SchemaUI;
+    pub use super::SessionOutcome;
     #[cfg(feature = "tui")]
     pub use super::TuiFrontend;
     #[cfg(feature = "tui")]

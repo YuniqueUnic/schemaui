@@ -1,7 +1,6 @@
 use anyhow::Result;
-use serde_json::Value;
 
-use crate::core::frontend::{Frontend, FrontendContext};
+use crate::core::frontend::{Frontend, FrontendContext, SessionOutcome};
 use crate::precompile::TuiArtifacts;
 use crate::tui::app::{App, UiOptions};
 use crate::tui::model::form_schema_from_ui_ast;
@@ -28,7 +27,7 @@ pub(crate) fn resolve_tui_artifacts(
 }
 
 impl Frontend for TuiFrontend {
-    fn run(self, ctx: FrontendContext) -> Result<Value> {
+    fn run(self, ctx: FrontendContext) -> Result<SessionOutcome> {
         let TuiFrontend {
             options,
             tui_artifacts,
@@ -42,6 +41,7 @@ impl Frontend for TuiFrontend {
             initial_data: _,
             schema: _,
             validator,
+            deadline,
         } = ctx;
 
         let resolved = resolve_tui_artifacts(&ui_ast, &layout, tui_artifacts);
@@ -52,7 +52,7 @@ impl Frontend for TuiFrontend {
 
         let mut app = App::new(form_state, validator, options);
         app.set_session_title(title);
-        let result = app.run()?;
-        Ok(result)
+        app.set_deadline(deadline);
+        app.run()
     }
 }
