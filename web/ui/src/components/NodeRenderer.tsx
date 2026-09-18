@@ -14,6 +14,8 @@ import { CompositeRenderer } from "./renderers/CompositeRenderer";
 import { FieldRenderer } from "./renderers/FieldRenderer";
 import { KeyValueRenderer } from "./renderers/KeyValueRenderer";
 import { ObjectRenderer } from "./renderers/ObjectRenderer";
+import { RangeControl } from "./renderers/controls/RangeControl";
+import { resolveControl } from "../lib/control";
 
 // Type narrowing helpers
 type FieldNode = UiNode & { kind: Extract<UiNodeKind, { type: "field" }> };
@@ -157,6 +159,17 @@ function NodeBody({
       );
 
     case "array":
+      // A two-number array that asked for `range` is an interval, not a list.
+      // Checked before the list renderer so the schema's intent wins.
+      if (resolveControl(node) === "range") {
+        return (
+          <RangeControl
+            node={node}
+            value={value}
+            onChange={onChange}
+          />
+        );
+      }
       return (
         <ArrayRenderer
           node={node as ArrayNode}

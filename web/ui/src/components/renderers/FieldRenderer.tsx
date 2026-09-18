@@ -4,6 +4,11 @@ import type { JsonValue, UiNode } from "../../types";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
+import { Checkbox } from "../ui/checkbox";
+import { Slider } from "../ui/slider";
+import { Segmented } from "../ui/segmented";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { ColorPicker } from "../ui/color-picker";
 import {
   Select,
   SelectContent,
@@ -14,6 +19,7 @@ import {
 import { defaultForKind } from "../../ui-ast";
 import { Textarea } from "../ui/textarea";
 import type { InlineFieldKind } from "../../utils/typeHelpers";
+import { resolveBounds, resolveControl, snapToBounds } from "../../lib/control";
 
 type FieldNode = UiNode & {
   kind: Extract<import("../../types").UiNodeKind, { type: "field" }>;
@@ -34,41 +40,117 @@ function cloneJsonValue<T extends JsonValue>(value: T): T {
 }
 
 /**
- * Renders field controls (string, number, boolean, enum)
+ * Renders the control the schema asked for, or the one that suits the value.
+ *
+ * The decision itself lives in `resolveControl` so that this component only
+ * maps a decision to a widget — and so that a control the schema names but this
+ * build cannot draw still produces a working field rather than an empty one.
  */
 export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
   const resolved = value === undefined
     ? (node.default_value ?? defaultForKind(node.kind))
     : value;
   const nullable = node.kind.nullable === true;
+  const control = resolveControl(node);
 
+  // Enums first: every enum control needs the option list, and the plain
+  // scalars below can never be one.
   if (node.kind.enum_options?.length) {
-    const enumValues = node.kind.enum_values ?? node.kind.enum_options;
-    const selectedIndex = enumValues.findIndex((option) =>
-      sameJsonValue(option as JsonValue, resolved)
-    );
     return (
-      <Select
-        value={selectedIndex >= 0 ? String(selectedIndex) : ""}
-        onValueChange={(newValue) => {
-          const next = enumValues[Number(newValue)];
-          if (next !== undefined) {
-            onChange(node.pointer, cloneJsonValue(next as JsonValue));
-          }
-        }}
-      >
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select an option" />
-        </SelectTrigger>
-        <SelectContent>
-          {node.kind.enum_options.map((option, index) => (
-            <SelectItem key={`${option}-${index}`} value={String(index)}>
-              {option}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <EnumControl
+        node={node}
+        control={control}
+        value={resolved}
+        onChange={onChange}
+      />
     );
+  }
+
+  switch (control) {
+    case "color": {
+      const text = typeof resolved === "string" ? resolved : "";
+      return (
+        <ColorPicker
+          value={text}
+          onChange={(next) => onChange(node.pointer, next)}
+        />
+      );
+    }
+
+    case "slider": {
+      const bounds = resolveBounds(node);
+      // `resolveControl` only returns `slider` when bounds exist, so this is
+      // unreachable in practice; falling through to the number box keeps the
+      // component honest if that ever stops being true.
+      if (!bounds) break;
+      const current = typeof resolved === "number" ? resolved : bounds.min;
+      return (
+        <Slider
+          min={bounds.min}
+          max={bounds.max}
+          step={bounds.step}
+          marks={bounds.marks}
+          showValue
+          value={[current]}
+          onValueChange={([next]) =>
+            onChange(node.pointer, snapToBounds(next, bounds))}
+        />
+      );
+    }
+
+    case "switch": {
+      const on = resolved === true;
+      return (
+        <div className="flex items-center gap-3">
+          <Switch
+            id={controlId(node.pointer)}
+            checked={on}
+            onCheckedChange={(checked) => onChange(node.pointer, checked)}
+          />
+          <Label
+            htmlFor={controlId(node.pointer)}
+            className="text-sm text-muted-foreground"
+          >
+            {on ? "On" : "Off"}
+          </Label>
+        </div>
+      );
+    }
+
+    case "checkbox": {
+      const checked = resolved === true;
+      return (
+        <div className="flex items-center gap-2.5">
+          <Checkbox
+            id={controlId(node.pointer)}
+            checked={checked}
+            onCheckedChange={(next) => onChange(node.pointer, next === true)}
+          />
+          <Label
+            htmlFor={controlId(node.pointer)}
+            className="text-sm text-muted-foreground"
+          >
+            {checked ? "Enabled" : "Disabled"}
+          </Label>
+        </div>
+      );
+    }
+
+    case "textarea": {
+      const text = (resolved as string) ?? "";
+      return (
+        <Textarea
+          rows={4}
+          value={text}
+          onChange={(event) => commitText(node.pointer, event.target.value, nullable, onChange)}
+        />
+      );
+    }
+
+    case "number":
+    case "text":
+    default:
+      break;
   }
 
   switch (node.kind.scalar) {
@@ -103,40 +185,124 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
         />
       );
     case "boolean":
+      // Reached only when the schema asked for a control that does not fit a
+      // boolean and the fallback was overridden; a switch is the safe default.
       return (
-        <div className="flex items-center gap-3">
-          <Switch
-            checked={Boolean(resolved)}
-            onCheckedChange={(checked) => onChange(node.pointer, checked)}
-          />
-          <Label className="text-sm text-muted-foreground">
-            Toggle
-          </Label>
-        </div>
+        <Switch
+          checked={Boolean(resolved)}
+          onCheckedChange={(checked) => onChange(node.pointer, checked)}
+        />
       );
     case "string":
     default: {
       const text = (resolved as string) ?? "";
-      const commit = (next: string) =>
-        onChange(node.pointer, next === "" && nullable ? null : next);
-      if (node.kind.multiline) {
-        return (
-          <Textarea
-            rows={4}
-            value={text}
-            onChange={(event) => commit(event.target.value)}
-          />
-        );
-      }
       return (
         <Input
           type="text"
           value={text}
-          onChange={(event) => commit(event.target.value)}
+          onChange={(event) => commitText(node.pointer, event.target.value, nullable, onChange)}
         />
       );
     }
   }
+}
+
+/** The three ways an enum can be presented. */
+function EnumControl({
+  node,
+  control,
+  value,
+  onChange,
+}: {
+  node: FieldNode;
+  control: ReturnType<typeof resolveControl>;
+  value: JsonValue | undefined;
+  onChange: (pointer: string, value: JsonValue) => void;
+}) {
+  const labels = node.kind.enum_options ?? [];
+  const values = node.kind.enum_values ?? labels;
+  const selected = values.findIndex((option) =>
+    sameJsonValue(option as JsonValue, value)
+  );
+
+  const pick = (index: number) => {
+    const next = values[index];
+    if (next !== undefined) {
+      onChange(node.pointer, cloneJsonValue(next as JsonValue));
+    }
+  };
+
+  if (control === "segmented" || control === "radio") {
+    const options = labels.map((label, index) => ({
+      value: String(index),
+      label,
+    }));
+    const selectedKey = selected >= 0 ? String(selected) : "";
+
+    if (control === "segmented") {
+      return (
+        <Segmented
+          value={selectedKey}
+          onValueChange={(next) => pick(Number(next))}
+          options={options}
+        />
+      );
+    }
+    return (
+      <RadioGroup
+        value={selectedKey}
+        onValueChange={(next) => pick(Number(next))}
+      >
+        {options.map((option) => (
+          <div key={option.value} className="flex items-center gap-2.5">
+            <RadioGroupItem
+              value={option.value}
+              id={controlId(`${node.pointer}-${option.value}`)}
+            />
+            <Label
+              htmlFor={controlId(`${node.pointer}-${option.value}`)}
+              className="text-sm font-normal text-foreground"
+            >
+              {option.label}
+            </Label>
+          </div>
+        ))}
+      </RadioGroup>
+    );
+  }
+
+  return (
+    <Select
+      value={selected >= 0 ? String(selected) : ""}
+      onValueChange={(next) => pick(Number(next))}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Select an option" />
+      </SelectTrigger>
+      <SelectContent>
+        {labels.map((label, index) => (
+          <SelectItem key={`${label}-${index}`} value={String(index)}>
+            {label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** An empty string is a value for a nullable field and a no-op otherwise. */
+function commitText(
+  pointer: string,
+  next: string,
+  nullable: boolean,
+  onChange: (pointer: string, value: JsonValue) => void,
+) {
+  onChange(pointer, next === "" && nullable ? null : next);
+}
+
+/** A DOM id derived from the pointer, so a label can point at its control. */
+export function controlId(pointer: string): string {
+  return `field${pointer.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 /**

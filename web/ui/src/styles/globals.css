@@ -1,38 +1,67 @@
 @import "tailwindcss";
 
+/* Geist Mono, self-hosted: the shadcn preset this theme is built from sets it
+   as the UI font. Only the latin subset is bundled (23 KB); everything the
+   forms render that is outside it — Chinese, most of all — falls through to
+   the system stack, which is the intended look rather than a compromise.
+   Local on purpose: the embedded bundle stays free of external requests. */
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../assets/fonts/GeistMono-Variable.woff2") format("woff2-variations");
+}
+
 /* ============================================
    Tailwind CSS 4 Theme Configuration
-   Using @theme for proper utility class generation
+   Tokens transcribed from the shadcn "mono" preset
+   (https://ui.shadcn.com/create?preset=b38BALLjk):
+   a monochrome scale in both modes, white-alpha borders in dark,
+   radius 0.625rem, Geist Mono.
    ============================================ */
-
 @theme {
-  /* Color palette - using oklch for alpha support */
-  --color-background: oklch(100% 0 0);
-  --color-foreground: oklch(14% 0.02 265);
-  --color-card: oklch(100% 0 0);
-  --color-card-foreground: oklch(14% 0.02 265);
-  --color-popover: oklch(100% 0 0);
-  --color-popover-foreground: oklch(14% 0.02 265);
-  --color-primary: oklch(55% 0.24 262);
-  --color-primary-foreground: oklch(100% 0 0);
-  --color-secondary: oklch(96% 0.01 265);
-  --color-secondary-foreground: oklch(20% 0.02 265);
-  --color-muted: oklch(96% 0.01 265);
-  --color-muted-foreground: oklch(50% 0.02 265);
-  --color-accent: oklch(96% 0.01 265);
-  --color-accent-foreground: oklch(20% 0.02 265);
-  --color-destructive: oklch(55% 0.25 27);
-  --color-destructive-foreground: oklch(100% 0 0);
-  --color-border: oklch(92% 0.01 265);
-  --color-input: oklch(92% 0.01 265);
-  --color-ring: oklch(55% 0.24 262);
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.145 0 0);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.145 0 0);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.145 0 0);
+  --color-primary: oklch(0.205 0 0);
+  --color-primary-foreground: oklch(0.985 0 0);
+  --color-secondary: oklch(0.97 0 0);
+  --color-secondary-foreground: oklch(0.205 0 0);
+  --color-muted: oklch(0.97 0 0);
+  --color-muted-foreground: oklch(0.556 0 0);
+  --color-accent: oklch(0.97 0 0);
+  --color-accent-foreground: oklch(0.205 0 0);
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.985 0 0);
+  --color-border: oklch(0.922 0 0);
+  --color-input: oklch(0.922 0 0);
+  --color-ring: oklch(0.708 0 0);
+  --color-chart-1: oklch(0.922 0 0);
+  --color-chart-2: oklch(0.708 0 0);
+  --color-chart-3: oklch(0.556 0 0);
+  --color-chart-4: oklch(0.488 0 0);
+  --color-chart-5: oklch(0.985 0 0);
+  --color-sidebar: oklch(0.985 0 0);
+  --color-sidebar-foreground: oklch(0.145 0 0);
+  --color-sidebar-primary: oklch(0.488 0.243 264.376);
+  --color-sidebar-primary-foreground: oklch(0.985 0 0);
+  --color-sidebar-accent: oklch(0.97 0 0);
+  --color-sidebar-accent-foreground: oklch(0.205 0 0);
+  --color-sidebar-border: oklch(0.922 0 0);
+  --color-sidebar-ring: oklch(0.708 0 0);
 
-  /* Panel surfaces - distinct elevation for the nav / editor / preview shell */
-  --color-panel: oklch(99% 0 0);
-  --color-panel-muted: oklch(97.5% 0.005 265);
-  --color-panel-subtle: oklch(98.5% 0.004 265);
-  --color-panel-border: oklch(92% 0.008 265);
-  --color-panel-border-strong: oklch(86% 0.01 265);
+  /* Panel surfaces - the three-column shell keeps its lightness steps, now on
+     the preset's monochrome scale instead of a hue. Cards sit one step above
+     the column they live in so divisions stay legible without any color. */
+  --color-panel: oklch(0.985 0 0);
+  --color-panel-muted: oklch(0.97 0 0);
+  --color-panel-subtle: oklch(0.985 0 0);
+  --color-panel-border: oklch(0.922 0 0);
+  --color-panel-border-strong: oklch(0.871 0 0);
 
   /* Spacing scale */
   --spacing-px: 1px;
@@ -71,20 +100,21 @@
   --spacing-80: 20rem;
   --spacing-96: 24rem;
 
-  /* Border radius */
-  --radius-none: 0px;
-  --radius-sm: 0.125rem;
-  --radius-default: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.5rem;
+  /* Border radius - the preset's 0.625rem base and its multipliers */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.375rem;
   --radius-full: 9999px;
 
   /* Font families */
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Mono",
+    "JetBrains Mono", Menlo, Consolas, monospace;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Mono",
+    "JetBrains Mono", Menlo, Consolas, monospace;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -146,35 +176,46 @@
 
 /* ============================================
    Dark Mode Theme Overrides
-   使用橙金色作为 destructive 颜色，避免红黑配色难以辨识
    ============================================ */
 .dark {
-  --color-background: oklch(12% 0.02 265);
-  --color-foreground: oklch(96% 0.01 265);
-  --color-card: oklch(15% 0.02 265);
-  --color-card-foreground: oklch(96% 0.01 265);
-  --color-popover: oklch(15% 0.02 265);
-  --color-popover-foreground: oklch(96% 0.01 265);
-  --color-primary: oklch(60% 0.22 262);
-  --color-primary-foreground: oklch(100% 0 0);
-  --color-secondary: oklch(22% 0.02 265);
-  --color-secondary-foreground: oklch(96% 0.01 265);
-  --color-muted: oklch(22% 0.02 265);
-  --color-muted-foreground: oklch(65% 0.02 265);
-  --color-accent: oklch(22% 0.02 265);
-  --color-accent-foreground: oklch(96% 0.01 265);
-  /* 橙金色 - 在深色背景上更易辨识 */
-  --color-destructive: oklch(75% 0.18 55);
-  --color-destructive-foreground: oklch(15% 0.02 55);
-  --color-border: oklch(25% 0.02 265);
-  --color-input: oklch(25% 0.02 265);
-  --color-ring: oklch(60% 0.22 262);
+  --color-background: oklch(0.145 0 0);
+  --color-foreground: oklch(0.985 0 0);
+  --color-card: oklch(0.269 0 0);
+  --color-card-foreground: oklch(0.985 0 0);
+  --color-popover: oklch(0.269 0 0);
+  --color-popover-foreground: oklch(0.985 0 0);
+  --color-primary: oklch(0.922 0 0);
+  --color-primary-foreground: oklch(0.205 0 0);
+  --color-secondary: oklch(0.269 0 0);
+  --color-secondary-foreground: oklch(0.985 0 0);
+  --color-muted: oklch(0.269 0 0);
+  --color-muted-foreground: oklch(0.708 0 0);
+  --color-accent: oklch(0.269 0 0);
+  --color-accent-foreground: oklch(0.985 0 0);
+  --color-destructive: oklch(0.704 0.191 22.216);
+  --color-destructive-foreground: oklch(0.921 0 0);
+  --color-border: oklch(1 0 0 / 10%);
+  --color-input: oklch(1 0 0 / 15%);
+  --color-ring: oklch(0.556 0 0);
+  --color-chart-1: oklch(0.488 0 0);
+  --color-chart-2: oklch(0.596 0 0);
+  --color-chart-3: oklch(0.708 0 0);
+  --color-chart-4: oklch(0.812 0 0);
+  --color-chart-5: oklch(0.922 0 0);
+  --color-sidebar: oklch(0.205 0 0);
+  --color-sidebar-foreground: oklch(0.985 0 0);
+  --color-sidebar-primary: oklch(0.488 0.243 264.376);
+  --color-sidebar-primary-foreground: oklch(0.985 0 0);
+  --color-sidebar-accent: oklch(0.269 0 0);
+  --color-sidebar-accent-foreground: oklch(0.985 0 0);
+  --color-sidebar-border: oklch(1 0 0 / 10%);
+  --color-sidebar-ring: oklch(0.556 0 0);
 
-  --color-panel: oklch(16% 0.02 265);
-  --color-panel-muted: oklch(13% 0.018 265);
-  --color-panel-subtle: oklch(18% 0.02 265);
-  --color-panel-border: oklch(26% 0.015 265);
-  --color-panel-border-strong: oklch(32% 0.018 265);
+  --color-panel: oklch(0.205 0 0);
+  --color-panel-muted: oklch(0.145 0 0);
+  --color-panel-subtle: oklch(0.205 0 0);
+  --color-panel-border: oklch(1 0 0 / 10%);
+  --color-panel-border-strong: oklch(1 0 0 / 20%);
 
   color-scheme: dark;
 }
@@ -183,6 +224,18 @@
    Base Styles
    ============================================ */
 @layer base {
+  :root {
+    /* One height for every column's top strip.
+     *
+     * The three strips are three different components — the nav's panel
+     * header, the editor's tab band, the preview's panel header — and sizing
+     * each by its own content is what made their bottom edges disagree: the
+     * nav's segmented control is 24px tall, the preview's copy button is 28px,
+     * and the tab band sized itself from its own padding. A shared constant is
+     * the only thing that keeps them in step. */
+    --panel-header-height: 3.25rem;
+  }
+
   * {
     border-color: var(--color-border);
   }
@@ -199,9 +252,17 @@
     font-family: var(--font-sans);
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Monospace digits are already tabular; do not let browsers second-guess
+     them into odd spacing inside inputs. */
+  input,
+  textarea,
+  select,
+  kbd {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -237,6 +298,15 @@
     background-color: var(--color-panel-subtle);
   }
 
+  /* The top strip of a column: a fixed height so the three columns align,
+     with content centred inside it rather than setting the height. */
+  .app-panel-header {
+    display: flex;
+    height: var(--panel-header-height);
+    flex-shrink: 0;
+    align-items: center;
+  }
+
   .border-theme {
     border-color: var(--color-panel-border);
   }
@@ -256,8 +326,7 @@
   }
 
   /* Resizer handle */
-  .app-resizer {
-    position: relative;
+  .app-resizer {    position: relative;
     width: 0.25rem;
     cursor: col-resize;
     background-color: transparent;
@@ -287,10 +356,138 @@
     background-color: var(--color-primary);
     width: 2px;
   }
+
+  /* ---------------------------------------------------------------
+     Range input
+
+     A native `<input type="range">` with the platform chrome stripped, so
+     keyboard, touch, and screen-reader behaviour stay the browser's job
+     while the look stays ours. Deliberately not a JS-built slider: the
+     engine ships as one embedded HTML file, and every dependency it does
+     not take is weight the form does not carry.
+     --------------------------------------------------------------- */
+  .range-input {
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    width: 100%;
+    height: 1.25rem;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .range-input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Focus is drawn on the thumb, so the input itself must not add a ring. */
+  .range-input:focus {
+    outline: none;
+  }
+
+  .range-input::-webkit-slider-runnable-track {
+    height: 0.375rem;
+    border-radius: 9999px;
+    /* `--fill` is set inline from the current value. */
+    background: linear-gradient(
+      to right,
+      var(--color-primary) 0%,
+      var(--color-primary) var(--fill, 0%),
+      var(--color-secondary) var(--fill, 0%),
+      var(--color-secondary) 100%
+    );
+  }
+
+  .range-input::-moz-range-track {
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--color-primary) 0%,
+      var(--color-primary) var(--fill, 0%),
+      var(--color-secondary) var(--fill, 0%),
+      var(--color-secondary) 100%
+    );
+  }
+
+  .range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    /* Centre a 1rem thumb on a 0.375rem track. */
+    margin-top: -0.3125rem;
+    border-radius: 9999px;
+    border: 2px solid var(--color-primary);
+    background-color: var(--color-background);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.12s ease;
+  }
+
+  .range-input::-moz-range-thumb {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 9999px;
+    border: 2px solid var(--color-primary);
+    background-color: var(--color-background);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.12s ease;
+  }
+
+  .range-input:hover::-webkit-slider-thumb {
+    transform: scale(1.12);
+  }
+
+  .range-input:hover::-moz-range-thumb {
+    transform: scale(1.12);
+  }
+
+  .range-input:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-ring) 45%, transparent);
+  }
+
+  .range-input:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-ring) 45%, transparent);
+  }
+
+  /* Stacked thumbs: the inputs cover the track so the whole strip is a hit
+     target, and only the handles take the pointer back — otherwise the upper
+     input would swallow every click meant for the lower one. */
+  .range-input-stacked {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .range-input-stacked::-webkit-slider-thumb {
+    pointer-events: auto;
+  }
+
+  .range-input-stacked::-moz-range-thumb {
+    pointer-events: auto;
+  }
+
+  /* A stacked input still draws its own track, which would sit on top of the
+     shared one below it. */
+  .range-input-stacked::-webkit-slider-runnable-track {
+    background: transparent;
+  }
+
+  .range-input-stacked::-moz-range-track {
+    background: transparent;
+  }
 }
 
 /* ============================================
    Prism.js Syntax Highlighting
+
+   A deliberate exception to the monochrome preset. Chrome stays colourless,
+   but code does not: a zero-chroma token palette distinguishes values by
+   lightness alone, which in dark mode collapsed keys, numbers, booleans and
+   keywords onto the same near-white. Hues here are held to a low chroma
+   (0.11-0.19) so the panel still reads as restrained.
    ============================================ */
 code[class*="language-"],
 pre[class*="language-"] {
@@ -312,35 +509,38 @@ pre[class*="language-"] {
   hyphens: none;
 }
 
-/* Light mode token colors */
+/* ---- Light ---- */
+
 .token.comment,
 .token.prolog,
 .token.doctype,
 .token.cdata {
-  color: oklch(55% 0.02 260);
+  color: oklch(0.556 0.02 260);
   font-style: italic;
 }
 
+/* Punctuation recedes: it is structure, not content. */
 .token.punctuation {
-  color: oklch(45% 0.02 260);
+  color: oklch(0.5 0.02 260);
 }
 
+/* JSON keys carry the structure, so they get the strongest weight. */
 .token.property,
 .token.tag,
 .token.constant,
 .token.symbol,
 .token.deleted {
-  color: oklch(50% 0.18 160);
+  color: oklch(0.45 0.15 265);
+  font-weight: 600;
 }
 
 .token.boolean {
-  color: oklch(55% 0.22 330);
+  color: oklch(0.5 0.18 310);
   font-weight: 600;
 }
 
 .token.number {
-  color: oklch(55% 0.2 290);
-  font-weight: 600;
+  color: oklch(0.55 0.15 45);
 }
 
 .token.selector,
@@ -349,7 +549,7 @@ pre[class*="language-"] {
 .token.char,
 .token.builtin,
 .token.inserted {
-  color: oklch(55% 0.18 200);
+  color: oklch(0.5 0.13 155);
 }
 
 .token.operator,
@@ -358,24 +558,28 @@ pre[class*="language-"] {
 .language-css .token.string,
 .style .token.string,
 .token.variable {
-  color: oklch(55% 0.15 190);
+  color: oklch(0.52 0.05 260);
 }
 
 .token.atrule,
 .token.attr-value,
 .token.function,
 .token.class-name {
-  color: oklch(50% 0.2 30);
+  color: oklch(0.48 0.15 265);
 }
 
 .token.keyword {
-  color: oklch(50% 0.2 30);
+  color: oklch(0.5 0.18 310);
   font-weight: 600;
 }
 
 .token.regex,
 .token.important {
-  color: oklch(55% 0.2 290);
+  color: oklch(0.55 0.15 45);
+}
+
+.token.null {
+  color: oklch(0.55 0.15 45);
 }
 
 .token.important,
@@ -391,21 +595,17 @@ pre[class*="language-"] {
   cursor: help;
 }
 
-.token.null {
-  color: oklch(65% 0.18 55);
-  font-weight: 600;
-}
+/* ---- Dark ---- */
 
-/* Dark mode token colors */
 .dark .token.comment,
 .dark .token.prolog,
 .dark .token.doctype,
 .dark .token.cdata {
-  color: oklch(60% 0.02 260);
+  color: oklch(0.62 0.02 260);
 }
 
 .dark .token.punctuation {
-  color: oklch(70% 0.02 260);
+  color: oklch(0.6 0.02 260);
 }
 
 .dark .token.property,
@@ -413,15 +613,17 @@ pre[class*="language-"] {
 .dark .token.constant,
 .dark .token.symbol,
 .dark .token.deleted {
-  color: oklch(70% 0.18 160);
+  color: oklch(0.8 0.11 265);
+  font-weight: 600;
 }
 
 .dark .token.boolean {
-  color: oklch(75% 0.18 330);
+  color: oklch(0.8 0.13 310);
+  font-weight: 600;
 }
 
 .dark .token.number {
-  color: oklch(75% 0.18 290);
+  color: oklch(0.84 0.12 60);
 }
 
 .dark .token.selector,
@@ -430,7 +632,7 @@ pre[class*="language-"] {
 .dark .token.char,
 .dark .token.builtin,
 .dark .token.inserted {
-  color: oklch(75% 0.15 180);
+  color: oklch(0.82 0.11 155);
 }
 
 .dark .token.operator,
@@ -439,20 +641,26 @@ pre[class*="language-"] {
 .dark .language-css .token.string,
 .dark .style .token.string,
 .dark .token.variable {
-  color: oklch(70% 0.12 190);
+  color: oklch(0.72 0.04 260);
 }
 
 .dark .token.atrule,
 .dark .token.attr-value,
 .dark .token.function,
 .dark .token.class-name {
-  color: oklch(75% 0.15 30);
+  color: oklch(0.8 0.11 265);
 }
 
 .dark .token.keyword {
-  color: oklch(75% 0.15 30);
+  color: oklch(0.8 0.13 310);
+  font-weight: 600;
+}
+
+.dark .token.regex,
+.dark .token.important {
+  color: oklch(0.84 0.12 60);
 }
 
 .dark .token.null {
-  color: oklch(80% 0.16 55);
+  color: oklch(0.84 0.12 60);
 }

@@ -93,6 +93,43 @@ export interface VisibleWhen {
   value: JsonValue;
 }
 
+/**
+ * The control an author asked for with `x-control`.
+ *
+ * Absent means "you choose" — pick the default for the node's shape. A control
+ * this build does not know about must also fall back to that default rather
+ * than render nothing, so adding a name here is the only way to opt into a
+ * bespoke renderer.
+ */
+export type FieldControl =
+  | "text"
+  | "textarea"
+  | "select"
+  | "segmented"
+  | "radio"
+  | "switch"
+  | "checkbox"
+  | "slider"
+  | "range"
+  | "color";
+
+/** A labelled stop along a slider track, from `x-slider-marks`. */
+export interface SliderMark {
+  value: number;
+  label?: string | null;
+}
+
+/**
+ * Range and scale for a ranged control, read from `minimum`, `maximum`,
+ * `multipleOf` and `x-slider-marks`.
+ */
+export interface FieldBounds {
+  minimum?: number | null;
+  maximum?: number | null;
+  step?: number | null;
+  marks?: SliderMark[];
+}
+
 export interface UiNode {
   pointer: string;
   title?: string | null;
@@ -100,6 +137,8 @@ export interface UiNode {
   required: boolean;
   default_value?: JsonValue | null;
   visible_when?: VisibleWhen | null;
+  control?: FieldControl | null;
+  bounds?: FieldBounds | null;
   kind: UiNodeKind;
 }
 
