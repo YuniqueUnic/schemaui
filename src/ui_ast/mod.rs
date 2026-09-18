@@ -9,5 +9,6 @@ pub use builder::build_ui_ast;
 pub use bundle::{UiAstBundle, build_ui_ast_bundle};
 pub use layout::{LayoutRoot, LayoutSection, UiLayout};
 pub use types::{
-    CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant, VisibleWhen, VisibleWhenOp,
+    CompositeMode, FieldBounds, FieldControl, ScalarKind, SliderMark, UiAst, UiNode, UiNodeKind,
+    UiVariant, VisibleWhen, VisibleWhenOp,
 };

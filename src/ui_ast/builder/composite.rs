@@ -37,15 +37,7 @@ pub(super) fn build_composite_node(
         None
     };
 
-    Ok(UiNode {
-        pointer,
-        title: super::schema_helpers::schema_title(schema),
-        description: super::schema_helpers::schema_description(schema),
-        required,
-        default_value,
-        visible_when: None,
-        kind,
-    })
+    super::hints::node(schema, pointer, required, default_value, kind)
 }
 
 pub(super) fn build_variant(

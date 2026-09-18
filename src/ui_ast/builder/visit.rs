@@ -101,17 +101,15 @@ pub(super) fn visit_schema(
     if let Some(template) =
         super::key_value::build_key_value_template(resolver, schema, active_refs)?
     {
-        return Ok(UiNode {
+        return super::hints::node(
+            schema,
             pointer,
-            title: super::schema_helpers::schema_title(schema),
-            description: super::schema_helpers::schema_description(schema),
             required,
-            default_value: super::defaults::schema_default_or_const(schema),
-            visible_when: None,
-            kind: UiNodeKind::KeyValue {
+            super::defaults::schema_default_or_const(schema),
+            UiNodeKind::KeyValue {
                 template: Box::new(template),
             },
-        });
+        );
     }
 
     if super::schema_helpers::is_array_schema(schema) {
@@ -124,19 +122,17 @@ pub(super) fn visit_schema(
         };
         let default_value = super::defaults::schema_default_or_const(schema)
             .or_else(|| Some(Value::Array(Vec::new())));
-        return Ok(UiNode {
+        return super::hints::node(
+            schema,
             pointer,
-            title: super::schema_helpers::schema_title(schema),
-            description: super::schema_helpers::schema_description(schema),
             required,
             default_value,
-            visible_when: None,
-            kind: UiNodeKind::Array {
+            UiNodeKind::Array {
                 item: Box::new(item_node),
                 min_items: array.and_then(|inner| inner.min_items).map(u64::from),
                 max_items: array.and_then(|inner| inner.max_items).map(u64::from),
             },
-        });
+        );
     }
 
     if super::schema_helpers::is_object_schema(schema) {
@@ -152,38 +148,34 @@ pub(super) fn visit_schema(
         )?;
         let default_value =
             super::defaults::schema_default_or_const(schema).or(Some(Value::Object(Map::new())));
-        return Ok(UiNode {
+        return super::hints::node(
+            schema,
             pointer,
-            title: super::schema_helpers::schema_title(schema),
-            description: super::schema_helpers::schema_description(schema),
             required,
             default_value,
-            visible_when: None,
-            kind: UiNodeKind::Object {
+            UiNodeKind::Object {
                 children,
                 required: required_fields,
             },
-        });
+        );
     }
 
     let (scalar, enum_options, enum_values, nullable) = super::defaults::detect_scalar(schema)?;
     let default_value = super::defaults::schema_default_or_const(schema)
         .or_else(|| super::defaults::infer_default_scalar(scalar, enum_values.as_ref()));
-    Ok(UiNode {
+    super::hints::node(
+        schema,
         pointer,
-        title: super::schema_helpers::schema_title(schema),
-        description: super::schema_helpers::schema_description(schema),
         required,
         default_value,
-        visible_when: None,
-        kind: UiNodeKind::Field {
+        UiNodeKind::Field {
             scalar,
             enum_options,
             enum_values,
             nullable,
             multiline: super::hints::is_multiline(schema)?,
         },
-    })
+    )
 }
 
 pub(super) fn visit_kind(
@@ -399,13 +391,5 @@ fn recursive_boundary_node(
             .or_else(|| super::defaults::infer_default_for_composite(variants, *allow_multiple)),
     };
 
-    Ok(UiNode {
-        pointer,
-        title: super::schema_helpers::schema_title(schema),
-        description: super::schema_helpers::schema_description(schema),
-        required,
-        default_value,
-        visible_when: None,
-        kind,
-    })
+    super::hints::node(schema, pointer, required, default_value, kind)
 }
