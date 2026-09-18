@@ -27,6 +27,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.14.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.13.0...schemaui-v0.14.0) - 2026-09-18
+
+
+
+
+### Features
+
+- **ui-ast:** parse x-control, x-slider-marks and range bounds into the AST(@YuniqueUnic)
+
+- **web:** draw the controls the schema asks for(@YuniqueUnic)
+
+
+
+
+### Bug Fixes
+
+- make the session deadline visible, and cut the Web UI back to one status line(@YuniqueUnic)
+
+
+
+
+### Documentation
+
+- controls gallery example, new screenshots, README refresh(@YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.13.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.12.4...schemaui-v0.13.0) - 2026-09-17
 
 
