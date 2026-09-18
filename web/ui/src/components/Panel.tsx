@@ -36,18 +36,19 @@ interface PanelHeaderProps extends HTMLAttributes<HTMLDivElement> {
   label?: ReactNode;
   actions?: ReactNode;
   icon?: ReactNode;
-  dense?: boolean;
 }
 
 /**
  * PanelHeader — consistent header strip for every panel:
  * small uppercase label on the left, optional icon, actions on the right.
+ *
+ * The height comes from `.app-panel-header` rather than from its own padding,
+ * so it matches the editor's tab band, which is not a PanelHeader at all.
  */
 export function PanelHeader({
   label,
   actions,
   icon,
-  dense = false,
   className,
   children,
   ...rest
@@ -55,15 +56,14 @@ export function PanelHeader({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-2 border-b border-theme bg-panel/60",
-        dense ? "px-3 py-2" : "px-4 py-3",
+        "app-panel-header justify-between gap-2 border-b border-theme bg-panel/60 px-4",
         className,
       )}
       {...rest}
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex min-w-0 items-center gap-2">
         {icon && (
-          <span className="text-muted-foreground shrink-0 flex items-center">
+          <span className="flex shrink-0 items-center text-muted-foreground">
             {icon}
           </span>
         )}

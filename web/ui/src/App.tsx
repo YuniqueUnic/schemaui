@@ -34,6 +34,16 @@ import {
 
 type PanelView = "nav" | "editor" | "preview";
 
+/**
+ * What the whole-document entry is called, in the tab band and the tree.
+ *
+ * A fixed word rather than the document's title: the title is a sentence
+ * ("Service rollout") that reads as a heading, and a tab needs a label. It also
+ * must not come from `layout.roots[0].title` — that is the *first section*, so
+ * using it labelled the root tab with the name of one of its own children.
+ */
+const ROOT_LABEL = "General";
+
 export default function App() {
   const { state, actions, dirtyRef } = useSessionState();
   const { sizes, startDrag, isDragging } = useResizableColumns({ nav: 280, preview: 380 });
@@ -100,14 +110,12 @@ export default function App() {
 
   const roots = useMemo(() => uiAst?.roots ?? [], [uiAst]);
 
-  const virtualRootTitle = session?.layout?.roots?.[0]?.title ?? "General";
-
   const selectedNode = useMemo<UiNode | undefined>(() => {
     if (!state.selectedPointer) {
       if (roots.length === 0) return undefined;
       return {
         pointer: "",
-        title: virtualRootTitle,
+        title: ROOT_LABEL,
         description: null,
         required: false,
         default_value: null,
@@ -115,7 +123,7 @@ export default function App() {
       };
     }
     return findNodeByPointer(roots, state.selectedPointer);
-  }, [roots, state.selectedPointer, virtualRootTitle]);
+  }, [roots, state.selectedPointer]);
 
   const hasLayout = !!(session?.layout && session.layout.roots.length > 0);
   const focusLabel = selectedNode
@@ -245,6 +253,7 @@ export default function App() {
                     ast={uiAst}
                     selectedPointer={selectedPointer}
                     errors={errors}
+                    rootLabel={ROOT_LABEL}
                     onSelect={(pointer) => {
                       actions.setSelectedPointer(pointer);
                       if (!isDesktop) setMobileView("editor");
@@ -257,7 +266,7 @@ export default function App() {
                       layout={session.layout}
                       ast={uiAst}
                       selectedPointer={selectedPointer}
-                      rootLabel={virtualRootTitle}
+                      rootLabel={ROOT_LABEL}
                       onSelect={(pointer) => {
                         actions.setSelectedPointer(pointer);
                         if (!isDesktop) setMobileView("editor");
@@ -285,6 +294,7 @@ export default function App() {
             <div className="flex flex-1 flex-col overflow-hidden">
               <SectionTabs
                 roots={roots}
+                rootLabel={ROOT_LABEL}
                 selectedPointer={selectedPointer}
                 onSelect={actions.setSelectedPointer}
               />
@@ -299,12 +309,26 @@ export default function App() {
                             root.pointer === selectedNode.pointer
                           )}
                         />
-                        <EditorBody
-                          node={selectedNode}
-                          data={data}
-                          errors={errors}
-                          onChange={handleChange}
-                        />
+                        {/* The virtual root has no fields of its own — it is
+                            every section at once, so each one is rendered with
+                            the heading the tabs would otherwise have carried. */}
+                        {!selectedNode.pointer && roots.length > 0
+                          ? (
+                            <GeneralView
+                              roots={roots}
+                              data={data}
+                              errors={errors}
+                              onChange={handleChange}
+                            />
+                          )
+                          : (
+                            <EditorBody
+                              node={selectedNode}
+                              data={data}
+                              errors={errors}
+                              onChange={handleChange}
+                            />
+                          )}
                       </>
                     )
                     : (
@@ -397,24 +421,30 @@ function SessionNotice({
 }
 
 /**
- * The editor's one navigation band: the top-level sections, as underlined tabs.
+ * The editor's one navigation band: "General", then the top-level sections, as
+ * underlined tabs.
  *
  * It used to be two rows of pill chips — one per level of the path — plus a
  * breadcrumb and a section heading, which named the same section up to four
  * times. One stable row is enough: it answers "which part of the form am I in",
- * and the tree on the left remains the full hierarchy. Hidden when there is
- * only one section, since a single tab navigates nowhere.
+ * and the tree on the left remains the full hierarchy.
+ *
+ * "General" is the whole document on one page, which is also where the session
+ * opens. Without it there was no way back to that view once a section had been
+ * picked, so browsing the form meant visiting every section in turn.
  */
 function SectionTabs({
   roots,
+  rootLabel,
   selectedPointer,
   onSelect,
 }: {
   roots: UiNode[];
+  rootLabel: string;
   selectedPointer?: string;
   onSelect(pointer: string): void;
 }) {
-  if (roots.length < 2) return null;
+  if (roots.length === 0) return null;
 
   const activePointer = roots.find(
     (root) =>
@@ -422,28 +452,55 @@ function SectionTabs({
       selectedPointer?.startsWith(`${root.pointer}/`),
   )?.pointer;
 
+  const tabs = [
+    { pointer: "", label: rootLabel },
+    ...roots.map((root) => ({ pointer: root.pointer, label: nodeLabel(root) })),
+  ];
+
+  // One section already is the whole document, so a band of tabs would offer
+  // two names for the same page. The strip still exists and is still the same
+  // height — a column whose header vanished would break the alignment the
+  // other two share — but it carries the name instead of a control.
+  const showTabs = roots.length >= 2;
+  const stripClass =
+    "app-panel-header shrink-0 border-b border-theme px-4 md:px-6";
+
+  if (!showTabs) {
+    return (
+      <div className={stripClass}>
+        <div className="mx-auto flex h-full w-full max-w-3xl items-center">
+          <span className="text-xs font-medium text-foreground">
+            {nodeLabel(roots[0])}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <nav
-      aria-label="Sections"
-      className="shrink-0 border-b border-theme px-4 md:px-6"
-    >
-      <div className="mx-auto flex w-full max-w-3xl gap-1 overflow-x-auto">
-        {roots.map((root) => {
-          const active = root.pointer === activePointer;
+    <nav aria-label="Sections" className={stripClass}>
+      {/* `items-stretch` plus a full-height button puts each tab's underline on
+          the strip's bottom edge, which is what makes the band read as one
+          row rather than as buttons floating inside a box. */}
+      <div className="mx-auto flex h-full w-full max-w-3xl items-stretch gap-1 overflow-x-auto">
+        {tabs.map((tab) => {
+          const active = tab.pointer === ""
+            ? !selectedPointer
+            : tab.pointer === activePointer;
           return (
             <button
-              key={root.pointer}
+              key={tab.pointer || "__general"}
               type="button"
-              onClick={() => onSelect(root.pointer)}
+              onClick={() => onSelect(tab.pointer)}
               aria-current={active ? "true" : undefined}
               className={cn(
-                "shrink-0 whitespace-nowrap border-b-2 px-2.5 pb-2.5 pt-3 text-xs transition-colors",
+                "flex shrink-0 items-center whitespace-nowrap border-b-2 px-2.5 text-xs transition-colors",
                 active
                   ? "border-primary font-medium text-foreground"
                   : "border-transparent text-muted-foreground hover:border-theme-strong hover:text-foreground",
               )}
             >
-              {nodeLabel(root)}
+              {tab.label}
             </button>
           );
         })}
@@ -550,6 +607,56 @@ function EditorBody({
   );
 }
 
+/**
+ * Every section on one page, in document order.
+ *
+ * This is what the "General" tab and the tree's root row show. Each section
+ * keeps its own heading and its own card list, so the page still reads as
+ * sections rather than as one undifferentiated column of fields — the point is
+ * to remove the need to *navigate*, not to remove the structure.
+ *
+ * Rendered through the same `EditorBody` the single-section view uses, so the
+ * two cannot drift apart in spacing or card treatment.
+ */
+function GeneralView({
+  roots,
+  data,
+  errors,
+  onChange,
+}: {
+  roots: UiNode[];
+  data: JsonValue;
+  errors: Map<string, string>;
+  onChange: (pointer: string, value: JsonValue) => void;
+}) {
+  return (
+    <div className="space-y-8">
+      {roots.map((root) => (
+        <section key={root.pointer} aria-labelledby={`section-${root.pointer}`}>
+          <h2
+            id={`section-${root.pointer}`}
+            className="mb-2 flex items-center gap-2 text-[13px] font-semibold tracking-tight text-foreground"
+          >
+            {nodeLabel(root)}
+            {root.required && <RequiredTag />}
+          </h2>
+          {root.description && (
+            <p className="mb-2.5 max-w-[68ch] text-xs leading-relaxed text-muted-foreground">
+              {root.description}
+            </p>
+          )}
+          <EditorBody
+            node={root}
+            data={data}
+            errors={errors}
+            onChange={onChange}
+          />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 function nodeLabel(node: UiNode): string {
   const title = node.title?.trim();
   if (title) return title;
@@ -570,7 +677,7 @@ interface MobilePanelSwitchProps {
 
 function MobilePanelSwitch({ value, onChange }: MobilePanelSwitchProps) {
   return (
-    <div className="flex items-center justify-center border-b border-theme bg-background/80 px-2 py-2 backdrop-blur lg:hidden">
+    <div className="app-panel-header justify-center border-b border-theme bg-background/80 px-2 backdrop-blur lg:hidden">
       <SegmentedControl<PanelView>
         value={value}
         onChange={onChange}

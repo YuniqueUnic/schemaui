@@ -93,13 +93,20 @@ function compactStatus(status: string, fallback: string) {
   return trimmed;
 }
 
+/**
+ * Tones on the preset's monochrome scale.
+ *
+ * The theme carries no hue, so state is carried by *weight* instead: a filled
+ * pill means "this wants attention" (unsaved), an outlined one means "nothing
+ * to do", and red is reserved for the single case that has earned a colour —
+ * errors. A green "Ready" and a blue "Saving" would each be a second accent
+ * competing with the content for the same glance.
+ */
 const TONE_CLASS: Record<StatusTone, string> = {
-  ready:
-    "border-emerald-500/30 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-  dirty:
-    "border-amber-500/30 bg-amber-500/12 text-amber-700 dark:text-amber-300",
-  error: "border-rose-500/30 bg-rose-500/12 text-rose-700 dark:text-rose-300",
-  busy: "border-sky-500/30 bg-sky-500/12 text-sky-700 dark:text-sky-300",
+  ready: "border-border bg-transparent text-muted-foreground",
+  dirty: "border-transparent bg-primary text-primary-foreground",
+  error: "border-destructive/40 bg-destructive/10 text-destructive",
+  busy: "border-border bg-muted text-muted-foreground",
 };
 
 /**
@@ -176,7 +183,7 @@ export function StatusBar({
           <button
             type="button"
             onClick={onErrorsClick}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-700 transition hover:bg-rose-500/15 dark:text-rose-300"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive transition hover:bg-destructive/15"
           >
             <AlertCircle className="h-3 w-3" />
             <span>{errorCount}</span>

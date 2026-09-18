@@ -8,6 +8,8 @@ interface TreeViewProps {
   ast?: UiAst | null;
   selectedPointer?: string;
   errors?: Map<string, string>;
+  /** Label for the root row that selects the whole document. */
+  rootLabel?: string;
   onSelect(pointer: string): void;
 }
 
@@ -20,9 +22,25 @@ interface TreeItem {
 }
 
 export function TreeView(
-  { ast, selectedPointer, errors, onSelect }: TreeViewProps,
+  { ast, selectedPointer, errors, rootLabel = "General", onSelect }:
+    TreeViewProps,
 ) {
-  const items = useMemo(() => buildTree(ast?.roots ?? [], 0), [ast]);
+  const items = useMemo(() => {
+    const roots = ast?.roots ?? [];
+    // The virtual root is prepended rather than special-cased in the renderer,
+    // so it collapses, indents and highlights exactly like any other branch.
+    // Layout mode has always exposed this row; schema mode was missing it, and
+    // that asymmetry was the only reason a user had to visit every section to
+    // see the whole form.
+    const root: TreeItem = {
+      pointer: "",
+      label: rootLabel,
+      depth: 0,
+      hasChildren: roots.length > 0,
+      children: buildTree(roots, 1),
+    };
+    return [root];
+  }, [ast, rootLabel]);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   // Check if a pointer or any of its children have errors
@@ -35,7 +53,7 @@ export function TreeView(
     return false;
   };
 
-  if (!items.length) {
+  if (!ast?.roots.length) {
     return (
       <div className="flex h-full items-center justify-center text-xs text-muted">
         No schema
@@ -77,8 +95,14 @@ function TreeRow({
   hasError: (pointer: string) => boolean;
   onSelect(pointer: string): void;
 }) {
-  const isActive = selectedPointer === item.pointer ||
-    selectedPointer?.startsWith(`${item.pointer}/`) === true;
+  // The root row highlights only when it is itself selected. Its pointer is the
+  // empty string, so the usual "is this an ancestor" test would match every
+  // descendant and leave the General row looking permanently active.
+  const isActive = item.pointer === ""
+    ? selectedPointer === ""
+    : selectedPointer === item.pointer ||
+      selectedPointer?.startsWith(`${item.pointer}/`) === true;
+  const isRoot = item.depth === 0;
   const isCollapsed = collapsed[item.pointer];
   const itemHasError = hasError(item.pointer);
   const toggle = (event: React.MouseEvent) => {
@@ -98,10 +122,6 @@ function TreeRow({
         )}
         style={{ paddingLeft: 8 + item.depth * 14 }}
       >
-        {/* Leaves get a blank column rather than an icon: every leaf shared the
-            same page glyph, so it carried no information and just added a stripe
-            of identical marks down the panel. The spacer keeps labels aligned
-            with their siblings under an expandable parent. */}
         {item.hasChildren
           ? (
             <span
@@ -114,7 +134,12 @@ function TreeRow({
             </span>
           )
           : <span className="h-4 w-4 shrink-0" aria-hidden="true" />}
-        <span className="truncate text-left flex items-center gap-2">
+        <span
+          className={cn(
+            "flex items-center gap-2 truncate text-left",
+            isRoot && "text-[13px] font-semibold tracking-tight",
+          )}
+        >
           {item.label}
           {itemHasError && (
             <AlertCircle className="h-3.5 w-3.5 text-destructive flex-shrink-0" />

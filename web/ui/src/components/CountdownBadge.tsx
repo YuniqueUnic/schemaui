@@ -24,12 +24,13 @@ export const CountdownBadge = memo(function CountdownBadge({
 }: CountdownBadgeProps) {
   const urgency = countdownUrgency(secondsLeft);
 
+  // Escalates through weight, then colour: quiet outline → full-contrast text
+  // → destructive. Three steps is enough to notice a deadline approaching
+  // without turning the header into a traffic light.
   const toneClass = {
     calm: "border-border/70 bg-muted/60 text-muted-foreground",
-    warning:
-      "border-amber-500/30 bg-amber-500/12 text-amber-700 dark:text-amber-300",
-    critical:
-      "border-rose-500/40 bg-rose-500/15 text-rose-700 dark:text-rose-300",
+    warning: "border-foreground/30 bg-muted text-foreground",
+    critical: "border-destructive/40 bg-destructive/10 text-destructive",
   }[urgency];
 
   return (

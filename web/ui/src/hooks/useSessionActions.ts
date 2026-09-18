@@ -125,9 +125,12 @@ export function useSessionActions(
       );
 
       const formats = payload.formats?.length ? payload.formats : ["json"];
-      const initialPointer = resolveInitialPointer(payload.ui_ast);
 
-      actions.initSession(payload, withDefaults, formats, initialPointer);
+      // Land on the virtual root, so the first thing on screen is the whole
+      // document rather than whichever section happened to be declared first.
+      // Every section is reachable from there in one scroll, and the tabs are
+      // there for anyone who would rather narrow it down.
+      actions.initSession(payload, withDefaults, formats, ROOT_POINTER);
 
       // Run initial validation and preview
       await Promise.all([
@@ -354,11 +357,15 @@ function fnv1a64(text: string): string {
     + (high >>> 0).toString(16).padStart(8, "0");
 }
 
-function resolveInitialPointer(
-  ast: { roots: { pointer: string }[] } | null | undefined,
-): string {
-  return ast?.roots?.[0]?.pointer ?? "";
-}
+/**
+ * The virtual root of the document.
+ *
+ * An empty JSON Pointer addresses the document itself, which is exactly what
+ * the root view shows: every section, in order. It is a real selection, not a
+ * "nothing selected" sentinel — that is why it is spelled out here rather than
+ * left as a bare `""` at the call site.
+ */
+const ROOT_POINTER = "";
 
 function previewErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
