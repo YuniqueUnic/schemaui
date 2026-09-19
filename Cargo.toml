@@ -13,23 +13,20 @@ documentation = "https://docs.rs/schemaui"
 description = "A Rust library for generating TUI and Web UIs from JSON Schemas for configuration management."
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-exclude = [
-  "web/ui/node_modules/**",
-  "web/ui/.vite/**",
-  "web/ui/.tmp/**",
-  "web/ui/.DS_Store",
-  "docs/**/*.gif",
-  "docs/**/*.mp4",
-]
+# A whitelist, so there is no `exclude` to pair with it: cargo warns that the
+# two cannot coexist and silently drops `exclude` anyway. Every pattern is
+# anchored with a leading `/` because an unanchored `README.md` or `LICENSE*`
+# matches at any depth, which pulls in the README/LICENSE files that
+# node_modules is full of — 2445 stray files, 85% of the unpacked tarball.
 include = [
-  "Cargo.toml",
-  "build.rs",
-  "keymap/default.keymap.json",
-  "src/**",
-  "web/dist/**",
-  "README.md",
-  "README.ZH.md",
-  "LICENSE*",
+  "/Cargo.toml",
+  "/build.rs",
+  "/keymap/default.keymap.json",
+  "/src/**",
+  "/web/dist/**",
+  "/README.md",
+  "/README.ZH.md",
+  "/LICENSE*",
 ]
 
 [features]
