@@ -29,6 +29,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.14.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.14.0...schemaui-v0.14.1) - 2026-09-19
+
+
+
+
+
+
+### Bug Fixes
+
+- **ci:** keep the Gitee mirror in the order and shape a visitor expects(@YuniqueUnic)
+
+- **packaging:** stop shipping node_modules in the published crate(@YuniqueUnic)
+
+
+
+
+### Documentation
+
+- **scripts:** list the Gitee mirror script alongside the other sync scripts(@YuniqueUnic)
+
+
+
+
+
+
+
+
+### Build and CI
+
+- **scripts:** demand GITEE_TOKEN instead of failing halfway(@YuniqueUnic)
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.14.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.13.0...schemaui-v0.14.0) - 2026-09-18
 
 
