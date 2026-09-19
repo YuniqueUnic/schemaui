@@ -132,6 +132,11 @@ python3 scripts/sync-release-to-gitee.py --tag "schemaui-cli-v0.7.0 schemaui-cli
   时以非零码退出，供 CI 断言
 - `--gitee-repo` 可覆盖镜像仓库；release 关联的提交取自 tag 自身指向的 commit
   （会解引用附注标签），不用分支名，否则 Gitee 上若缺该 tag 会被建到错误位置
+- **前提：Gitee 必须已持有该 tag 指向的 commit**。创建 release 会让 Gitee 去建
+  tag，而它建不了自己仓库里没有的 commit——此时返回 `400 创建标签失败`，只提
+  tag、不提真正原因。Gitee 自身的 git 同步跟不上 release-plz 推的提交，所以
+  `cd.yml` 在调用本脚本前会先把该 tag 推过去；手工回填若撞到这个 400，先执行
+  `git push https://gitee.com/Credhat/schemaui.git refs/tags/<tag>` 再重跑
 - 由 `cd.yml` 的 `mirror-to-gitee` 作业在 `upload-assets` 之后自动调用；历史
   release 用 `workflow_dispatch` 的 `gitee_tags` 输入触发
   `mirror-to-gitee-manual` 回填

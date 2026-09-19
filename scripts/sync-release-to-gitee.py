@@ -11,6 +11,12 @@ release assets from the same layout as GitHub:
 cd.yml runs this right after upload-assets, so a release is mirrored as soon as
 its binaries exist. --tag backfills the releases that predate the mirror.
 
+Creating a release makes Gitee create the tag, so the mirror has to hold the
+commit that tag points at before this runs: Gitee answers 400 "创建标签失败" for a
+commit it does not have. Its own git sync does not pick up the commits release-plz
+pushes, so cd.yml pushes the tag first. When backfilling by hand, push the tags
+too — the ones this script was written for are old enough that Gitee has them.
+
 Re-running is cheap and safe: an existing release is reused and an asset that is
 already attached is skipped, so an interrupted backfill can simply be run again.
 A dropped connection is retried, because a backfill makes a few hundred uploads

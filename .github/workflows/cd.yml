@@ -275,11 +275,43 @@ jobs:
     if: github.repository_owner == 'YuniqueUnic' && startsWith(github.event.release.name, 'schemaui-cli-v')
     runs-on: ubuntu-latest
     steps:
+      # The tag has to be pushed from here, so fetch the whole history rather
+      # than the one commit a default shallow checkout would leave behind.
       - name: Checkout default branch
         uses: actions/checkout@v7
         with:
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      # Creating a release makes Gitee create the tag, so the mirror has to hold
+      # the commit the tag points at first. Gitee's own mirror never picks up the
+      # commits release-plz pushes, and the release API then answers 400
+      # "创建标签失败" — which names the tag rather than the missing commit.
+      - name: Push the release tag to the Gitee mirror
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          # The token reaches git through an askpass helper instead of the URL, so
+          # it stays out of the process arguments and out of any error message.
+          # The heredoc is quoted, so $GITEE_TOKEN is written out for the helper
+          # to read from the environment rather than expanded here.
+          askpass="$(mktemp)"
+          trap 'rm -f "$askpass"' EXIT
+          cat > "$askpass" <<'ASKPASS'
+          #!/bin/sh
+          case "$1" in
+            *sername*) printf %s "Credhat" ;;
+            *) printf %s "$GITEE_TOKEN" ;;
+          esac
+          ASKPASS
+          chmod +x "$askpass"
+
+          GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+            git push https://gitee.com/Credhat/schemaui.git "refs/tags/${RELEASE_TAG}"
 
       - name: Setup Python 3
         uses: actions/setup-python@v7
