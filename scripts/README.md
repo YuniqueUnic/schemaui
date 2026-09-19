@@ -110,6 +110,7 @@ python3 scripts/sync-install-docs.py --check
 ```bash
 python3 scripts/sync-release-to-gitee.py --tag schemaui-cli-v0.8.0
 python3 scripts/sync-release-to-gitee.py --tag schemaui-cli-v0.8.0 --dry-run
+python3 scripts/sync-release-to-gitee.py --tag schemaui-cli-v0.8.0 --check
 
 # 回填多个历史 release（单个 --tag 内用空格或逗号分隔）
 python3 scripts/sync-release-to-gitee.py --tag "schemaui-cli-v0.7.0 schemaui-cli-v0.7.1"
@@ -121,8 +122,15 @@ python3 scripts/sync-release-to-gitee.py --tag "schemaui-cli-v0.7.0 schemaui-cli
 - 幂等：已存在的 release 会复用，已上传的 asset 会跳过，中断后可安全重跑
 - 上传中途连接被 Gitee 断开时，会先回查该 release 实际持有的 asset 再决定是否
   重传——断连时文件往往已经存进去了，盲目重传会产生重复附件
-- `--gitee-repo` / `--target-commitish` 可覆盖镜像仓库与目标分支；Gitee 默认指向
-  `master`，而本仓库没有该分支，所以默认值必须是 `main`
+- **多个 tag 会按版本从旧到新处理**，不要依赖传入顺序。Gitee 的 release 列表按
+  镜像记录的创建时间倒序排列，若先创建最新版，它就会被压到列表最底部（翻页才
+  看得到）
+- 同名附件若出现多份（例如两个回填进程并行），会自动只保留一份：优先保留大小与
+  GitHub 一致的副本，其余删除
+- `--check` 只校验镜像是否与 GitHub 一致，发现任何差异（缺失 / 重复 / 大小不符）
+  时以非零码退出，供 CI 断言
+- `--gitee-repo` 可覆盖镜像仓库；release 关联的提交取自 tag 自身指向的 commit
+  （会解引用附注标签），不用分支名，否则 Gitee 上若缺该 tag 会被建到错误位置
 - 由 `cd.yml` 的 `mirror-to-gitee` 作业在 `upload-assets` 之后自动调用；历史
   release 用 `workflow_dispatch` 的 `gitee_tags` 输入触发
   `mirror-to-gitee-manual` 回填

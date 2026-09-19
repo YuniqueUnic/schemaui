@@ -15,6 +15,15 @@ Re-running is cheap and safe: an existing release is reused and an asset that is
 already attached is skipped, so an interrupted backfill can simply be run again.
 A dropped connection is retried, because a backfill makes a few hundred uploads
 and one transient failure should not sink the run.
+
+Tags are processed oldest version first. Gitee orders a repo's release list by
+when the mirror created each record, newest first, so a backfill that creates the
+newest release first leaves it stranded at the bottom of the list. The newest
+release must be the one a visitor sees first, which is only true if the records
+were created in ascending version order.
+
+--check reports the same differences without writing and exits non-zero when it
+finds any, so CI can assert the mirror still matches GitHub.
 """
 from __future__ import annotations
 
@@ -71,31 +80,41 @@ def parse_args() -> argparse.Namespace:
         help="Gitee mirror in owner/name form",
     )
     parser.add_argument(
-        "--target-commitish",
-        default="main",
-        help=(
-            "branch the Gitee release points at; Gitee defaults to master, "
-            "which this mirror does not have"
-        ),
-    )
-    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="report what would change without writing to Gitee",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="report what would change and exit non-zero if anything would",
     )
     return parser.parse_args()
 
 
 def requested_tags(values: list[str]) -> list[str]:
-    """Split --tag values on commas and whitespace, keeping the caller's order.
+    """Split --tag values on commas and whitespace, ordered oldest version first.
 
-    cd.yml passes a single tag; a backfill passes a list, which is easier to
-    keep on one line in a workflow input than a repeated flag.
+    cd.yml passes a single tag; a backfill passes a list, which is easier to keep
+    on one line in a workflow input than a repeated flag.
+
+    The order matters even though every tag gets mirrored either way. Gitee lists
+    a repo's releases newest-*record*-first, and a record is stamped when the
+    mirror creates it, so creating the newest release first buries it at the
+    bottom of the list where nobody browsing the mirror will find it. Sorting by
+    version rather than trusting the caller keeps the page readable.
     """
     tags: list[str] = []
     for value in values:
         tags += [tag for tag in re.split(r"[,\s]+", value) if tag]
-    return list(dict.fromkeys(tags))
+    return sorted(dict.fromkeys(tags), key=version_key)
+
+
+def version_key(tag: str) -> tuple[tuple[int, ...], str]:
+    """Order a tag by the version it carries, falling back to its text."""
+    match = re.search(r"(\d+(?:\.\d+)*)$", tag)
+    numbers = tuple(int(part) for part in match.group(1).split(".")) if match else ()
+    return (numbers, tag)
 
 
 def request_bytes(
@@ -151,18 +170,46 @@ def request_json(url: str, **kwargs) -> object:
         raise SyncError(f"{url.split('?')[0]} -> not JSON: {body[:200]!r}") from error
 
 
-def github_release(repo: str, tag: str) -> dict:
+def github_headers() -> dict[str, str]:
     headers = {"Accept": "application/vnd.github+json"}
     # Optional, and only useful in CI where the runner IP is shared and the
-    # unauthenticated rate limit is easy to hit.
+    # unauthenticated rate limit is easy to hit. A backfill definitely hits it.
     token = os.environ.get("GITHUB_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def github_release(repo: str, tag: str) -> dict:
     url = f"{GITHUB_API}/repos/{repo}/releases/tags/{urllib.parse.quote(tag)}"
-    release = request_json(url, headers=headers)
+    release = request_json(url, headers=github_headers())
     if not isinstance(release, dict):
         raise SyncError(f"{repo} has no GitHub release tagged {tag}")
     return release
+
+
+def github_tag_commit(repo: str, tag: str) -> str:
+    """Return the commit a tag points at, dereferencing an annotated tag.
+
+    Gitee wants a commitish when it creates the release record, and it creates
+    the tag at that commitish if the tag is missing there. A branch name would
+    therefore drop an old release's tag onto today's tip, so resolve the commit
+    the tag actually names. GitHub's own release.target_commitish is no help: it
+    stores the branch the release was cut from, not a sha.
+    """
+    headers = github_headers()
+    ref = request_json(
+        f"{GITHUB_API}/repos/{repo}/git/ref/tags/{urllib.parse.quote(tag)}",
+        headers=headers,
+    )
+    target = ref["object"]
+    if target["type"] == "tag":
+        # Annotated tag: the ref names a tag object, which names the commit.
+        annotated = request_json(
+            f"{GITHUB_API}/repos/{repo}/git/tags/{target['sha']}", headers=headers
+        )
+        return annotated["object"]["sha"]
+    return target["sha"]
 
 
 def gitee_release(gitee_repo: str, tag: str, token: str) -> dict | None:
@@ -217,15 +264,65 @@ def gitee_attach_asset(gitee_repo: str, release_id: int, name: str, blob: bytes,
     )
 
 
-def gitee_asset_names(gitee_repo: str, tag: str, token: str) -> set[str]:
-    """Names the mirror's release carries, its own source archives included."""
-    release = gitee_release(gitee_repo, tag, token)
-    return {asset.get("name") for asset in (release or {}).get("assets") or []}
+def gitee_attachments(gitee_repo: str, release_id: int, token: str) -> list[dict]:
+    """List a release's uploaded attachments, each with an id and a size.
+
+    Preferred over the release's own `assets` array, which reports neither: a
+    name-only view cannot tell a duplicate from a single copy, and the set it
+    invites you to build silently swallows exactly that difference. `assets`
+    also mixes in the two source archives Gitee generates, which are not
+    attachments and cannot be deleted.
+    """
+    query = urllib.parse.urlencode({"access_token": token})
+    url = f"{GITEE_API}/repos/{gitee_repo}/releases/{release_id}/attach_files?{query}"
+    attachments = request_json(url)
+    return attachments if isinstance(attachments, list) else []
 
 
-def attach_asset(
-    gitee_repo: str, tag: str, release_id: int, name: str, blob: bytes, token: str
-) -> None:
+def gitee_delete_attachment(gitee_repo: str, release_id: int, attachment_id: int, token: str) -> None:
+    query = urllib.parse.urlencode({"access_token": token})
+    url = f"{GITEE_API}/repos/{gitee_repo}/releases/{release_id}/attach_files/{attachment_id}?{query}"
+    request_bytes(url, method="DELETE")
+
+
+def prune_duplicates(
+    gitee_repo: str,
+    release_id: int,
+    name: str,
+    copies: list[dict],
+    size: int,
+    token: str,
+    dry_run: bool,
+) -> int:
+    """Reduce an asset to a single attachment, keeping the copy worth keeping.
+
+    Two runs that overlap both read the release before either uploads, so both
+    upload the same name and the release ends up listing it twice. Nothing else
+    can clean that up: deleting the whole release to rebuild it would also push
+    it to the top of Gitee's release list, which is ordered by record age.
+
+    The copy whose size matches GitHub's is kept; a shorter one is a truncated
+    upload. Ties go to the earliest, so repeated runs converge.
+
+    Returns the number of surplus copies, whether or not they were removed.
+    """
+    if len(copies) < 2:
+        return 0
+    surplus = len(copies) - 1
+    if dry_run:
+        print(f"  {name}: would drop {surplus} duplicate copy(ies)")
+        return surplus
+    keep = next(
+        (copy for copy in copies if copy["size"] == size), min(copies, key=lambda a: a["id"])
+    )
+    for copy in copies:
+        if copy["id"] != keep["id"]:
+            gitee_delete_attachment(gitee_repo, release_id, copy["id"], token)
+    print(f"  {name}: dropped {surplus} duplicate copy(ies)")
+    return surplus
+
+
+def attach_asset(gitee_repo: str, release_id: int, name: str, blob: bytes, token: str) -> None:
     """Attach one asset, tolerating a connection Gitee dropped mid-upload.
 
     Gitee can close the connection before it answers, which leaves no way to
@@ -240,7 +337,8 @@ def attach_asset(
         except SyncError as error:
             if attempt == RETRIES:
                 raise
-            if name in gitee_asset_names(gitee_repo, tag, token):
+            held = gitee_attachments(gitee_repo, release_id, token)
+            if any(attachment["name"] == name for attachment in held):
                 print(f"  {name}: stored before the connection dropped", file=sys.stderr)
                 return
             delay = RETRY_BACKOFF_SECONDS * attempt
@@ -258,7 +356,6 @@ def mirror_tag(
     *,
     repo: str,
     gitee_repo: str,
-    target_commitish: str,
     token: str,
     dry_run: bool,
 ) -> int:
@@ -272,34 +369,40 @@ def mirror_tag(
         if dry_run:
             print(f"{tag}: would create the Gitee release with {len(assets)} asset(s)")
             return len(assets)
-        release = gitee_create_release(gitee_repo, source, target_commitish, token)
-        print(f"{tag}: created Gitee release {release['id']}")
+        commit = github_tag_commit(repo, tag)
+        release = gitee_create_release(gitee_repo, source, commit, token)
+        print(f"{tag}: created Gitee release {release['id']} at {commit[:7]}")
     else:
         print(f"{tag}: reusing Gitee release {release['id']}")
 
-    # Gitee adds the tag's two source archives by itself, so the names to
-    # compare against are whatever the release already carries.
-    attached = {asset.get("name") for asset in release.get("assets") or []}
-    uploaded = 0
+    held: dict[str, list[dict]] = {}
+    for attachment in gitee_attachments(gitee_repo, release["id"], token):
+        held.setdefault(attachment["name"], []).append(attachment)
+
+    differences = 0
     for asset in assets:
         name = asset["name"]
-        if name in attached:
-            print(f"  {name}: already mirrored")
-            continue
         size = int(asset["size"])
+        copies = held.get(name, [])
+        if copies:
+            if len(copies) == 1:
+                print(f"  {name}: already mirrored")
+            differences += prune_duplicates(
+                gitee_repo, release["id"], name, copies, size, token, dry_run
+            )
+            continue
         if size > GITEE_MAX_ASSET_BYTES:
             raise SyncError(
                 f"{name} is {size} bytes, over Gitee's {GITEE_MAX_ASSET_BYTES} byte limit"
             )
+        differences += 1
         if dry_run:
             print(f"  {name}: would upload {size} bytes")
-            uploaded += 1
             continue
         blob = download_asset(asset["browser_download_url"])
-        attach_asset(gitee_repo, tag, release["id"], name, blob, token)
-        uploaded += 1
+        attach_asset(gitee_repo, release["id"], name, blob, token)
         print(f"  {name}: uploaded {len(blob)} bytes")
-    return uploaded
+    return differences
 
 
 def main() -> int:
@@ -309,24 +412,33 @@ def main() -> int:
         raise SyncError("pass at least one --tag")
 
     token = os.environ.get("GITEE_TOKEN", "")
-    if not token and not args.dry_run:
+    if not token and not (args.dry_run or args.check):
         raise SyncError("GITEE_TOKEN is not set")
 
-    uploaded = 0
+    # --check is --dry-run that also fails, so a CI job can assert the mirror
+    # matches GitHub without ever writing to it.
+    dry_run = args.dry_run or args.check
+
+    differences = 0
     for tag in tags:
-        uploaded += mirror_tag(
+        differences += mirror_tag(
             tag,
             repo=args.repo,
             gitee_repo=args.gitee_repo,
-            target_commitish=args.target_commitish,
             token=token,
-            dry_run=args.dry_run,
+            dry_run=dry_run,
         )
 
-    if args.dry_run:
-        print(f"would mirror {len(tags)} release(s), {uploaded} asset(s)")
+    if args.check:
+        if differences:
+            print(f"{len(tags)} release(s) checked, {differences} difference(s) from GitHub")
+            return 1
+        print(f"{len(tags)} release(s) checked, mirror matches GitHub")
+        return 0
+    if dry_run:
+        print(f"would mirror {len(tags)} release(s), {differences} change(s)")
     else:
-        print(f"mirrored {len(tags)} release(s), uploaded {uploaded} asset(s)")
+        print(f"mirrored {len(tags)} release(s), {differences} change(s)")
     return 0
 
 
