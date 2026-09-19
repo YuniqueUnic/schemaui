@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.8.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.8.0...schemaui-cli-v0.8.1) - 2026-09-19
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Other
+
+- updated the following local packages: schemaui
+
+
+
+
 ## [0.8.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-cli-v0.7.7...schemaui-cli-v0.8.0) - 2026-09-18
 
 
