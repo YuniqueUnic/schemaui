@@ -114,6 +114,9 @@ python3 scripts/sync-release-to-gitee.py --tag schemaui-cli-v0.8.0 --check
 
 # 回填多个历史 release（单个 --tag 内用空格或逗号分隔）
 python3 scripts/sync-release-to-gitee.py --tag "schemaui-cli-v0.7.0 schemaui-cli-v0.7.1"
+
+# 校验镜像负责的全部 release（列表从 GitHub 发现，不写任何东西）
+python3 scripts/sync-release-to-gitee.py --all --check
 ```
 
 - **所有模式（含 `--check` / `--dry-run`）都需要 `GITEE_TOKEN`**（Gitee
@@ -140,6 +143,10 @@ python3 scripts/sync-release-to-gitee.py --tag "schemaui-cli-v0.7.0 schemaui-cli
 - 由 `cd.yml` 的 `mirror-to-gitee` 作业在 `upload-assets` 之后自动调用；历史
   release 用 `workflow_dispatch` 的 `gitee_tags` 输入触发
   `mirror-to-gitee-manual` 回填
+- `--all` 从 GitHub 分页发现镜像负责的全部 release（`schemaui-cli-*`），与
+  `--tag` 互斥。它是给定时自检用的：镜像失败是**静默**的——某个 release
+  压根没镜像过去时，与从未发过版无法区分。所以 `cd.yml` 的 `mirror-check`
+  作业每周一跑一次 `--all --check`，有任何漂移就以非零码退出
 
 ## 🚀 发布入口
 

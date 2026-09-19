@@ -13,6 +13,11 @@ on:
         description: "schemaui-cli tags to mirror to Gitee (space or comma separated); empty skips the mirror"
         required: false
         type: string
+  schedule:
+    # A mirror job that dies halfway leaves a release missing, and a release that
+    # never arrived looks exactly like one that was never published. Compare on a
+    # schedule so the difference surfaces without anyone browsing Gitee.
+    - cron: "0 3 * * 1"
 
 env:
   CARGO_INCREMENTAL: 0
@@ -351,3 +356,31 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITEE_TAGS: ${{ github.event.inputs.gitee_tags }}
         run: python3 scripts/sync-release-to-gitee.py --tag "$GITEE_TAGS"
+
+  # The mirror's failure mode is silent: nothing looks wrong until someone
+  # browses Gitee and finds a release missing. --all discovers the release list
+  # from GitHub rather than taking one, so a release the mirror never received is
+  # what this notices. --check writes nothing and exits non-zero on any drift.
+  mirror-check:
+    name: Check the Gitee Mirror
+    permissions:
+      contents: read
+    if: github.repository_owner == 'YuniqueUnic' && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Setup Python 3
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Compare the mirror with GitHub
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/sync-release-to-gitee.py --all --check

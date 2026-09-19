@@ -29,7 +29,9 @@ release must be the one a visitor sees first, which is only true if the records
 were created in ascending version order.
 
 --check reports the same differences without writing and exits non-zero when it
-finds any, so CI can assert the mirror still matches GitHub.
+finds any, so CI can assert the mirror still matches GitHub. --all discovers the
+release list from GitHub instead of being given one, which is what lets the
+scheduled check notice a release the mirror never received at all.
 """
 from __future__ import annotations
 
@@ -47,6 +49,11 @@ import uuid
 
 DEFAULT_REPO = "YuniqueUnic/schemaui"
 DEFAULT_GITEE_REPO = "Credhat/schemaui"
+
+# cd.yml mirrors the CLI's releases only, and guards its jobs on this same
+# prefix. --all reuses it so a scheduled check covers exactly what the mirror is
+# responsible for, rather than everything the repository publishes.
+MIRRORED_TAG_PREFIX = "schemaui-cli-v"
 
 GITHUB_API = "https://api.github.com"
 GITEE_API = "https://gitee.com/api/v5"
@@ -69,7 +76,8 @@ class SyncError(RuntimeError):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument(
         "--tag",
         action="append",
         default=[],
@@ -77,6 +85,14 @@ def parse_args() -> argparse.Namespace:
         help=(
             "release tag to mirror; repeatable, and each value may list several "
             "tags separated by spaces or commas"
+        ),
+    )
+    scope.add_argument(
+        "--all",
+        action="store_true",
+        help=(
+            "every release the mirror covers, discovered from GitHub; meant for "
+            "the scheduled check, where a list would go stale"
         ),
     )
     parser.add_argument("--repo", default=DEFAULT_REPO, help="GitHub repo in owner/name form")
@@ -113,6 +129,34 @@ def requested_tags(values: list[str]) -> list[str]:
     tags: list[str] = []
     for value in values:
         tags += [tag for tag in re.split(r"[,\s]+", value) if tag]
+    return sorted(dict.fromkeys(tags), key=version_key)
+
+
+def mirrored_tags(repo: str) -> list[str]:
+    """List every release the mirror is responsible for, oldest version first.
+
+    Pages through GitHub rather than taking a list, so the scheduled check picks
+    up releases nobody remembered to add to it. Stopping at the first page would
+    be the worst outcome: it would report a clean mirror while never looking at
+    the newest releases, which are exactly the ones at risk.
+    """
+    tags: list[str] = []
+    page = 1
+    while True:
+        batch = request_json(
+            f"{GITHUB_API}/repos/{repo}/releases?per_page=100&page={page}",
+            headers=github_headers(),
+        )
+        if not isinstance(batch, list) or not batch:
+            break
+        tags += [
+            release["tag_name"]
+            for release in batch
+            if str(release.get("tag_name", "")).startswith(MIRRORED_TAG_PREFIX)
+        ]
+        if len(batch) < 100:
+            break
+        page += 1
     return sorted(dict.fromkeys(tags), key=version_key)
 
 
@@ -421,9 +465,9 @@ def mirror_tag(
 
 def main() -> int:
     args = parse_args()
-    tags = requested_tags(args.tag)
+    tags = mirrored_tags(args.repo) if args.all else requested_tags(args.tag)
     if not tags:
-        raise SyncError("pass at least one --tag")
+        raise SyncError("pass at least one --tag, or --all")
 
     token = os.environ.get("GITEE_TOKEN", "")
     # Every mode reads the Gitee API, including --check and --dry-run. Gitee
