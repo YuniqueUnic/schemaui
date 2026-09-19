@@ -13,14 +13,18 @@ its binaries exist. --tag backfills the releases that predate the mirror.
 
 Re-running is cheap and safe: an existing release is reused and an asset that is
 already attached is skipped, so an interrupted backfill can simply be run again.
+A dropped connection is retried, because a backfill makes a few hundred uploads
+and one transient failure should not sink the run.
 """
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -38,6 +42,10 @@ GITEE_MAX_ASSET_BYTES = 100 * 1024 * 1024
 
 TIMEOUT = 120
 UPLOAD_TIMEOUT = 600
+
+RETRIES = 3
+RETRY_BACKOFF_SECONDS = 3
+TRANSIENT_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
 
 
 class SyncError(RuntimeError):
@@ -97,21 +105,40 @@ def request_bytes(
     data: bytes | None = None,
     headers: dict[str, str] | None = None,
     timeout: int = TIMEOUT,
+    attempts: int = RETRIES,
 ) -> bytes:
     """Perform a request, keeping the access token out of any error message.
 
     Gitee takes its token as a query parameter, so reporting the whole URL on
     failure would write it to the CI log; only the path is ever reported.
+
+    A dropped connection or a 5xx is retried, since every caller but the asset
+    upload is a read and those failures are transient. The upload opts out with
+    attempts=1: resending a body whose first copy may already have been stored
+    would attach the same asset twice, so attach_asset verifies instead.
     """
     request = urllib.request.Request(url, data=data, method=method, headers=headers or {})
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.read()
-    except urllib.error.HTTPError as error:
-        detail = error.read()[:300].decode(errors="replace").strip()
-        raise SyncError(f"{method} {url.split('?')[0]} -> HTTP {error.code}: {detail}") from error
-    except urllib.error.URLError as error:
-        raise SyncError(f"{method} {url.split('?')[0]} -> {error.reason}") from error
+    path = url.split("?")[0]
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return response.read()
+        except urllib.error.HTTPError as error:
+            detail = error.read()[:300].decode(errors="replace").strip()
+            if error.code not in TRANSIENT_HTTP_CODES or attempt == attempts:
+                raise SyncError(f"{method} {path} -> HTTP {error.code}: {detail}") from error
+            reason = f"HTTP {error.code}"
+        except (urllib.error.URLError, http.client.HTTPException, OSError) as error:
+            # A dropped connection arrives as RemoteDisconnected (HTTPException),
+            # a timeout as URLError wrapping socket.timeout, a reset as OSError.
+            if attempt == attempts:
+                cause = getattr(error, "reason", error)
+                raise SyncError(f"{method} {path} -> {cause}") from error
+            reason = str(getattr(error, "reason", error))
+        delay = RETRY_BACKOFF_SECONDS * attempt
+        print(f"  {path}: {reason}; retrying in {delay}s", file=sys.stderr)
+        time.sleep(delay)
+    raise AssertionError("retry loop exited without returning or raising")
 
 
 def request_json(url: str, **kwargs) -> object:
@@ -184,7 +211,41 @@ def gitee_attach_asset(gitee_repo: str, release_id: int, name: str, blob: bytes,
         data=preamble + blob + f"\r\n--{boundary}--\r\n".encode(),
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
         timeout=UPLOAD_TIMEOUT,
+        # attach_asset owns retrying this one; a blind resend here could store
+        # the same bytes twice.
+        attempts=1,
     )
+
+
+def gitee_asset_names(gitee_repo: str, tag: str, token: str) -> set[str]:
+    """Names the mirror's release carries, its own source archives included."""
+    release = gitee_release(gitee_repo, tag, token)
+    return {asset.get("name") for asset in (release or {}).get("assets") or []}
+
+
+def attach_asset(
+    gitee_repo: str, tag: str, release_id: int, name: str, blob: bytes, token: str
+) -> None:
+    """Attach one asset, tolerating a connection Gitee dropped mid-upload.
+
+    Gitee can close the connection before it answers, which leaves no way to
+    tell from the failure alone whether the bytes were stored. Attaching the
+    same name twice would leave the release carrying two copies, so a retry
+    asks Gitee what it holds rather than resending blind.
+    """
+    for attempt in range(1, RETRIES + 1):
+        try:
+            gitee_attach_asset(gitee_repo, release_id, name, blob, token)
+            return
+        except SyncError as error:
+            if attempt == RETRIES:
+                raise
+            if name in gitee_asset_names(gitee_repo, tag, token):
+                print(f"  {name}: stored before the connection dropped", file=sys.stderr)
+                return
+            delay = RETRY_BACKOFF_SECONDS * attempt
+            print(f"  {name}: {error}; retrying in {delay}s", file=sys.stderr)
+            time.sleep(delay)
 
 
 def download_asset(url: str) -> bytes:
@@ -235,7 +296,7 @@ def mirror_tag(
             uploaded += 1
             continue
         blob = download_asset(asset["browser_download_url"])
-        gitee_attach_asset(gitee_repo, release["id"], name, blob, token)
+        attach_asset(gitee_repo, tag, release["id"], name, blob, token)
         uploaded += 1
         print(f"  {name}: uploaded {len(blob)} bytes")
     return uploaded
