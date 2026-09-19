@@ -116,8 +116,9 @@ python3 scripts/sync-release-to-gitee.py --tag schemaui-cli-v0.8.0 --check
 python3 scripts/sync-release-to-gitee.py --tag "schemaui-cli-v0.7.0 schemaui-cli-v0.7.1"
 ```
 
-- 需要 `GITEE_TOKEN`（Gitee 私人令牌，需 `projects` 权限）；CI 中已配置为同名
-  repository secret
+- **所有模式（含 `--check` / `--dry-run`）都需要 `GITEE_TOKEN`**（Gitee
+  私人令牌，需 `projects` 权限）；CI 中已配置为同名 repository secret。Gitee
+  对匿名调用限流很严，一个回填跑到中途就会 403，所以直接要求令牌而不是半路失败
 - 使用 `GITHUB_TOKEN` 可提升 GitHub API 额度（匿名仅 60 次/小时，回填会撞到）
 - 幂等：已存在的 release 会复用，已上传的 asset 会跳过，中断后可安全重跑
 - 上传中途连接被 Gitee 断开时，会先回查该 release 实际持有的 asset 再决定是否

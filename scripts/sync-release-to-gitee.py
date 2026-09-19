@@ -212,11 +212,22 @@ def github_tag_commit(repo: str, tag: str) -> str:
     return target["sha"]
 
 
+def gitee_url(path: str, token: str, **params: str) -> str:
+    """Build a Gitee API URL, carrying the token only when there is one.
+
+    Gitee reads an empty `access_token` as an invalid one and answers 401, so an
+    absent token has to be left out of the query rather than sent blank.
+    """
+    if token:
+        params["access_token"] = token
+    query = urllib.parse.urlencode(params)
+    return f"{GITEE_API}{path}?{query}" if query else f"{GITEE_API}{path}"
+
+
 def gitee_release(gitee_repo: str, tag: str, token: str) -> dict | None:
     """Return the mirror's release for tag, or None when it does not exist yet."""
-    query = urllib.parse.urlencode({"access_token": token})
-    url = f"{GITEE_API}/repos/{gitee_repo}/releases/tags/{urllib.parse.quote(tag)}?{query}"
-    release = request_json(url)
+    path = f"/repos/{gitee_repo}/releases/tags/{urllib.parse.quote(tag)}"
+    release = request_json(gitee_url(path, token))
     return release if isinstance(release, dict) else None
 
 
@@ -273,16 +284,13 @@ def gitee_attachments(gitee_repo: str, release_id: int, token: str) -> list[dict
     also mixes in the two source archives Gitee generates, which are not
     attachments and cannot be deleted.
     """
-    query = urllib.parse.urlencode({"access_token": token})
-    url = f"{GITEE_API}/repos/{gitee_repo}/releases/{release_id}/attach_files?{query}"
-    attachments = request_json(url)
+    attachments = request_json(gitee_url(f"/repos/{gitee_repo}/releases/{release_id}/attach_files", token))
     return attachments if isinstance(attachments, list) else []
 
 
 def gitee_delete_attachment(gitee_repo: str, release_id: int, attachment_id: int, token: str) -> None:
-    query = urllib.parse.urlencode({"access_token": token})
-    url = f"{GITEE_API}/repos/{gitee_repo}/releases/{release_id}/attach_files/{attachment_id}?{query}"
-    request_bytes(url, method="DELETE")
+    path = f"/repos/{gitee_repo}/releases/{release_id}/attach_files/{attachment_id}"
+    request_bytes(gitee_url(path, token), method="DELETE")
 
 
 def prune_duplicates(
@@ -412,7 +420,10 @@ def main() -> int:
         raise SyncError("pass at least one --tag")
 
     token = os.environ.get("GITEE_TOKEN", "")
-    if not token and not (args.dry_run or args.check):
+    # Every mode reads the Gitee API, including --check and --dry-run. Gitee
+    # rate-limits anonymous callers hard enough that a run dies partway through
+    # with a 403, so demand the token up front instead of failing mid-way.
+    if not token:
         raise SyncError("GITEE_TOKEN is not set")
 
     # --check is --dry-run that also fails, so a CI job can assert the mirror
