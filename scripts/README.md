@@ -101,6 +101,32 @@ python3 scripts/sync-install-docs.py --check
 - 写回文档时会使用 `deno fmt` 归一化 Markdown 输出；`--check` 可在无 `deno`
   环境下运行
 
+#### sync-release-to-gitee.py
+
+把已发布的 `schemaui-cli` release（说明 + 全部 asset）镜像到 Gitee 仓库
+`Credhat/schemaui`。github.com 在国内不稳定，`a2ui-ask` 的安装脚本会在 GitHub
+不可达时回退到该镜像，因此镜像必须持有同名 tag 下的同名 asset。
+
+```bash
+python3 scripts/sync-release-to-gitee.py --tag schemaui-cli-v0.8.0
+python3 scripts/sync-release-to-gitee.py --tag schemaui-cli-v0.8.0 --dry-run
+
+# 回填多个历史 release（单个 --tag 内用空格或逗号分隔）
+python3 scripts/sync-release-to-gitee.py --tag "schemaui-cli-v0.7.0 schemaui-cli-v0.7.1"
+```
+
+- 需要 `GITEE_TOKEN`（Gitee 私人令牌，需 `projects` 权限）；CI 中已配置为同名
+  repository secret
+- 使用 `GITHUB_TOKEN` 可提升 GitHub API 额度（匿名仅 60 次/小时，回填会撞到）
+- 幂等：已存在的 release 会复用，已上传的 asset 会跳过，中断后可安全重跑
+- 上传中途连接被 Gitee 断开时，会先回查该 release 实际持有的 asset 再决定是否
+  重传——断连时文件往往已经存进去了，盲目重传会产生重复附件
+- `--gitee-repo` / `--target-commitish` 可覆盖镜像仓库与目标分支；Gitee 默认指向
+  `master`，而本仓库没有该分支，所以默认值必须是 `main`
+- 由 `cd.yml` 的 `mirror-to-gitee` 作业在 `upload-assets` 之后自动调用；历史
+  release 用 `workflow_dispatch` 的 `gitee_tags` 输入触发
+  `mirror-to-gitee-manual` 回填
+
 ## 🚀 发布入口
 
 如果要用 `cargo release` 发布 `schemaui-cli`，仓库已经把 tag 约定和 GitHub
@@ -118,6 +144,8 @@ just release-cli patch
 - 推送到 GitHub 后：
   - `push main` 会触发 `prek-checks`、`release-plz-pr`、`release-plz-release`
   - `push schemaui-cli-v* tag` 会自动创建 GitHub Release，并继续触发 `CD`
+  - `CD` 里 `upload-assets` 上传完预编译产物后，`mirror-to-gitee` 会把整个
+    release 镜像到 Gitee，无需手动操作
 
 ## 🐛 故障排除
 
