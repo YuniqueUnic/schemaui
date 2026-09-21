@@ -202,6 +202,7 @@ Requires the `web` feature (`cargo add schemaui --features web`), which is why
 this example is `ignore`d — doctests build against the default feature set.
 
 ```rust,ignore
+use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
 use schemaui::SessionOutcome;
@@ -227,7 +228,8 @@ async fn run() -> anyhow::Result<()> {
       // Optional: close the session if nobody answers within 10 minutes.
       .with_deadline(Some(Instant::now() + Duration::from_secs(600)))
       .build()?;
-  let session = bind_session(config, ServeOptions::default()).await?;
+  let addr = ServeOptions::new(IpAddr::from([127, 0, 0, 1]), 0).socket_addr();
+  let session = bind_session(config, addr).await?;
   println!("visit http://{}/", session.local_addr());
 
   match session.run().await? {
@@ -242,13 +244,86 @@ async fn run() -> anyhow::Result<()> {
 }
 ```
 
-`bind_session` / `serve_session` spawn an Axum router with `/api/session`,
-`/api/save`, `/api/exit` plus embedded static assets. For custom HTTP stacks,
-reuse `session_router` / `WebSessionBuilder` instead of the turnkey helpers. The
-CLI `schemaui web …` command is a thin wrapper around these APIs.
+`bind_session` / `serve_session` spawn an Axum router serving the versioned
+`/api/v1/*` contract (session bootstrap, validate, preview, save, exit — see
+[Pluggable Frontends & Theming](#pluggable-frontends--theming) below) plus
+static assets, embedded by default. For custom HTTP stacks, reuse
+`session_router` / `WebSessionBuilder` instead of the turnkey helpers. The CLI
+`schemaui web …` command is a thin wrapper around these APIs.
 
 Architecture notes:
 [`docs/en/web-ui-architecture-and-refactor-spec.md`](./docs/en/web-ui-architecture-and-refactor-spec.md).
+
+### Pluggable Frontends & Theming
+
+The Web session speaks a versioned, framework-agnostic HTTP contract at
+`/api/v1/*` — bootstrap (`GET /session`, `GET /schema`), `POST /validate`,
+`POST /preview`, `POST /save`, `POST /exit`, plus `GET /theme.css` when a theme
+is configured. The bundled React SPA is the reference client, not the only
+possible one:
+
+```bash
+# reskin the bundled UI by overriding its design tokens
+schemaui web -s schema.json --web-theme examples/themes/midnight.css
+
+# swap the frontend entirely for a directory containing your own index.html
+schemaui web -s schema.json --frontend examples/frontend
+```
+
+`examples/frontend/` is a framework-free, build-step-free `index.html` that
+drives a real session through `/api/v1/*` — proof the contract works for any
+stack, not just the bundled one. `examples/themes/midnight.css` is a worked
+`--web-theme` example; both are covered by contract tests
+(`src/tests/web/theme_tests.rs`).
+
+During development, run a real session on a fixed port and point `web/ui`'s Vite
+dev server at it instead of the embedded build — no CORS layer needed,
+`vite.config.ts` proxies `/api/*` to `http://127.0.0.1:8787`:
+
+```bash
+schemaui web -s schema.json -p 8787 &   # in one terminal
+cd web/ui && pnpm dev                   # in another; edits hot-reload against it
+```
+
+Design record:
+[`docs/en/web-v1-theming-and-wasm.md`](./docs/en/web-v1-theming-and-wasm.md).
+
+## WebAssembly, Playground & Edge API
+
+`schemaui-wasm` compiles the same schema → UiAst → validate → render pipeline to
+WebAssembly, so it runs with no server at all — in a static site, inside a
+non-Rust host, or on an edge worker. Five exports mirror the HTTP contract
+byte-for-byte (a shared test fixture in `src/tests/web/wasm_parity_tests.rs`
+asserts they agree): `buildUiAst`, `validate`, `render`, `schemaWithDefaults`,
+`schemaFromData`, plus `parseDocument` for accepting JSON/YAML/TOML input with
+no server to have already parsed it.
+
+```sh
+just build-wasm         # -> schemaui-wasm/pkg (wasm-bindgen "web" target)
+just build-playground   # -> web/playground-dist (static, no server needed)
+```
+
+**Playground.** The same React SPA that ships with the CLI, pointed at a
+`WasmBackend` transport instead of an HTTP one — one frontend, two backends, so
+a gap in the contract shows up as something the Playground can't do rather than
+going unnoticed. Paste or drop a schema (`web/ui/src/playground/`), fill the
+generated form entirely client-side, and export the result — no network request
+leaves the tab. Deployed to GitHub Pages from
+`.github/workflows/deploy-playground.yml` on every push to `main`.
+
+**Edge API.** `edge/` is a stateless Cloudflare Worker over the same wasm
+artifact, for callers that want the contract over HTTP without a Rust dependency
+or a wasm loader — schema in, UiAst/validation/rendered document out, no session
+and no storage. Deploy with `just deploy-edge` (needs `CLOUDFLARE_API_TOKEN` /
+`CLOUDFLARE_ACCOUNT_ID`); `.github/workflows/deploy-edge.yml` does the same on
+push to `main` once those secrets are configured, and fails loudly rather than
+silently no-op-ing when they are not.
+
+Stored, shareable hosted sessions are an explicit non-goal for now — see the
+"Rejected" section of the design record for why.
+
+Design record:
+[`docs/en/decisions/0005-wasm-core-and-hosting.md`](./docs/en/decisions/0005-wasm-core-and-hosting.md).
 
 ## Config Schema Auto-Detection
 
@@ -842,6 +917,10 @@ Deep dive: [`docs/en/cli_usage.md`](./docs/en/cli_usage.md) · Chinese:
   `x-visible-when` presentation hints that choose a field's control from the
   schema.
 - `docs/en/web-ui-architecture-and-refactor-spec.md` – Web UI architecture.
+- `docs/en/web-v1-theming-and-wasm.md` – the Web Session API v1 contract,
+  theming, pluggable frontends, and the WASM/Playground/Edge API plan.
+- `docs/en/decisions/` – the individual ADRs behind that plan (contract
+  versioning, theming, WASM/hosting).
 - `docs/web.mix.png` – Web UI screenshot (schema form + live JSON preview);
   `web.mix.dark.png` is the dark-mode variant used automatically by the README.
 - `docs/web.controls.*.png` – per-control-family screenshots (sliders, ranges,
