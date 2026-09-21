@@ -71,6 +71,24 @@ build-playground: build-wasm
 build-playground: build-wasm
     cd web/ui; pnpm build:playground
 
+# run the stateless edge API worker locally against a local wasm build (Unix)
+[unix]
+dev-edge: build-wasm
+    cd edge && pnpm install && pnpm dev
+
+[windows]
+dev-edge: build-wasm
+    cd edge; pnpm install; pnpm dev
+
+# deploy the stateless edge API worker to Cloudflare (needs `wrangler login` or CLOUDFLARE_API_TOKEN)
+[unix]
+deploy-edge: build-wasm
+    cd edge && pnpm install && pnpm deploy
+
+[windows]
+deploy-edge: build-wasm
+    cd edge; pnpm install; pnpm deploy
+
 # build the cli
 build-cli:
     cargo build -p schemaui-cli -F full

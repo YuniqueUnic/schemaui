@@ -1,0 +1,90 @@
+name: Deploy Playground
+
+# The static, server-less Playground (docs/en/decisions/0005-wasm-core-and-hosting.md):
+# schemaui-wasm -> web/ui's playground build -> GitHub Pages. No server, no
+# secrets — the only inputs are this repository's own source.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "schemaui-wasm/**"
+      - "src/**"
+      - "web/ui/**"
+      - ".github/workflows/deploy-playground.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Pages deploys should never race each other; let a newer push win rather
+# than serving whichever of two concurrent runs happens to finish last.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository_owner == 'YuniqueUnic'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Build the wasm package
+        working-directory: schemaui-wasm
+        run: |
+          RUSTFLAGS='--cfg getrandom_backend="wasm_js"' \
+            wasm-pack build --target web --out-dir pkg --scope schemaui
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: web/ui/pnpm-lock.yaml
+
+      - name: Build the Playground
+        working-directory: web/ui
+        run: pnpm install --frozen-lockfile && pnpm run build:playground
+
+      # GitHub Pages serves a directory's index.html at its root; the
+      # Playground's own entry is named after itself so it can sit alongside
+      # the default SPA's index.html in the same source directory.
+      - name: Rename the entry point for Pages
+        run: mv web/playground-dist/playground.html web/playground-dist/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/playground-dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,8 @@
+name = "schemaui-edge"
+main = "src/index.ts"
+compatibility_date = "2026-09-21"
+
+# `schemaui-wasm/pkg` is a build artifact (`just build-wasm`), not checked
+# in — wrangler's bundler resolves the `.wasm` import at build/dev time, so
+# this only needs to exist locally or in CI immediately before `wrangler dev`
+# / `wrangler deploy`, same as the Playground's dependency on it.

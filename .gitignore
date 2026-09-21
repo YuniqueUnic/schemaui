@@ -57,6 +57,9 @@ web/ui/node_modules
 /.pnp
 .pnp.js
 
+# wrangler's local dev state (KV/D1 emulation, build cache)
+.wrangler/
+
 # testing
 /coverage
 
