@@ -41,9 +41,13 @@ export function RangeControl({ node, value, onChange }: RangeControlProps) {
         step={bounds.step}
         marks={bounds.marks}
         value={current}
-        // The pair prints as one badge above the track, the same place the
-        // single-value slider puts its readout.
+        // The pair prints as two badges above the track, the same place the
+        // single-value slider puts its readout, and each end is typeable on
+        // its own — the gap between the handles is enforced by the slider.
         showValue
+        editable
+        stepper
+        valueLabel={node.title ?? undefined}
         // The slider keeps the handles one step apart, so a drag cannot cross
         // them; the sort in `commit` is for values that arrive out of order
         // from the document rather than from a drag.

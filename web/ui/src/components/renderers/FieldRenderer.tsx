@@ -91,6 +91,13 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
           step={bounds.step}
           marks={bounds.marks}
           showValue
+          // The readout is the only place an exact value can be given: a drag
+          // resolves to whatever pixel the pointer landed on, and arrow keys
+          // take one step per press, which is a hundred presses across a
+          // fractional track.
+          editable
+          stepper
+          valueLabel={node.title ?? undefined}
           value={[current]}
           onValueChange={([next]) =>
             onChange(node.pointer, snapToBounds(next, bounds))}
