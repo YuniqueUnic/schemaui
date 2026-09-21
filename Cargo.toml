@@ -31,7 +31,7 @@ include = [
 
 [features]
 default = ["tui", "json"]
-full = ["all_formats", "tui", "web"]
+full = ["all_formats", "tui", "web", "wasm"]
 tui = ["dep:crossterm", "dep:ratatui", "dep:unicode-width"]
 web = ["dep:include_dir", "dep:axum", "dep:tokio"]
 web-types = ["dep:ts-rs"]

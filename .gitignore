@@ -134,6 +134,7 @@ build/
 develop-eggs/
 dist/
 !web/dist/
+web/playground-dist/
 downloads/
 eggs/
 .eggs/

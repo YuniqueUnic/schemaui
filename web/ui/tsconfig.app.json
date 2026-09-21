@@ -38,5 +38,9 @@
   },
   "include": [
     "src"
+  ],
+  "exclude": [
+    "src/playground",
+    "src/transport/wasmTransport.ts"
   ]
 }

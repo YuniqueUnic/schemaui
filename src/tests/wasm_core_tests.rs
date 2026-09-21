@@ -3,7 +3,9 @@
 
 use serde_json::json;
 
-use crate::wasm_core::{build_ui_ast, render, schema_from_data, schema_with_defaults, validate};
+use crate::wasm_core::{
+    build_ui_ast, parse_document, render, schema_from_data, schema_with_defaults, validate,
+};
 
 fn fixture_schema() -> serde_json::Value {
     json!({
@@ -65,4 +67,28 @@ fn schema_from_data_infers_types_and_defaults() {
     let inferred = schema_from_data(json!({ "port": 8080 }));
     assert_eq!(inferred["properties"]["port"]["type"], json!("integer"));
     assert_eq!(inferred["properties"]["port"]["default"], json!(8080));
+}
+
+#[test]
+fn parse_document_accepts_json() {
+    let value = parse_document(r#"{"name":"alice"}"#).expect("valid JSON");
+    assert_eq!(value, json!({ "name": "alice" }));
+}
+
+#[cfg(feature = "yaml")]
+#[test]
+fn parse_document_accepts_yaml() {
+    let value = parse_document("name: alice\nport: 8080").expect("valid YAML");
+    assert_eq!(value, json!({ "name": "alice", "port": 8080 }));
+}
+
+// No dedicated TOML case: `parse_document_auto` tries formats in a fixed
+// order and YAML is permissive enough to accept most multi-line TOML as a
+// folded plain scalar before TOML gets a turn. That is an existing property
+// of `parse_document_auto` (also true for the CLI without `--format`), not
+// something this thin wrapper adds — see `io::input::parse_document_auto`.
+
+#[test]
+fn parse_document_rejects_garbage() {
+    assert!(parse_document("not: valid: : anything: [[[").is_err());
 }

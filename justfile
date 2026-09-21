@@ -52,6 +52,25 @@ build-web:
     if (Test-Path web/dist) { Remove-Item -Recurse -Force web/dist }
     cd web/ui; pnpm build:embedded
 
+# build the schemaui-wasm package into schemaui-wasm/pkg (Unix)
+[unix]
+build-wasm:
+    cd schemaui-wasm && RUSTFLAGS='--cfg getrandom_backend="wasm_js"' wasm-pack build --target web --out-dir pkg --scope schemaui
+
+# build the schemaui-wasm package into schemaui-wasm/pkg (Windows)
+[windows]
+build-wasm:
+    cd schemaui-wasm; $env:RUSTFLAGS = '--cfg getrandom_backend="wasm_js"'; wasm-pack build --target web --out-dir pkg --scope schemaui
+
+# build the static Playground into web/playground-dist (needs build-wasm first)
+[unix]
+build-playground: build-wasm
+    cd web/ui && pnpm build:playground
+
+[windows]
+build-playground: build-wasm
+    cd web/ui; pnpm build:playground
+
 # build the cli
 build-cli:
     cargo build -p schemaui-cli -F full

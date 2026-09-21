@@ -6,16 +6,24 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(thisDir, "..");
+const repoRoot = path.resolve(workspaceRoot, "..");
 
 export default defineConfig(({ mode }) => {
   // Check if building for embedded mode (single-file for Rust embedding)
   const isEmbedded = mode === "embedded";
+  // The static, server-less Playground: a separate entry (playground.html)
+  // built to its own output directory, deployed to GitHub Pages.
+  const isPlayground = mode === "playground";
 
   return {
     ...(isEmbedded ? {
       base: "./",
       publicDir: false,
     } : {}),
+    // Relative asset paths, so the built site works from whatever subpath it
+    // is served under (a GitHub Pages project page, a custom domain, ...)
+    // without a repo name baked into the config.
+    ...(isPlayground ? { base: "./" } : {}),
     plugins: [
       react(),
       // Only use single-file plugin for embedded builds
@@ -29,12 +37,17 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@schemaui/types": path.resolve(workspaceRoot, "types"),
+        // The built wasm package (`just build-wasm`), consumed by the
+        // Playground's WasmBackend. Not an npm dependency: aliasing straight
+        // to the workspace build output avoids a pnpm-install-order
+        // dependency on a directory that only exists after a wasm-pack build.
+        "@schemaui/wasm": path.resolve(repoRoot, "schemaui-wasm/pkg/schemaui_wasm.js"),
         "@": path.resolve(thisDir, "./src"),
       },
     },
     server: {
       fs: {
-        allow: [workspaceRoot],
+        allow: [repoRoot],
       },
     },
     build: {
@@ -48,8 +61,13 @@ export default defineConfig(({ mode }) => {
         chunkSizeWarningLimit: 100_000_000,
       } : {}),
       cssCodeSplit: !isEmbedded,
-      outDir: "../dist",
+      outDir: isPlayground ? "../playground-dist" : "../dist",
       emptyOutDir: true,
+      ...(isPlayground ? {
+        rollupOptions: {
+          input: path.resolve(thisDir, "playground.html"),
+        },
+      } : {}),
       ...(isEmbedded ? {
         rolldownOptions: {
           output: {

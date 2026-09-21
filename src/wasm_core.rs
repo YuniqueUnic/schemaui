@@ -10,6 +10,10 @@
 //! This module has no `wasm32` in it: it is ordinary, host-portable Rust, so
 //! it is exercised by the regular test suite rather than only under a wasm
 //! target.
+//!
+//! [`parse_document`] is the one function here with no HTTP counterpart — it
+//! exists for the Playground's paste-a-schema screen, which has no server to
+//! have already parsed the input.
 
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -17,7 +21,9 @@ use serde_json::Value;
 
 use crate::io::{
     DocumentFormat,
-    input::{schema_from_data_value, schema_with_defaults as merge_schema_defaults},
+    input::{
+        parse_document_auto, schema_from_data_value, schema_with_defaults as merge_schema_defaults,
+    },
     output::OutputOptions,
 };
 use crate::ui_ast::{UiAst, UiLayout, build_ui_ast_bundle};
@@ -108,4 +114,16 @@ pub fn schema_with_defaults(schema: Value, data: Value) -> Value {
 /// is given — see `schemaui-cli/src/session/schema_source.rs`.
 pub fn schema_from_data(data: Value) -> Value {
     schema_from_data_value(&data)
+}
+
+/// Parse `text` as JSON, YAML or TOML, trying each enabled format in turn.
+///
+/// Not an HTTP mirror like the functions above: a live session only ever
+/// receives already-parsed JSON over the wire, so the server has no
+/// equivalent route. The Playground's paste-a-schema screen does need this —
+/// pasting a schema or a data document in whichever of the three formats the
+/// author had on hand, the way `schemaui-cli` accepts any of them from a
+/// file, rather than forcing JSON specifically.
+pub fn parse_document(text: &str) -> Result<Value> {
+    parse_document_auto(text)
 }
