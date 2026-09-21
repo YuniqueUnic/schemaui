@@ -49,16 +49,22 @@ describe("RangeControl", () => {
     expect(low.value).toBe("20");
     expect(high.value).toBe("80");
     // A list would offer an "add item" affordance, which would let the user
-    // build a three-element array the schema rejects.
-    expect(screen.queryByRole("button")).toBeNull();
+    // build a three-element array the schema rejects. The buttons that are
+    // here belong to the readout, and none of them change the array's length.
+    expect(screen.queryByRole("button", { name: /add|remove|delete/i })).toBeNull();
   });
 
-  it("prints the pair once, as a single readout", () => {
+  it("prints each end as its own readout", () => {
     render(
       <RangeControl node={pairNode()} value={[20, 80]} onChange={() => {}} />,
     );
 
-    expect(screen.getByText("20 – 80")).toBeTruthy();
+    // Two badges rather than one `20 – 80` string: each end is typed into
+    // separately, and a single readout has nowhere to put the caret.
+    expect(screen.getByRole("button", { name: "Edit minimum value" }))
+      .toHaveTextContent("20");
+    expect(screen.getByRole("button", { name: "Edit maximum value" }))
+      .toHaveTextContent("80");
     // The ends belong to the track, not to a second row of numbers; the marks
     // row is the only other place a number may appear, and there are none here.
     expect(screen.getAllByText("0")).toHaveLength(1);
@@ -74,7 +80,9 @@ describe("RangeControl", () => {
             { value: 100, label: "full" },
           ],
         })}
-        value={[0, 100]}
+        // Away from the marks, so that finding "0" below can only mean the
+        // footer row came back — not that a readout happens to hold that value.
+        value={[25, 75]}
         onChange={() => {}}
       />,
     );
@@ -130,7 +138,10 @@ describe("RangeControl", () => {
 
     // `NaN – NaN` would tell the user nothing about what to fix; the schema's
     // own interval is always a valid thing to show.
-    expect(screen.getByText("0 – 100")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit minimum value" }))
+      .toHaveTextContent("0");
+    expect(screen.getByRole("button", { name: "Edit maximum value" }))
+      .toHaveTextContent("100");
   });
 
   it("falls back when the stored pair has the wrong length", () => {
@@ -142,7 +153,10 @@ describe("RangeControl", () => {
       />,
     );
 
-    expect(screen.getByText("0 – 100")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit minimum value" }))
+      .toHaveTextContent("0");
+    expect(screen.getByRole("button", { name: "Edit maximum value" }))
+      .toHaveTextContent("100");
   });
 
   it("renders nothing when the schema declares only one end", () => {
