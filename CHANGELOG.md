@@ -31,6 +31,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.15.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.14.1...schemaui-v0.15.0) - 2026-09-21
+
+
+
+
+### Features
+
+- contract v1 + theme + draft + pluggable frontend([#187](https://github.com/YuniqueUnic/schemaui/pull/187), @YuniqueUnic)
+
+- **wasm:** add schemaui-wasm crate and the wasm_core pure layer (P4)([#187](https://github.com/YuniqueUnic/schemaui/pull/187), @YuniqueUnic)
+
+- **playground:** static WASM Playground with a two-transport SPA (P5)([#187](https://github.com/YuniqueUnic/schemaui/pull/187), @YuniqueUnic)
+
+- **playground:** wide side-by-side layout, its own theme toggle, and Back navigation([#190](https://github.com/YuniqueUnic/schemaui/pull/190), @YuniqueUnic)
+
+
+
+
+
+
+### Documentation
+
+- document the v1 contract, theming, pluggable frontends, wasm, Playground and Edge API([#190](https://github.com/YuniqueUnic/schemaui/pull/190), @YuniqueUnic)
+
+
+
+
+
+
+### Tests
+
+- **web:** guard the example theme and frontend files against drift([#190](https://github.com/YuniqueUnic/schemaui/pull/190), @YuniqueUnic)
+
+
+
+
+
+
+### Other
+
+- **web:** rebuild the embedded SPA artifact([#187](https://github.com/YuniqueUnic/schemaui/pull/187), @YuniqueUnic)
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.14.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.14.0...schemaui-v0.14.1) - 2026-09-19
 
 
