@@ -1,6 +1,15 @@
 import { useId, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
-import { ChevronDown, ExternalLink, FileUp, Languages, ShieldCheck, UploadCloud } from "lucide-react";
+import {
+  ChevronDown,
+  ExternalLink,
+  FileUp,
+  Languages,
+  Moon,
+  ShieldCheck,
+  Sun,
+  UploadCloud,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,6 +21,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useTheme } from "../theme";
 import { parseDocumentText } from "../transport/wasmTransport";
 import type { JsonValue } from "../types";
 import {
@@ -28,7 +38,20 @@ import {
 import controlsGallerySchema from "../../../../examples/controls-gallery.schema.json?raw";
 
 interface SchemaPasteScreenProps {
-  onReady(schema: JsonValue, defaults: JsonValue): void;
+  /** `rawSchemaText`/`rawDataText` are the exact textarea contents, alongside
+   * the parsed values — `PlaygroundRoot` keeps them so "Back" from the built
+   * form can hand them straight back to `initialSchemaText`/`initialDataText`
+   * instead of losing what was typed. */
+  onReady(
+    schema: JsonValue,
+    defaults: JsonValue,
+    rawSchemaText: string,
+    rawDataText: string,
+  ): void;
+  /** What was last typed here, handed back by `PlaygroundRoot` when a visitor
+   * returns from the built form — so "back" does not mean "retype it". */
+  initialSchemaText?: string;
+  initialDataText?: string;
 }
 
 const EXAMPLE_SCHEMA = controlsGallerySchema.trim();
@@ -51,16 +74,20 @@ function initialLanguage(): Language {
  *
  * There is no server here to bootstrap a session from, so the schema has to
  * come from the visitor before `App` has anything to render. Once `onReady`
- * fires, this screen is gone for the rest of the page's life — there is
- * deliberately no way back to it short of a reload, matching how the rest of
- * the Playground session behaves (see `useSessionActions.handleExit`).
+ * fires this screen unmounts, but `PlaygroundRoot` keeps what was typed here
+ * and hands it back via `initialSchemaText`/`initialDataText` if the visitor
+ * returns from the built form (see `PlaygroundRoot`'s "Back" wiring) — so
+ * coming back means picking up where you left off, not retyping it.
  */
-export function SchemaPasteScreen({ onReady }: SchemaPasteScreenProps) {
+export function SchemaPasteScreen(
+  { onReady, initialSchemaText = "", initialDataText = "" }: SchemaPasteScreenProps,
+) {
   const [lang, setLang] = useState<Language>(initialLanguage);
   const t = STRINGS[lang];
+  const { theme, toggle: toggleTheme } = useTheme();
 
-  const [schemaText, setSchemaText] = useState("");
-  const [dataText, setDataText] = useState("");
+  const [schemaText, setSchemaText] = useState(initialSchemaText);
+  const [dataText, setDataText] = useState(initialDataText);
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
 
@@ -97,7 +124,7 @@ export function SchemaPasteScreen({ onReady }: SchemaPasteScreenProps) {
       }
 
       setError(null);
-      onReady(schema, defaults);
+      onReady(schema, defaults, schemaText, dataText);
     } finally {
       setBuilding(false);
     }
@@ -105,7 +132,18 @@ export function SchemaPasteScreen({ onReady }: SchemaPasteScreenProps) {
 
   return (
     <div className="flex min-h-screen flex-col items-center gap-6 bg-background px-4 py-10 text-foreground">
-      <div className="flex w-full max-w-2xl justify-end">
+      <div className="flex w-full max-w-5xl justify-end gap-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={toggleTheme}
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+        >
+          {theme === "dark"
+            ? <Sun className="h-3.5 w-3.5" aria-hidden="true" />
+            : <Moon className="h-3.5 w-3.5" aria-hidden="true" />}
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -120,7 +158,7 @@ export function SchemaPasteScreen({ onReady }: SchemaPasteScreenProps) {
 
       <SyzygyPromo t={t} />
 
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-5xl">
         <CardHeader>
           <CardTitle className="text-lg">{t.title}</CardTitle>
           <CardDescription>{t.description}</CardDescription>
@@ -144,24 +182,32 @@ export function SchemaPasteScreen({ onReady }: SchemaPasteScreenProps) {
               .
             </p>
           </div>
-          <DocumentField
-            id="playground-schema"
-            label={t.schemaLabel}
-            value={schemaText}
-            onChange={setSchemaText}
-            placeholder={EXAMPLE_SCHEMA}
-            minHeightClassName="min-h-[220px]"
-            t={t}
-          />
-          <DocumentField
-            id="playground-data"
-            label={t.dataLabel}
-            value={dataText}
-            onChange={setDataText}
-            placeholder="{}"
-            minHeightClassName="min-h-[100px]"
-            t={t}
-          />
+          {/* Side by side rather than stacked: the two documents are meant to
+              be compared against each other (which pointer in the schema does
+              this default belong to?), and a wide screen has the room to make
+              that a glance instead of a scroll. `md:` rather than `lg:` — a
+              tablet-width window already has enough room for two columns of
+              monospace text, and stacking is one column's worth of it. */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <DocumentField
+              id="playground-schema"
+              label={t.schemaLabel}
+              value={schemaText}
+              onChange={setSchemaText}
+              placeholder={EXAMPLE_SCHEMA}
+              minHeightClassName="min-h-[420px]"
+              t={t}
+            />
+            <DocumentField
+              id="playground-data"
+              label={t.dataLabel}
+              value={dataText}
+              onChange={setDataText}
+              placeholder="{}"
+              minHeightClassName="min-h-[420px]"
+              t={t}
+            />
+          </div>
           {error && (
             <p role="alert" className="text-xs text-destructive">
               {error}
@@ -191,7 +237,7 @@ export function SchemaPasteScreen({ onReady }: SchemaPasteScreenProps) {
         </CardContent>
       </Card>
 
-      <p className="max-w-2xl text-center text-xs text-muted-foreground">
+      <p className="max-w-5xl text-center text-xs text-muted-foreground">
         {t.aboutPrefix}{" "}
         <a
           href={SCHEMAUI_URL}
@@ -328,7 +374,7 @@ function faqItems(t: PlaygroundStrings): { question: string; answer: ReactNode }
 
 function Faq({ t }: { t: PlaygroundStrings }) {
   return (
-    <div className="w-full max-w-2xl rounded-lg border border-theme bg-card px-4 py-3">
+    <div className="w-full max-w-5xl rounded-lg border border-theme bg-card px-4 py-3">
       <h2 className="mb-1.5 text-xs font-semibold text-foreground">{t.faqTitle}</h2>
       <div className="divide-y divide-border">
         {faqItems(t).map((item) => (
@@ -359,7 +405,7 @@ function Faq({ t }: { t: PlaygroundStrings }) {
  */
 function SyzygyPromo({ t }: { t: PlaygroundStrings }) {
   return (
-    <div className="flex w-full max-w-2xl items-center gap-3 rounded-lg border border-theme bg-card px-4 py-3">
+    <div className="flex w-full max-w-5xl items-center gap-3 rounded-lg border border-theme bg-card px-4 py-3">
       <img
         src={SYZYGY_ICON_URL}
         alt=""

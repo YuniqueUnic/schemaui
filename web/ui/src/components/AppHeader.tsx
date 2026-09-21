@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { ExternalLink, Moon, Power, Save, Sun } from "lucide-react";
+import { ArrowLeft, ExternalLink, Moon, Power, Save, Sun } from "lucide-react";
 import { useTheme } from "../theme";
 import { Button } from "@/components/ui/button";
 import { CountdownBadge } from "./CountdownBadge";
@@ -19,6 +19,11 @@ interface AppHeaderProps {
    * instead (the Playground, which has no server to hand the document to). */
   exitLabel?: string;
   exitingLabel?: string;
+  /** Present only for the Playground: there is a paste screen to return to,
+   * with what was typed still in it. A server session has nothing to go back
+   * to — closing it back at `/session` is what Exit already means — so this
+   * button does not exist there at all rather than being disabled. */
+  onBack?: () => void;
 }
 
 /**
@@ -39,6 +44,7 @@ export const AppHeader = memo(function AppHeader({
   onExit,
   exitLabel = "Exit",
   exitingLabel = "Exiting…",
+  onBack,
 }: AppHeaderProps) {
   const { theme, toggle } = useTheme();
   return (
@@ -46,6 +52,18 @@ export const AppHeader = memo(function AppHeader({
       <div className="flex items-center justify-between gap-4">
         {/* Left: Brand, Title & Description */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
+          {onBack && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              title="Back to schema"
+              className="shrink-0"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden md:inline ml-1">Back</span>
+            </Button>
+          )}
           <a
             href={SCHEMAUI_URL}
             target="_blank"

@@ -7,19 +7,41 @@ import { SchemaPasteScreen } from "./SchemaPasteScreen";
 
 /**
  * The Playground's whole state machine: paste a schema, or edit the form it
- * produced. Two states, no way back from the second to the first short of a
- * reload — see `SchemaPasteScreen`'s doc comment for why.
+ * produced — plus the raw text of the last paste, kept around so "Back" from
+ * the built form means picking up where you left off rather than retyping it.
  */
 export function PlaygroundRoot() {
   const [transport, setTransport] = useState<SchemaUiTransport | null>(null);
+  const [rawSchemaText, setRawSchemaText] = useState("");
+  const [rawDataText, setRawDataText] = useState("");
 
-  const handleReady = useCallback((schema: JsonValue, defaults: JsonValue) => {
-    setTransport(createWasmTransport(schema, defaults));
+  const handleReady = useCallback(
+    (
+      schema: JsonValue,
+      defaults: JsonValue,
+      schemaText: string,
+      dataText: string,
+    ) => {
+      setRawSchemaText(schemaText);
+      setRawDataText(dataText);
+      setTransport(createWasmTransport(schema, defaults));
+    },
+    [],
+  );
+
+  const handleBack = useCallback(() => {
+    setTransport(null);
   }, []);
 
   if (!transport) {
-    return <SchemaPasteScreen onReady={handleReady} />;
+    return (
+      <SchemaPasteScreen
+        onReady={handleReady}
+        initialSchemaText={rawSchemaText}
+        initialDataText={rawDataText}
+      />
+    );
   }
 
-  return <App transport={transport} />;
+  return <App transport={transport} onBack={handleBack} />;
 }
