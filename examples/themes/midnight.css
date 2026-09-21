@@ -1,0 +1,32 @@
+/*
+ * Example `--web-theme` stylesheet.
+ *
+ *   schemaui web schema.json --web-theme examples/themes/midnight.css
+ *
+ * The web UI's tokens live in web/ui/src/styles/globals.css, under a
+ * Tailwind v4 `@theme` block for light mode and a `.dark` block for dark
+ * mode. A plain, unlayered stylesheet like this one already wins the CSS
+ * cascade over Tailwind's layered `theme`/`base`/`components`/`utilities`
+ * rules, so overriding a handful of `--color-*` / `--radius-*` custom
+ * properties here is enough to reskin the whole UI — no build step, no
+ * `!important`, and nothing else in this file needs to change to pick up a
+ * different accent color.
+ *
+ * This is deliberately small: a demonstration of the token names worth
+ * overriding, not a second bundled theme. Copy it and change the values.
+ */
+
+:root {
+  --color-primary: oklch(0.55 0.22 290);
+  --color-primary-foreground: oklch(0.98 0 0);
+  --color-ring: oklch(0.55 0.22 290);
+  --color-sidebar-primary: oklch(0.55 0.22 290);
+  --radius-md: 0.25rem;
+}
+
+.dark {
+  --color-primary: oklch(0.72 0.19 290);
+  --color-primary-foreground: oklch(0.15 0 0);
+  --color-ring: oklch(0.72 0.19 290);
+  --color-sidebar-primary: oklch(0.72 0.19 290);
+}

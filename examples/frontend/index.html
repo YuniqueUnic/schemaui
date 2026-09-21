@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SchemaUI — custom frontend example</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    max-width: 720px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.1rem; }
+  p.lede { color: #888; font-size: 0.85rem; }
+  fieldset { border: 1px solid #8888; border-radius: 6px; margin: 0 0 1rem; padding: 0.75rem 1rem; }
+  legend { font-size: 0.8rem; color: #888; padding: 0 0.4rem; }
+  label { display: block; font-size: 0.85rem; margin: 0.6rem 0 0.2rem; }
+  input[type=text], input[type=number], select {
+    width: 100%; box-sizing: border-box; padding: 0.4rem 0.5rem;
+    font: inherit; border: 1px solid #8888; border-radius: 4px; background: transparent; color: inherit;
+  }
+  input[type=checkbox] { width: 1rem; height: 1rem; }
+  .error { color: #e5484d; font-size: 0.75rem; margin-top: 0.2rem; }
+  .unsupported { color: #f5a623; font-size: 0.8rem; }
+  pre { background: #8881; padding: 0.75rem; border-radius: 6px; overflow: auto; font-size: 0.8rem; }
+  button { font: inherit; padding: 0.4rem 0.9rem; border-radius: 4px; border: 1px solid #8888; background: transparent; color: inherit; cursor: pointer; }
+  button:hover { background: #8882; }
+  .row { display: flex; gap: 0.5rem; align-items: center; }
+  #status { font-size: 0.8rem; color: #888; }
+</style>
+</head>
+<body>
+  <h1 id="title">SchemaUI — custom frontend example</h1>
+  <p class="lede">
+    A framework-free proof that <code>/api/v1/*</code> is a real, versioned
+    contract: this page is plain HTML and JS with no build step, pointed at
+    by <code>--frontend examples/frontend</code>. It renders the schema's
+    top-level scalar fields — enough to prove the wire format, not a
+    replacement for the bundled React UI (arrays, composites and key/value
+    maps show as "unsupported" here rather than being reimplemented twice).
+  </p>
+
+  <form id="form"></form>
+
+  <div class="row">
+    <button type="button" id="save">Save</button>
+    <button type="button" id="exit">Exit</button>
+    <span id="status"></span>
+  </div>
+
+  <h2>Preview</h2>
+  <pre id="preview">(loading…)</pre>
+
+<script type="module">
+// ---- A tiny JSON Pointer helper (RFC 6901 subset: object keys only). ----
+function getPointerValue(data, pointer) {
+  if (!pointer) return data;
+  return pointer.split("/").filter(Boolean).reduce((acc, key) => acc?.[key], data);
+}
+
+function setPointerValue(data, pointer, value) {
+  const segments = pointer.split("/").filter(Boolean);
+  const next = structuredClone(data ?? {});
+  let cursor = next;
+  for (let i = 0; i < segments.length - 1; i++) {
+    const key = segments[i];
+    if (typeof cursor[key] !== "object" || cursor[key] === null) cursor[key] = {};
+    cursor = cursor[key];
+  }
+  cursor[segments[segments.length - 1]] = value;
+  return next;
+}
+
+// ---- API client, one function per /api/v1/* route. ----
+async function api(path, options) {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`);
+  return res.status === 204 ? null : res.json();
+}
+
+const fetchSession = () => api("/api/v1/session");
+const postValidate = (data) => api("/api/v1/validate", { method: "POST", body: JSON.stringify({ data }) });
+const postPreview = (data) => api("/api/v1/preview", { method: "POST", body: JSON.stringify({ data, format: "json", pretty: true }) });
+const postSave = (data) => api("/api/v1/save", { method: "POST", body: JSON.stringify({ data }) });
+const postExit = (data, commit) => api("/api/v1/exit", { method: "POST", body: JSON.stringify({ data, commit }) });
+
+// ---- Render the top-level object's scalar fields. Everything else (arrays,
+// composites, key/value maps) is flagged rather than rendered: this example
+// exists to prove the contract, not to re-implement the bundled UI. ----
+function renderField(node, value, onChange) {
+  const wrap = document.createElement("div");
+  const label = document.createElement("label");
+  label.textContent = node.title || node.pointer;
+  wrap.appendChild(label);
+
+  if (node.kind.type !== "field") {
+    const p = document.createElement("p");
+    p.className = "unsupported";
+    p.textContent = `(${node.kind.type} fields are not rendered by this example frontend)`;
+    wrap.appendChild(p);
+    return wrap;
+  }
+
+  const { scalar, enum_options } = node.kind;
+  let input;
+  if (enum_options && enum_options.length) {
+    input = document.createElement("select");
+    for (const [i, label] of enum_options.entries()) {
+      const opt = document.createElement("option");
+      opt.value = String(i);
+      opt.textContent = label;
+      input.appendChild(opt);
+    }
+    const values = node.kind.enum_values ?? [];
+    input.value = String(values.findIndex((v) => JSON.stringify(v) === JSON.stringify(value)));
+    input.addEventListener("change", () => onChange(values[Number(input.value)]));
+  } else if (scalar === "boolean") {
+    input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = Boolean(value);
+    input.addEventListener("change", () => onChange(input.checked));
+  } else if (scalar === "integer" || scalar === "number") {
+    input = document.createElement("input");
+    input.type = "number";
+    if (scalar === "integer") input.step = "1";
+    input.value = value ?? "";
+    input.addEventListener("input", () => onChange(input.value === "" ? null : Number(input.value)));
+  } else {
+    input = document.createElement("input");
+    input.type = "text";
+    input.value = value ?? "";
+    input.addEventListener("input", () => onChange(input.value));
+  }
+  wrap.appendChild(input);
+
+  const err = document.createElement("p");
+  err.className = "error";
+  err.dataset.pointer = node.pointer;
+  wrap.appendChild(err);
+
+  return wrap;
+}
+
+async function main() {
+  const session = await fetchSession();
+  document.getElementById("title").textContent = session.title || "SchemaUI — custom frontend example";
+
+  let data = session.data ?? {};
+  const form = document.getElementById("form");
+  const roots = session.ui_ast.roots ?? [];
+  const fields = roots[0]?.kind?.type === "object" ? roots[0].kind.children : roots;
+
+  const rerenderErrors = (errors) => {
+    form.querySelectorAll(".error").forEach((el) => (el.textContent = ""));
+    for (const { pointer, message } of errors ?? []) {
+      const el = form.querySelector(`.error[data-pointer="${pointer}"]`);
+      if (el) el.textContent = message;
+    }
+  };
+
+  const refresh = async () => {
+    const [validation, preview] = await Promise.all([postValidate(data), postPreview(data)]);
+    rerenderErrors(validation.errors);
+    document.getElementById("preview").textContent = preview.payload;
+  };
+
+  for (const node of fields) {
+    const fieldset = document.createElement("fieldset");
+    const legend = document.createElement("legend");
+    legend.textContent = node.pointer;
+    fieldset.appendChild(legend);
+    fieldset.appendChild(
+      renderField(node, getPointerValue(data, node.pointer), (value) => {
+        data = setPointerValue(data, node.pointer, value);
+        refresh();
+      }),
+    );
+    form.appendChild(fieldset);
+  }
+
+  await refresh();
+
+  document.getElementById("save").addEventListener("click", async () => {
+    await postSave(data);
+    document.getElementById("status").textContent = "Saved.";
+  });
+  document.getElementById("exit").addEventListener("click", async () => {
+    await postExit(data, true);
+    document.getElementById("status").textContent = "Session ended — you can close this tab.";
+    form.querySelectorAll("input, select, button").forEach((el) => (el.disabled = true));
+  });
+}
+
+main().catch((err) => {
+  document.getElementById("preview").textContent = String(err);
+});
+</script>
+</body>
+</html>
