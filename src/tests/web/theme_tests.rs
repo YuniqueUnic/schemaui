@@ -143,3 +143,31 @@ fn a_themed_session_advertises_and_serves_it() {
         .expect("session thread should not panic")
         .expect("session should end cleanly");
 }
+
+/// `examples/themes/midnight.css` is the worked example `--web-theme` docs
+/// point to. A regression guard, not a design test: this fails loudly if the
+/// file is ever renamed or deleted out from under the docs that reference it,
+/// rather than that going unnoticed until someone tries the command.
+#[test]
+fn the_example_theme_loads() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/themes/midnight.css");
+    let theme = Theme::from_path(&path).expect("the example theme should load");
+    assert!(theme.css().contains("--color-primary"));
+}
+
+/// `examples/frontend/` is the worked example for `--frontend`. Same
+/// reasoning as above: this exists to catch the directory going missing or
+/// losing its `index.html`, not to test `FilesystemAssets` itself.
+#[test]
+fn the_example_frontend_has_an_entry_point() {
+    use crate::web::assets::{FilesystemAssets, WebAssetProvider};
+
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/frontend");
+    let assets = FilesystemAssets::new(root);
+    let index = assets.load("/").expect("index.html should be served at /");
+    assert!(
+        String::from_utf8_lossy(&index.contents).contains("/api/v1/session"),
+        "the example frontend should actually call the contract it demonstrates"
+    );
+}
