@@ -50,9 +50,13 @@ interface AppProps {
   /** Where the schema pipeline runs. Defaults to the HTTP session this app
    * was built for; the Playground passes a wasm-backed transport instead. */
   transport?: SchemaUiTransport;
+  /** Playground only: returns to the paste screen with what was typed there
+   * still in it. Absent for an HTTP session, which has nothing to go back to
+   * — see `AppHeader`'s doc comment on the same prop. */
+  onBack?: () => void;
 }
 
-export default function App({ transport = httpTransport }: AppProps = {}) {
+export default function App({ transport = httpTransport, onBack }: AppProps = {}) {
   const { state, actions, dirtyRef } = useSessionState();
   const { sizes, startDrag, isDragging } = useResizableColumns({ nav: 280, preview: 380 });
 
@@ -202,6 +206,7 @@ export default function App({ transport = httpTransport }: AppProps = {}) {
           onExit={() => handleExit()}
           exitLabel={transport.kind === "wasm" ? "Export" : "Exit"}
           exitingLabel={transport.kind === "wasm" ? "Exporting…" : "Exiting…"}
+          onBack={onBack}
         />
         <div className="app-panel-muted flex flex-1 flex-col overflow-hidden border-y border-theme lg:flex-row">
           {!isDesktop && (
