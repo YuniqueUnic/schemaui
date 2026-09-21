@@ -1,5 +1,5 @@
 [workspace]
-members = ["schemaui-cli"]
+members = ["schemaui-cli", "schemaui-wasm"]
 
 [package]
 name = "schemaui"
@@ -35,6 +35,10 @@ full = ["all_formats", "tui", "web"]
 tui = ["dep:crossterm", "dep:ratatui", "dep:unicode-width"]
 web = ["dep:include_dir", "dep:axum", "dep:tokio"]
 web-types = ["dep:ts-rs"]
+# Exposes `wasm_core`, the pure orchestration layer the `schemaui-wasm` crate
+# binds to JS. No new dependencies: it is a visibility marker, the same role
+# `web-types` plays for ts-rs derives.
+wasm = []
 
 all_formats = ["json", "yaml", "toml"]
 json = []

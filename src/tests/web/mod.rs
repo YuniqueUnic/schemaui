@@ -15,6 +15,9 @@ mod web_snapshot_tests;
 #[cfg(feature = "web")]
 mod theme_tests;
 
+#[cfg(all(feature = "web", feature = "wasm"))]
+mod wasm_parity_tests;
+
 #[cfg(feature = "web")]
 mod harness {
     //! Starting a real session and talking to it over HTTP.

@@ -4,13 +4,15 @@
 mod core;
 pub mod draft;
 pub mod io;
-// #[cfg(feature = "precompile")]
+#[cfg(feature = "tui")]
 pub(crate) mod keymap_spec;
 pub mod precompile;
 mod schema;
 #[cfg(feature = "tui")]
 pub mod tui;
 pub mod ui_ast;
+#[cfg(feature = "wasm")]
+pub mod wasm_core;
 #[cfg(feature = "web")]
 pub mod web;
 

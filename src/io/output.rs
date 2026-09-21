@@ -1,6 +1,4 @@
-use std::fs::File;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde_json::Value;
@@ -11,11 +9,16 @@ use super::DocumentFormat;
 #[derive(Debug, Clone)]
 pub enum OutputDestination {
     Stdout,
-    File(PathBuf),
+    /// Write to a file on disk.
+    ///
+    /// Not available on `wasm32` targets: there is no filesystem.
+    #[cfg(not(target_arch = "wasm32"))]
+    File(std::path::PathBuf),
 }
 
 impl OutputDestination {
-    pub fn file(path: impl AsRef<Path>) -> Self {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn file(path: impl AsRef<std::path::Path>) -> Self {
         OutputDestination::File(path.as_ref().to_path_buf())
     }
 }
@@ -64,6 +67,7 @@ impl OutputOptions {
         for destination in &self.destinations {
             write_payload(destination, &payload).with_context(|| match destination {
                 OutputDestination::Stdout => "failed to write to stdout".to_string(),
+                #[cfg(not(target_arch = "wasm32"))]
                 OutputDestination::File(path) => {
                     format!("failed to write to file {}", path.display())
                 }
@@ -167,7 +171,9 @@ fn write_payload(destination: &OutputDestination, payload: &str) -> Result<()> {
                 .context("failed to flush stdout")?;
             stdout.flush().context("failed to flush stdout")
         }
+        #[cfg(not(target_arch = "wasm32"))]
         OutputDestination::File(path) => {
+            use std::fs::File;
             let mut file = File::create(path)?;
             file.write_all(payload.as_bytes())?;
             file.write_all(b"\n")?;
