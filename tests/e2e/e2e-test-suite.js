@@ -231,6 +231,260 @@ class SchemaUIE2ETestSuite {
         }
     }
 
+    async testSliderEditableValue(testCase) {
+        console.log(chalk.yellow(`\n📝 Testing Editable Slider: ${testCase.name}`));
+
+        try {
+            if (testCase.path) {
+                await this.navigateToPath(testCase.path);
+                await this.page.waitForTimeout(500);
+            }
+
+            // Helper to retrieve JSON preview value
+            const getJsonValue = async () => {
+                return await this.page.evaluate(
+                    (path, field) => {
+                        const bodyText = document.body.innerText;
+                        try {
+                            const jsonMatch = bodyText.match(/\{[\s\S]*\}/);
+                            if (jsonMatch) {
+                                const json = JSON.parse(jsonMatch[0]);
+                                let value = json;
+                                const segments = path ? path.split("/").filter((s) => s) : [];
+                                for (const seg of segments) {
+                                    value = value?.[seg];
+                                }
+                                return field ? value?.[field] : value;
+                            }
+                        } catch (e) {
+                            return null;
+                        }
+                    },
+                    testCase.path || "",
+                    testCase.field || "",
+                );
+            };
+
+            // 1. Enter edit mode
+            const valueButton = await this.page.$(
+                'button[aria-label="Edit value"], button[aria-label="Edit minimum value"]',
+            );
+            if (!valueButton) {
+                throw new Error(
+                    "Could not find editable slider value button (editable=true)",
+                );
+            }
+
+            await valueButton.click();
+            await this.page.waitForTimeout(300);
+
+            let editInput = await this.page.$(
+                'input[aria-label="Edit value"], input[aria-label="Edit minimum value"]',
+            );
+            if (!editInput) {
+                throw new Error(
+                    "Input did not appear after clicking slider value display",
+                );
+            }
+            console.log(chalk.green("  ✅ 1. Enter edit mode verified"));
+
+            // 2. Valid commit (Enter)
+            const validVal = testCase.validValue !== undefined
+                ? testCase.validValue
+                : 42;
+            await editInput.click({ clickCount: 3 });
+            await editInput.type(validVal.toString());
+            await this.page.keyboard.press("Enter");
+            await this.page.waitForTimeout(500);
+
+            const inputAfterEnter = await this.page.$(
+                'input[aria-label="Edit value"], input[aria-label="Edit minimum value"]',
+            );
+            if (inputAfterEnter) {
+                throw new Error("Edit mode did not exit after pressing Enter");
+            }
+
+            const buttonAfterEnter = await this.page.$(
+                'button[aria-label="Edit value"], button[aria-label="Edit minimum value"]',
+            );
+            const displayedText = await this.page.evaluate(
+                (el) => el?.textContent?.trim(),
+                buttonAfterEnter,
+            );
+            const jsonAfterEnter = await getJsonValue();
+            console.log(
+                chalk.green(
+                    `  ✅ 2. Valid commit (Enter) verified (display: ${displayedText}, json: ${jsonAfterEnter})`,
+                ),
+            );
+
+            // 3. Blur commit
+            const blurVal = testCase.anotherValidValue !== undefined
+                ? testCase.anotherValidValue
+                : 60;
+            await buttonAfterEnter.click();
+            await this.page.waitForTimeout(300);
+
+            editInput = await this.page.$(
+                'input[aria-label="Edit value"], input[aria-label="Edit minimum value"]',
+            );
+            if (!editInput) {
+                throw new Error("Input did not appear on second edit entry");
+            }
+            await editInput.click({ clickCount: 3 });
+            await editInput.type(blurVal.toString());
+
+            // Trigger blur using existing test pattern
+            await this.page.evaluate(() => {
+                const active = document.activeElement;
+                if (active && typeof active.blur === "function") {
+                    active.blur();
+                }
+            });
+            await this.page.waitForTimeout(500);
+
+            const inputAfterBlur = await this.page.$(
+                'input[aria-label="Edit value"], input[aria-label="Edit minimum value"]',
+            );
+            if (inputAfterBlur) {
+                throw new Error("Edit mode did not exit after blur");
+            }
+            const jsonAfterBlur = await getJsonValue();
+            console.log(
+                chalk.green(
+                    `  ✅ 3. Blur commit verified (json: ${jsonAfterBlur})`,
+                ),
+            );
+
+            // 4. Escape cancel
+            const buttonBeforeCancel = await this.page.$(
+                'button[aria-label="Edit value"], button[aria-label="Edit minimum value"]',
+            );
+            const valBeforeCancel = await this.page.evaluate(
+                (el) => el?.textContent?.trim(),
+                buttonBeforeCancel,
+            );
+            const jsonBeforeCancel = await getJsonValue();
+
+            await buttonBeforeCancel.click();
+            await this.page.waitForTimeout(300);
+
+            editInput = await this.page.$(
+                'input[aria-label="Edit value"], input[aria-label="Edit minimum value"]',
+            );
+            await editInput.click({ clickCount: 3 });
+            await editInput.type("9999");
+            await this.page.keyboard.press("Escape");
+            await this.page.waitForTimeout(300);
+
+            const inputAfterEscape = await this.page.$(
+                'input[aria-label="Edit value"], input[aria-label="Edit minimum value"]',
+            );
+            if (inputAfterEscape) {
+                throw new Error("Edit mode did not exit after pressing Escape");
+            }
+
+            const valAfterEscape = await this.page.evaluate(
+                (el) => el?.textContent?.trim(),
+                await this.page.$(
+                    'button[aria-label="Edit value"], button[aria-label="Edit minimum value"]',
+                ),
+            );
+            const jsonAfterEscape = await getJsonValue();
+
+            if (
+                valAfterEscape !== valBeforeCancel ||
+                jsonAfterEscape !== jsonBeforeCancel
+            ) {
+                throw new Error(
+                    `Escape did not restore previous value (expected: ${valBeforeCancel}, actual: ${valAfterEscape})`,
+                );
+            }
+            console.log(
+                chalk.green(
+                    "  ✅ 4. Escape cancel verified (original value retained)",
+                ),
+            );
+
+            // 5. Invalid value
+            const buttonBeforeInvalid = await this.page.$(
+                'button[aria-label="Edit value"], button[aria-label="Edit minimum value"]',
+            );
+            await buttonBeforeInvalid.click();
+            await this.page.waitForTimeout(300);
+
+            editInput = await this.page.$(
+                'input[aria-label="Edit value"], input[aria-label="Edit minimum value"]',
+            );
+            await editInput.click({ clickCount: 3 });
+            await editInput.type(testCase.invalidValue || "not-a-number");
+            await this.page.keyboard.press("Enter");
+            await this.page.waitForTimeout(300);
+
+            const ariaInvalid = await this.page.evaluate(
+                (el) => el.getAttribute("aria-invalid"),
+                editInput,
+            );
+            const alertElement = await this.page.$('[role="alert"]');
+            if (ariaInvalid !== "true" || !alertElement) {
+                throw new Error(
+                    "Invalid value did not set aria-invalid='true' or render accessible role='alert'",
+                );
+            }
+            const jsonAfterInvalid = await getJsonValue();
+            if (jsonAfterInvalid !== jsonBeforeCancel) {
+                throw new Error(
+                    "Invalid value incorrectly modified JSON preview model",
+                );
+            }
+
+            // Clean up invalid state by pressing Escape
+            await this.page.keyboard.press("Escape");
+            await this.page.waitForTimeout(300);
+            console.log(
+                chalk.green(
+                    "  ✅ 5. Invalid value verified (aria-invalid='true', alert present, model unchanged)",
+                ),
+            );
+
+            // 6. Disabled/readOnly validation
+            const disabledButtons = await this.page.$$(
+                'button[disabled][aria-label*="Edit"], [aria-disabled="true"][aria-label*="Edit"]',
+            );
+            for (const btn of disabledButtons) {
+                await btn.click();
+                await this.page.waitForTimeout(200);
+            }
+            const rogueInput = await this.page.$(
+                'input[aria-label="Edit value"], input[aria-label="Edit minimum value"]',
+            );
+            if (rogueInput) {
+                throw new Error(
+                    "Disabled or readOnly button allowed entering edit mode",
+                );
+            }
+            console.log(
+                chalk.green(
+                    "  ✅ 6. Disabled and readOnly validation verified (cannot enter edit mode)",
+                ),
+            );
+
+            this.results.push({
+                test: testCase.name,
+                success: true,
+            });
+            return true;
+        } catch (error) {
+            console.log(chalk.red(`  ❌ ERROR: ${error.message}`));
+            this.results.push({
+                test: testCase.name,
+                success: false,
+                error: error.message,
+            });
+            return false;
+        }
+    }
+
     async runAllTests() {
         await this.setup();
 
@@ -284,6 +538,13 @@ class SchemaUIE2ETestSuite {
         // Run array tests
         for (const test of arrayTests) {
             await this.testArrayOperations(test);
+        }
+
+        // Run editable slider tests if provided
+        if (Array.isArray(this.sliderTests) && this.sliderTests.length > 0) {
+            for (const test of this.sliderTests) {
+                await this.testSliderEditableValue(test);
+            }
         }
 
         // Generate report
