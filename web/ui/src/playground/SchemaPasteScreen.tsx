@@ -20,24 +20,18 @@ import {
   type Language,
   type PlaygroundStrings,
 } from "./i18n";
+// The repo's own control gallery (`examples/controls-gallery.schema.json`),
+// imported verbatim rather than duplicated: one control per property, every
+// default filled in, kept in sync with the schema by construction instead of
+// by remembering to update a second copy. A two-field toy schema would build
+// a form in one glance and prove nothing about what this build can render.
+import controlsGallerySchema from "../../../../examples/controls-gallery.schema.json?raw";
 
 interface SchemaPasteScreenProps {
   onReady(schema: JsonValue, defaults: JsonValue): void;
 }
 
-const EXAMPLE_SCHEMA = JSON.stringify(
-  {
-    title: "Example",
-    type: "object",
-    properties: {
-      name: { type: "string", default: "" },
-      retries: { type: "integer", minimum: 0, default: 3 },
-    },
-    required: ["name"],
-  },
-  null,
-  2,
-);
+const EXAMPLE_SCHEMA = controlsGallerySchema.trim();
 
 const SCHEMAUI_URL = "https://github.com/yuniqueunic/schemaui";
 const SYZYGY_SITE_URL = "https://www.syzygysync.com/";
