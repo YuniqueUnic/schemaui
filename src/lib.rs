@@ -2,6 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 mod core;
+pub mod draft;
 pub mod io;
 // #[cfg(feature = "precompile")]
 pub(crate) mod keymap_spec;
@@ -18,6 +19,7 @@ pub(crate) mod tests;
 
 pub use core::frontend::{FrontendOptions, SessionOutcome, format_budget};
 pub use core::schema_ui::{DocumentInput, SchemaUI};
+pub use draft::{DraftStore, SessionDraft};
 pub use io::{
     DocumentFormat, DocumentFormatProbe,
     input::{
@@ -38,7 +40,11 @@ pub use tui::{
     view::{CompositeOverlay, PopupRender, UiContext, draw},
 };
 #[cfg(feature = "web")]
-pub use web::{frontend::WebFrontend, session::ServeOptions};
+pub use web::{
+    frontend::WebFrontend,
+    session::{API_VERSION, Capability, ServeOptions},
+    theme::Theme,
+};
 pub mod prelude {
     pub use super::DocumentInput;
     pub use super::FrontendOptions;

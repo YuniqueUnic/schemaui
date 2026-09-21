@@ -107,22 +107,43 @@ export function useSessionActions(
 
       draftKeyRef.current = draftStorageKey(payload.ui_ast);
 
-      // Try to restore from localStorage
-      let restoredData: JsonValue | null = null;
+      // Inject user theme stylesheet when the backend offers one.
+      // A <link> is idempotent-safe: if the element already exists we skip it,
+      // so hot-reloading the hook does not pile up duplicate stylesheets.
+      if (payload.capabilities?.includes("theme")) {
+        const THEME_LINK_ID = "schemaui-user-theme";
+        if (!document.getElementById(THEME_LINK_ID)) {
+          const link = document.createElement("link");
+          link.id = THEME_LINK_ID;
+          link.rel = "stylesheet";
+          link.href = "/api/v1/theme.css";
+          document.head.appendChild(link);
+        }
+      }
+
+      // Two independent draft layers:
+      //   1. Backend draft (draft_restored=true): the server already merged it
+      //      into payload.data. We just show the user a banner.
+      //   2. Browser localStorage: a crash-recovery layer written on every
+      //      keystroke, cleared only on a successful commit exit. Preferred
+      //      over the backend draft because it is more recent.
+      let effectiveData: JsonValue = payload.data || {};
+
+      if (payload.draft_restored) {
+        toast.info("Draft restored from previous session", { duration: 6000 });
+      }
+
       try {
         const stored = localStorage.getItem(draftKeyRef.current);
         if (stored) {
-          restoredData = JSON.parse(stored);
-          toast.info("Restored previous session data");
+          effectiveData = JSON.parse(stored) as JsonValue;
+          toast.info("Unsaved changes restored from browser storage", { duration: 4000 });
         }
       } catch (err) {
         console.error("Failed to restore from localStorage", err);
       }
 
-      const withDefaults = applyUiDefaults(
-        payload.ui_ast,
-        restoredData || payload.data || {},
-      );
+      const withDefaults = applyUiDefaults(payload.ui_ast, effectiveData);
 
       const formats = payload.formats?.length ? payload.formats : ["json"];
 
@@ -197,14 +218,18 @@ export function useSessionActions(
     try {
       await persistData(state.data);
       actions.markSaved();
-      clearLocalStorage();
-      toast.success("Changes saved successfully");
+      // localStorage is NOT cleared here: it is an independent crash-recovery
+      // layer that protects against power-cuts and process crashes. A backend
+      // save writes to disk on the server side; the browser draft guards against
+      // the opposite failure. Both layers can co-exist. localStorage is only
+      // cleared once the session ends with a successful commit.
+      toast.success("Draft saved");
     } catch (error) {
       console.error("Save failed", error);
-      toast.error("Failed to save changes");
+      toast.error("Failed to save draft");
       actions.setSaving(false);
     }
-  }, [state.session, state.data, actions, clearLocalStorage, runValidation]);
+  }, [state.session, state.data, actions, runValidation]);
 
   // ============================================
   // Handle Exit

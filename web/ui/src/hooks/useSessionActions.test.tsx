@@ -41,6 +41,9 @@ function useHarness() {
 }
 
 const session: SessionResponse = {
+  api_version: "1.0",
+  capabilities: [],
+  draft_restored: false,
   title: "Web Save Validation",
   description: "Session description",
   data: {},

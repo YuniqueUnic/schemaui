@@ -5,6 +5,7 @@ use jsonschema::Validator;
 use serde_json::Value;
 
 use crate::core::ui_ast::{UiAst, UiLayout};
+use crate::draft::SessionDraft;
 #[cfg(feature = "tui")]
 use crate::tui::app::UiOptions;
 #[cfg(feature = "web")]
@@ -61,6 +62,14 @@ pub struct FrontendContext {
     /// frontend owns both the countdown display and the enforcement, so the
     /// deadline has exactly one source of truth.
     pub deadline: Option<Instant>,
+    /// Where an explicit save is checkpointed, and whether `initial_data` came
+    /// back from a previous one.
+    ///
+    /// The frontend owns the rule, because the frontend is where a value is
+    /// produced: write on save, discard once the session yields
+    /// [`SessionOutcome::Completed`], and leave it alone on a timeout — the one
+    /// moment an unfinished form is worth recovering.
+    pub draft: Option<SessionDraft>,
 }
 
 impl FrontendContext {

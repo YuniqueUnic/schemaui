@@ -1,5 +1,7 @@
 #[cfg(feature = "json")]
 pub(crate) mod api;
+#[cfg(feature = "json")]
+pub(crate) mod draft_tests;
 pub(crate) mod io;
 #[cfg(feature = "json")]
 pub(crate) mod schema;

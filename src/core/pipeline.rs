@@ -7,6 +7,7 @@ use serde_json::{Map, Value};
 use crate::core::frontend::{Frontend, FrontendContext, SessionOutcome};
 use crate::core::io::input::schema_with_defaults;
 use crate::core::ui_ast::{UiAst, UiAstBundle, build_ui_ast_bundle};
+use crate::draft::{DraftStore, SessionDraft};
 use crate::schema::metadata::root_schema_header;
 
 /// Core pipeline for preparing a `FrontendContext` from a base JSON Schema,
@@ -31,6 +32,7 @@ pub struct SchemaPipeline {
     defaults: Option<Value>,
     ui_ast_source: UiAstSource,
     timeout: Option<Duration>,
+    draft: Option<SessionDraft>,
 }
 
 impl SchemaPipeline {
@@ -42,6 +44,7 @@ impl SchemaPipeline {
             defaults: None,
             ui_ast_source: UiAstSource::Runtime,
             timeout: None,
+            draft: None,
         }
     }
 
@@ -87,6 +90,16 @@ impl SchemaPipeline {
         self
     }
 
+    /// Checkpoint saves into `store`, and start from whatever a previous
+    /// session left there.
+    pub fn with_draft(mut self, store: Option<DraftStore>) -> Self {
+        self.draft = store.map(|store| SessionDraft {
+            store,
+            restored: false,
+        });
+        self
+    }
+
     pub(crate) fn build_frontend_context(self) -> Result<FrontendContext> {
         let SchemaPipeline {
             schema,
@@ -95,9 +108,23 @@ impl SchemaPipeline {
             defaults,
             ui_ast_source,
             timeout,
+            mut draft,
         } = self;
 
-        let data = defaults.unwrap_or_else(|| Value::Object(Map::new()));
+        // A draft outranks the caller's defaults. It exists only when a
+        // previous session ended without producing a value, and it is strictly
+        // newer than whatever that session started from.
+        let mut restored = None;
+        if let Some(session_draft) = draft.as_mut()
+            && let Some(saved) = session_draft.store.load()
+        {
+            session_draft.restored = true;
+            restored = Some(saved);
+        }
+
+        let data = restored
+            .or(defaults)
+            .unwrap_or_else(|| Value::Object(Map::new()));
         let enriched = schema_with_defaults(&schema, &data);
         let (schema_title, schema_description) = root_schema_header(&enriched);
 
@@ -117,6 +144,7 @@ impl SchemaPipeline {
             schema: enriched,
             validator,
             deadline: timeout.map(|timeout| Instant::now() + timeout),
+            draft,
         })
     }
 

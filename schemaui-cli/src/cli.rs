@@ -95,6 +95,13 @@ pub struct WebCommand {
         default_value_t = 0
     )]
     pub port: u16,
+    #[arg(
+        long = "frontend",
+        value_name = "DIR",
+        help = "serve the frontend in DIR (must contain index.html) instead of the built-in one",
+        value_parser = value_parser!(PathBuf)
+    )]
+    pub frontend: Option<PathBuf>,
 }
 
 #[cfg(feature = "web")]
@@ -230,6 +237,20 @@ pub struct CommonArgs {
         value_parser = value_parser!(u64)
     )]
     pub timeout: Option<u64>,
+    #[arg(
+        long = "draft",
+        value_name = "PATH",
+        help = "keep the session's draft at PATH instead of the per-user state directory",
+        value_parser = value_parser!(PathBuf)
+    )]
+    pub draft: Option<PathBuf>,
+    #[arg(
+        long = "web-theme",
+        value_name = "CSS",
+        help = "stylesheet layered over the web UI's design tokens (web mode only)",
+        value_parser = value_parser!(PathBuf)
+    )]
+    pub web_theme: Option<PathBuf>,
 }
 
 impl CommonArgs {
@@ -251,6 +272,8 @@ impl CommonArgs {
             no_pretty: self.no_pretty || local.no_pretty,
             force: self.force || local.force,
             timeout: local.timeout.or(self.timeout),
+            draft: local.draft.clone().or_else(|| self.draft.clone()),
+            web_theme: local.web_theme.clone().or_else(|| self.web_theme.clone()),
         }
     }
 }

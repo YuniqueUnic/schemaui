@@ -56,6 +56,7 @@ fn main() -> Result<()> {
             common: common.merged_with(&args.common),
             host: args.host,
             port: args.port,
+            frontend: args.frontend,
         }),
         #[cfg(feature = "web")]
         Some(Commands::WebSnapshot(args)) => web::run_snapshot_cli(WebSnapshotCommand {
