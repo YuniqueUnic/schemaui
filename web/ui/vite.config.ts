@@ -49,6 +49,21 @@ export default defineConfig(({ mode }) => {
       fs: {
         allow: [repoRoot],
       },
+      // `pnpm dev` serves the SPA on its own port; without this, every
+      // `/api/*` call it makes targets that same port and 404s, because
+      // nothing here is a `schemaui web` session. Proxying — not a CORS
+      // layer — keeps the request same-origin from the browser's point of
+      // view and needs no change on the server. Not for `playground` mode:
+      // the Playground's WasmBackend never calls `/api/*` at all, so a proxy
+      // there would suggest a capability that mode deliberately does not have.
+      ...(isPlayground ? {} : {
+        proxy: {
+          "/api": {
+            target: "http://127.0.0.1:8787",
+            changeOrigin: true,
+          },
+        },
+      }),
     },
     build: {
       target: "esnext",
