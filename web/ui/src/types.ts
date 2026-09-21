@@ -1,3 +1,4 @@
+import type { Capability as ServerCapability } from "@schemaui/types/Capability";
 import type { FieldError as ServerFieldError } from "@schemaui/types/FieldError";
 import type { PreviewRequest as ServerPreviewRequest } from "@schemaui/types/PreviewRequest";
 import type { PreviewResponse as ServerPreviewResponse } from "@schemaui/types/PreviewResponse";
@@ -6,6 +7,8 @@ import type { SessionResponse as ServerSessionResponse } from "@schemaui/types/S
 import type { ExitRequest as ServerExitRequest } from "@schemaui/types/ExitRequest";
 import type { ValidateRequest as ServerValidateRequest } from "@schemaui/types/ValidateRequest";
 import type { ValidationResponse as ServerValidationResponse } from "@schemaui/types/ValidationResponse";
+
+export type Capability = ServerCapability;
 
 export type JsonValue =
   | string
@@ -24,7 +27,7 @@ export type ValidationResponse = Omit<ServerValidationResponse, "errors"> & {
 export type SessionResponse =
   & Omit<
     ServerSessionResponse,
-    "data" | "ui_ast" | "layout" | "blueprint"
+    "data" | "ui_ast" | "layout"
   >
   & {
     data: JsonValue;

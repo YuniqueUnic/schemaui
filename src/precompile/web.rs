@@ -28,14 +28,19 @@ pub fn build_session_snapshot(
         .collect();
 
     Ok(SessionResponse {
+        api_version: crate::web::session::API_VERSION.to_string(),
+        // A snapshot is the payload without the server: nothing is serving a
+        // stylesheet, and nothing is there to write a draft into.
+        capabilities: Vec::new(),
         title,
         description,
         ui_ast,
         data: defaults_value,
         formats,
-        layout: Some(layout),
+        layout,
         // A precompiled snapshot has no live session behind it, so no deadline.
         expires_in_ms: None,
+        draft_restored: false,
     })
 }
 

@@ -6,9 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:playground": "vite --mode playground",
     "build": "tsc -b && vite build",
     "build:embedded": "tsc -b && vite build --mode embedded",
+    "build:playground": "tsc -p tsconfig.playground.json && vite build --mode playground",
     "typecheck": "tsc -b",
+    "typecheck:playground": "tsc -p tsconfig.playground.json",
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview"

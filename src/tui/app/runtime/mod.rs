@@ -1,4 +1,5 @@
 use crate::core::frontend::SessionOutcome;
+use crate::draft::SessionDraft;
 use crate::tui::model::FieldKind;
 use crate::tui::state::{FormCommand, FormEngine, FormState};
 use crate::tui::view::{
@@ -67,6 +68,7 @@ pub(crate) struct App {
     input_router: InputRouter,
     keymap_store: Arc<KeymapStore>,
     help_overlay: Option<HelpOverlayState>,
+    draft: Option<SessionDraft>,
 }
 
 struct HelpOverlayState {
@@ -528,11 +530,25 @@ impl App {
             input_router: InputRouter::new(keymap_store.clone()),
             keymap_store,
             help_overlay: None,
+            draft: None,
         }
     }
 
     pub fn set_session_title(&mut self, title: Option<String>) {
         self.session_title = title;
+    }
+
+    /// Checkpoint saves into `draft`, so an interrupted session can resume.
+    ///
+    /// Says so on the status line when the form opened on recovered answers:
+    /// a user who sees fields already filled in is owed the reason, or they
+    /// will assume the tool invented them.
+    pub fn set_draft(&mut self, draft: Option<SessionDraft>) {
+        if draft.as_ref().is_some_and(|draft| draft.restored) {
+            self.status
+                .set_raw("Restored an unfinished draft from a previous session.");
+        }
+        self.draft = draft;
     }
 
     /// Arm the session deadline. The loop below both enforces it and feeds the
@@ -759,10 +775,19 @@ impl App {
         false
     }
 
+    /// Save: hold the validated value, and put a copy somewhere that outlives
+    /// this process. A save the user is told succeeded, but which a crash
+    /// erases, is worse than no save at all.
     fn on_save(&mut self) {
         if let Some(value) = self.run_validation(true) {
-            self.status
-                .set_raw("Configuration saved. Press Ctrl+Q to exit.");
+            match self.draft.as_ref().map(|draft| draft.store.save(&value)) {
+                Some(Err(err)) => self
+                    .status
+                    .set_raw(format!("Saved in memory; draft not written: {err:#}")),
+                _ => self
+                    .status
+                    .set_raw("Configuration saved. Press Ctrl+Q to exit."),
+            }
             self.result = Some(value);
             self.form_state.mark_clean();
             self.exit_armed = false;

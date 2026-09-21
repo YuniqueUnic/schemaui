@@ -1,5 +1,5 @@
 use std::future::IntoFuture;
-use std::net::{IpAddr, SocketAddr, TcpListener};
+use std::net::{IpAddr, SocketAddr};
 use std::sync::mpsc::{self, Receiver};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use ureq::Agent;
 
+use super::harness::{reserve_port, test_http_agent, wait_until_ready};
 use crate::web::session::ServeOptions;
 use crate::{FrontendOptions, SchemaUI, SessionOutcome};
 
@@ -16,43 +17,6 @@ use crate::{FrontendOptions, SchemaUI, SessionOutcome};
 /// against is a shutdown that waits forever on an idle keep-alive connection,
 /// and a hung `join` would hang the whole test binary instead of failing.
 const SESSION_WATCHDOG: Duration = Duration::from_secs(10);
-
-fn reserve_port() -> u16 {
-    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind ephemeral port");
-    let port = listener.local_addr().expect("listener addr").port();
-    drop(listener);
-    port
-}
-
-fn test_http_agent() -> Agent {
-    Agent::new_with_config(
-        Agent::config_builder()
-            .http_status_as_error(false)
-            .timeout_global(Some(Duration::from_secs(2)))
-            .proxy(None)
-            .build(),
-    )
-}
-
-fn wait_until_ready(agent: &Agent, base_url: &str) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let session_url = format!("{base_url}/api/session");
-
-    loop {
-        let outcome = match agent.get(&session_url).call() {
-            Ok(response) if response.status().as_u16() == 200 => return,
-            Ok(response) => format!("unexpected status: {}", response.status()),
-            Err(err) => err.to_string(),
-        };
-
-        assert!(
-            Instant::now() < deadline,
-            "web session did not become ready at {base_url}; last outcome: {}",
-            outcome
-        );
-        thread::sleep(Duration::from_millis(50));
-    }
-}
 
 #[test]
 fn web_frontend_exit_does_not_panic_when_runtime_is_dropped() {
@@ -68,17 +32,17 @@ fn web_frontend_exit_does_not_panic_when_runtime_is_dropped() {
     });
 
     let handle = thread::spawn(move || {
-        SchemaUI::from_schema(schema).run(FrontendOptions::Web(ServeOptions {
-            host: IpAddr::from([127, 0, 0, 1]),
+        SchemaUI::from_schema(schema).run(FrontendOptions::Web(ServeOptions::new(
+            IpAddr::from([127, 0, 0, 1]),
             port,
-        }))
+        )))
     });
 
     let agent = test_http_agent();
     wait_until_ready(&agent, &base_url);
 
     let response = agent
-        .post(format!("{base_url}/api/exit"))
+        .post(format!("{base_url}/api/v1/exit"))
         .content_type("application/json")
         .send(
             serde_json::to_string(&json!({
@@ -112,10 +76,7 @@ async fn web_frontend_async_runner_works_inside_existing_runtime() {
 
     let task = tokio::spawn(async move {
         SchemaUI::from_schema(schema)
-            .run_web_async(ServeOptions {
-                host: IpAddr::from([127, 0, 0, 1]),
-                port,
-            })
+            .run_web_async(ServeOptions::new(IpAddr::from([127, 0, 0, 1]), port))
             .await
     });
 
@@ -127,7 +88,7 @@ async fn web_frontend_async_runner_works_inside_existing_runtime() {
     .await
     .expect("wait task should not panic");
 
-    let exit_url = format!("{base_url}/api/exit");
+    let exit_url = format!("{base_url}/api/v1/exit");
     let exit_payload = json!({
         "data": expected.clone(),
         "commit": true
@@ -165,10 +126,10 @@ fn spawn_web_session(
         if let Some(timeout) = timeout {
             ui = ui.with_timeout(timeout);
         }
-        let outcome = ui.run(FrontendOptions::Web(ServeOptions {
-            host: IpAddr::from([127, 0, 0, 1]),
+        let outcome = ui.run(FrontendOptions::Web(ServeOptions::new(
+            IpAddr::from([127, 0, 0, 1]),
             port,
-        }));
+        )));
         let _ = done_tx.send(());
         outcome
     });
@@ -177,7 +138,7 @@ fn spawn_web_session(
 
 fn fetch_session_payload(agent: &Agent, base_url: &str) -> Value {
     let mut response = agent
-        .get(format!("{base_url}/api/session"))
+        .get(format!("{base_url}/api/v1/session"))
         .call()
         .expect("get session payload");
     assert_eq!(response.status().as_u16(), 200);
@@ -190,7 +151,7 @@ fn fetch_session_payload(agent: &Agent, base_url: &str) -> Value {
 
 fn post_exit(agent: &Agent, base_url: &str, data: Value) {
     let response = agent
-        .post(format!("{base_url}/api/exit"))
+        .post(format!("{base_url}/api/v1/exit"))
         .content_type("application/json")
         .send(
             serde_json::to_string(&json!({ "data": data, "commit": true }))

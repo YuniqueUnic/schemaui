@@ -57,12 +57,12 @@ pub fn build_ui_artifact_bundle(
     let enriched = schema_with_defaults(schema, &defaults);
     let ui = build_ui_ast_bundle(&enriched)?;
     let fingerprint = UiArtifactFingerprint {
-        schema_sha256: sha256_hex(&stable_value_bytes(schema)?),
-        defaults_sha256: sha256_hex(&stable_value_bytes(&defaults)?),
-        input_sha256: sha256_hex(&stable_value_bytes(&Value::Object(Map::from_iter([
-            ("schema".to_string(), stable_value(schema)),
-            ("defaults".to_string(), stable_value(&defaults)),
-        ])))?),
+        schema_sha256: value_digest(schema)?,
+        defaults_sha256: value_digest(&defaults)?,
+        input_sha256: value_digest(&Value::Object(Map::from_iter([
+            ("schema".to_string(), schema.clone()),
+            ("defaults".to_string(), defaults.clone()),
+        ])))?,
     };
     #[cfg(feature = "tui")]
     let tui = TuiArtifacts {
@@ -194,6 +194,15 @@ pub(crate) fn resolve_file_format(
         )),
         DocumentFormatProbe::Unknown => Ok(fallback),
     }
+}
+
+/// A content digest of `value` that ignores key order.
+///
+/// The one definition of "these two documents are the same one", shared by
+/// artifact fingerprints and by draft filenames — two features that would
+/// silently disagree about identity if each hashed values its own way.
+pub(crate) fn value_digest(value: &Value) -> Result<String> {
+    Ok(sha256_hex(&stable_value_bytes(value)?))
 }
 
 fn stable_value_bytes(value: &Value) -> Result<Vec<u8>> {

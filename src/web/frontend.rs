@@ -3,12 +3,11 @@ use std::sync::Arc;
 
 use crate::core::frontend::{Frontend, FrontendContext, SessionOutcome, format_budget};
 
-use super::assets::EmbeddedAssets;
 use super::session::{ServeOptions, WebSessionConfig, bind_session};
 
 /// Web frontend implementation that consumes a prepared `FrontendContext`
 /// and runs the browser-based UI via a temporary HTTP server.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct WebFrontend {
     pub serve: ServeOptions,
 }
@@ -16,9 +15,18 @@ pub struct WebFrontend {
 impl WebFrontend {
     pub async fn run_async(self, ctx: FrontendContext) -> Result<SessionOutcome> {
         let budget = ctx.time_remaining();
-        let config = web_session_config(ctx);
+        if let Some(draft) = ctx.draft.as_ref()
+            && draft.restored
+        {
+            eprintln!(
+                "Restored an unfinished draft from {}",
+                draft.store.path().display()
+            );
+        }
+        let addr = self.serve.socket_addr();
+        let config = web_session_config(ctx, &self.serve);
         let title = &config.title.clone().unwrap_or_default();
-        let bound = bind_session(config, self.serve)
+        let bound = bind_session(config, addr)
             .await
             .context("failed to bind web session")?;
         let addr = bound.local_addr();
@@ -48,7 +56,7 @@ impl Frontend for WebFrontend {
     }
 }
 
-fn web_session_config(ctx: FrontendContext) -> WebSessionConfig {
+fn web_session_config(ctx: FrontendContext, serve: &ServeOptions) -> WebSessionConfig {
     let FrontendContext {
         title,
         description,
@@ -58,6 +66,7 @@ fn web_session_config(ctx: FrontendContext) -> WebSessionConfig {
         schema,
         validator: _,
         deadline,
+        draft,
     } = ctx;
 
     WebSessionConfig {
@@ -67,7 +76,9 @@ fn web_session_config(ctx: FrontendContext) -> WebSessionConfig {
         layout,
         data: initial_data,
         schema,
-        asset_provider: Arc::new(EmbeddedAssets),
+        asset_provider: Arc::clone(&serve.assets),
         deadline,
+        theme: serve.theme.clone(),
+        draft,
     }
 }

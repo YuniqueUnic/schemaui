@@ -1,4 +1,6 @@
 use anyhow::{Result, anyhow};
+use schemaui::DraftStore;
+use serde_json::Value;
 
 use crate::cli::CommonArgs;
 
@@ -55,11 +57,34 @@ pub fn prepare_session(args: &CommonArgs) -> Result<SessionBundle> {
     }
     let resolved = resolve_session_inputs(schema_document, config_document)?;
 
+    let draft = resolve_draft(args, &resolved.schema);
+
     Ok(SessionBundle {
         schema: resolved.schema,
         defaults: resolved.defaults,
         title: args.title.clone(),
         description: args.description.clone(),
         output: output_settings,
+        draft,
     })
+}
+
+/// Where this run keeps its draft.
+///
+/// Drafts are on by default: a session that is interrupted after an explicit
+/// save is exactly the case they exist for, and asking users to opt in would
+/// mean only those who already lost work ever turn them on. A machine with no
+/// usable state directory runs without one, with a warning — losing drafts is
+/// not a reason to refuse to show a form.
+fn resolve_draft(args: &CommonArgs, schema: &Value) -> Option<DraftStore> {
+    if let Some(path) = args.draft.as_ref() {
+        return Some(DraftStore::at(path));
+    }
+    match DraftStore::for_schema(schema) {
+        Ok(store) => Some(store),
+        Err(err) => {
+            eprintln!("schemaui: drafts are disabled for this run ({err:#})");
+            None
+        }
+    }
 }

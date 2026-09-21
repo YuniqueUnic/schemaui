@@ -33,11 +33,11 @@ async function request<T>(
 }
 
 export function fetchSession(): Promise<SessionResponse> {
-  return request<SessionResponse>("/api/session");
+  return request<SessionResponse>("/api/v1/session");
 }
 
 export function validateData(data: JsonValue): Promise<ValidationResponse> {
-  return request<ValidationResponse>("/api/validate", {
+  return request<ValidationResponse>("/api/v1/validate", {
     method: "POST",
     json: { data },
   });
@@ -48,22 +48,28 @@ export function renderPreview(
   format: string,
   pretty: boolean,
 ): Promise<PreviewResponse> {
-  return request<PreviewResponse>("/api/preview", {
+  return request<PreviewResponse>("/api/v1/preview", {
     method: "POST",
     json: { data, format, pretty },
   });
 }
 
+/** Write a durable draft that outlives the process (requires `Draft` capability). */
 export function persistData(data: JsonValue) {
-  return request("/api/save", {
+  return request("/api/v1/save", {
     method: "POST",
     json: { data },
   });
 }
 
 export function exitSession(data: JsonValue, commit: boolean) {
-  return request("/api/exit", {
+  return request("/api/v1/exit", {
     method: "POST",
     json: { data, commit },
   });
+}
+
+/** Fetch the raw JSON Schema that backs this session (`/api/v1/schema`). */
+export function fetchSchema(): Promise<JsonValue> {
+  return request<JsonValue>("/api/v1/schema");
 }

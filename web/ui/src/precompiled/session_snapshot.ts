@@ -1,6 +1,9 @@
 import type { SessionResponse } from '@schemaui/types/SessionResponse';
 
 export const PrecompiledSession: SessionResponse = {
+  "api_version": "1.0",
+  "capabilities": [],
+  "draft_restored": false,
   "title": "用户注册信息",
   "description": null,
   "ui_ast": {

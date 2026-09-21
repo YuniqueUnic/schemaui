@@ -182,7 +182,7 @@ fn json_snapshot_roundtrip_via_file_is_deserializable() {
     // Basic structural sanity checks
     assert_eq!(decoded.formats, snapshot.formats);
     assert!(!decoded.ui_ast.roots.is_empty());
-    assert!(decoded.layout.is_some());
+    assert!(!decoded.layout.roots.is_empty());
 
     let _ = std::fs::remove_file(&out_path);
 }

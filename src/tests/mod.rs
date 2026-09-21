@@ -1,5 +1,7 @@
 #[cfg(feature = "json")]
 pub(crate) mod api;
+#[cfg(feature = "json")]
+pub(crate) mod draft_tests;
 pub(crate) mod io;
 #[cfg(feature = "json")]
 pub(crate) mod schema;
@@ -7,5 +9,7 @@ pub(crate) mod schema;
 pub(crate) mod tui;
 #[cfg(feature = "json")]
 pub(crate) mod ui_ast;
+#[cfg(all(feature = "json", feature = "wasm"))]
+pub(crate) mod wasm_core_tests;
 #[cfg(all(feature = "json", feature = "web"))]
 pub(crate) mod web;

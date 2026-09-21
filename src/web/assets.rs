@@ -52,14 +52,41 @@ impl FilesystemAssets {
 impl WebAssetProvider for FilesystemAssets {
     fn load(&self, path: &str) -> Option<AssetResponse> {
         let normalized = normalize_path(path);
-        let joined = self.root.join(normalized);
-        let contents = fs::read(joined).ok()?;
+        let relative = contained_relative_path(normalized)?;
+        let contents = fs::read(self.root.join(&relative)).ok()?;
         Some(AssetResponse {
             path: normalized.to_string(),
             mime: mime_from_path(normalized),
             contents: Cow::Owned(contents),
         })
     }
+}
+
+/// Resolve a request path to something that cannot escape the served root.
+///
+/// The embedded provider is indexed by an exact key and never had this
+/// problem; a directory on disk does. `..` is rejected outright rather than
+/// popped, because a request containing one is a request for a file the
+/// frontend was never meant to reach — resolving it to something else would
+/// answer a question nobody asked.
+fn contained_relative_path(path: &str) -> Option<PathBuf> {
+    use std::path::Component;
+
+    let candidate = Path::new(path);
+    if candidate.is_absolute() {
+        return None;
+    }
+
+    let mut relative = PathBuf::new();
+    for component in candidate.components() {
+        match component {
+            Component::Normal(part) => relative.push(part),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+
+    (!relative.as_os_str().is_empty()).then_some(relative)
 }
 
 pub fn embedded_asset(path: &str) -> Option<AssetResponse> {
@@ -82,38 +109,5 @@ fn mime_from_path(path: &str) -> &'static str {
         Some(ref ext) if ext == "json" => "application/json; charset=utf-8",
         Some(ref ext) if ext == "svg" => "image/svg+xml",
         _ => "application/octet-stream",
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn loads_index_html() {
-        let assets = EmbeddedAssets;
-        let asset = assets.load("/").expect("index.html embedded");
-        assert_eq!(asset.mime, "text/html; charset=utf-8");
-        // Assert that the embedded asset still contains an HTML DOCTYPE. We
-        // do a case-insensitive search for `<!doctype html>` so the test is
-        // robust across different bundler/minifier behaviors.
-        let bytes = asset.contents.as_ref();
-        let lower = bytes
-            .iter()
-            .map(|b| b.to_ascii_lowercase())
-            .collect::<Vec<u8>>();
-        let needle = b"<!doctype html>";
-        let has_doctype = lower.windows(needle.len()).any(|window| window == needle);
-        assert!(
-            has_doctype,
-            "embedded index.html must contain <!doctype html> (case-insensitive) DOCTYPE",
-        );
-    }
-
-    #[test]
-    fn normalizes_root_path() {
-        let assets = EmbeddedAssets;
-        let asset = assets.load("").expect("falls back to index");
-        assert_eq!(asset.path, "index.html");
     }
 }

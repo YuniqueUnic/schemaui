@@ -1,58 +1,22 @@
-use std::net::{IpAddr, SocketAddr, TcpListener};
+use std::net::{IpAddr, SocketAddr};
 use std::thread;
-use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use ureq::Agent;
 
+use super::harness::{reserve_port, test_http_agent, wait_until_ready};
 use crate::web::session::ServeOptions;
 use crate::{FrontendOptions, SchemaUI, SessionOutcome};
-
-fn reserve_port() -> u16 {
-    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind ephemeral port");
-    let port = listener.local_addr().expect("listener addr").port();
-    drop(listener);
-    port
-}
-
-fn test_http_agent() -> Agent {
-    Agent::new_with_config(
-        Agent::config_builder()
-            .http_status_as_error(false)
-            .timeout_global(Some(Duration::from_secs(2)))
-            .proxy(None)
-            .build(),
-    )
-}
-
-fn wait_until_ready(agent: &Agent, base_url: &str) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let session_url = format!("{base_url}/api/session");
-
-    loop {
-        let outcome = match agent.get(&session_url).call() {
-            Ok(response) if response.status().as_u16() == 200 => return,
-            Ok(response) => format!("unexpected status: {}", response.status()),
-            Err(err) => err.to_string(),
-        };
-
-        assert!(
-            Instant::now() < deadline,
-            "web session did not become ready at {base_url}; last outcome: {outcome}"
-        );
-        thread::sleep(Duration::from_millis(50));
-    }
-}
 
 fn start_preview_session(
     schema: Value,
 ) -> (u16, thread::JoinHandle<anyhow::Result<SessionOutcome>>) {
     let port = reserve_port();
     let handle = thread::spawn(move || {
-        SchemaUI::from_schema(schema).run(FrontendOptions::Web(ServeOptions {
-            host: IpAddr::from([127, 0, 0, 1]),
+        SchemaUI::from_schema(schema).run(FrontendOptions::Web(ServeOptions::new(
+            IpAddr::from([127, 0, 0, 1]),
             port,
-        }))
+        )))
     });
     (port, handle)
 }
@@ -64,7 +28,7 @@ fn post_preview(
     format: &str,
 ) -> ureq::http::Response<ureq::Body> {
     agent
-        .post(format!("{base_url}/api/preview"))
+        .post(format!("{base_url}/api/v1/preview"))
         .content_type("application/json")
         .send(
             serde_json::to_string(&json!({
@@ -83,7 +47,7 @@ fn close_session(
     handle: thread::JoinHandle<anyhow::Result<SessionOutcome>>,
 ) {
     let response = agent
-        .post(format!("{base_url}/api/exit"))
+        .post(format!("{base_url}/api/v1/exit"))
         .content_type("application/json")
         .send(
             serde_json::to_string(&json!({

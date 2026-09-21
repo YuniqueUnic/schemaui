@@ -12,6 +12,15 @@ use crate::session::schema_source::{load_optional_document, resolve_session_inpu
 use crate::session::{SessionBundle, prepare_session};
 
 pub fn run_cli(args: &CommonArgs) -> Result<()> {
+    // Explicitly refused rather than quietly dropped: a user who asked for a
+    // theme and got the default one deserves to know the flag did nothing,
+    // rather than concluding their stylesheet is broken.
+    if let Some(path) = args.web_theme.as_ref() {
+        eprintln!(
+            "schemaui: --web-theme {} has no effect in TUI mode; terminals do not render CSS",
+            path.display()
+        );
+    }
     let session = prepare_session(args)?;
     execute_session(session, lifecycle::deadline_from_seconds(args.timeout))
 }
@@ -26,6 +35,7 @@ pub(crate) fn execute_session(
         title,
         description,
         output,
+        draft,
     } = session;
     let mut ui = if let Some(defaults) = defaults {
         SchemaUI::new(defaults).with_schema(schema)
@@ -40,6 +50,9 @@ pub(crate) fn execute_session(
     }
     if let Some(deadline) = deadline {
         ui = ui.with_timeout(deadline);
+    }
+    if let Some(draft) = draft {
+        ui = ui.with_draft(draft);
     }
     lifecycle::finish(ui.run_tui()?, output)
 }

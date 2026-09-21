@@ -33,6 +33,9 @@ vi.mock("sonner", () => ({
 }));
 
 const session: SessionResponse = {
+  api_version: "1.0",
+  capabilities: [],
+  draft_restored: false,
   title: "Complex Composite Session",
   description: "Schema-level description should appear in the header.",
   data: {},
@@ -177,6 +180,9 @@ const session: SessionResponse = {
 
 /** A field whose visibility is driven by a sibling boolean. */
 const conditionalSession: SessionResponse = {
+  api_version: "1.0",
+  capabilities: [],
+  draft_restored: false,
   title: "Conditional Session",
   description: null,
   data: {},
@@ -230,6 +236,9 @@ const conditionalSession: SessionResponse = {
 };
 
 const multilineSession: SessionResponse = {
+  api_version: "1.0",
+  capabilities: [],
+  draft_restored: false,
   title: "Multiline Session",
   description: null,
   data: {},
@@ -262,6 +271,9 @@ const multilineSession: SessionResponse = {
  * can tell which sections are on screen.
  */
 const sectionedSession: SessionResponse = {
+  api_version: "1.0",
+  capabilities: [],
+  draft_restored: false,
   title: "Sectioned Session",
   description: null,
   data: {},
@@ -471,6 +483,9 @@ describe("App web interactions", () => {
 
   it("shows the selected section description above child fields", async () => {
     apiMocks.fetchSession.mockResolvedValue({
+      api_version: "1.0",
+      capabilities: [],
+      draft_restored: false,
       title: "My title",
       description: "My description",
       data: {},

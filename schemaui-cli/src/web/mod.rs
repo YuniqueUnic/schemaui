@@ -1,11 +1,11 @@
-use std::fs;
+use std::{fs, path::PathBuf};
 
 use anyhow::Result;
-use schemaui::SchemaUI;
 use schemaui::precompile::web::{
     build_session_snapshot, write_session_snapshot_json, write_session_snapshot_ts_module,
 };
 use schemaui::web::session::ServeOptions as WebServeOptions;
+use schemaui::{SchemaUI, Theme};
 
 use crate::cli::{WebCommand, WebSnapshotCommand};
 use crate::session::diagnostics::DiagnosticCollector;
@@ -26,6 +26,7 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
         title,
         description,
         output,
+        draft,
     } = session;
 
     let mut ui = if let Some(defaults) = defaults {
@@ -42,13 +43,36 @@ fn execute_web_session(session: SessionBundle, cmd: WebCommand) -> Result<()> {
     if let Some(deadline) = lifecycle::deadline_from_seconds(cmd.common.timeout) {
         ui = ui.with_timeout(deadline);
     }
+    if let Some(draft) = draft {
+        ui = ui.with_draft(draft);
+    }
 
-    let serve = WebServeOptions {
-        host: cmd.host,
-        port: cmd.port,
-    };
+    let mut serve =
+        WebServeOptions::new(cmd.host, cmd.port).with_theme(load_theme(cmd.common.web_theme));
+    if let Some(dir) = cmd.frontend {
+        serve = serve.with_frontend_dir(dir);
+    }
 
     lifecycle::finish(ui.run_web(serve)?, output)
+}
+
+/// Read `--web-theme`, or carry on without one.
+///
+/// A stylesheet that will not load is worth saying out loud but not worth
+/// refusing to open the form over: the session is still perfectly usable in the
+/// default theme, and aborting would cost the user their actual task.
+fn load_theme(path: Option<PathBuf>) -> Option<Theme> {
+    let path = path?;
+    match Theme::from_path(&path) {
+        Ok(theme) => Some(theme),
+        Err(err) => {
+            eprintln!(
+                "schemaui: ignoring --web-theme {} and using the default theme ({err:#})",
+                path.display()
+            );
+            None
+        }
+    }
 }
 
 pub fn run_snapshot_cli(cmd: WebSnapshotCommand) -> Result<()> {

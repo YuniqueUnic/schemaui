@@ -22,6 +22,8 @@ import { useSessionState } from "./hooks/useSessionState";
 import { useSessionActions } from "./hooks/useSessionActions";
 import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useCountdown } from "./hooks/useCountdown";
+import { httpTransport } from "./transport/httpTransport";
+import type { SchemaUiTransport } from "./transport/types";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -44,7 +46,13 @@ type PanelView = "nav" | "editor" | "preview";
  */
 const ROOT_LABEL = "General";
 
-export default function App() {
+interface AppProps {
+  /** Where the schema pipeline runs. Defaults to the HTTP session this app
+   * was built for; the Playground passes a wasm-backed transport instead. */
+  transport?: SchemaUiTransport;
+}
+
+export default function App({ transport = httpTransport }: AppProps = {}) {
   const { state, actions, dirtyRef } = useSessionState();
   const { sizes, startDrag, isDragging } = useResizableColumns({ nav: 280, preview: 380 });
 
@@ -55,7 +63,7 @@ export default function App() {
     handleExit,
     handlePreviewFormatChange,
     handlePreviewPrettyChange,
-  } = useSessionActions({ state, actions, dirtyRef });
+  } = useSessionActions({ state, actions, dirtyRef, transport });
 
   const [navMode, setNavMode] = useState<"schema" | "layout">("schema");
   const isDesktop = useMediaQuery("(min-width: 1024px)");
@@ -192,6 +200,8 @@ export default function App() {
           secondsLeft={secondsLeft}
           onSave={handleSave}
           onExit={() => handleExit()}
+          exitLabel={transport.kind === "wasm" ? "Export" : "Exit"}
+          exitingLabel={transport.kind === "wasm" ? "Exporting…" : "Exiting…"}
         />
         <div className="app-panel-muted flex flex-1 flex-col overflow-hidden border-y border-theme lg:flex-row">
           {!isDesktop && (

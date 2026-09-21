@@ -1,5 +1,4 @@
 use std::{
-    fs,
     future::IntoFuture,
     net::{IpAddr, SocketAddr},
     path::PathBuf,
@@ -29,13 +28,37 @@ use tokio::{
 #[cfg(feature = "web-types")]
 use ts_rs::TS;
 
+use crate::draft::SessionDraft;
 use crate::io::{DocumentFormat, input::schema_with_defaults, output::OutputOptions};
 use crate::precompile::UiArtifactBundle;
 use crate::schema::metadata::root_schema_header;
 
 use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
+use super::theme::Theme;
 use crate::core::frontend::SessionOutcome;
 use crate::ui_ast::{UiAst, UiAstBundle, UiLayout, build_ui_ast_bundle};
+
+/// The contract this server speaks, reported in every session response.
+///
+/// Paths are versioned too (`/api/v1/...`), which is what lets a client fail
+/// fast on an incompatible server; this field distinguishes additive revisions
+/// within that major version.
+pub const API_VERSION: &str = "1.0";
+
+/// An optional part of the contract this session actually offers.
+///
+/// A client reads this instead of probing endpoints: a 404 on a capability it
+/// was never offered is not a useful thing to discover at runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
+pub enum Capability {
+    /// `GET /api/v1/theme.css` is served, and the frontend should link it.
+    Theme,
+    /// Saving writes a draft that outlives the process.
+    Draft,
+}
 
 pub struct WebSessionBuilder {
     schema: Value,
@@ -46,6 +69,8 @@ pub struct WebSessionBuilder {
     ui_bundle: Option<UiAstBundle>,
     ui_artifact_bundle: Option<UiArtifactBundle>,
     deadline: Option<Instant>,
+    theme: Option<Theme>,
+    draft: Option<SessionDraft>,
 }
 
 impl WebSessionBuilder {
@@ -60,6 +85,8 @@ impl WebSessionBuilder {
             ui_bundle: None,
             ui_artifact_bundle: None,
             deadline: None,
+            theme: None,
+            draft: None,
         }
     }
 
@@ -112,6 +139,18 @@ impl WebSessionBuilder {
         self
     }
 
+    /// Serve `theme` alongside the built-in stylesheet.
+    pub fn with_theme(mut self, theme: Option<Theme>) -> Self {
+        self.theme = theme;
+        self
+    }
+
+    /// Persist saves to `draft`, so an interrupted session can be resumed.
+    pub fn with_draft(mut self, draft: Option<SessionDraft>) -> Self {
+        self.draft = draft;
+        self
+    }
+
     pub fn build(mut self) -> Result<WebSessionConfig> {
         let data = self
             .defaults
@@ -136,6 +175,8 @@ impl WebSessionBuilder {
             schema,
             asset_provider: self.asset_provider,
             deadline: self.deadline,
+            theme: self.theme,
+            draft: self.draft,
         })
     }
 }
@@ -150,11 +191,15 @@ pub struct WebSessionConfig {
     pub schema: Value,
     pub asset_provider: Arc<dyn WebAssetProvider>,
     pub deadline: Option<Instant>,
+    pub theme: Option<Theme>,
+    pub draft: Option<SessionDraft>,
 }
 
 impl WebSessionConfig {
     pub fn session_response(&self) -> SessionResponse {
         SessionResponse {
+            api_version: API_VERSION.to_string(),
+            capabilities: capabilities(self.theme.as_ref(), self.draft.as_ref()),
             title: self.title.clone(),
             description: self.description.clone(),
             ui_ast: self.ui_ast.clone(),
@@ -163,10 +208,23 @@ impl WebSessionConfig {
                 .into_iter()
                 .map(|format| format.to_string())
                 .collect(),
-            layout: Some(self.layout.clone()),
+            layout: self.layout.clone(),
             expires_in_ms: remaining_ms(self.deadline),
+            draft_restored: self.draft.as_ref().is_some_and(|draft| draft.restored),
         }
     }
+}
+
+/// What this session offers beyond the mandatory endpoints.
+fn capabilities(theme: Option<&Theme>, draft: Option<&SessionDraft>) -> Vec<Capability> {
+    let mut capabilities = Vec::new();
+    if theme.is_some() {
+        capabilities.push(Capability::Theme);
+    }
+    if draft.is_some() {
+        capabilities.push(Capability::Draft);
+    }
+    capabilities
 }
 
 /// Milliseconds left before `deadline`, or `None` when the session is unbounded.
@@ -179,10 +237,47 @@ fn remaining_ms(deadline: Option<Instant>) -> Option<u64> {
     })
 }
 
-#[derive(Debug, Clone, Copy)]
+/// How the temporary HTTP server is configured: where it listens, what it
+/// serves, and what it serves it wearing.
+///
+/// Everything web-specific lives here rather than on the shared frontend
+/// context, so a TUI-only build never has to know these concepts exist.
+#[derive(Debug, Clone)]
 pub struct ServeOptions {
     pub host: IpAddr,
     pub port: u16,
+    /// What answers the paths the API does not claim. Defaults to the SPA
+    /// embedded in the binary; point it at a directory to run a different
+    /// frontend entirely.
+    pub assets: Arc<dyn WebAssetProvider>,
+    /// A user stylesheet, served at `/api/v1/theme.css`.
+    pub theme: Option<Theme>,
+}
+
+impl ServeOptions {
+    /// Listen on `host:port`, serving the embedded SPA with no user theme.
+    pub fn new(host: IpAddr, port: u16) -> Self {
+        Self {
+            host,
+            port,
+            ..Self::default()
+        }
+    }
+
+    /// Serve a frontend from `root` instead of the embedded SPA.
+    pub fn with_frontend_dir(mut self, root: impl Into<PathBuf>) -> Self {
+        self.assets = Arc::new(FilesystemAssets::new(root));
+        self
+    }
+
+    pub fn with_theme(mut self, theme: Option<Theme>) -> Self {
+        self.theme = theme;
+        self
+    }
+
+    pub fn socket_addr(&self) -> SocketAddr {
+        SocketAddr::new(self.host, self.port)
+    }
 }
 
 impl Default for ServeOptions {
@@ -190,6 +285,9 @@ impl Default for ServeOptions {
         Self {
             host: IpAddr::from([127, 0, 0, 1]),
             port: 0,
+            #[allow(clippy::default_constructed_unit_structs)]
+            assets: Arc::new(EmbeddedAssets::default()),
+            theme: None,
         }
     }
 }
@@ -251,7 +349,12 @@ impl BoundSession {
     }
 }
 
-pub async fn bind_session(config: WebSessionConfig, options: ServeOptions) -> Result<BoundSession> {
+/// Wire up a session and bind it to `addr`.
+///
+/// Takes an address rather than the whole [`ServeOptions`]: everything else in
+/// that struct describes what to *serve*, and by this point it has already been
+/// resolved into `config`. Passing both would invite the two to disagree.
+pub async fn bind_session(config: WebSessionConfig, addr: SocketAddr) -> Result<BoundSession> {
     // Captured here rather than inside the blocking task so the timer lands on
     // the caller's runtime, which is the one that will drive the server.
     let runtime = tokio::runtime::Handle::current();
@@ -259,7 +362,7 @@ pub async fn bind_session(config: WebSessionConfig, options: ServeOptions) -> Re
         .await
         .context("failed to build web session state")??;
     wiring.arm_deadline(runtime);
-    let listener = TcpListener::bind(SocketAddr::new(options.host, options.port))
+    let listener = TcpListener::bind(addr)
         .await
         .context("failed to bind web listener")?;
     let addr = listener
@@ -273,11 +376,8 @@ pub async fn bind_session(config: WebSessionConfig, options: ServeOptions) -> Re
     })
 }
 
-pub async fn serve_session(
-    config: WebSessionConfig,
-    options: ServeOptions,
-) -> Result<SessionOutcome> {
-    bind_session(config, options).await?.run().await
+pub async fn serve_session(config: WebSessionConfig, addr: SocketAddr) -> Result<SessionOutcome> {
+    bind_session(config, addr).await?.run().await
 }
 
 /// Build the session's routes and shared state.
@@ -329,6 +429,8 @@ fn build_session_wiring(config: WebSessionConfig) -> Result<SessionWiring> {
         schema,
         asset_provider,
         deadline,
+        theme,
+        draft,
     } = config;
     let validator = Arc::new(validator_for(&schema).context("failed to compile JSON schema")?);
     let (result_tx, result_rx) = oneshot::channel();
@@ -339,6 +441,7 @@ fn build_session_wiring(config: WebSessionConfig) -> Result<SessionWiring> {
         ui_ast: Arc::new(ui_ast),
         layout: Arc::new(layout),
         data: Arc::new(Mutex::new(data)),
+        schema: Arc::new(schema),
         formats: DocumentFormat::available_formats(),
         validator,
         finish_line: Arc::new(FinishLine {
@@ -348,17 +451,26 @@ fn build_session_wiring(config: WebSessionConfig) -> Result<SessionWiring> {
         finished: Arc::new(AtomicBool::new(false)),
         asset_provider,
         deadline,
+        theme: theme.map(Arc::new),
+        draft: draft.map(Arc::new),
     };
 
-    let router = Router::new()
-        .route("/api/session", get(get_session))
-        .route("/api/session/export", get(get_session_export))
-        .route("/api/save", post(post_save))
-        .route("/api/exit", post(post_exit))
-        .route("/api/validate", post(post_validate))
-        .route("/api/preview", post(post_preview))
-        .fallback(static_assets)
-        .with_state(shared.clone());
+    let mut router = Router::new()
+        .route("/api/v1/session", get(get_session))
+        .route("/api/v1/session/export", get(get_session_export))
+        .route("/api/v1/schema", get(get_schema))
+        .route("/api/v1/save", post(post_save))
+        .route("/api/v1/exit", post(post_exit))
+        .route("/api/v1/validate", post(post_validate))
+        .route("/api/v1/preview", post(post_preview));
+
+    // Registered only when there is a stylesheet to serve, so the advertised
+    // capability and the routing table cannot disagree.
+    if shared.theme.is_some() {
+        router = router.route("/api/v1/theme.css", get(get_theme_css));
+    }
+
+    let router = router.fallback(static_assets).with_state(shared.clone());
 
     Ok(SessionWiring {
         router,
@@ -396,18 +508,24 @@ struct SharedState {
     ui_ast: Arc<UiAst>,
     layout: Arc<UiLayout>,
     data: Arc<Mutex<Value>>,
+    schema: Arc<Value>,
     formats: Vec<DocumentFormat>,
     validator: Arc<Validator>,
     finish_line: Arc<FinishLine>,
     finished: Arc<AtomicBool>,
     asset_provider: Arc<dyn WebAssetProvider>,
     deadline: Option<Instant>,
+    theme: Option<Arc<Theme>>,
+    draft: Option<Arc<SessionDraft>>,
 }
 
 impl SharedState {
     /// End the session because its deadline passed. Reports `TimedOut` rather
     /// than the data collected so far: a half-filled form is not an answer, and
     /// conflating the two would let a caller persist one as if it were real.
+    ///
+    /// The draft is deliberately left on disk. A deadline firing is exactly
+    /// when an unfinished form is worth recovering.
     async fn time_out(&self) {
         if self.finished.swap(true, Ordering::SeqCst) {
             return;
@@ -436,26 +554,33 @@ impl FinishLine {
 #[cfg_attr(feature = "web-types", derive(TS))]
 #[cfg_attr(feature = "web-types", ts(export, export_to = "web/types/"))]
 pub struct SessionResponse {
+    /// The contract revision this payload follows. See [`API_VERSION`].
+    pub api_version: String,
+    /// Optional parts of the contract this session actually offers.
+    pub capabilities: Vec<Capability>,
     pub title: Option<String>,
     pub description: Option<String>,
     pub ui_ast: UiAst,
     #[cfg_attr(feature = "web-types", ts(type = "Record<string, unknown>"))]
     pub data: Value,
     pub formats: Vec<String>,
-    pub layout: Option<UiLayout>,
+    pub layout: UiLayout,
     /// Milliseconds until the session is aborted, or `None` when unbounded.
     /// A duration rather than a timestamp so a client on a skewed clock (a
     /// phone on the LAN, say) still counts down correctly.
     #[cfg_attr(feature = "web-types", ts(type = "number | null"))]
     pub expires_in_ms: Option<u64>,
+    /// Whether `data` came back from a draft rather than from the caller.
+    /// The user typed it once already and is owed the explanation.
+    pub draft_restored: bool,
 }
 
 async fn get_session(State(state): State<SharedState>) -> impl IntoResponse {
-    Json(build_and_maybe_dump_session(&state).await)
+    Json(build_session(&state).await)
 }
 
 async fn get_session_export(State(state): State<SharedState>) -> impl IntoResponse {
-    let payload = build_and_maybe_dump_session(&state).await;
+    let payload = build_session(&state).await;
     (
         [(
             header::CONTENT_DISPOSITION,
@@ -465,24 +590,39 @@ async fn get_session_export(State(state): State<SharedState>) -> impl IntoRespon
     )
 }
 
-async fn build_and_maybe_dump_session(state: &SharedState) -> SessionResponse {
-    const DEFAULT_PATH: &str = "/tmp/schemaui-session.json";
-    let ui_ast = (*state.ui_ast).clone();
-    let layout = (*state.layout).clone();
-    let payload = SessionResponse {
+async fn build_session(state: &SharedState) -> SessionResponse {
+    SessionResponse {
+        api_version: API_VERSION.to_string(),
+        capabilities: capabilities(state.theme.as_deref(), state.draft.as_deref()),
         title: state.title.clone(),
         description: state.description.clone(),
-        ui_ast,
+        ui_ast: (*state.ui_ast).clone(),
         data: state.data.lock().await.clone(),
         formats: state.formats.iter().map(|f| f.to_string()).collect(),
-        layout: Some(layout),
+        layout: (*state.layout).clone(),
         expires_in_ms: remaining_ms(state.deadline),
-    };
-    if let Ok(serialized) = serde_json::to_vec_pretty(&payload) {
-        let path = std::env::var("SCHEMAUI_SESSION_DUMP").unwrap_or_else(|_| DEFAULT_PATH.into());
-        let _ = tokio::task::spawn_blocking(move || fs::write(path, serialized)).await;
+        draft_restored: state.draft.as_ref().is_some_and(|draft| draft.restored),
     }
-    payload
+}
+
+/// The schema the session was built from, for frontends that would rather
+/// render it themselves than consume the UI AST.
+async fn get_schema(State(state): State<SharedState>) -> impl IntoResponse {
+    Json((*state.schema).clone())
+}
+
+async fn get_theme_css(State(state): State<SharedState>) -> Response<Body> {
+    let css = state
+        .theme
+        .as_ref()
+        .map(|theme| theme.css().to_string())
+        .unwrap_or_default();
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/css; charset=utf-8")
+        .header(header::CACHE_CONTROL, "no-store")
+        .body(Body::from(css))
+        .expect("static header values are valid")
 }
 
 #[derive(Deserialize)]
@@ -493,6 +633,12 @@ pub(crate) struct SaveRequest {
     pub data: Value,
 }
 
+/// Checkpoint the session: hold the value, and put it somewhere that outlives
+/// the process.
+///
+/// An in-memory-only save would be the more dangerous half of a promise — the
+/// user reads "saved" and stops worrying, while the only copy is in a process
+/// one crash away from gone.
 async fn post_save(
     State(state): State<SharedState>,
     Json(req): Json<SaveRequest>,
@@ -501,6 +647,15 @@ async fn post_save(
         return (
             StatusCode::GONE,
             Json(json!({"error": "session already closed"})),
+        );
+    }
+
+    if let Some(draft) = state.draft.as_ref()
+        && let Err(err) = draft.store.save(&req.data)
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("failed to write draft: {err:#}")})),
         );
     }
     *state.data.lock().await = req.data;
@@ -537,6 +692,11 @@ async fn post_exit(
     } else {
         state.data.lock().await.clone()
     };
+    // The session produced a value; whatever the caller does with it, the
+    // draft has nothing left to protect.
+    if let Some(draft) = state.draft.as_ref() {
+        draft.store.discard();
+    }
     state
         .finish_line
         .complete(SessionOutcome::Completed(final_value))

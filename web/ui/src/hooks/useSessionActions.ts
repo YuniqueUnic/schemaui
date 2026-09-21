@@ -6,15 +6,11 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import {
-  exitSession,
-  fetchSession,
-  persistData,
-  renderPreview,
-  validateData,
-} from "../api";
+import { httpTransport } from "../transport/httpTransport";
+import type { SchemaUiTransport } from "../transport/types";
 import type { JsonValue, UiAst } from "../types";
 import { applyUiDefaults } from "../ui-ast";
+import { downloadTextFile } from "../utils/downloadFile";
 import { deepClone, setPointerValue } from "../utils/jsonPointer";
 import type { useSessionState } from "./useSessionState";
 import { staticSession } from "../generated/session";
@@ -25,10 +21,13 @@ interface UseSessionActionsOptions {
   state: SessionStateHook["state"];
   actions: SessionStateHook["actions"];
   dirtyRef: SessionStateHook["dirtyRef"];
+  /** Where the schema pipeline actually runs. Defaults to the HTTP session
+   * this hook was written for; the Playground passes a wasm-backed one. */
+  transport?: SchemaUiTransport;
 }
 
 export function useSessionActions(
-  { state, actions, dirtyRef }: UseSessionActionsOptions,
+  { state, actions, dirtyRef, transport = httpTransport }: UseSessionActionsOptions,
 ) {
   const validationSeq = useRef(0);
   const previewSeq = useRef(0);
@@ -64,7 +63,7 @@ export function useSessionActions(
     async (data: JsonValue): Promise<Map<string, string>> => {
       const seq = ++validationSeq.current;
       try {
-        const result = await validateData(data);
+        const result = await transport.validate(data);
         if (seq !== validationSeq.current) return new Map();
         const errors = new Map<string, string>();
         result.errors?.forEach((err) =>
@@ -77,14 +76,14 @@ export function useSessionActions(
         return new Map();
       }
     },
-    [actions],
+    [actions, transport],
   );
 
   const updatePreview = useCallback(
     async (data: JsonValue, pretty: boolean, format: string) => {
       const seq = ++previewSeq.current;
       try {
-        const result = await renderPreview(data, format, pretty);
+        const result = await transport.preview(data, format, pretty);
         if (seq !== previewSeq.current) return;
         actions.setPreviewPayload(result.payload);
       } catch (error) {
@@ -94,7 +93,7 @@ export function useSessionActions(
         actions.setPreviewError(message);
       }
     },
-    [actions],
+    [actions, transport],
   );
 
   // ============================================
@@ -103,26 +102,47 @@ export function useSessionActions(
 
   const initializeSession = useCallback(async () => {
     try {
-      const payload = staticSession ?? await fetchSession();
+      const payload = staticSession ?? await transport.bootstrap();
 
       draftKeyRef.current = draftStorageKey(payload.ui_ast);
 
-      // Try to restore from localStorage
-      let restoredData: JsonValue | null = null;
+      // Inject user theme stylesheet when the backend offers one.
+      // A <link> is idempotent-safe: if the element already exists we skip it,
+      // so hot-reloading the hook does not pile up duplicate stylesheets.
+      if (payload.capabilities?.includes("theme")) {
+        const THEME_LINK_ID = "schemaui-user-theme";
+        if (!document.getElementById(THEME_LINK_ID)) {
+          const link = document.createElement("link");
+          link.id = THEME_LINK_ID;
+          link.rel = "stylesheet";
+          link.href = "/api/v1/theme.css";
+          document.head.appendChild(link);
+        }
+      }
+
+      // Two independent draft layers:
+      //   1. Backend draft (draft_restored=true): the server already merged it
+      //      into payload.data. We just show the user a banner.
+      //   2. Browser localStorage: a crash-recovery layer written on every
+      //      keystroke, cleared only on a successful commit exit. Preferred
+      //      over the backend draft because it is more recent.
+      let effectiveData: JsonValue = payload.data || {};
+
+      if (payload.draft_restored) {
+        toast.info("Draft restored from previous session", { duration: 6000 });
+      }
+
       try {
         const stored = localStorage.getItem(draftKeyRef.current);
         if (stored) {
-          restoredData = JSON.parse(stored);
-          toast.info("Restored previous session data");
+          effectiveData = JSON.parse(stored) as JsonValue;
+          toast.info("Unsaved changes restored from browser storage", { duration: 4000 });
         }
       } catch (err) {
         console.error("Failed to restore from localStorage", err);
       }
 
-      const withDefaults = applyUiDefaults(
-        payload.ui_ast,
-        restoredData || payload.data || {},
-      );
+      const withDefaults = applyUiDefaults(payload.ui_ast, effectiveData);
 
       const formats = payload.formats?.length ? payload.formats : ["json"];
 
@@ -146,7 +166,7 @@ export function useSessionActions(
       actions.setStatus("Failed to load session");
       actions.setLoading(false);
     }
-  }, [actions, runValidation, updatePreview]);
+  }, [actions, runValidation, updatePreview, transport]);
 
   // ============================================
   // Handle Data Change
@@ -195,16 +215,24 @@ export function useSessionActions(
 
     actions.setSaving(true);
     try {
-      await persistData(state.data);
+      await transport.save(state.data);
       actions.markSaved();
-      clearLocalStorage();
-      toast.success("Changes saved successfully");
+      // localStorage is NOT cleared here: it is an independent crash-recovery
+      // layer that protects against power-cuts and process crashes. A backend
+      // save writes to disk on the server side; the browser draft guards against
+      // the opposite failure. Both layers can co-exist. localStorage is only
+      // cleared once the session ends with a successful commit.
+      toast.success(
+        transport.kind === "wasm"
+          ? "Kept in this browser only — there is no server to save to"
+          : "Draft saved",
+      );
     } catch (error) {
       console.error("Save failed", error);
-      toast.error("Failed to save changes");
+      toast.error("Failed to save draft");
       actions.setSaving(false);
     }
-  }, [state.session, state.data, actions, clearLocalStorage, runValidation]);
+  }, [state.session, state.data, actions, runValidation, transport]);
 
   // ============================================
   // Handle Exit
@@ -213,7 +241,7 @@ export function useSessionActions(
   const forceExit = useCallback(async () => {
     actions.setExiting(true);
     try {
-      await exitSession(state.data, false); // commit=false
+      await transport.exit(state.data, false); // commit=false
       clearLocalStorage();
       actions.setSessionEnded(true);
       toast.success("Session aborted (changes discarded)");
@@ -222,7 +250,7 @@ export function useSessionActions(
       toast.error("Failed to exit session");
       actions.setExiting(false);
     }
-  }, [state.data, actions, clearLocalStorage]);
+  }, [state.data, actions, clearLocalStorage, transport]);
 
   const handleExit = useCallback(async (force = false) => {
     // Prevent multiple exit attempts
@@ -265,10 +293,18 @@ export function useSessionActions(
     // Clean exit: no errors, no unsaved changes
     actions.setExiting(true);
     try {
-      await exitSession(state.data, true); // commit=true
+      await transport.exit(state.data, true); // commit=true
+      // There is no server session for the wasm transport to hand the
+      // finished document to, so "ending" the session means downloading it.
+      if (transport.kind === "wasm") {
+        const format = state.previewFormat || "json";
+        downloadTextFile(`document.${format}`, state.previewPayload, previewMimeType(format));
+      }
       clearLocalStorage();
       actions.setSessionEnded(true);
-      toast.success("Session ended successfully");
+      toast.success(
+        transport.kind === "wasm" ? "Document downloaded" : "Session ended successfully",
+      );
     } catch (error) {
       console.error("Exit failed", error);
       toast.error("Failed to exit session");
@@ -278,11 +314,14 @@ export function useSessionActions(
     state.sessionEnded,
     state.exiting,
     state.data,
+    state.previewFormat,
+    state.previewPayload,
     dirtyRef,
     actions,
     clearLocalStorage,
     forceExit,
     runValidation,
+    transport,
   ]);
 
   // ============================================
@@ -380,4 +419,14 @@ function previewErrorMessage(error: unknown): string {
     return error.message;
   }
   return "Preview failed";
+}
+
+const PREVIEW_MIME_TYPES: Record<string, string> = {
+  json: "application/json",
+  yaml: "application/yaml",
+  toml: "application/toml",
+};
+
+function previewMimeType(format: string): string {
+  return PREVIEW_MIME_TYPES[format] ?? "text/plain";
 }

@@ -42,6 +42,7 @@ impl Frontend for TuiFrontend {
             schema: _,
             validator,
             deadline,
+            draft,
         } = ctx;
 
         let resolved = resolve_tui_artifacts(&ui_ast, &layout, tui_artifacts);
@@ -53,6 +54,14 @@ impl Frontend for TuiFrontend {
         let mut app = App::new(form_state, validator, options);
         app.set_session_title(title);
         app.set_deadline(deadline);
-        app.run()
+        app.set_draft(draft.clone());
+
+        let outcome = app.run()?;
+        // The session produced a value, so the draft has nothing left to
+        // protect. A timeout leaves it exactly where it is.
+        if let (SessionOutcome::Completed(_), Some(draft)) = (&outcome, draft.as_ref()) {
+            draft.store.discard();
+        }
+        Ok(outcome)
     }
 }

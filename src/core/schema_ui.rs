@@ -5,6 +5,7 @@ use serde_json::Value;
 
 use crate::core::frontend::{Frontend, FrontendOptions, SessionOutcome};
 use crate::core::pipeline::SchemaPipeline;
+use crate::draft::DraftStore;
 use crate::io::{
     self, DocumentFormat,
     input::{looks_like_json_schema, parse_document_auto},
@@ -78,6 +79,7 @@ pub struct SchemaUI {
     #[cfg(feature = "tui")]
     tui_artifacts: Option<TuiArtifacts>,
     timeout: Option<Duration>,
+    draft: Option<DraftStore>,
 }
 
 impl SchemaUI {
@@ -93,6 +95,7 @@ impl SchemaUI {
             #[cfg(feature = "tui")]
             tui_artifacts: None,
             timeout: None,
+            draft: None,
         }
     }
 
@@ -165,6 +168,17 @@ impl SchemaUI {
     /// value, so a half-filled session is never mistaken for a real save.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
+        self
+    }
+
+    /// Checkpoint explicit saves into `store`, and resume from whatever a
+    /// previous session left there.
+    ///
+    /// A restored draft takes precedence over data passed with
+    /// [`Self::with_data`]: a draft only survives a session that ended without
+    /// producing a value, so it is always the newer of the two.
+    pub fn with_draft(mut self, store: DraftStore) -> Self {
+        self.draft = Some(store);
         self
     }
 
@@ -288,6 +302,7 @@ impl SchemaUI {
             #[cfg(feature = "tui")]
                 tui_artifacts: _,
             timeout,
+            draft,
         } = self;
 
         let ui_bundle = ui_artifact_bundle.map(|bundle| bundle.ui).or(ui_bundle);
@@ -296,6 +311,7 @@ impl SchemaUI {
             .with_description(description)
             .with_defaults(inputs.defaults)
             .with_timeout(timeout)
+            .with_draft(draft)
             .with_prepared_ui_ast(ui_ast)
             .with_prepared_ui_bundle(ui_bundle);
         pipeline.build_frontend_context()

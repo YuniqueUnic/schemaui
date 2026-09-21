@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.playground.tsbuildinfo",
+    "paths": {
+      "@schemaui/types/*": [
+        "../types/*"
+      ],
+      "@schemaui/wasm": [
+        "../../schemaui-wasm/pkg/schemaui_wasm"
+      ],
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": []
+}

@@ -1,8 +1,10 @@
 import { memo } from "react";
-import { Moon, Power, Save, Sun } from "lucide-react";
+import { ExternalLink, Moon, Power, Save, Sun } from "lucide-react";
 import { useTheme } from "../theme";
 import { Button } from "@/components/ui/button";
 import { CountdownBadge } from "./CountdownBadge";
+
+const SCHEMAUI_URL = "https://github.com/yuniqueunic/schemaui";
 
 interface AppHeaderProps {
   title?: string | null;
@@ -13,6 +15,10 @@ interface AppHeaderProps {
   secondsLeft?: number | null;
   onSave(): void;
   onExit(): void;
+  /** "Exit" for a server session; "Export" when exiting downloads a file
+   * instead (the Playground, which has no server to hand the document to). */
+  exitLabel?: string;
+  exitingLabel?: string;
 }
 
 /**
@@ -31,24 +37,42 @@ export const AppHeader = memo(function AppHeader({
   secondsLeft = null,
   onSave,
   onExit,
+  exitLabel = "Exit",
+  exitingLabel = "Exiting…",
 }: AppHeaderProps) {
   const { theme, toggle } = useTheme();
   return (
     <header className="border-b border-border/50 bg-background px-4 py-3 md:px-6 md:py-3.5">
       <div className="flex items-center justify-between gap-4">
-        {/* Left: Title & Description */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-sm font-semibold text-foreground md:text-[15px]">
-              {title || "Configuration session"}
-            </h1>
-            {secondsLeft != null && <CountdownBadge secondsLeft={secondsLeft} />}
+        {/* Left: Brand, Title & Description */}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <a
+            href={SCHEMAUI_URL}
+            target="_blank"
+            rel="noreferrer"
+            title="SchemaUI on GitHub"
+            className="hidden shrink-0 items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground sm:flex"
+          >
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            SchemaUI
+          </a>
+          <span
+            aria-hidden="true"
+            className="hidden h-4 w-px shrink-0 bg-border sm:block"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-sm font-semibold text-foreground md:text-[15px]">
+                {title || "Configuration session"}
+              </h1>
+              {secondsLeft != null && <CountdownBadge secondsLeft={secondsLeft} />}
+            </div>
+            {description && (
+              <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block">
+                {description}
+              </p>
+            )}
           </div>
-          {description && (
-            <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block">
-              {description}
-            </p>
-          )}
         </div>
 
         {/* Right: Actions */}
@@ -84,11 +108,11 @@ export const AppHeader = memo(function AppHeader({
             onClick={onExit}
             disabled={saving || exiting}
             className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            title="Exit"
+            title={exitLabel}
           >
             <Power className="h-4 w-4" />
             <span className="hidden md:inline ml-1">
-              {exiting ? "Exiting…" : "Exit"}
+              {exiting ? exitingLabel : exitLabel}
             </span>
           </Button>
         </div>
