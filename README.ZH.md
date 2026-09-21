@@ -185,7 +185,8 @@ flag 必须放在 `-o` 之前，多个目的地在同一个 `-o` 后空格分隔
 
 ### 库（嵌入你的应用）
 
-```rust,no_run
+```rust,ignore
+use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
 use schemaui::SessionOutcome;
@@ -211,7 +212,8 @@ async fn run() -> anyhow::Result<()> {
       // 可选：10 分钟内无人作答就自动结束会话
       .with_deadline(Some(Instant::now() + Duration::from_secs(600)))
       .build()?;
-  let session = bind_session(config, ServeOptions::default()).await?;
+  let addr = ServeOptions::new(IpAddr::from([127, 0, 0, 1]), 0).socket_addr();
+  let session = bind_session(config, addr).await?;
   println!("visit http://{}/", session.local_addr());
 
   match session.run().await? {
@@ -226,12 +228,79 @@ async fn run() -> anyhow::Result<()> {
 }
 ```
 
-`bind_session` / `serve_session` 会拉起 Axum，暴露
-`/api/session`、`/api/save`、`/api/exit` 以及内嵌静态资源。若要挂进现有 HTTP
+`bind_session` / `serve_session` 会拉起 Axum，暴露带版本号的 `/api/v1/*`
+约定（会话引导、validate、preview、save、exit——详见下方
+[可插拔前端与主题](#可插拔前端与主题)）以及内嵌静态资源。若要挂进现有 HTTP
 栈，可复用 `session_router` / `WebSessionBuilder`。官方 CLI 的 `schemaui web …`
 只是这些 API 的薄封装。
 
 架构说明：[`docs/en/web-ui-architecture-and-refactor-spec.md`](./docs/en/web-ui-architecture-and-refactor-spec.md)。
+
+### 可插拔前端与主题
+
+Web 会话在 `/api/v1/*` 上暴露一套带版本号、与框架无关的 HTTP 约定：
+会话引导（`GET /session`、`GET /schema`）、`POST /validate`、
+`POST /preview`、`POST /save`、`POST /exit`，配置了主题时还有
+`GET /theme.css`。内置的 React SPA 只是这套约定的参考客户端，并非唯一实现：
+
+```bash
+# 通过覆盖设计 token 来给内置 UI 换肤
+schemaui web -s schema.json --web-theme examples/themes/midnight.css
+
+# 把前端整个换成你自己的、包含 index.html 的目录
+schemaui web -s schema.json --frontend examples/frontend
+```
+
+`examples/frontend/` 是一个不需要构建、不依赖任何框架的 `index.html`，它通过
+`/api/v1/*` 驱动一个真实会话——证明这套约定能被任何技术栈使用，
+而不只是内置的那一套。`examples/themes/midnight.css` 是一份完整可用的
+`--web-theme` 示例；两者都受契约测试覆盖（`src/tests/web/theme_tests.rs`）。
+
+开发期间，把 `web/ui` 的 Vite 开发服务器指向一个固定端口跑起来的真实会话，
+而不是内嵌构建——无需 CORS 层，`vite.config.ts` 会把 `/api/*` 代理到
+`http://127.0.0.1:8787`：
+
+```bash
+schemaui web -s schema.json -p 8787 &   # 终端一
+cd web/ui && pnpm dev                   # 终端二；改动会针对它热更新
+```
+
+设计记录：[`docs/en/web-v1-theming-and-wasm.md`](./docs/en/web-v1-theming-and-wasm.md)。
+
+## WebAssembly、Playground 与 Edge API
+
+`schemaui-wasm` 把同一套 schema → UiAst → 校验 → 渲染 的流水线编译到
+WebAssembly，因此它可以完全不依赖服务器运行——在静态站点里、在非 Rust
+宿主里，或是在边缘 worker 上。五个导出与 HTTP 约定逐字节对齐（
+`src/tests/web/wasm_parity_tests.rs` 里的共享测试夹具会断言两者一致）：
+`buildUiAst`、`validate`、`render`、`schemaWithDefaults`、
+`schemaFromData`，再加上用于接受 JSON/YAML/TOML 输入的 `parseDocument`
+——毕竟这里没有服务器能预先帮你解析格式。
+
+```sh
+just build-wasm         # -> schemaui-wasm/pkg（wasm-bindgen "web" target）
+just build-playground   # -> web/playground-dist（静态产物，无需服务器）
+```
+
+**Playground。** 就是 CLI 附带的那套 React SPA，只是把它接到 `WasmBackend`
+传输层而不是 HTTP 传输层——一套前端，两种后端，这样约定里的任何缺口都会 表现为
+Playground 做不到的事，而不是被悄悄漏掉。在 `web/ui/src/playground/`
+粘贴或拖入一份 schema，完全在客户端把生成的表单
+填完并导出结果——没有任何网络请求离开这个标签页。通过
+`.github/workflows/deploy-playground.yml` 在每次推送到 `main` 时部署到 GitHub
+Pages。
+
+**Edge API。** `edge/` 是基于同一份 wasm 产物的无状态 Cloudflare
+Worker，服务那些想通过 HTTP 使用这套约定、但不想依赖 Rust 或自己加载 wasm
+的调用方——传入 schema，返回 UiAst / 校验结果 / 渲染后的文档，没有会话也
+没有存储。用 `just deploy-edge` 部署（需要 `CLOUDFLARE_API_TOKEN` /
+`CLOUDFLARE_ACCOUNT_ID`）；`.github/workflows/deploy-edge.yml` 会在推送到 `main`
+且配置好这两个密钥后做同样的事——密钥没配置时它会
+明确失败，而不是悄悄什么都不做。
+
+带存储、可分享的托管会话目前是明确的非目标——原因见设计记录里的 "Rejected" 一节。
+
+设计记录：[`docs/en/decisions/0005-wasm-core-and-hosting.md`](./docs/en/decisions/0005-wasm-core-and-hosting.md)。
 
 ## Config Schema 自动检测
 
@@ -782,6 +851,10 @@ schemaui \
 - `docs/en/control-hints.md` – `x-control` / `x-slider-marks` / `x-visible-when`
   等展示提示，用于从 schema 决定字段使用哪种控件。
 - `docs/en/web-ui-architecture-and-refactor-spec.md` – Web UI 架构说明。
+- `docs/en/web-v1-theming-and-wasm.md` – Web Session API v1 约定、主题、
+  可插拔前端，以及 WASM / Playground / Edge API 的整体设计。
+- `docs/en/decisions/` – 支撑上述设计的各篇 ADR（契约版本化、主题、
+  WASM/托管方案）。
 - `docs/web.mix.png` – Web UI 截图（schema 表单 + 实时 JSON 预览）；
   `web.mix.dark.png` 为深色模式版本，README 会按系统主题自动切换。
 - `docs/web.controls.*.png` – 各控件家族截图（滑块、范围、选项、外观），来自
