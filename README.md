@@ -374,7 +374,7 @@ References:
 
 ```toml
 [dependencies]
-schemaui = "0.14.1"
+schemaui = "0.15.0"
 serde_json = "1"
 ```
 
