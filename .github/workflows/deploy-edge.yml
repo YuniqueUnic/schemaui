@@ -53,7 +53,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          # wrangler 4 requires >=22 (`engines.node` in its package.json);
+          # on 20 it refuses to run before `wrangler deploy` gets anywhere
+          # near CLOUDFLARE_API_TOKEN, masking the "missing secrets" failure
+          # this workflow's own comment says is the intended one.
+          node-version: "22"
           cache: "pnpm"
           cache-dependency-path: edge/pnpm-lock.yaml
 
