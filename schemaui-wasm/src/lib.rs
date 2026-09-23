@@ -52,9 +52,13 @@ fn to_js(value: &impl Serialize) -> Result<JsValue, JsValue> {
 /// `schema` — the JSON Schema as a JS value.
 /// `defaults` — optional initial data (`null` or `undefined` → empty object).
 ///
-/// Returns `{ ui_ast, layout, data, formats }` — the same shape as
+/// Returns `{ ui_ast, layout, rich, data, formats }` — the same shape as
 /// `GET /api/v1/session`, minus the server-side metadata (`title`,
 /// `description`, `api_version`, `capabilities`, `expires_in_ms`).
+///
+/// `rich` carries the rendered figures for everything the schema declared;
+/// it is absent when there is nothing to render or this build cannot render
+/// the declared kinds.
 ///
 /// # Errors
 /// Propagates schema-parse and UiAst-build errors as JS `Error`s.
@@ -113,6 +117,26 @@ pub fn render(data: JsValue, format: &str, pretty: bool) -> Result<JsValue, JsVa
     let result = schemaui::wasm_core::render(data, format, pretty)
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
+    to_js(&result)
+}
+
+/// Render one Mermaid diagram on demand, as SVG in the requested theme.
+///
+/// `kind` — `"mermaid"` (the only renderable kind: SVG and markdown are
+/// session-authored, never user-typed).
+/// `theme` — `"light"` or `"dark"`.
+///
+/// Returns `{ svg: { body, width, height } }`. Matches `POST /api/v1/render`.
+/// Only exists in packages built with the `mermaid` feature.
+///
+/// # Errors
+/// Returns a JS `Error` with the renderer's message (including its line and
+/// column hint) when the source does not parse.
+#[cfg(feature = "mermaid")]
+#[wasm_bindgen(js_name = renderRich)]
+pub fn render_rich(kind: &str, source: &str, theme: &str) -> Result<JsValue, JsValue> {
+    let result = schemaui::wasm_core::render_rich(kind, source, theme)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
     to_js(&result)
 }
 

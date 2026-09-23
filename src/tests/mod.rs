@@ -4,6 +4,8 @@ pub(crate) mod api;
 pub(crate) mod draft_tests;
 pub(crate) mod io;
 #[cfg(feature = "json")]
+pub(crate) mod rich;
+#[cfg(feature = "json")]
 pub(crate) mod schema;
 #[cfg(all(feature = "json", feature = "tui"))]
 pub(crate) mod tui;

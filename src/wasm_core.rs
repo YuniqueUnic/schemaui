@@ -26,6 +26,7 @@ use crate::io::{
     },
     output::OutputOptions,
 };
+use crate::rich::{RichAssets, collect_assets};
 use crate::ui_ast::{UiAst, UiLayout, build_ui_ast_bundle};
 
 /// Mirrors the fields `GET /api/v1/session` returns, minus the server-side
@@ -35,6 +36,9 @@ use crate::ui_ast::{UiAst, UiLayout, build_ui_ast_bundle};
 pub struct SessionBuild {
     pub ui_ast: UiAst,
     pub layout: UiLayout,
+    /// Rendered rich content, the same map the HTTP session serves — one
+    /// `collect_assets` call, two hosts, no drift.
+    pub rich: Option<RichAssets>,
     pub data: Value,
     pub formats: Vec<String>,
 }
@@ -65,6 +69,7 @@ pub fn build_ui_ast(schema: Value, defaults: Value) -> Result<SessionBuild> {
     let bundle = build_ui_ast_bundle(&enriched_schema)?;
     let (ui_ast, layout) = bundle.into_parts();
     Ok(SessionBuild {
+        rich: collect_assets(&ui_ast),
         ui_ast,
         layout,
         data: defaults,
@@ -102,6 +107,32 @@ pub fn render(data: Value, format: &str, pretty: bool) -> Result<RenderResult> {
         .with_pretty(pretty)
         .render(&data)?;
     Ok(RenderResult { payload })
+}
+
+/// The `Result` payload of a successful [`render_rich`] — the same `svg`
+/// shape `POST /api/v1/render` answers with.
+#[cfg(feature = "mermaid")]
+#[derive(Debug, Clone, Serialize)]
+pub struct RenderContentResult {
+    pub svg: crate::rich::RenderedSvg,
+}
+
+/// Render one diagram on demand: `POST /api/v1/render` for hosts with no
+/// HTTP server. `kind` is `mermaid`, `theme` is `light` or `dark`; the error
+/// message is what the HTTP route would put in `error.message`.
+#[cfg(feature = "mermaid")]
+pub fn render_rich(kind: &str, source: &str, theme: &str) -> Result<RenderContentResult> {
+    if kind != "mermaid" {
+        anyhow::bail!("unsupported kind '{kind}'; expected 'mermaid'");
+    }
+    let theme = match theme {
+        "light" => crate::rich::DiagramTheme::Light,
+        "dark" => crate::rich::DiagramTheme::Dark,
+        other => anyhow::bail!("unknown theme '{other}'; expected 'light' or 'dark'"),
+    };
+    Ok(RenderContentResult {
+        svg: crate::rich::render_diagram(source, theme).map_err(anyhow::Error::msg)?,
+    })
 }
 
 /// Merge `data` into `schema` as `default` values. A thin wrapper so the wasm

@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::sync::Arc;
 
 use crate::core::frontend::{Frontend, FrontendContext, SessionOutcome, format_budget};
+use crate::rich::collect_assets;
 
 use super::session::{ServeOptions, WebSessionConfig, bind_session};
 
@@ -72,6 +73,9 @@ fn web_session_config(ctx: FrontendContext, serve: &ServeOptions) -> WebSessionC
     WebSessionConfig {
         title,
         description,
+        // The pipeline hands over a bare AST; rendering its rich content is
+        // web's job, so the TUI path never pays for it.
+        rich: collect_assets(&ui_ast),
         ui_ast,
         layout,
         data: initial_data,

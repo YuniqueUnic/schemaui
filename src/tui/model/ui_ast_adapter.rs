@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ui_ast::{CompositeMode, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
+use crate::ui_ast::{CompositeMode, EnumDetail, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
 
 use super::form_schema::{
     CompositeField, CompositeMode as DomainCompositeMode, CompositeVariant, FieldKind, FieldSchema,
@@ -127,18 +127,37 @@ fn field_schema_from_node(node: &UiNode) -> FieldSchema {
     }
 }
 
+/// Enum labels with `x-options` overrides applied by index: the author's
+/// label where declared, the derived one everywhere else. The terminal cannot
+/// render figures or long descriptions, so a label the author bothered to
+/// write is the one part of the details worth keeping.
+///
+/// Selection indexes by position, so the result keeps the base list's length
+/// even if a hand-built AST skimps on details.
+fn display_labels(base: &[String], details: Option<&[EnumDetail]>) -> Vec<String> {
+    let Some(details) = details else {
+        return base.to_vec();
+    };
+    base.iter()
+        .zip(details)
+        .map(|(base, detail)| detail.label.clone().unwrap_or_else(|| base.clone()))
+        .chain(base.iter().skip(details.len()).cloned())
+        .collect()
+}
+
 fn field_kind_from_node_kind(kind: &UiNodeKind) -> FieldKind {
     match kind {
         UiNodeKind::Field {
             scalar,
             enum_options,
+            enum_details,
             enum_values,
             nullable,
             ..
         } => {
             let kind = match enum_options {
                 Some(options) if !options.is_empty() => FieldKind::Enum {
-                    labels: options.clone(),
+                    labels: display_labels(options, enum_details.as_deref()),
                     values: enum_values.clone().unwrap_or_else(|| {
                         options
                             .iter()

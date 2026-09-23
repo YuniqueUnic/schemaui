@@ -34,6 +34,9 @@ pub fn build_session_snapshot(
         capabilities: Vec::new(),
         title,
         description,
+        // Rich content is rendered right here, so a precompiled bundle ships
+        // figures that display with no server and no runtime at all.
+        rich: crate::rich::collect_assets(&ui_ast),
         ui_ast,
         data: defaults_value,
         formats,

@@ -7,8 +7,14 @@ mod contract_v1_tests;
 #[cfg(feature = "web")]
 mod frontend_runtime_tests;
 
-#[cfg(feature = "web")]
+// Every test in here exercises TOML null handling, so the whole module —
+// helpers included — only compiles where `toml` does.
+#[cfg(all(feature = "web", feature = "toml"))]
 mod preview_tests;
+#[cfg(all(feature = "web", feature = "mermaid"))]
+mod render_endpoint_tests;
+#[cfg(all(feature = "web", feature = "json"))]
+mod session_rich_tests;
 #[cfg(feature = "precompile")]
 mod web_snapshot_tests;
 

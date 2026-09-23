@@ -34,6 +34,11 @@ pub struct UiNode {
     /// whether the value is a single number (a slider) or a pair of numbers (a
     /// range) — the two controls differ, the bounds do not.
     pub bounds: Option<FieldBounds>,
+    /// A figure or prose block attached with `x-content`, rendered alongside
+    /// the node rather than as part of any control. Source only: rendering is
+    /// the host's job, so a TUI-only build never pays for it and a frontend
+    /// without the matching capability falls back to showing the source.
+    pub content: Option<RichContent>,
     pub kind: UiNodeKind,
 }
 
@@ -67,6 +72,10 @@ pub enum FieldControl {
     Range,
     /// Colour picker for a string holding a CSS colour.
     Color,
+    /// Mermaid source editor with a live rendered preview. The value the user
+    /// edits *is* the diagram source, so the field stays a plain string on the
+    /// wire; frontends without a renderer fall back to a text area.
+    Mermaid,
 }
 
 impl FieldControl {
@@ -83,13 +92,17 @@ impl FieldControl {
             FieldControl::Slider => "slider",
             FieldControl::Range => "range",
             FieldControl::Color => "color",
+            FieldControl::Mermaid => "mermaid",
         }
     }
 
     /// The schema shape this control can render, for error messages.
     pub fn expects(self) -> &'static str {
         match self {
-            FieldControl::Text | FieldControl::Textarea | FieldControl::Color => "a string",
+            FieldControl::Text
+            | FieldControl::Textarea
+            | FieldControl::Color
+            | FieldControl::Mermaid => "a string",
             FieldControl::Switch | FieldControl::Checkbox => "a boolean",
             FieldControl::Slider => "a number",
             FieldControl::Range => "an array of two numbers",
@@ -162,6 +175,55 @@ pub enum VisibleWhenOp {
     Contains,
 }
 
+/// Schema-authored rich content: a diagram, an inline SVG figure, or a
+/// markdown block.
+///
+/// The AST carries only the source. Turning it into something displayable —
+/// rendering, sanitising — happens at the host boundary (`crate::rich`), so
+/// the declaration is meaningful in every build while the cost of rendering
+/// it stays optional.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RichContent {
+    Mermaid { source: String },
+    Svg { source: String },
+    Markdown { source: String },
+}
+
+impl RichContent {
+    /// The wire name of the variant, as the `type` tag spells it.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            RichContent::Mermaid { .. } => "mermaid",
+            RichContent::Svg { .. } => "svg",
+            RichContent::Markdown { .. } => "markdown",
+        }
+    }
+
+    pub fn source(&self) -> &str {
+        match self {
+            RichContent::Mermaid { source }
+            | RichContent::Svg { source }
+            | RichContent::Markdown { source } => source,
+        }
+    }
+}
+
+/// Per-option metadata for an enum field, authored with `x-options`.
+///
+/// Aligned with `enum_values` by index, so an option can carry a display
+/// label distinct from its value, a longer description, and an illustrative
+/// figure — the plain `enum_options` label remains the fallback for anything
+/// a detail leaves `None`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "web-types", derive(TS))]
+pub struct EnumDetail {
+    pub label: Option<String>,
+    pub description: Option<String>,
+    pub content: Option<RichContent>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "web-types", derive(TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -171,6 +233,11 @@ pub enum UiNodeKind {
         enum_options: Option<Vec<String>>,
         #[cfg_attr(feature = "web-types", ts(type = "unknown[] | null"))]
         enum_values: Option<Vec<Value>>,
+        /// Per-option metadata from `x-options`, aligned with `enum_values` by
+        /// index. Additive on purpose: `enum_options`/`enum_values` stay the
+        /// base every frontend already understands, and each detail field is
+        /// `None` unless the author declared it.
+        enum_details: Option<Vec<EnumDetail>>,
         nullable: bool,
         multiline: bool,
     },

@@ -31,6 +31,7 @@ use ts_rs::TS;
 use crate::draft::SessionDraft;
 use crate::io::{DocumentFormat, input::schema_with_defaults, output::OutputOptions};
 use crate::precompile::UiArtifactBundle;
+use crate::rich::{RichAssets, collect_assets};
 use crate::schema::metadata::root_schema_header;
 
 use super::assets::{EmbeddedAssets, FilesystemAssets, WebAssetProvider};
@@ -58,6 +59,9 @@ pub enum Capability {
     Theme,
     /// Saving writes a draft that outlives the process.
     Draft,
+    /// `POST /api/v1/render` is served: this build can render a diagram on
+    /// demand, so a live preview is worth mounting at all.
+    ContentRender,
 }
 
 pub struct WebSessionBuilder {
@@ -169,6 +173,9 @@ impl WebSessionBuilder {
         Ok(WebSessionConfig {
             title: self.title.or(schema_title),
             description: self.description.or(description),
+            // Rendered once, here, rather than on every session response: a
+            // session is served many times but built once.
+            rich: collect_assets(&ui_ast),
             ui_ast,
             layout,
             data,
@@ -187,6 +194,9 @@ pub struct WebSessionConfig {
     pub description: Option<String>,
     pub ui_ast: UiAst,
     pub layout: UiLayout,
+    /// Rendered rich content for everything the schema declared, computed at
+    /// build time and served verbatim afterwards.
+    pub rich: Option<RichAssets>,
     pub data: Value,
     pub schema: Value,
     pub asset_provider: Arc<dyn WebAssetProvider>,
@@ -209,6 +219,7 @@ impl WebSessionConfig {
                 .map(|format| format.to_string())
                 .collect(),
             layout: self.layout.clone(),
+            rich: self.rich.clone(),
             expires_in_ms: remaining_ms(self.deadline),
             draft_restored: self.draft.as_ref().is_some_and(|draft| draft.restored),
         }
@@ -223,6 +234,11 @@ fn capabilities(theme: Option<&Theme>, draft: Option<&SessionDraft>) -> Vec<Capa
     }
     if draft.is_some() {
         capabilities.push(Capability::Draft);
+    }
+    // Advertised under exactly the condition that registers the route, so a
+    // client told "content render" never finds a 404.
+    if cfg!(feature = "mermaid") {
+        capabilities.push(Capability::ContentRender);
     }
     capabilities
 }
@@ -425,6 +441,7 @@ fn build_session_wiring(config: WebSessionConfig) -> Result<SessionWiring> {
         description,
         ui_ast,
         layout,
+        rich,
         data,
         schema,
         asset_provider,
@@ -440,6 +457,7 @@ fn build_session_wiring(config: WebSessionConfig) -> Result<SessionWiring> {
         description,
         ui_ast: Arc::new(ui_ast),
         layout: Arc::new(layout),
+        rich,
         data: Arc::new(Mutex::new(data)),
         schema: Arc::new(schema),
         formats: DocumentFormat::available_formats(),
@@ -465,9 +483,13 @@ fn build_session_wiring(config: WebSessionConfig) -> Result<SessionWiring> {
         .route("/api/v1/preview", post(post_preview));
 
     // Registered only when there is a stylesheet to serve, so the advertised
-    // capability and the routing table cannot disagree.
+    // capability and the routing table cannot agree to disagree.
     if shared.theme.is_some() {
         router = router.route("/api/v1/theme.css", get(get_theme_css));
+    }
+    #[cfg(feature = "mermaid")]
+    {
+        router = router.route("/api/v1/render", post(post_render));
     }
 
     let router = router.fallback(static_assets).with_state(shared.clone());
@@ -507,6 +529,7 @@ struct SharedState {
     description: Option<String>,
     ui_ast: Arc<UiAst>,
     layout: Arc<UiLayout>,
+    rich: Option<RichAssets>,
     data: Arc<Mutex<Value>>,
     schema: Arc<Value>,
     formats: Vec<DocumentFormat>,
@@ -565,6 +588,13 @@ pub struct SessionResponse {
     pub data: Value,
     pub formats: Vec<String>,
     pub layout: UiLayout,
+    /// Rendered rich content keyed by content id: the front-end's lookup
+    /// table for every figure and prose block the AST declares. Absent from
+    /// the payload unless the schema declared something — the overwhelmingly
+    /// common case stays exactly as small as it always was.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "web-types", ts(optional))]
+    pub rich: Option<RichAssets>,
     /// Milliseconds until the session is aborted, or `None` when unbounded.
     /// A duration rather than a timestamp so a client on a skewed clock (a
     /// phone on the LAN, say) still counts down correctly.
@@ -600,6 +630,7 @@ async fn build_session(state: &SharedState) -> SessionResponse {
         data: state.data.lock().await.clone(),
         formats: state.formats.iter().map(|f| f.to_string()).collect(),
         layout: (*state.layout).clone(),
+        rich: state.rich.clone(),
         expires_in_ms: remaining_ms(state.deadline),
         draft_restored: state.draft.as_ref().is_some_and(|draft| draft.restored),
     }
@@ -791,6 +822,51 @@ fn encode_value(
     pretty: bool,
 ) -> Result<String, anyhow::Error> {
     OutputOptions::new(format).with_pretty(pretty).render(value)
+}
+
+/// The body of `POST /api/v1/render`.
+#[cfg(feature = "mermaid")]
+#[derive(Deserialize)]
+pub(crate) struct RenderRequest {
+    /// Only `mermaid` is renderable on demand: raw SVG and markdown are
+    /// session-authored content, never user-typed values.
+    pub kind: String,
+    pub source: String,
+    pub theme: String,
+}
+
+/// Render a diagram the user is editing, as SVG in the requested theme.
+///
+/// A malformed request (unknown kind or theme) is a 400; a source that will
+/// not render is a 422 with the renderer's message — an author error shown
+/// next to the source, never a 200 wearing an error costume.
+#[cfg(feature = "mermaid")]
+async fn post_render(Json(req): Json<RenderRequest>) -> Response<Body> {
+    let theme = match req.theme.as_str() {
+        "light" => crate::rich::DiagramTheme::Light,
+        "dark" => crate::rich::DiagramTheme::Dark,
+        other => {
+            return render_rejection(
+                StatusCode::BAD_REQUEST,
+                format!("unknown theme `{other}`; expected `light` or `dark`"),
+            );
+        }
+    };
+    if req.kind != "mermaid" {
+        return render_rejection(
+            StatusCode::BAD_REQUEST,
+            format!("unsupported kind `{}`; expected `mermaid`", req.kind),
+        );
+    }
+    match crate::rich::render_diagram(&req.source, theme) {
+        Ok(svg) => (StatusCode::OK, Json(json!({ "svg": svg }))).into_response(),
+        Err(message) => render_rejection(StatusCode::UNPROCESSABLE_ENTITY, message),
+    }
+}
+
+#[cfg(feature = "mermaid")]
+fn render_rejection(status: StatusCode, message: String) -> Response<Body> {
+    (status, Json(json!({ "error": { "message": message } }))).into_response()
 }
 
 async fn static_assets(State(state): State<SharedState>, uri: OriginalUri) -> impl IntoResponse {

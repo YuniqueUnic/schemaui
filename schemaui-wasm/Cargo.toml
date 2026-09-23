@@ -18,6 +18,9 @@ all_formats = ["json", "yaml", "toml"]
 json = ["schemaui/json"]
 yaml = ["schemaui/yaml"]
 toml = ["schemaui/toml"]
+# Off by default until a wasm32 build of the renderer is part of the release
+# pipeline; the compile probe already passes, so this is a packaging decision.
+mermaid = ["schemaui/mermaid"]
 
 [dependencies]
 schemaui = { path = "..", default-features = false, features = ["wasm"] }

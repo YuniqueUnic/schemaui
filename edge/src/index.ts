@@ -43,6 +43,18 @@ const ROUTES: Record<string, (body: Record<string, unknown>) => unknown> = {
   "/buildUiAst": (body) => wasm.buildUiAst(body.schema, body.defaults ?? {}),
   "/validate": (body) => wasm.validate(body.schema, body.data),
   "/render": (body) => wasm.render(body.data, body.format as string, Boolean(body.pretty)),
+  "/renderRich": (body) => {
+    // Only present in wasm packages built with the `mermaid` feature; say so
+    // instead of surfacing a bare "not a function" TypeError.
+    if (typeof wasm.renderRich !== "function") {
+      throw new Error("this deployment was built without the mermaid feature");
+    }
+    return wasm.renderRich(
+      body.kind as string,
+      body.source as string,
+      (body.theme as string) ?? "light",
+    );
+  },
   "/schemaWithDefaults": (body) => wasm.schemaWithDefaults(body.schema, body.data),
   "/schemaFromData": (body) => wasm.schemaFromData(body.data),
   "/parseDocument": (body) => wasm.parseDocument(body.text as string),

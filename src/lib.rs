@@ -7,6 +7,7 @@ pub mod io;
 #[cfg(feature = "tui")]
 pub(crate) mod keymap_spec;
 pub mod precompile;
+pub mod rich;
 mod schema;
 #[cfg(feature = "tui")]
 pub mod tui;
