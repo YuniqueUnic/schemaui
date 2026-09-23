@@ -260,6 +260,71 @@
         }
       }
     },
+    "rich_content": {
+      "title": "Rich content",
+      "description": "Figures and prose declared in the schema itself: `x-content` attaches a diagram, an inline SVG or a markdown block to a node, `x-options` gives enum options labels, descriptions and figures, and `x-control: \"mermaid\"` edits diagram source with a live preview. The engine renders and sanitises all of it at session build time; a runnable deep-dive lives in `examples/rich-content.schema.json`.",
+      "type": "object",
+      "x-content": {
+        "type": "mermaid",
+        "source": "flowchart LR\n  schema(schema) --> engine[render + sanitise]\n  engine --> form(form)"
+      },
+      "properties": {
+        "architecture": {
+          "title": "Radio with figures",
+          "description": "`x-options` entries align with the enum by index; each may carry a label override, a description, and a figure. Hover the thumbnail to enlarge, click for the fullscreen viewer.",
+          "type": "string",
+          "enum": ["mesh", "star"],
+          "x-control": "radio",
+          "default": "mesh",
+          "x-options": [
+            {
+              "label": "Mesh",
+              "description": "Every node talks to every other node.",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  a --- b\n  b --- c\n  c --- a" }
+            },
+            {
+              "label": "Star",
+              "description": "All traffic through one hub.",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  hub(hub) --- a\n  hub --- b" }
+            }
+          ]
+        },
+        "provider": {
+          "title": "Select with figures",
+          "description": "Dropdown options can carry a small figure too; the popup stays text-first beyond that.",
+          "type": "string",
+          "enum": ["s3", "gcs"],
+          "default": "s3",
+          "x-options": [
+            {
+              "label": "Amazon S3",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  app --> s3[(S3)]" }
+            },
+            {
+              "label": "Google Cloud Storage",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  app --> gcs[(GCS)]" }
+            }
+          ]
+        },
+        "pipeline": {
+          "title": "Mermaid source editor",
+          "description": "`x-control: \"mermaid\"` — the value is the diagram source. The pane arrangement (side by side, stacked, swapped) and live-vs-manual rendering are toggles above the editor.",
+          "type": "string",
+          "x-control": "mermaid",
+          "default": "flowchart TD\n  clone(clone) --> build\n  build --> test[pytest]\n  test --> publish((crates.io))"
+        },
+        "notes_figure": {
+          "title": "Markdown on a node",
+          "description": "`x-content` with markdown: converted and sanitised server-side.",
+          "type": "string",
+          "default": "unused",
+          "x-content": {
+            "type": "markdown",
+            "source": "A **figure**, not a value: this block belongs to the node, with a [link](https://example.com) and `inline code`."
+          }
+        }
+      }
+    },
     "appearance": {
       "title": "Appearance",
       "description": "Colour values. The picker is drawn by the UI, not by the browser's native colour input.",

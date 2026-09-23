@@ -6,6 +6,8 @@
         "test": "npm run test:e2e",
         "test:e2e": "node e2e/e2e-test-suite.js",
         "test:e2e:headless": "HEADLESS=true node e2e/e2e-test-suite.js",
+        "test:rich-content": "node e2e/rich-content-e2e.js",
+        "test:rich-content:headless": "HEADLESS=true node e2e/rich-content-e2e.js",
         "test:web-ui": "node web-ui/web-ui-automated-tests.js",
         "install": "npm install"
     },

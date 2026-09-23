@@ -39,7 +39,26 @@ npm run test:e2e --prefix tests
 npm run test:e2e:headless --prefix tests
 ```
 
-#### 2. Web UI 测试
+#### 2. 富内容 E2E 测试（Mermaid/SVG/Markdown）
+
+自起服务器（`examples/rich-content.schema.json`，临时端口，无需手动启动），
+真实浏览器驱动，覆盖：会话资产与 capability、选项配图与标签覆盖、悬停放大
+（viewport-aware）、全屏查看器（复制/下载/Esc 关闭）、Mermaid 编辑器实时预
+览与解析错误、主题切换图变体：
+
+```bash
+# 可视化模式
+npm run test:rich-content --prefix tests
+
+# 无头模式（CI/CD）
+npm run test:rich-content:headless --prefix tests
+```
+
+> 浏览器优先使用系统安装的 Google Chrome（`channel: "chrome"`）；不可用时 回退
+> puppeteer 自带 Chromium。首次运行需
+> `npm install --no-save --prefix tests puppeteer chalk`。
+
+#### 3. Web UI 测试
 
 ##### 方法一：使用自动化脚本
 
@@ -70,6 +89,8 @@ open tests/web-ui/automated-ui-tests.html
 - ✅ 数字输入字段（简单和复杂类型）
 - ✅ OneOf/AnyOf 变体切换
 - ✅ 数组 CRUD 操作
+- ✅ 富内容：选项配图/悬停放大/全屏查看器/Mermaid
+  编辑器/主题切换（`rich-content-e2e.js`）
 - ✅ 深层嵌套结构
 - ✅ 表单验证
 

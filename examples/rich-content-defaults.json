@@ -1,0 +1,22 @@
+{
+  "figures": {
+    "deploy_flow": "unused",
+    "status_legend": "unused",
+    "runbook": "unused"
+  },
+  "choices": {
+    "topology": "mesh",
+    "provider": "s3",
+    "reference_arch": "monolith",
+    "compact_pick": "safe"
+  },
+  "more_shapes": {
+    "rollout_call": "unused",
+    "cost_split": "unused",
+    "failover_mode": "active_passive",
+    "regions": ["eu-west-1", "us-east-1"]
+  },
+  "diagram_editing": {
+    "pipeline": "flowchart TD\n  clone(clone) --> build\n  build --> test[pytest]\n  test --> sign\n  sign --> publish((crates.io))"
+  }
+}
