@@ -23,7 +23,7 @@ toml = ["schemaui/toml"]
 mermaid = ["schemaui/mermaid"]
 
 [dependencies]
-schemaui = { path = "..", default-features = false, features = ["wasm"] }
+schemaui = { path = "..", version = "0.16", default-features = false, features = ["wasm"] }
 wasm-bindgen = "0.2"
 serde = "1"
 serde-wasm-bindgen = "0.6"
