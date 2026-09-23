@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Rich content gallery",
+  "description": "Diagrams and prose inside a form: figures on nodes and options (`x-content`, `x-options`), plus a Mermaid source editor with a live preview (`x-control: \"mermaid\"`). Use `schemaui web --schema examples/rich-content.schema.json --config examples/rich-content-defaults.json`. Everything the engine renders for this schema arrives in `SessionResponse.rich` — inspect `GET /api/v1/session` to see the sanitised assets.",
+  "type": "object",
+  "properties": {
+    "figures": {
+      "title": "Figures on fields",
+      "description": "`x-content` attaches a figure or prose block to the node itself. The AST carries the source; the engine renders and sanitises it at session build time. Switch the theme in the header — diagram variants for both are already in the payload, so switching costs nothing.",
+      "type": "object",
+      "properties": {
+        "deploy_flow": {
+          "title": "Mermaid figure",
+          "description": "A rendered diagram, shown above the (unused) control. The value is a placeholder; the figure is the point.",
+          "type": "string",
+          "default": "unused",
+          "x-content": {
+            "type": "mermaid",
+            "source": "flowchart LR\n  You[You] --> Gate[review-gate]\n  Gate -->|approved| Prod[production]\n  Gate -->|changes| Dev[working tree]\n  Dev --> Gate"
+          }
+        },
+        "status_legend": {
+          "title": "SVG figure",
+          "description": "Raw SVG, rebuilt through an element/attribute whitelist — scripts, event handlers and foreignObject would have been dropped at load.",
+          "type": "string",
+          "default": "unused",
+          "x-content": {
+            "type": "svg",
+            "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 48\" role=\"img\" aria-label=\"status legend\"><circle cx=\"16\" cy=\"24\" r=\"10\" fill=\"#16a34a\"/><text x=\"34\" y=\"29\" font-size=\"15\" fill=\"currentColor\">healthy</text><circle cx=\"128\" cy=\"24\" r=\"10\" fill=\"#dc2626\"/><text x=\"146\" y=\"29\" font-size=\"15\" fill=\"currentColor\">failing</text></svg>"
+          }
+        },
+        "runbook": {
+          "title": "Markdown block",
+          "description": "Markdown converts to sanitised HTML server-side; tables and strikethrough are on, and so are links and inline code.",
+          "type": "string",
+          "default": "unused",
+          "x-content": {
+            "type": "markdown",
+            "source": "### Runbook excerpt\n\n1. **Drain** the node from the load balancer.\n2. Apply the config and wait for the health probe (see `ops/probes.md`).\n\n| Step | Owner | SLA |\n| --- | --- | --- |\n| Drain | on-call | 5 min |\n| Verify | on-call | ~deliberately unscheduled* |\n\nEscalate if two probes fail ~~twice in a row~~ in the same window. Details live in [the wiki](https://example.com/runbook)."
+          }
+        }
+      }
+    },
+    "choices": {
+      "title": "Choices with figures",
+      "description": "`x-options` adds per-option label, description and figure, aligned with the enum by index. Hover a thumbnail to enlarge it (viewport-aware), click it for the fullscreen viewer with copy/download.",
+      "type": "object",
+      "properties": {
+        "topology": {
+          "title": "Deployment topology",
+          "description": "A radio group whose options are diagrams. The enum still validates exactly as before — the figures are presentation.",
+          "type": "string",
+          "enum": ["mesh", "star", "ring"],
+          "default": "mesh",
+          "x-control": "radio",
+          "x-options": [
+            {
+              "label": "Mesh",
+              "description": "Every node talks to every other node. Lowest latency, highest link count.",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  a --- b\n  b --- c\n  c --- a" }
+            },
+            {
+              "label": "Star",
+              "description": "All traffic through one hub. Simple, and the hub is a single point of failure.",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  hub(hub) --- a\n  hub --- b\n  hub --- c" }
+            },
+            {
+              "label": "Ring"
+            }
+          ]
+        },
+        "provider": {
+          "title": "Storage provider",
+          "description": "A plain dropdown; labels are overridden and each option carries its own small diagram inside the popup.",
+          "type": "string",
+          "enum": ["s3", "gcs", "azure_blob"],
+          "default": "s3",
+          "x-options": [
+            {
+              "label": "Amazon S3",
+              "description": "The default; works everywhere.",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  app --> s3[(S3)]" }
+            },
+            {
+              "label": "Google Cloud Storage",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  app --> gcs[(GCS)]" }
+            },
+            { "label": "Azure Blob Storage" }
+          ]
+        },
+        "reference_arch": {
+          "title": "Reference architecture",
+          "description": "A dropdown whose options are diagrams: pick the architecture by looking at it.",
+          "type": "string",
+          "enum": ["monolith", "microservices", "serverless"],
+          "default": "monolith",
+          "x-options": [
+            {
+              "label": "Monolith",
+              "content": { "type": "mermaid", "source": "flowchart TD\n  ui[UI] --> app[App] --> db[(DB)]" }
+            },
+            {
+              "label": "Microservices",
+              "content": { "type": "mermaid", "source": "flowchart TD\n  gw[gateway] --> a & b\n  a --> dba[(db)]\n  b --> dbb[(db)]" }
+            },
+            {
+              "label": "Serverless",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  fn1(lambda) --> queue --> fn2(lambda)" }
+            }
+          ]
+        },
+        "compact_pick": {
+          "title": "Compact picker",
+          "description": "Segmented has no room for figures, so `x-options` here carries labels only — declaring content on a segmented control is a load error.",
+          "type": "string",
+          "enum": ["fast", "safe"],
+          "default": "safe",
+          "x-control": "segmented",
+          "x-options": [
+            { "label": "Fast" },
+            { "label": "Safe" }
+          ]
+        }
+      }
+    },
+    "more_shapes": {
+      "title": "More shapes a figure can take",
+      "description": "Figures are not tied to one node kind or one diagram type: the header above is a section-level `x-content`, the Mermaid family covers sequence and pie diagrams too, a nullable enum can carry figures on its real options, and an array can host a figure of its own.",
+      "type": "object",
+      "x-content": {
+        "type": "mermaid",
+        "source": "flowchart TD\n  more[This section] --> shows[shows four]\n  shows --> shapes[kinds of figure]"
+      },
+      "properties": {
+        "rollout_call": {
+          "title": "Sequence diagram",
+          "description": "Same `x-content`, different Mermaid family — actors and arrows instead of nodes.",
+          "type": "string",
+          "default": "unused",
+          "x-content": {
+            "type": "mermaid",
+            "source": "sequenceDiagram\n  participant D as Developer\n  participant G as review-gate\n  participant P as production\n  D->>G: open PR\n  G-->>D: approved\n  D->>P: deploy\n  P-->>D: healthy"
+          }
+        },
+        "cost_split": {
+          "title": "Pie chart",
+          "description": "Data-shaped diagrams render through the same pipeline and the same sanitiser.",
+          "type": "string",
+          "default": "unused",
+          "x-content": {
+            "type": "mermaid",
+            "source": "pie title Monthly cost\n  \"compute\" : 45\n  \"storage\" : 30\n  \"network\" : 25"
+          }
+        },
+        "failover_mode": {
+          "title": "Nullable choice with figures",
+          "description": "An enum that also allows `null`: figures sit on the two real options, and the null option keeps its plain label.",
+          "type": ["string", "null"],
+          "enum": ["active_passive", "active_active", null],
+          "default": "active_passive",
+          "x-control": "radio",
+          "x-options": [
+            {
+              "label": "Active–passive",
+              "description": "One node serves; the other watches.",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  live(primary) -.take over.-> stand[standby]" }
+            },
+            {
+              "label": "Active–active",
+              "description": "Both nodes serve; the balancer spreads the load.",
+              "content": { "type": "mermaid", "source": "flowchart LR\n  lb(lb) --> n1 & n2" }
+            },
+            { "label": "Not configured" }
+          ]
+        },
+        "regions": {
+          "title": "Array with a figure",
+          "description": "`x-content` works on any node kind — here an array of strings carries the deployment map above its items.",
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["eu-west-1", "us-east-1"],
+          "x-content": {
+            "type": "svg",
+            "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 36\" role=\"img\" aria-label=\"regions\"><text x=\"0\" y=\"26\" font-size=\"16\">eu-west-1</text><line x1=\"96\" y1=\"18\" x2=\"118\" y2=\"18\" stroke=\"currentColor\"/><text x=\"124\" y=\"26\" font-size=\"16\">us-east-1</text></svg>"
+          }
+        }
+      }
+    },
+    "diagram_editing": {
+      "title": "Editing a diagram",
+      "description": "The value of a `mermaid` control is the source itself — the field stays a plain string on the wire. With a renderer available the right pane previews as you type; without one this is an ordinary text area.",
+      "type": "object",
+      "properties": {
+        "pipeline": {
+          "title": "Pipeline (Mermaid source)",
+          "description": "Edit the source; the preview re-renders after you stop typing. A parse error shows the renderer's message next to the source instead of the last good diagram.",
+          "type": "string",
+          "default": "flowchart TD\n  clone(clone) --> build\n  build --> test[pytest]\n  test --> sign\n  sign --> publish((crates.io))",
+          "x-control": "mermaid"
+        }
+      }
+    }
+  }
+}

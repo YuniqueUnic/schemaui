@@ -252,6 +252,10 @@ def test_smoke_feature_matrix_compiles() -> None:
     assert_check_ok("schemaui", ("json", "web"), no_default=True)
     assert_check_ok("schemaui", ("json", "web", "web-types"), no_default=True)
     assert_check_ok("schemaui", ("json", "web", "precompile"), no_default=True)
+    # Rich content: sanitisation without the renderer, and with it.
+    assert_check_ok("schemaui", ("json", "rich"), no_default=True)
+    assert_check_ok("schemaui", ("json", "mermaid"), no_default=True)
+    assert_check_ok("schemaui", ("json", "web", "mermaid"), no_default=True)
     assert_check_ok("schemaui", ("all_formats",), no_default=True)
     assert_check_ok("schemaui", ("full",), no_default=True)
 
@@ -262,6 +266,7 @@ def test_smoke_feature_matrix_compiles() -> None:
     assert_check_ok("schemaui-cli", ("json", "web"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "web", "web-types"), no_default=True)
     assert_check_ok("schemaui-cli", ("json", "web", "remote-schema"), no_default=True)
+    assert_check_ok("schemaui-cli", ("json", "web", "mermaid"), no_default=True)
     assert_check_ok("schemaui-cli", ("full",), no_default=True)
 
 

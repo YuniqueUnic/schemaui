@@ -31,18 +31,19 @@ Names the control to use for a node.
 }
 ```
 
-| Value       | Renders                  | Requires                    |
-| ----------- | ------------------------ | --------------------------- |
-| `text`      | Single-line text input   | `string`                    |
-| `textarea`  | Multi-line text area     | `string`                    |
-| `select`    | Dropdown                 | `enum`                      |
-| `segmented` | Inline segmented buttons | `enum`                      |
-| `radio`     | Radio group              | `enum`                      |
-| `switch`    | Toggle                   | `boolean`                   |
-| `checkbox`  | Checkbox                 | `boolean`                   |
-| `slider`    | Single-thumb slider      | `number`/`integer` + bounds |
-| `range`     | Two-thumb range slider   | array of 2 numbers + bounds |
-| `color`     | Colour picker            | `string`                    |
+| Value       | Renders                                  | Requires                    |
+| ----------- | ---------------------------------------- | --------------------------- |
+| `text`      | Single-line text input                   | `string`                    |
+| `textarea`  | Multi-line text area                     | `string`                    |
+| `select`    | Dropdown                                 | `enum`                      |
+| `segmented` | Inline segmented buttons                 | `enum`                      |
+| `radio`     | Radio group                              | `enum`                      |
+| `switch`    | Toggle                                   | `boolean`                   |
+| `checkbox`  | Checkbox                                 | `boolean`                   |
+| `slider`    | Single-thumb slider                      | `number`/`integer` + bounds |
+| `range`     | Two-thumb range slider                   | array of 2 numbers + bounds |
+| `color`     | Colour picker                            | `string`                    |
+| `mermaid`   | Source editor with live rendered preview | `string`                    |
 
 A `range` field is an array, and it must declare both ends so the UI knows how
 many thumbs to draw:
@@ -126,6 +127,69 @@ supported because this one predates the general hint.
 ```jsonc
 { "type": "string", "x-multiline": true }
 ```
+
+## `x-content`
+
+Attaches a figure or prose block to a node itself — a diagram next to the
+control, not inside any value. The AST carries only the source; the engine
+renders and sanitises it at session build time and ships the result in
+`SessionResponse.rich`, addressed by content id.
+
+```jsonc
+{
+  "type": "object",
+  "properties": {
+    "region": {
+      "type": "string",
+      "enum": ["eu", "us"],
+      "x-content": {
+        "type": "mermaid",
+        "source": "flowchart LR; You-->CDN-->Edge"
+      }
+    }
+  }
+}
+```
+
+`type` is `mermaid` (rendered diagram, light and dark variants), `svg` (raw SVG,
+rebuilt through a whitelist — `<script>`, event handlers and `foreignObject`
+never survive), or `markdown` (converted to sanitised HTML). A frontend without
+the rendered asset falls back to showing the source as code; that is a
+capability fallback, not an error. An unparsable diagram is an error and is
+shown next to the source it came from. A runnable schema exercising every
+rich-content shape lives in
+[`examples/rich-content.schema.json`](../../examples/rich-content.schema.json);
+serve it with `schemaui web --schema examples/rich-content.schema.json`.
+
+## `x-options`
+
+Per-option detail for an enum, aligned with the enum values by index. Each entry
+may carry a `label` (overriding the derived one, including in the terminal UI),
+a `description`, and a `content` figure rendered beside the option.
+
+```jsonc
+{
+  "type": "string",
+  "enum": ["mesh", "star", "ring"],
+  "x-control": "radio",
+  "x-options": [
+    {
+      "label": "Mesh",
+      "description": "Every node connected to every other",
+      "content": {
+        "type": "mermaid",
+        "source": "flowchart LR; A---B & C; B---C"
+      }
+    },
+    { "label": "Star" },
+    {}
+  ]
+}
+```
+
+The list must line up with the enum one-for-one, and entries may be empty.
+`segmented` has no room for figures, so `x-options` content on a segmented
+control is rejected at load time — use `radio` or `select`.
 
 ## `x-visible-when`
 
