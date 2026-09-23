@@ -18,6 +18,8 @@ import {
 } from "../ui/select";
 import { defaultForKind } from "../../ui-ast";
 import { Textarea } from "../ui/textarea";
+import { RichSurface } from "../rich/RichSurface";
+import { MermaidEditorControl } from "../rich/MermaidEditorControl";
 import type { InlineFieldKind } from "../../utils/typeHelpers";
 import { resolveBounds, resolveControl, snapToBounds } from "../../lib/control";
 
@@ -73,6 +75,16 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
         <ColorPicker
           value={text}
           onChange={(next) => onChange(node.pointer, next)}
+        />
+      );
+    }
+
+    case "mermaid": {
+      const text = typeof resolved === "string" ? resolved : "";
+      return (
+        <MermaidEditorControl
+          value={text}
+          onChange={(next) => commitText(node.pointer, next, nullable, onChange)}
         />
       );
     }
@@ -226,8 +238,11 @@ function EnumControl({
   value: JsonValue | undefined;
   onChange: (pointer: string, value: JsonValue) => void;
 }) {
-  const labels = node.kind.enum_options ?? [];
-  const values = node.kind.enum_values ?? labels;
+  const baseLabels = node.kind.enum_options ?? [];
+  const values = node.kind.enum_values ?? baseLabels;
+  const details = node.kind.enum_details;
+  // An `x-options` label overrides the derived one, by index.
+  const labelFor = (index: number) => details?.[index]?.label ?? baseLabels[index] ?? "";
   const selected = values.findIndex((option) =>
     sameJsonValue(option as JsonValue, value)
   );
@@ -240,9 +255,9 @@ function EnumControl({
   };
 
   if (control === "segmented" || control === "radio") {
-    const options = labels.map((label, index) => ({
+    const options = baseLabels.map((_, index) => ({
       value: String(index),
-      label,
+      label: labelFor(index),
     }));
     const selectedKey = selected >= 0 ? String(selected) : "";
 
@@ -260,20 +275,38 @@ function EnumControl({
         value={selectedKey}
         onValueChange={(next) => pick(Number(next))}
       >
-        {options.map((option) => (
-          <div key={option.value} className="flex items-center gap-2.5">
-            <RadioGroupItem
-              value={option.value}
-              id={controlId(`${node.pointer}-${option.value}`)}
-            />
-            <Label
-              htmlFor={controlId(`${node.pointer}-${option.value}`)}
-              className="text-sm font-normal text-foreground"
-            >
-              {option.label}
-            </Label>
-          </div>
-        ))}
+        {options.map((option, index) => {
+          const detail = details?.[index];
+          return (
+            <div key={option.value} className="flex items-start gap-2.5">
+              <RadioGroupItem
+                value={option.value}
+                id={controlId(`${node.pointer}-${option.value}`)}
+                className="mt-0.5"
+              />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Label
+                  htmlFor={controlId(`${node.pointer}-${option.value}`)}
+                  className="block text-sm font-normal text-foreground"
+                >
+                  {option.label}
+                </Label>
+                {detail?.description && (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {detail.description}
+                  </p>
+                )}
+                {detail?.content && (
+                  <RichSurface
+                    content={detail.content}
+                    variant="thumb"
+                    title={option.label}
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
       </RadioGroup>
     );
   }
@@ -287,11 +320,24 @@ function EnumControl({
         <SelectValue placeholder="Select an option" />
       </SelectTrigger>
       <SelectContent>
-        {labels.map((label, index) => (
-          <SelectItem key={`${label}-${index}`} value={String(index)}>
-            {label}
-          </SelectItem>
-        ))}
+        {baseLabels.map((_, index) => {
+          const detail = details?.[index];
+          return (
+            <SelectItem key={`${index}-${labelFor(index)}`} value={String(index)}>
+              <span className="flex items-center gap-2">
+                {detail?.content && (
+                  <RichSurface
+                    content={detail.content}
+                    variant="mini"
+                    interactive={false}
+                    title={labelFor(index)}
+                  />
+                )}
+                {labelFor(index)}
+              </span>
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

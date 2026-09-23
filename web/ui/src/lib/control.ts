@@ -83,6 +83,7 @@ function fits(control: FieldControl, node: UiNode): boolean {
   switch (control) {
     case "text":
     case "textarea":
+    case "mermaid":
       return scalar === "string";
     case "color":
       return scalar === "string";

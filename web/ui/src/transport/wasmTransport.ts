@@ -1,5 +1,11 @@
-import type { JsonValue, PreviewResponse, SessionResponse, ValidationResponse } from "../types";
-import type { SchemaUiTransport } from "./types";
+import type {
+  JsonValue,
+  PreviewResponse,
+  RenderContentResult,
+  SessionResponse,
+  ValidationResponse,
+} from "../types";
+import type { RenderContentInput, SchemaUiTransport } from "./types";
 
 /**
  * Lazily loads and initializes the `schemaui-wasm` module.
@@ -50,16 +56,21 @@ export function createWasmTransport(
       const built = wasm.buildUiAst(schema, defaults) as {
         ui_ast: SessionResponse["ui_ast"];
         layout: SessionResponse["layout"];
+        rich?: SessionResponse["rich"];
         data: JsonValue;
         formats: string[];
       };
       return {
         api_version: "wasm-local",
-        capabilities: [],
+        // Advertise exactly what this wasm package can do: `renderRich` only
+        // exists in packages built with the mermaid feature.
+        capabilities:
+          typeof wasm.renderRich === "function" ? ["content_render"] : [],
         title: null,
         description: null,
         ui_ast: built.ui_ast,
         layout: built.layout,
+        rich: built.rich ?? null,
         data: built.data,
         formats: built.formats,
         expires_in_ms: null,
@@ -79,6 +90,28 @@ export function createWasmTransport(
     ): Promise<PreviewResponse> {
       const wasm = await loadWasm();
       return wasm.render(data, format, pretty) as PreviewResponse;
+    },
+
+    async renderContent(
+      input: RenderContentInput,
+    ): Promise<RenderContentResult> {
+      const wasm = await loadWasm();
+      // The engine's own words for why there is nothing to show: an author
+      // error or a package built without the renderer.
+      if (typeof wasm.renderRich !== "function") {
+        return {
+          error: { message: "this build does not include the mermaid renderer" },
+        };
+      }
+      try {
+        return (await wasm.renderRich(input.kind, input.source, input.theme)) as RenderContentResult;
+      } catch (err) {
+        return {
+          error: {
+            message: typeof err === "string" ? err : err instanceof Error ? err.message : String(err),
+          },
+        };
+      }
     },
 
     // There is no server to write a draft to; the browser's own localStorage

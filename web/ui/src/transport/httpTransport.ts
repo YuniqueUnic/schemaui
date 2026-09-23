@@ -2,6 +2,7 @@ import {
   exitSession,
   fetchSession,
   persistData,
+  renderDiagram,
   renderPreview,
   validateData,
 } from "../api";
@@ -13,6 +14,7 @@ export const httpTransport: SchemaUiTransport = {
   bootstrap: fetchSession,
   validate: validateData,
   preview: renderPreview,
+  renderContent: renderDiagram,
   async save(data) {
     await persistData(data);
   },

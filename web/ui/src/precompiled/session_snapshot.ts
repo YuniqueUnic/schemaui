@@ -3,7 +3,6 @@ import type { SessionResponse } from '@schemaui/types/SessionResponse';
 export const PrecompiledSession: SessionResponse = {
   "api_version": "1.0",
   "capabilities": [],
-  "draft_restored": false,
   "title": "用户注册信息",
   "description": null,
   "ui_ast": {
@@ -17,11 +16,13 @@ export const PrecompiledSession: SessionResponse = {
         "visible_when": null,
         "control": null,
         "bounds": null,
+        "content": null,
         "kind": {
           "type": "field",
           "scalar": "string",
           "enum_options": null,
           "enum_values": null,
+          "enum_details": null,
           "nullable": false,
           "multiline": false
         }
@@ -35,11 +36,13 @@ export const PrecompiledSession: SessionResponse = {
         "visible_when": null,
         "control": null,
         "bounds": null,
+        "content": null,
         "kind": {
           "type": "field",
           "scalar": "string",
           "enum_options": null,
           "enum_values": null,
+          "enum_details": null,
           "nullable": false,
           "multiline": false
         }
@@ -58,11 +61,13 @@ export const PrecompiledSession: SessionResponse = {
           "step": null,
           "marks": []
         },
+        "content": null,
         "kind": {
           "type": "field",
           "scalar": "integer",
           "enum_options": null,
           "enum_values": null,
+          "enum_details": null,
           "nullable": false,
           "multiline": false
         }
@@ -76,11 +81,13 @@ export const PrecompiledSession: SessionResponse = {
         "visible_when": null,
         "control": null,
         "bounds": null,
+        "content": null,
         "kind": {
           "type": "field",
           "scalar": "string",
           "enum_options": null,
           "enum_values": null,
+          "enum_details": null,
           "nullable": false,
           "multiline": false
         }
@@ -94,11 +101,13 @@ export const PrecompiledSession: SessionResponse = {
         "visible_when": null,
         "control": null,
         "bounds": null,
+        "content": null,
         "kind": {
           "type": "field",
           "scalar": "string",
           "enum_options": null,
           "enum_values": null,
+          "enum_details": null,
           "nullable": false,
           "multiline": false
         }
@@ -112,6 +121,7 @@ export const PrecompiledSession: SessionResponse = {
         "visible_when": null,
         "control": null,
         "bounds": null,
+        "content": null,
         "kind": {
           "type": "array",
           "item": {
@@ -119,6 +129,7 @@ export const PrecompiledSession: SessionResponse = {
             "scalar": "string",
             "enum_options": null,
             "enum_values": null,
+            "enum_details": null,
             "nullable": false,
             "multiline": false
           },
@@ -161,5 +172,6 @@ export const PrecompiledSession: SessionResponse = {
       }
     ]
   },
-  "expires_in_ms": null
+  "expires_in_ms": null,
+  "draft_restored": false
 } as const;
