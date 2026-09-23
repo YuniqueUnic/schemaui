@@ -4,6 +4,7 @@ import type {
   SessionResponse,
   ValidationResponse,
 } from "./types";
+import type { RenderContentInput, RenderContentResult } from "./transport/types";
 
 async function request<T>(
   path: string,
@@ -72,4 +73,24 @@ export function exitSession(data: JsonValue, commit: boolean) {
 /** Fetch the raw JSON Schema that backs this session (`/api/v1/schema`). */
 export function fetchSchema(): Promise<JsonValue> {
   return request<JsonValue>("/api/v1/schema");
+}
+
+/**
+ * Render one Mermaid diagram (`POST /api/v1/render`). Unlike the other
+ * helpers, a rejection here is *data* — an author error shown next to their
+ * source — so 4xx bodies are returned as `{ error }`, not thrown.
+ */
+export async function renderDiagram(
+  input: RenderContentInput,
+): Promise<RenderContentResult> {
+  const response = await fetch("/api/v1/render", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json()) as RenderContentResult;
+  if (!response.ok && !("error" in body)) {
+    return { error: { message: `Request failed: ${response.status}` } };
+  }
+  return body;
 }

@@ -11,4 +11,6 @@ export type Capability =
     /** `GET /api/v1/theme.css` is served; the frontend should link it. */
     | "theme"
     /** `POST /api/v1/save` writes a draft that outlives the process. */
-    | "draft";
+    | "draft"
+    /** `POST /api/v1/render` renders a Mermaid diagram on demand. */
+    | "content_render";

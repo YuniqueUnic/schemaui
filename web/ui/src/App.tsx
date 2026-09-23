@@ -7,6 +7,10 @@ import { StatusBar } from "./components/StatusBar";
 import { TreeView } from "./components/TreeView";
 import { LayoutExplorer } from "./components/LayoutExplorer";
 import { OverlayProvider } from "./components/Overlay";
+import { RichAssetsProvider } from "./components/rich/RichAssetsProvider";
+import { HoverPreviewProvider } from "./components/rich/HoverPreviewLayer";
+import { RichSurface } from "./components/rich/RichSurface";
+import { EditorRuntimeProvider } from "./components/rich/EditorRuntime";
 import { ValidationErrorsDialog } from "./components/ValidationErrorsDialog";
 import { Panel, PanelHeader } from "./components/Panel";
 import { SegmentedControl } from "./components/SegmentedControl";
@@ -194,215 +198,227 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
   }
 
   return (
-    <OverlayProvider>
-      <div className="app-shell flex h-screen flex-col">
-        <AppHeader
-          title={session?.title}
-          description={session?.description}
-          saving={saving}
-          exiting={exiting}
-          secondsLeft={secondsLeft}
-          onSave={handleSave}
-          onExit={() => handleExit()}
-          exitLabel={transport.kind === "wasm" ? "Export" : "Exit"}
-          exitingLabel={transport.kind === "wasm" ? "Exporting…" : "Exiting…"}
-          onBack={onBack}
-        />
-        <div className="app-panel-muted flex flex-1 flex-col overflow-hidden border-y border-theme lg:flex-row">
-          {!isDesktop && (
-            <MobilePanelSwitch
-              value={mobileView}
-              onChange={setMobileView}
+    // RichAssets wraps Overlay: the fullscreen viewer renders through the
+    // Overlay's own subtree, and context flows with the React tree, not the
+    // DOM — a provider outside Overlay is invisible to the viewer.
+    <RichAssetsProvider assets={session.rich}>
+      <OverlayProvider>
+        <EditorRuntimeProvider
+          transport={transport}
+          capabilities={session.capabilities}
+        >
+          <HoverPreviewProvider>
+          <div className="app-shell flex h-screen flex-col">
+            <AppHeader
+              title={session?.title}
+              description={session?.description}
+              saving={saving}
+              exiting={exiting}
+              secondsLeft={secondsLeft}
+              onSave={handleSave}
+              onExit={() => handleExit()}
+              exitLabel={transport.kind === "wasm" ? "Export" : "Exit"}
+              exitingLabel={transport.kind === "wasm" ? "Exporting…" : "Exiting…"}
+              onBack={onBack}
             />
-          )}
-          {/* Navigation Panel */}
-          <Panel
-            as="aside"
-            className={cn(
-              "lg:flex lg:border-r border-theme",
-              !isDragging && "transition-[width] duration-150",
-              !isDesktop && mobileView === "nav" && "flex flex-1 border-b",
-              !isDesktop && mobileView !== "nav" && "hidden",
-              isDesktop && navCollapsed && "!w-10 overflow-hidden",
-            )}
-            style={isDesktop && !navCollapsed ? { width: sizes.nav } : undefined}
-          >
-            <PanelHeader
-              icon={<ListTree className="h-3.5 w-3.5" />}
-              // No text label: this panel is the narrowest column, and
-              // "Navigation" was being clipped to "NAVIGA…" by the Schema/Layout
-              // switch sitting next to it. The icon and the tree below say the
-              // same thing without the collision.
-              actions={
-                <div className="flex items-center gap-1">
-                  {(!isDesktop || !navCollapsed) && hasLayout && (
-                    <SegmentedControl<"schema" | "layout">
-                      value={navMode}
-                      onChange={(v) => setNavMode(v)}
-                      options={[
-                        { id: "schema", label: "Schema" },
-                        { id: "layout", label: "Layout" },
-                      ]}
-                    />
-                  )}
-                  {isDesktop && (
-                    <button
-                      type="button"
-                      onClick={() => setNavCollapsed((v) => !v)}
-                      aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
-                      className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    >
-                      {navCollapsed
-                        ? <ChevronRight className="h-3.5 w-3.5" />
-                        : <ChevronLeft className="h-3.5 w-3.5" />}
-                    </button>
-                  )}
-                </div>
-              }
-            />
-            {/* Show content when: on mobile (always), or on desktop when not collapsed */}
-            {(!isDesktop || !navCollapsed) && (
-              <>
-                {(!hasLayout || navMode === "schema") && (
-                  <TreeView
-                    ast={uiAst}
-                    selectedPointer={selectedPointer}
-                    errors={errors}
-                    rootLabel={ROOT_LABEL}
-                    onSelect={(pointer) => {
-                      actions.setSelectedPointer(pointer);
-                      if (!isDesktop) setMobileView("editor");
-                    }}
-                  />
+            <div className="app-panel-muted flex flex-1 flex-col overflow-hidden border-y border-theme lg:flex-row">
+              {!isDesktop && (
+                <MobilePanelSwitch
+                  value={mobileView}
+                  onChange={setMobileView}
+                />
+              )}
+              {/* Navigation Panel */}
+              <Panel
+                as="aside"
+                className={cn(
+                  "lg:flex lg:border-r border-theme",
+                  !isDragging && "transition-[width] duration-150",
+                  !isDesktop && mobileView === "nav" && "flex flex-1 border-b",
+                  !isDesktop && mobileView !== "nav" && "hidden",
+                  isDesktop && navCollapsed && "!w-10 overflow-hidden",
                 )}
-                {hasLayout && navMode === "layout" && (
-                  <div className="flex-1 min-h-0 px-1 pb-2">
-                    <LayoutExplorer
-                      layout={session.layout}
-                      ast={uiAst}
-                      selectedPointer={selectedPointer}
-                      rootLabel={ROOT_LABEL}
-                      onSelect={(pointer) => {
-                        actions.setSelectedPointer(pointer);
-                        if (!isDesktop) setMobileView("editor");
-                      }}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </Panel>
-          {/* Resizer */}
-          <div
-            className="app-resizer hidden lg:block"
-            onPointerDown={(event) => startDrag(event, "nav")}
-          />
-          {/* Main Editor Panel */}
-          <Panel
-            as="main"
-            className={cn(
-              "lg:flex lg:flex-1",
-              !isDesktop && mobileView === "editor" && "flex flex-1",
-              !isDesktop && mobileView !== "editor" && "hidden",
-            )}
-          >
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <SectionTabs
-                roots={roots}
-                rootLabel={ROOT_LABEL}
-                selectedPointer={selectedPointer}
-                onSelect={actions.setSelectedPointer}
-              />
-              <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
-                <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6">
-                  {selectedNode
-                    ? (
-                      <>
-                        <EditorHeading
-                          node={selectedNode}
-                          isRoot={roots.some((root) =>
-                            root.pointer === selectedNode.pointer
-                          )}
+                style={isDesktop && !navCollapsed ? { width: sizes.nav } : undefined}
+              >
+                <PanelHeader
+                  icon={<ListTree className="h-3.5 w-3.5" />}
+                  // No text label: this panel is the narrowest column, and
+                  // "Navigation" was being clipped to "NAVIGA…" by the Schema/Layout
+                  // switch sitting next to it. The icon and the tree below say the
+                  // same thing without the collision.
+                  actions={
+                    <div className="flex items-center gap-1">
+                      {(!isDesktop || !navCollapsed) && hasLayout && (
+                        <SegmentedControl<"schema" | "layout">
+                          value={navMode}
+                          onChange={(v) => setNavMode(v)}
+                          options={[
+                            { id: "schema", label: "Schema" },
+                            { id: "layout", label: "Layout" },
+                          ]}
                         />
-                        {/* The virtual root has no fields of its own — it is
-                            every section at once, so each one is rendered with
-                            the heading the tabs would otherwise have carried. */}
-                        {!selectedNode.pointer && roots.length > 0
-                          ? (
-                            <GeneralView
-                              roots={roots}
-                              data={data}
-                              errors={errors}
-                              onChange={handleChange}
-                            />
-                          )
-                          : (
-                            <EditorBody
-                              node={selectedNode}
-                              data={data}
-                              errors={errors}
-                              onChange={handleChange}
-                            />
-                          )}
-                      </>
-                    )
-                    : (
-                      <div className="flex h-full items-center justify-center py-16">
-                        <div className="text-center text-muted-foreground">
-                          <FileText className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                          <p className="text-sm">
-                            Select a node to start editing
-                          </p>
-                        </div>
+                      )}
+                      {isDesktop && (
+                        <button
+                          type="button"
+                          onClick={() => setNavCollapsed((v) => !v)}
+                          aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+                          className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                        >
+                          {navCollapsed
+                            ? <ChevronRight className="h-3.5 w-3.5" />
+                            : <ChevronLeft className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  }
+                />
+                {/* Show content when: on mobile (always), or on desktop when not collapsed */}
+                {(!isDesktop || !navCollapsed) && (
+                  <>
+                    {(!hasLayout || navMode === "schema") && (
+                      <TreeView
+                        ast={uiAst}
+                        selectedPointer={selectedPointer}
+                        errors={errors}
+                        rootLabel={ROOT_LABEL}
+                        onSelect={(pointer) => {
+                          actions.setSelectedPointer(pointer);
+                          if (!isDesktop) setMobileView("editor");
+                        }}
+                      />
+                    )}
+                    {hasLayout && navMode === "layout" && (
+                      <div className="flex-1 min-h-0 px-1 pb-2">
+                        <LayoutExplorer
+                          layout={session.layout}
+                          ast={uiAst}
+                          selectedPointer={selectedPointer}
+                          rootLabel={ROOT_LABEL}
+                          onSelect={(pointer) => {
+                            actions.setSelectedPointer(pointer);
+                            if (!isDesktop) setMobileView("editor");
+                          }}
+                        />
                       </div>
                     )}
+                  </>
+                )}
+              </Panel>
+              {/* Resizer */}
+              <div
+                className="app-resizer hidden lg:block"
+                onPointerDown={(event) => startDrag(event, "nav")}
+              />
+              {/* Main Editor Panel */}
+              <Panel
+                as="main"
+                className={cn(
+                  "lg:flex lg:flex-1",
+                  !isDesktop && mobileView === "editor" && "flex flex-1",
+                  !isDesktop && mobileView !== "editor" && "hidden",
+                )}
+              >
+                <div className="flex flex-1 flex-col overflow-hidden">
+                  <SectionTabs
+                    roots={roots}
+                    rootLabel={ROOT_LABEL}
+                    selectedPointer={selectedPointer}
+                    onSelect={actions.setSelectedPointer}
+                  />
+                  <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
+                    <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6">
+                      {selectedNode
+                        ? (
+                          <>
+                            <EditorHeading
+                              node={selectedNode}
+                              isRoot={roots.some((root) =>
+                                root.pointer === selectedNode.pointer
+                              )}
+                            />
+                            {/* The virtual root has no fields of its own — it is
+                                every section at once, so each one is rendered with
+                                the heading the tabs would otherwise have carried. */}
+                            {!selectedNode.pointer && roots.length > 0
+                              ? (
+                                <GeneralView
+                                  roots={roots}
+                                  data={data}
+                                  errors={errors}
+                                  onChange={handleChange}
+                                />
+                              )
+                              : (
+                                <EditorBody
+                                  node={selectedNode}
+                                  data={data}
+                                  errors={errors}
+                                  onChange={handleChange}
+                                />
+                              )}
+                          </>
+                        )
+                        : (
+                          <div className="flex h-full items-center justify-center py-16">
+                            <div className="text-center text-muted-foreground">
+                              <FileText className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                              <p className="text-sm">
+                                Select a node to start editing
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </Panel>
+              {/* Resizer */}
+              <div
+                className="app-resizer hidden lg:block"
+                onPointerDown={(event) => startDrag(event, "preview")}
+              />
+              {/* Preview Panel — outer Panel provided by PreviewPane internally */}
+              <PreviewPaneWithToggle
+                collapsed={previewCollapsed}
+                onToggle={() => setPreviewCollapsed((v) => !v)}
+                isDesktop={isDesktop}
+                isDragging={isDragging}
+                mobileVisible={!isDesktop && mobileView === "preview"}
+                previewWidth={sizes.preview}
+                formats={formats}
+                format={previewFormat}
+                onFormatChange={handlePreviewFormatChange}
+                pretty={previewPretty}
+                onPrettyChange={handlePreviewPrettyChange}
+                payload={previewPayload}
+                error={previewError}
+              />
             </div>
-          </Panel>
-          {/* Resizer */}
-          <div
-            className="app-resizer hidden lg:block"
-            onPointerDown={(event) => startDrag(event, "preview")}
-          />
-          {/* Preview Panel — outer Panel provided by PreviewPane internally */}
-          <PreviewPaneWithToggle
-            collapsed={previewCollapsed}
-            onToggle={() => setPreviewCollapsed((v) => !v)}
-            isDesktop={isDesktop}
-            isDragging={isDragging}
-            mobileVisible={!isDesktop && mobileView === "preview"}
-            previewWidth={sizes.preview}
-            formats={formats}
-            format={previewFormat}
-            onFormatChange={handlePreviewFormatChange}
-            pretty={previewPretty}
-            onPrettyChange={handlePreviewPrettyChange}
-            payload={previewPayload}
-            error={previewError}
-          />
-        </div>
-        <StatusBar
-          status={status}
-          dirty={dirty}
-          validating={false}
-          saving={saving}
-          exiting={exiting}
-          errorCount={errors.size}
-          focusLabel={focusLabel}
-          onErrorsClick={errors.size > 0
-            ? () => actions.setShowErrorsDialog(true)
-            : undefined}
-        />
-        <ValidationErrorsDialog
-          open={showErrorsDialog}
-          onOpenChange={actions.setShowErrorsDialog}
-          errors={errors}
-          onNavigateToError={(pointer) =>
-            actions.setSelectedPointer(resolveNavigablePointer(roots, pointer))}
-        />
-      </div>
-    </OverlayProvider>
+            <StatusBar
+              status={status}
+              dirty={dirty}
+              validating={false}
+              saving={saving}
+              exiting={exiting}
+              errorCount={errors.size}
+              focusLabel={focusLabel}
+              onErrorsClick={errors.size > 0
+                ? () => actions.setShowErrorsDialog(true)
+                : undefined}
+            />
+            <ValidationErrorsDialog
+              open={showErrorsDialog}
+              onOpenChange={actions.setShowErrorsDialog}
+              errors={errors}
+              onNavigateToError={(pointer) =>
+                actions.setSelectedPointer(resolveNavigablePointer(roots, pointer))}
+            />
+          </div>
+          </HoverPreviewProvider>
+        </EditorRuntimeProvider>
+      </OverlayProvider>
+    </RichAssetsProvider>
   );
 }
 
@@ -659,6 +675,15 @@ function GeneralView({
             <p className="mb-2.5 max-w-[68ch] text-xs leading-relaxed text-muted-foreground">
               {root.description}
             </p>
+          )}
+          {root.content && (
+            <div className="mb-3">
+              <RichSurface
+                content={root.content}
+                variant="block"
+                title={nodeLabel(root)}
+              />
+            </div>
           )}
           <EditorBody
             node={root}

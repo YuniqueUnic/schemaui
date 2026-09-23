@@ -4,6 +4,7 @@
 // `cargo test --features web-types` and re-apply comments when the struct changes.
 
 import type { Capability } from "./Capability";
+import type { RichAsset } from "./RichAsset";
 
 export interface SessionResponse {
     /** Contract revision this payload follows, e.g. "1.0". */
@@ -19,6 +20,11 @@ export interface SessionResponse {
     formats: Array<string>;
     // Optional UiLayout tree; the web UI also reinterprets this locally.
     layout: Record<string, unknown> | null;
+    // Rendered rich content keyed by content id: the lookup table for every
+    // figure and prose block the AST declares (`x-content`, `x-options`).
+    // Absent when the schema declared nothing or this build renders none of
+    // the declared kinds; frontends fall back to showing the source.
+    rich?: Record<string, RichAsset> | null;
     // Milliseconds until the backend aborts the session, or null when the
     // session is unbounded. A duration, not a deadline, so a client whose clock
     // is off still counts down correctly. The client owns the visible countdown

@@ -12,6 +12,12 @@ import {
 interface OverlayOptions {
   title?: string;
   description?: string;
+  /**
+   * A roomy stage for figures: the dialog grows to nearly the whole screen
+   * on desktop and becomes truly fullscreen on a phone, so a diagram has
+   * room instead of sitting tiny inside a tall empty frame.
+   */
+  wide?: boolean;
   content: (close: () => void) => React.ReactNode;
 }
 
@@ -51,7 +57,12 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
       {children}
       <Dialog open={stack.length > 0} onOpenChange={(open) => !open && close()}>
         <DialogContent
-          className="max-w-3xl max-h-[85vh] overflow-hidden"
+          className={
+            top?.wide
+              ? // Fullscreen on a phone; near-fullscreen on anything bigger.
+                "flex h-dvh w-screen max-w-none flex-col rounded-none border-0 p-4 sm:h-[88vh] sm:w-[min(96vw,1200px)] sm:rounded-lg sm:border sm:p-6"
+              : "max-w-3xl max-h-[85vh] overflow-hidden"
+          }
           aria-describedby={top?.description ? undefined : "overlay-fallback-description"}
         >
           <DialogHeader>
@@ -72,10 +83,21 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
               </DialogDescription>
             )}
           </DialogHeader>
-          <div className="max-h-[60vh] min-h-[16rem] overflow-y-auto px-1 py-1 sm:px-2">
+          <div
+            className={
+              top?.wide
+                ? // The stage owns the leftover height; frames scroll within.
+                  "min-h-0 flex-1 overflow-y-auto px-1 py-1 sm:px-2"
+                : "max-h-[60vh] min-h-[16rem] overflow-y-auto px-1 py-1 sm:px-2"
+            }
+          >
             {stack.map((frame, index) => (
               <div
                 key={frame.id}
+                // `h-full` lets a wide frame's content own the stage height;
+                // in the default dialog the parent's height is auto, so it is
+                // harmless there.
+                className="h-full"
                 hidden={index !== stack.length - 1}
                 aria-hidden={index !== stack.length - 1}
               >

@@ -10,6 +10,7 @@ const apiMocks = vi.hoisted(() => ({
   renderPreview: vi.fn(),
   fetchSession: vi.fn(),
   exitSession: vi.fn(),
+  renderDiagram: vi.fn(),
 }));
 
 vi.mock("../api", () => ({
@@ -18,6 +19,7 @@ vi.mock("../api", () => ({
   renderPreview: apiMocks.renderPreview,
   fetchSession: apiMocks.fetchSession,
   exitSession: apiMocks.exitSession,
+  renderDiagram: apiMocks.renderDiagram,
 }));
 
 const toast = vi.hoisted(() => ({

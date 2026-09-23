@@ -56,12 +56,49 @@ export type PreviewResponse = ServerPreviewResponse;
 export type ScalarKind = "string" | "integer" | "number" | "boolean";
 export type CompositeMode = "one_of" | "any_of";
 
+/**
+ * Schema-authored rich content: a diagram, an inline SVG figure, or a
+ * markdown block. The AST carries only the source — the rendered counterpart
+ * ships in `SessionResponse.rich`, keyed by content id.
+ */
+export type RichContent =
+  | { type: "mermaid"; source: string }
+  | { type: "svg"; source: string }
+  | { type: "markdown"; source: string };
+
+/** Per-option metadata from `x-options`, aligned with the enum values by index. */
+export interface EnumDetail {
+  label?: string | null;
+  description?: string | null;
+  content?: RichContent | null;
+}
+
+/** An SVG plus its intrinsic size, when the source declares one. */
+export interface RenderedSvg {
+  body: string;
+  width?: number | null;
+  height?: number | null;
+}
+
+/**
+ * The rendered, sanitised form of one declared content. `failed` reports an
+ * error in the author's source; a kind this build cannot render is *absent*
+ * from the asset map instead — a capability question, answered by falling
+ * back to the source.
+ */
+export type RichAsset =
+  | { kind: "diagram"; light: RenderedSvg; dark: RenderedSvg }
+  | { kind: "svg"; svg: RenderedSvg }
+  | { kind: "html"; html: string }
+  | { kind: "failed"; message: string };
+
 export type UiNodeKind =
   | {
     type: "field";
     scalar: ScalarKind;
     enum_options?: string[] | null;
     enum_values?: JsonValue[] | null;
+    enum_details?: EnumDetail[] | null;
     nullable?: boolean;
     multiline?: boolean;
   }
@@ -114,7 +151,8 @@ export type FieldControl =
   | "checkbox"
   | "slider"
   | "range"
-  | "color";
+  | "color"
+  | "mermaid";
 
 /** A labelled stop along a slider track, from `x-slider-marks`. */
 export interface SliderMark {
@@ -142,6 +180,8 @@ export interface UiNode {
   visible_when?: VisibleWhen | null;
   control?: FieldControl | null;
   bounds?: FieldBounds | null;
+  /** A figure or prose block attached with `x-content`, shown above the control. */
+  content?: RichContent | null;
   kind: UiNodeKind;
 }
 

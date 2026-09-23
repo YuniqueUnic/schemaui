@@ -15,6 +15,7 @@ import { FieldRenderer } from "./renderers/FieldRenderer";
 import { KeyValueRenderer } from "./renderers/KeyValueRenderer";
 import { ObjectRenderer } from "./renderers/ObjectRenderer";
 import { RangeControl } from "./renderers/controls/RangeControl";
+import { RichSurface } from "./rich/RichSurface";
 import { resolveControl } from "../lib/control";
 
 // Type narrowing helpers
@@ -71,6 +72,13 @@ export function NodeRenderer({
   return (
     <div className={chromeClass}>
       {!hideHeader && <NodeHeader node={node} />}
+      {node.content && (
+        <RichSurface
+          content={node.content}
+          variant="block"
+          title={node.title ?? undefined}
+        />
+      )}
       <NodeBody
         node={node}
         value={value}
