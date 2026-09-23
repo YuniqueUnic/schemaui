@@ -1,11 +1,27 @@
 import type {
   JsonValue,
   PreviewResponse,
-  RenderContentResult,
   SessionResponse,
   ValidationResponse,
 } from "../types";
-import type { RenderContentInput, SchemaUiTransport } from "./types";
+import type {
+  RenderContentInput,
+  RenderContentResult,
+  SchemaUiTransport,
+} from "./types";
+
+/**
+ * `renderRich` only exists in wasm packages built with the `mermaid`
+ * feature, so it is absent from the checked-in package types. Optional on
+ * purpose: its presence is the Playground's content_render capability.
+ */
+type WasmWithRenderRich = typeof import("@schemaui/wasm") & {
+  renderRich?: (
+    kind: string,
+    source: string,
+    theme: string,
+  ) => Promise<RenderContentResult>;
+};
 
 /**
  * Lazily loads and initializes the `schemaui-wasm` module.
@@ -52,7 +68,7 @@ export function createWasmTransport(
     kind: "wasm",
 
     async bootstrap(): Promise<SessionResponse> {
-      const wasm = await loadWasm();
+      const wasm = (await loadWasm()) as WasmWithRenderRich;
       const built = wasm.buildUiAst(schema, defaults) as {
         ui_ast: SessionResponse["ui_ast"];
         layout: SessionResponse["layout"];
@@ -95,7 +111,7 @@ export function createWasmTransport(
     async renderContent(
       input: RenderContentInput,
     ): Promise<RenderContentResult> {
-      const wasm = await loadWasm();
+      const wasm = (await loadWasm()) as WasmWithRenderRich;
       // The engine's own words for why there is nothing to show: an author
       // error or a package built without the renderer.
       if (typeof wasm.renderRich !== "function") {
