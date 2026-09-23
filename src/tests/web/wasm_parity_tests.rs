@@ -166,3 +166,30 @@ fn schema_with_defaults_matches_the_raw_schema_endpoint() {
         );
     });
 }
+
+#[cfg(feature = "mermaid")]
+#[test]
+fn render_rich_matches_post_render_byte_for_byte() {
+    with_session(fixture_schema(), fixture_data(), |agent, base_url| {
+        let request = json!({
+            "kind": "mermaid",
+            "source": "flowchart LR; A-->B",
+            "theme": "dark"
+        });
+        let http_result = post_json(agent, &format!("{base_url}/api/v1/render"), &request);
+
+        let wasm_result = crate::wasm_core::render_rich(
+            request["kind"].as_str().expect("kind"),
+            request["source"].as_str().expect("source"),
+            request["theme"].as_str().expect("theme"),
+        )
+        .expect("render_rich should succeed on the same fixture");
+        let wasm_result =
+            serde_json::to_value(&wasm_result).expect("RenderContentResult serializes");
+
+        assert_eq!(
+            wasm_result["svg"], http_result["svg"],
+            "renderRich must render exactly what POST /api/v1/render renders"
+        );
+    });
+}

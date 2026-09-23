@@ -161,6 +161,7 @@ pub(super) fn visit_schema(
     }
 
     let (scalar, enum_options, enum_values, nullable) = super::defaults::detect_scalar(schema)?;
+    let enum_details = super::hints::enum_details(schema, enum_values.as_ref())?;
     let default_value = super::defaults::schema_default_or_const(schema)
         .or_else(|| super::defaults::infer_default_scalar(scalar, enum_values.as_ref()));
     super::hints::node(
@@ -172,6 +173,7 @@ pub(super) fn visit_schema(
             scalar,
             enum_options,
             enum_values,
+            enum_details,
             nullable,
             multiline: super::hints::is_multiline(schema)?,
         },
@@ -251,10 +253,12 @@ pub(super) fn visit_kind(
     }
 
     let (scalar, enum_options, enum_values, nullable) = super::defaults::detect_scalar(schema)?;
+    let enum_details = super::hints::enum_details(schema, enum_values.as_ref())?;
     Ok(UiNodeKind::Field {
         scalar,
         enum_options,
         enum_values,
+        enum_details,
         nullable,
         multiline: super::hints::is_multiline(schema)?,
     })
@@ -321,6 +325,9 @@ pub(super) fn recursive_boundary_kind(schema: &SchemaObject) -> Result<UiNodeKin
             scalar,
             enum_options,
             enum_values,
+            // A recursive boundary stands in for a schema the builder has
+            // already visited; there is nothing new to describe per option.
+            enum_details: None,
             nullable,
             multiline: super::hints::is_multiline(schema)?,
         });

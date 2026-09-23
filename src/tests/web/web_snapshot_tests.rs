@@ -248,7 +248,15 @@ fn web_session_builder_with_ui_artifact_bundle_matches_snapshot_builder() {
         web::build_session_snapshot_from_files(&path, DocumentFormat::Json, Some(&defaults_path))
             .expect("build web snapshot from files");
 
-    assert_eq!(runtime_snapshot, snapshot_from_builder);
+    // Everything payload-shaped must agree; `capabilities` is the one lawful
+    // difference, because a snapshot is the payload without the server while
+    // a live session advertises what its build can do (content render among
+    // the rest).
+    let mut runtime = runtime_snapshot;
+    let mut snapshot = snapshot_from_builder;
+    runtime.capabilities.clear();
+    snapshot.capabilities.clear();
+    assert_eq!(runtime, snapshot);
 
     let _ = fs::remove_file(&defaults_path);
 }

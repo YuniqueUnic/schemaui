@@ -10,7 +10,10 @@ use indexmap::IndexMap;
 use serde_json::Value;
 
 use super::{Schema, SchemaObject, VisibleWhen};
-use crate::ui_ast::types::{FieldBounds, FieldControl, SliderMark, UiNode, UiNodeKind};
+use crate::rich::MAX_SOURCE_BYTES;
+use crate::ui_ast::types::{
+    EnumDetail, FieldBounds, FieldControl, RichContent, SliderMark, UiNode, UiNodeKind,
+};
 
 /// `x-multiline: true` — render a string field as a multi-line text area.
 pub(super) const MULTILINE: &str = "x-multiline";
@@ -24,6 +27,14 @@ pub(super) const SLIDER_MARKS: &str = "x-slider-marks";
 /// `x-visible-when: {"field": <sibling>, "op": "equals" | "contains", "value": <value>}`
 /// — keep a node hidden until a sibling property matches.
 pub(super) const VISIBLE_WHEN: &str = "x-visible-when";
+
+/// `x-options: [{label?, description?, content?}]` — per-option detail,
+/// aligned with the enum values by index.
+pub(super) const OPTIONS: &str = "x-options";
+
+/// `x-content: {"type": "mermaid" | "svg" | "markdown", "source": <text>}` —
+/// a figure or prose block attached to the node itself.
+pub(super) const CONTENT: &str = "x-content";
 
 /// Whether the field asks for a multi-line text area.
 pub(super) fn is_multiline(schema: &SchemaObject) -> Result<bool> {
@@ -58,9 +69,10 @@ pub(super) fn field_control(schema: &SchemaObject) -> Result<Option<FieldControl
         "slider" => FieldControl::Slider,
         "range" => FieldControl::Range,
         "color" => FieldControl::Color,
+        "mermaid" => FieldControl::Mermaid,
         other => bail!(
             "`{CONTROL}` names an unknown control `{other}`; expected one of \
-             text, textarea, select, segmented, radio, switch, checkbox, slider, range, color"
+             text, textarea, select, segmented, radio, switch, checkbox, slider, range, color, mermaid"
         ),
     };
     Ok(Some(control))
@@ -136,6 +148,85 @@ fn slider_marks(schema: &SchemaObject) -> Result<Vec<SliderMark>> {
         .collect()
 }
 
+/// Per-option metadata from `x-options`, aligned with the enum values.
+///
+/// The entries must line up with the enum one-for-one: an `x-options` list
+/// that drifts from its enum is a schema bug whose symptom would otherwise be
+/// the wrong figure on the wrong option, which nothing downstream can catch.
+pub(super) fn enum_details(
+    schema: &SchemaObject,
+    enum_values: Option<&Vec<Value>>,
+) -> Result<Option<Vec<EnumDetail>>> {
+    let Some(raw) = schema.extensions.get(OPTIONS) else {
+        return Ok(None);
+    };
+    let Some(entries) = raw.as_array() else {
+        bail!("`{OPTIONS}` must be an array, found `{raw}`");
+    };
+    let Some(values) = enum_values else {
+        bail!("`{OPTIONS}` needs an enum to describe, but the property declares none");
+    };
+    if entries.len() != values.len() {
+        bail!(
+            "`{OPTIONS}` has {} entries but the enum has {} values",
+            entries.len(),
+            values.len()
+        );
+    }
+
+    let details = entries
+        .iter()
+        .map(|entry| {
+            let Some(fields) = entry.as_object() else {
+                bail!("`{OPTIONS}` entries must be objects, found `{entry}`");
+            };
+            Ok(EnumDetail {
+                label: optional_string(fields.get("label"), "label", OPTIONS)?,
+                description: optional_string(fields.get("description"), "description", OPTIONS)?,
+                content: rich_content(fields.get("content"), OPTIONS)?,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    // An all-empty list is the author's way of writing nothing; keep it out
+    // of the AST so the wire stays free of placeholder detail rows.
+    let meaningful = details.iter().any(|detail| {
+        detail.label.is_some() || detail.description.is_some() || detail.content.is_some()
+    });
+    Ok(meaningful.then_some(details))
+}
+
+/// The figure or prose block declared with `x-content`, if any.
+pub(super) fn node_content(schema: &SchemaObject) -> Result<Option<RichContent>> {
+    rich_content(schema.extensions.get(CONTENT), CONTENT)
+}
+
+fn optional_string(raw: Option<&Value>, field: &str, keyword: &str) -> Result<Option<String>> {
+    match raw {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(text)) => Ok(Some(text.clone())),
+        Some(other) => bail!("`{keyword}` entry {field} must be a string, found `{other}`"),
+    }
+}
+
+fn rich_content(raw: Option<&Value>, keyword: &str) -> Result<Option<RichContent>> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let content: RichContent = serde_json::from_value(raw.clone())
+        .map_err(|error| anyhow::anyhow!("`{keyword}` is malformed ({error}), found `{raw}`"))?;
+    if content.source().is_empty() {
+        bail!("`{keyword}` needs a non-empty `source`");
+    }
+    if content.source().len() > MAX_SOURCE_BYTES {
+        bail!(
+            "`{keyword}` source is {} bytes; the limit is {MAX_SOURCE_BYTES}",
+            content.source().len()
+        );
+    }
+    Ok(Some(content))
+}
+
 /// Assemble a node, attaching every `x-` hint it declares.
 ///
 /// Every construction path goes through here so that a hint cannot be silently
@@ -159,9 +250,11 @@ pub(super) fn node(
         visible_when: None,
         control: field_control(schema)?,
         bounds: field_bounds(schema)?,
+        content: node_content(schema)?,
         kind,
     };
     check_control_fits(&node)?;
+    check_details_fit(&node)?;
     Ok(node)
 }
 
@@ -182,10 +275,13 @@ fn check_control_fits(node: &UiNode) -> Result<()> {
     };
 
     let fits = match (&node.kind, control) {
-        (UiNodeKind::Field { scalar, .. }, FieldControl::Text | FieldControl::Textarea)
-        | (UiNodeKind::Field { scalar, .. }, FieldControl::Color) => {
-            matches!(scalar, super::ScalarKind::String)
-        }
+        (
+            UiNodeKind::Field { scalar, .. },
+            FieldControl::Text
+            | FieldControl::Textarea
+            | FieldControl::Color
+            | FieldControl::Mermaid,
+        ) => matches!(scalar, super::ScalarKind::String),
         (UiNodeKind::Field { scalar, .. }, FieldControl::Switch | FieldControl::Checkbox) => {
             matches!(scalar, super::ScalarKind::Boolean)
         }
@@ -250,6 +346,30 @@ fn describe_kind(kind: &UiNodeKind) -> String {
         UiNodeKind::KeyValue { .. } => "a key/value map".to_string(),
         UiNodeKind::Composite { .. } => "a oneOf/anyOf".to_string(),
     }
+}
+
+/// Rejects `x-options` figures the declared control cannot show.
+///
+/// A segmented row has no room for anything but its label; declaring a
+/// diagram on one would silently lose it, which is the same class of bug as a
+/// typo'd control name. The check fires only when there is something to lose,
+/// so plain labelled options stay valid on every enum control.
+fn check_details_fit(node: &UiNode) -> Result<()> {
+    if node.control != Some(FieldControl::Segmented) {
+        return Ok(());
+    }
+    if let UiNodeKind::Field {
+        enum_details: Some(details),
+        ..
+    } = &node.kind
+        && details.iter().any(|detail| detail.content.is_some())
+    {
+        bail!(
+            "`{OPTIONS}` content needs room to render; `{CONTROL}: \"segmented\"` has none. \
+             Use `radio` or `select` so each option can show its figure"
+        );
+    }
+    Ok(())
 }
 
 /// The visibility rule declared on this schema, if any.

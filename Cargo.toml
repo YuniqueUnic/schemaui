@@ -45,6 +45,13 @@ json = []
 yaml = ["dep:serde_yaml"]
 toml = ["dep:toml"]
 
+# Sanitised rich content for schema-authored figures and prose (raw SVG,
+# markdown). Diagram rendering builds on it.
+rich = ["dep:quick-xml", "dep:pulldown-cmark", "dep:ammonia"]
+# Mermaid diagram rendering, delivered as pre-rendered SVG assets. Opt-in:
+# the renderer is by far the heaviest dependency in the tree.
+mermaid = ["rich", "dep:mermaid-rs-renderer"]
+
 precompile = []
 
 # use debug features for debugging which is more flexible than debug_assertions
@@ -75,6 +82,14 @@ ts-rs = { version = "12", optional = true, features = ["serde-compat"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_yaml = { version = "0.9", optional = true }
 toml = { version = "1", optional = true }
+
+# For rich content (feature `rich` / `mermaid`)
+quick-xml = { version = "0.42", optional = true }
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"], optional = true }
+ammonia = { version = "4", optional = true }
+# Library use only: the default features pull in the CLI (clap) and PNG
+# rasterisation (resvg), neither of which belongs in an embedded session.
+mermaid-rs-renderer = { version = "0.3", default-features = false, optional = true }
 
 [[example]]
 name = "demo"
