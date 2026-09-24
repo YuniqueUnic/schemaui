@@ -321,7 +321,25 @@ class RichContentE2E {
       if (Math.abs(mid.height - before.height) > 1) {
         throw new Error(`pane height jumped ${before.height} → ${mid.height}`);
       }
+      // After settling, the diagram must FIT the pane. The interaction span
+      // between pane and stage once broke the `h-full` chain and let the
+      // svg render at intrinsic size, spilling over the card below.
       await new Promise((resolve) => setTimeout(resolve, 900));
+      const fit = await page.evaluate(() => {
+        const pane = document.querySelector('[data-testid="mermaid-preview"]');
+        const paneRect = pane.getBoundingClientRect();
+        const fig = pane.querySelector("[role='img']")?.getBoundingClientRect();
+        const svg = pane.querySelector("svg")?.getBoundingClientRect();
+        return {
+          paneH: paneRect.height,
+          figOverflows: fig ? fig.bottom > paneRect.bottom + 1 || fig.height > paneRect.height + 1 : null,
+          svgOverflows: svg ? svg.bottom > paneRect.bottom + 1 : null,
+        };
+      });
+      if (fit.figOverflows === null) throw new Error("preview stage missing after settle");
+      if (fit.figOverflows || fit.svgOverflows) {
+        throw new Error(`preview diagram overflows the pane (pane ${fit.paneH}px)`);
+      }
     });
 
     await this.test("editor layout switches between split, stacked and swapped", async () => {
