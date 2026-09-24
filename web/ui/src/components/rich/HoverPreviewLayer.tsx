@@ -11,18 +11,18 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import type { RichContent } from "../../types";
 import { computeFloatingPosition, type FloatingPosition } from "../../lib/floatingPosition";
-import { RichSurface } from "./RichSurface";
+import { DiagramStage, type FigureDescriptor } from "./RichSurface";
+import { useI18n } from "../../i18n";
 
 interface HoverRequest {
-  content: RichContent;
+  figure: FigureDescriptor;
   trigger: DOMRect;
 }
 
 interface HoverPreviewContextValue {
-  /** Show the preview for `content`, anchored to `trigger`'s rect. */
-  show: (content: RichContent, trigger: DOMRect) => void;
+  /** Show the preview for `figure`, anchored to `trigger`'s rect. */
+  show: (figure: FigureDescriptor, trigger: DOMRect) => void;
   /** Ask to hide; a short grace period absorbs thumb-to-preview travel. */
   hide: () => void;
 }
@@ -40,13 +40,15 @@ const HIDE_GRACE_MS = 120;
  *
  * A singleton rather than a popover per row: one portal means one z-index
  * story and one repositioning loop, and a row never has to know where its
- * preview ends up. Positioned by the pure `computeFloatingPosition`
- * (below-first, flip, shift, clamp, shrink), re-measured on scroll and
- * resize. Keyboard users get the same preview via focus, and Escape closes
- * it; the layer never takes focus itself, so the underlying control keeps
- * working.
+ * preview ends up. It speaks `FigureDescriptor`, so any figure anywhere —
+ * a declared asset or the editor's on-the-fly render — enlarges the same
+ * way. Positioned by the pure `computeFloatingPosition` (below-first, flip,
+ * shift, clamp, shrink), re-measured on scroll and resize. Keyboard users
+ * get the same preview via focus, and Escape closes it; the layer never
+ * takes focus itself, so the underlying control keeps working.
  */
 export function HoverPreviewProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [request, setRequest] = useState<HoverRequest | null>(null);
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState<FloatingPosition | null>(null);
@@ -62,11 +64,12 @@ export function HoverPreviewProvider({ children }: { children: ReactNode }) {
     timers.current = {};
   };
 
-  const show = useCallback((content: RichContent, trigger: DOMRect) => {
+  const show = useCallback((figure: FigureDescriptor, trigger: DOMRect) => {
     clearTimers();
     triggerRef.current = trigger;
     timers.current.show = window.setTimeout(() => {
-      setRequest({ content, trigger });
+      setRequest({ figure, trigger });
+      setPosition(null);
       setVisible(true);
     }, SHOW_DELAY_MS);
   }, []);
@@ -76,15 +79,17 @@ export function HoverPreviewProvider({ children }: { children: ReactNode }) {
     timers.current.hide = window.setTimeout(() => {
       setVisible(false);
       setRequest(null);
+      setPosition(null);
       triggerRef.current = null;
     }, HIDE_GRACE_MS);
   }, []);
 
   // Re-measure while visible; the measured content size feeds the collision
   // pass, so the position settles over two frames like the popover does.
+  // (Resetting position lives in the show/hide transitions above — state
+  // changes belong to the state machine, not to a reactive afterthought.)
   useEffect(() => {
     if (!visible) {
-      setPosition(null);
       return;
     }
     const measure = () => {
@@ -123,12 +128,12 @@ export function HoverPreviewProvider({ children }: { children: ReactNode }) {
         clearTimers();
         setVisible(false);
         setRequest(null);
+        setPosition(null);
         triggerRef.current = null;
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const value = useMemo(() => ({ show, hide }), [show, hide]);
@@ -136,7 +141,7 @@ export function HoverPreviewProvider({ children }: { children: ReactNode }) {
   return (
     <HoverPreviewContext.Provider value={value}>
       {children}
-      {visible && request?.content &&
+      {visible && request?.figure &&
         createPortal(
           <div
             ref={contentRef}
@@ -158,7 +163,12 @@ export function HoverPreviewProvider({ children }: { children: ReactNode }) {
                 : { visibility: "hidden" }
             }
           >
-            <RichSurface content={request.content} variant="preview" />
+            <DiagramStage
+              svg={request.figure.svg}
+              label={request.figure.title ?? t("Figure")}
+              fit="fill"
+              className="h-[60vmin] w-[60vmin]"
+            />
           </div>,
           document.body,
         )}

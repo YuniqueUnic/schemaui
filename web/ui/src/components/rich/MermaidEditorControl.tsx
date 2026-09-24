@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Textarea } from "../ui/textarea";
-import { DiagramStage } from "./RichSurface";
+import { DiagramStage, type FigureDescriptor } from "./RichSurface";
 import { useEditorRuntime } from "./EditorRuntime";
 import { useTheme } from "../../theme";
+import { useI18n } from "../../i18n";
 import type { RenderedSvg } from "../../types";
 
 /** How the editor and the preview share the row. */
@@ -44,6 +45,10 @@ function loadLayout(): EditorLayout {
  *   edit-then-commit reading — for sources big enough that watching them
  *   redraw per keystroke is noise.
  *
+ * The preview is a first-class figure: it goes through `DiagramStage` with a
+ * descriptor, so hovering enlarges it and clicking opens the fullscreen
+ * viewer (copy/download included) exactly like every declared figure.
+ *
  * Without a renderer — an older engine, a wasm package built without the
  * feature — this is a plain multi-line text area, which is exactly what the
  * field was before the control existed.
@@ -55,6 +60,7 @@ export function MermaidEditorControl({
   value: string;
   onChange: (next: string) => void;
 }) {
+  const { t } = useI18n();
   const { renderContent } = useEditorRuntime();
   const { theme } = useTheme();
   const [layout, setLayout] = useState<EditorLayout>(loadLayout);
@@ -65,7 +71,8 @@ export function MermaidEditorControl({
   const seqRef = useRef(0);
   const cacheRef = useRef(new Map<string, RenderedSvg>());
   // The source the current `lastGood` was rendered from: a manual-mode
-  // button compares against this to know the pane is stale.
+  // button compares against this to know the pane is stale, and the
+  // viewer's copy/download must show the source that is actually on screen.
   const renderedSourceRef = useRef<string | null>(null);
 
   const cacheKey = `${theme}\0${value}`;
@@ -137,7 +144,7 @@ export function MermaidEditorControl({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         spellCheck={false}
-        aria-label="Mermaid source"
+        aria-label={t("Mermaid source")}
         className="min-h-40 font-mono text-xs"
       />
     );
@@ -149,29 +156,40 @@ export function MermaidEditorControl({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       spellCheck={false}
-      aria-label="Mermaid source"
+      aria-label={t("Mermaid source")}
       className="h-56 resize-none font-mono text-xs sm:h-64"
     />
   );
+  const previewSource = renderedSourceRef.current ?? value;
+  const previewFigure: FigureDescriptor | undefined = lastGood
+    ? {
+      svg: lastGood,
+      title: t("Mermaid preview"),
+      content: { type: "mermaid", source: previewSource },
+    }
+    : undefined;
   const previewPane = (
     <div className="relative h-56 sm:h-64" data-testid="mermaid-preview">
-      {lastGood ? (
-        <DiagramStage
-          svg={lastGood}
-          label="Mermaid preview"
-          fit="fill"
-          className="h-full w-full"
-        />
-      ) : error ? (
-        <ErrorCard message={error} />
-      ) : (
-        <div className="flex h-full items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
-          Type Mermaid source to see it rendered
-        </div>
-      )}
+      {lastGood
+        ? (
+          <DiagramStage
+            svg={lastGood}
+            label={t("Mermaid preview")}
+            fit="fill"
+            className="h-full w-full"
+            figure={previewFigure}
+          />
+        )
+        : error
+        ? <ErrorCard message={error} />
+        : (
+          <div className="flex h-full items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
+            {t("Type Mermaid source to see it rendered")}
+          </div>
+        )}
       {rendering && (
         <span className="absolute right-2 top-2 rounded-full border border-border bg-background/90 px-2 py-0.5 text-[10px] text-muted-foreground">
-          Rendering…
+          {t("Rendering…")}
         </span>
       )}
       {error && lastGood && (
@@ -189,34 +207,34 @@ export function MermaidEditorControl({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
         <ToolButton
-          label="Editor left, preview right"
+          label={t("Editor left, preview right")}
           pressed={!stacked && !layout.swapped}
           onClick={() => updateLayout({ mode: "split", swapped: false })}
         >
-          左右
+          {t("Side by side")}
         </ToolButton>
         <ToolButton
-          label="Editor above, preview below"
+          label={t("Editor above, preview below")}
           pressed={stacked}
           onClick={() => updateLayout({ mode: "stacked", swapped: false })}
         >
-          上下
+          {t("Stacked")}
         </ToolButton>
         <ToolButton
-          label="Preview left, editor right"
+          label={t("Preview left, editor right")}
           pressed={!stacked && layout.swapped}
           disabled={stacked}
           onClick={() => updateLayout({ swapped: true })}
         >
-          对换
+          {t("Swap sides")}
         </ToolButton>
         <span className="mx-1 h-4 w-px bg-border" />
         <ToolButton
-          label="Preview follows typing"
+          label={t("Preview follows typing")}
           pressed={follow}
           onClick={() => setFollow((current) => !current)}
         >
-          实时
+          {t("Live")}
         </ToolButton>
         {!follow && stale && (
           <button
@@ -224,7 +242,7 @@ export function MermaidEditorControl({
             onClick={render}
             className="rounded-md border border-border px-2 py-0.5 hover:bg-muted"
           >
-            渲染预览
+            {t("Render preview")}
           </button>
         )}
       </div>
@@ -273,9 +291,10 @@ function ToolButton({
 }
 
 function ErrorCard({ message }: { message: string }) {
+  const { t } = useI18n();
   return (
     <div className="flex h-full flex-col justify-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-      <p className="text-xs font-medium text-destructive">This diagram does not parse:</p>
+      <p className="text-xs font-medium text-destructive">{t("This diagram does not parse:")}</p>
       <p className="text-xs text-destructive/90">{message}</p>
     </div>
   );

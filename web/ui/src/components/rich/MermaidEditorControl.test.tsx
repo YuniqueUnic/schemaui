@@ -4,6 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { MermaidEditorControl } from "./MermaidEditorControl";
 import { EditorRuntimeProvider } from "./EditorRuntime";
 import { ThemeProvider } from "../../theme";
+import { I18nProvider } from "../../i18n";
+import { OverlayProvider } from "../Overlay";
+import { HoverPreviewProvider } from "./HoverPreviewLayer";
+import { RichAssetsProvider } from "./RichAssetsProvider";
 import type { RenderContentInput, RenderContentResult, SchemaUiTransport } from "../../transport/types";
 
 const SVG = { body: "<svg viewBox='0 0 10 10'></svg>", width: 10, height: 10 };
@@ -35,9 +39,17 @@ function Editor({
 }) {
   return (
     <ThemeProvider>
-      <EditorRuntimeProvider transport={transport} capabilities={capabilities}>
-        <MermaidEditorControl value={value} onChange={onChange} />
-      </EditorRuntimeProvider>
+      <I18nProvider>
+        <OverlayProvider>
+          <HoverPreviewProvider>
+            <RichAssetsProvider assets={null}>
+              <EditorRuntimeProvider transport={transport} capabilities={capabilities}>
+                <MermaidEditorControl value={value} onChange={onChange} />
+              </EditorRuntimeProvider>
+            </RichAssetsProvider>
+          </HoverPreviewProvider>
+        </OverlayProvider>
+      </I18nProvider>
     </ThemeProvider>
   );
 }
@@ -47,6 +59,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  localStorage.removeItem("schemaui-locale");
 });
 
 describe("MermaidEditorControl", () => {
@@ -145,5 +158,48 @@ describe("MermaidEditorControl", () => {
     );
     await user.type(screen.getByRole("textbox", { name: "Mermaid source" }), "x");
     expect(onChange).toHaveBeenCalledWith("x");
+  });
+
+  it("follows the locale: the toolbar reads Chinese under zh", () => {
+    localStorage.setItem("schemaui-locale", "zh");
+    render(
+      <Editor
+        transport={fakeTransport(vi.fn())}
+        value="flowchart LR; A-->B"
+        onChange={() => {}}
+        capabilities={["content_render"]}
+      />,
+    );
+    expect(screen.getByText("左右")).toBeTruthy();
+    expect(screen.getByText("上下")).toBeTruthy();
+    expect(screen.getByText("对换")).toBeTruthy();
+    expect(screen.getByText("实时")).toBeTruthy();
+    expect(screen.getByLabelText("编辑器在左，预览在右")).toBeTruthy();
+  });
+
+  it("opens the preview in the fullscreen viewer with copy and download", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(
+      <Editor
+        transport={fakeTransport(vi.fn().mockResolvedValue({ svg: SVG }))}
+        value="flowchart LR; A-->B"
+        onChange={() => {}}
+        capabilities={["content_render"]}
+      />,
+    );
+    await vi.advanceTimersByTimeAsync(400);
+    await waitFor(() => expect(document.querySelector("svg")).toBeTruthy());
+
+    // The preview is a first-class figure: hover/click like every other one.
+    const pane = document.querySelector('[data-testid="mermaid-preview"]')!;
+    const zoom = pane.querySelector("span.cursor-zoom-in");
+    expect(zoom).toBeTruthy();
+    await user.click(zoom!);
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector("svg")).toBeTruthy();
+    expect(screen.getByText("Copy source")).toBeTruthy();
+    expect(screen.getByText("Download SVG")).toBeTruthy();
+    expect(dialog.textContent).toContain("flowchart LR");
   });
 });
