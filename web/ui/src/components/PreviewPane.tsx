@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Panel, PanelBody, PanelHeader } from "./Panel";
 import { cn } from "@/lib/utils";
+import { useI18n } from "../i18n";
 
 interface PreviewPaneProps {
   formats: string[];
@@ -30,6 +31,7 @@ export const PreviewPane = memo(function PreviewPane({
   loading = false,
   onToggleCollapse,
 }: PreviewPaneProps) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<number | null>(null);
 
@@ -55,7 +57,7 @@ export const PreviewPane = memo(function PreviewPane({
     <Panel as="aside" className="h-full w-full">
       <PanelHeader
         icon={<Eye className="h-3.5 w-3.5" />}
-        label="Preview"
+        label={t("Preview")}
         actions={
           <div className="flex items-center gap-1">
             <Button
@@ -68,13 +70,13 @@ export const PreviewPane = memo(function PreviewPane({
               {copied
                 ? <Check className="h-3.5 w-3.5" />
                 : <Copy className="h-3.5 w-3.5" />}
-              <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
+              <span className="ml-1">{copied ? t("Copied") : t("Copy")}</span>
             </Button>
             {onToggleCollapse && (
               <button
                 type="button"
                 onClick={onToggleCollapse}
-                aria-label="Collapse preview"
+                aria-label={t("Collapse preview")}
                 className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -114,7 +116,7 @@ export const PreviewPane = memo(function PreviewPane({
             htmlFor="pretty-format"
             className="cursor-pointer text-xs text-muted-foreground"
           >
-            Pretty
+            {t("Pretty")}
           </Label>
         </div>
       </div>
@@ -127,7 +129,7 @@ export const PreviewPane = memo(function PreviewPane({
         {error
           ? (
             <div className="relative h-full overflow-auto whitespace-pre-wrap break-words rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs leading-relaxed shadow-inner">
-              <p className="font-medium text-destructive">Preview failed</p>
+              <p className="font-medium text-destructive">{t("Preview failed")}</p>
               <p className="mt-1 font-mono text-foreground">{error}</p>
             </div>
           )

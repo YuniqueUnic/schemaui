@@ -10,6 +10,7 @@ import {
   Save,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n, type TParams } from "../i18n";
 
 interface ShortcutHint {
   combo: string;
@@ -28,10 +29,6 @@ interface StatusBarProps {
   onErrorsClick?: () => void;
 }
 
-const DEFAULT_SHORTCUTS: ShortcutHint[] = [
-  { combo: "Ctrl / Cmd + S", label: "Save changes" },
-];
-
 type StatusTone = "ready" | "dirty" | "error" | "busy";
 
 interface StatusModel {
@@ -40,53 +37,60 @@ interface StatusModel {
   message: string;
 }
 
-function buildStatusModel({
-  status,
-  dirty,
-  validating,
-  saving,
-  exiting,
-  errorCount,
-}: Pick<
-  StatusBarProps,
-  "status" | "dirty" | "validating" | "saving" | "exiting" | "errorCount"
->): StatusModel {
+type Translate = (key: string, params?: TParams) => string;
+
+function buildStatusModel(
+  {
+    status,
+    dirty,
+    validating,
+    saving,
+    exiting,
+    errorCount,
+  }: Pick<
+    StatusBarProps,
+    "status" | "dirty" | "validating" | "saving" | "exiting" | "errorCount"
+  >,
+  t: Translate,
+): StatusModel {
   if (exiting) {
-    return { tone: "busy", badge: "Exiting", message: "Ending session…" };
+    return { tone: "busy", badge: t("Exiting"), message: t("Ending session…") };
   }
   if (saving) {
-    return { tone: "busy", badge: "Saving", message: "Persisting changes…" };
+    return { tone: "busy", badge: t("Saving"), message: t("Persisting changes…") };
   }
   if (validating) {
     return {
       tone: "busy",
-      badge: "Validating",
-      message: "Checking the current document…",
+      badge: t("Validating"),
+      message: t("Checking the current document…"),
     };
   }
   if (errorCount > 0) {
     return {
       tone: "error",
-      badge: `Errors ${errorCount}`,
-      message: compactStatus(status, "Fix validation errors before saving."),
+      badge: t("Errors {count}", { count: errorCount }),
+      message: compactStatus(status, t("Fix validation errors before saving.")),
     };
   }
   if (dirty) {
     return {
       tone: "dirty",
-      badge: "Unsaved",
-      message: compactStatus(status, "Changes are staged locally."),
+      badge: t("Unsaved"),
+      message: compactStatus(status, t("Changes are staged locally.")),
     };
   }
   return {
     tone: "ready",
-    badge: "Ready",
-    message: compactStatus(status, "Everything is synced."),
+    badge: t("Ready"),
+    message: compactStatus(status, t("Everything is synced.")),
   };
 }
 
 function compactStatus(status: string, fallback: string) {
   const trimmed = status.trim();
+  // The engine's status strings are data (English on the wire), so the
+  // comparison stays literal even when the surrounding chrome is translated.
   if (!trimmed || trimmed === "Ready") {
     return fallback;
   }
@@ -126,10 +130,14 @@ export function StatusBar({
   exiting = false,
   errorCount,
   focusLabel,
-  shortcuts = DEFAULT_SHORTCUTS,
+  shortcuts,
   onErrorsClick,
 }: StatusBarProps) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
+  const resolvedShortcuts = shortcuts ?? [
+    { combo: "Ctrl / Cmd + S", label: t("Save changes") },
+  ];
 
   const statusModel = buildStatusModel({
     status,
@@ -138,7 +146,7 @@ export function StatusBar({
     saving,
     exiting,
     errorCount,
-  });
+  }, t);
 
   const toneClass = TONE_CLASS[statusModel.tone];
 
@@ -190,12 +198,12 @@ export function StatusBar({
           </button>
         )}
 
-        {shortcuts.length > 0 && (
+        {resolvedShortcuts.length > 0 && (
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
             aria-expanded={expanded}
-            aria-label={expanded ? "Hide shortcuts" : "Show shortcuts"}
+            aria-label={expanded ? t("Hide shortcuts") : t("Show shortcuts")}
             className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Keyboard className="h-3 w-3" />
@@ -206,9 +214,9 @@ export function StatusBar({
         )}
       </div>
 
-      {expanded && shortcuts.length > 0 && (
+      {expanded && resolvedShortcuts.length > 0 && (
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/50 pt-1.5">
-          {shortcuts.map((shortcut) => (
+          {resolvedShortcuts.map((shortcut) => (
             <span
               key={shortcut.combo}
               className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground"

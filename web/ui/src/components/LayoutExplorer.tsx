@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useI18n } from "../i18n";
 
 interface LayoutExplorerProps {
     layout?: UiLayout | null;
@@ -37,17 +38,18 @@ export function LayoutExplorer(
         rootLabel,
     }: LayoutExplorerProps,
 ) {
+    const { t } = useI18n();
     const items = useMemo(() => {
         if (!ast || ast.roots.length === 0) return [];
         const resolvedRootLabel = rootLabel ??
-            layout?.roots?.[0]?.title ?? "General";
+            layout?.roots?.[0]?.title ?? t("General");
         return buildItems(ast, resolvedRootLabel);
-    }, [ast, layout, rootLabel]);
+    }, [ast, layout, rootLabel, t]);
 
     if (items.length === 0) {
         return (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                No layout available
+                {t("No layout available")}
             </div>
         );
     }

@@ -9,6 +9,7 @@
 
 import type { ReactNode } from "react";
 import type { JsonValue, UiNode, UiNodeKind } from "../types";
+import { useI18n } from "../i18n";
 import { ArrayRenderer } from "./renderers/ArrayRenderer";
 import { CompositeRenderer } from "./renderers/CompositeRenderer";
 import { FieldRenderer } from "./renderers/FieldRenderer";
@@ -124,9 +125,10 @@ function NodeHeader({ node }: { node: UiNode }) {
 
 /** The one way this app marks a field as required. */
 export function RequiredTag() {
+  const { t } = useI18n();
   return (
     <span className="shrink-0 rounded border border-destructive/25 bg-destructive/8 px-1.5 py-px text-[10px] font-medium leading-4 text-destructive">
-      Required
+      {t("Required")}
     </span>
   );
 }

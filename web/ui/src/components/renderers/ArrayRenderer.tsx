@@ -18,6 +18,7 @@ import { materializeCompositeKind } from "../../utils/schemaToUiKind";
 import { renderSimpleFieldInline } from "./FieldRenderer";
 import { MultiSelectRenderer } from "./MultiSelectRenderer";
 import { EntryEditor } from "./shared/EntryEditor";
+import { useI18n } from "../../i18n";
 
 /**
  * Array Renderer - Handles all array rendering logic
@@ -115,6 +116,7 @@ function SimpleArrayRenderer({
   onChange,
   removeEntry,
 }: SimpleArrayRendererProps) {
+  const { t } = useI18n();
   const addEntry = () => {
     const placeholder = defaultForKind(itemKind);
     const next = [...entries, placeholder];
@@ -132,9 +134,9 @@ function SimpleArrayRenderer({
       {entries.length === 0
         ? (
           <div className="text-center py-4 text-muted-foreground border border-dashed rounded-lg">
-            <p className="text-sm">No items yet</p>
+            <p className="text-sm">{t("No items yet")}</p>
             <p className="text-xs mt-1">
-              Click below to add your first item
+              {t("Click below to add your first item")}
             </p>
           </div>
         )
@@ -161,7 +163,7 @@ function SimpleArrayRenderer({
                 onClick={() => removeEntry(index)}
                 className="text-destructive hover:text-destructive shrink-0"
               >
-                Remove
+                {t("Remove")}
               </Button>
             </div>
           ))
@@ -173,7 +175,7 @@ function SimpleArrayRenderer({
         onClick={addEntry}
         className="w-full"
       >
-        + Add entry
+        {t("+ Add entry")}
       </Button>
     </div>
   );
@@ -208,6 +210,7 @@ function ComplexArrayRenderer({
   overlay,
   renderNode,
 }: ComplexArrayRendererProps) {
+  const { t } = useI18n();
   const editorKind = materializeCompositeKind(itemKind);
 
   const openEntryEditor = (
@@ -218,8 +221,8 @@ function ComplexArrayRenderer({
     const entryNode: UiNode = {
       pointer: `${node.pointer}/${index}`,
       title: node.title
-        ? `${node.title} entry ${index + 1}`
-        : `Entry ${index + 1}`,
+        ? t("{title} entry {count}", { title: node.title, count: index + 1 })
+        : t("Entry {count}", { count: index + 1 }),
       description: node.description,
       required: false,
       default_value: node.default_value,
@@ -227,7 +230,10 @@ function ComplexArrayRenderer({
     };
 
     overlay.open({
-      title: `${node.title ?? node.pointer} · Item ${index + 1}`,
+      title: t("{name} · Item {count}", {
+        name: node.title ?? node.pointer,
+        count: index + 1,
+      }),
       content: (close) => (
         <EntryEditor
           node={entryNode}
@@ -265,9 +271,9 @@ function ComplexArrayRenderer({
       {entries.length === 0
         ? (
           <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-            <p className="text-sm">No items yet</p>
+            <p className="text-sm">{t("No items yet")}</p>
             <p className="text-xs mt-1">
-              Click below to add your first item
+              {t("Click below to add your first item")}
             </p>
           </div>
         )
@@ -305,7 +311,7 @@ function ComplexArrayRenderer({
                     size="sm"
                     onClick={() => editEntry(index)}
                   >
-                    Edit
+                    {t("Edit")}
                   </Button>
                   <Button
                     type="button"
@@ -314,7 +320,7 @@ function ComplexArrayRenderer({
                     onClick={() => removeEntry(index)}
                     className="text-destructive hover:text-destructive"
                   >
-                    Remove
+                    {t("Remove")}
                   </Button>
                 </div>
               </Card>
@@ -328,7 +334,7 @@ function ComplexArrayRenderer({
         onClick={addEntry}
         className="w-full"
       >
-        + Add entry
+        {t("+ Add entry")}
       </Button>
     </div>
   );

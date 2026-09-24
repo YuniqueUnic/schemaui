@@ -7,6 +7,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { EntryEditor } from "./shared/EntryEditor";
+import { useI18n } from "../../i18n";
 
 type KeyValueNode = UiNode & {
   kind: Extract<import("../../types").UiNodeKind, { type: "key_value" }>;
@@ -37,6 +38,7 @@ export function KeyValueRenderer({
   onChange,
   renderNode,
 }: KeyValueRendererProps) {
+  const { t } = useI18n();
   const overlay = useOverlay();
   const entries = Object.entries(
     value && typeof value === "object" && !Array.isArray(value) ? value : {},
@@ -49,8 +51,8 @@ export function KeyValueRenderer({
   const entryNodeFor = (entryIndex: number): UiNode => ({
     pointer: `${node.pointer}/${entryIndex}`,
     title: node.title
-      ? `${node.title} entry ${entryIndex + 1}`
-      : `Entry ${entryIndex + 1}`,
+      ? t("{title} entry {count}", { title: node.title, count: entryIndex + 1 })
+      : t("Entry {count}", { count: entryIndex + 1 }),
     description: node.description,
     required: false,
     default_value: draftToJsonValue(buildDraftValue(template)),
@@ -124,9 +126,9 @@ export function KeyValueRenderer({
       {entries.length === 0
         ? (
           <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-            <p className="text-sm">No entries yet</p>
+            <p className="text-sm">{t("No entries yet")}</p>
             <p className="text-xs mt-1">
-              Click below to add your first entry
+              {t("Click below to add your first entry")}
             </p>
           </div>
         )
@@ -192,7 +194,7 @@ export function KeyValueRenderer({
           )}
         className="w-full"
       >
-        + Add entry
+        {t("+ Add entry")}
       </Button>
     </div>
   );

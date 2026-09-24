@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "../i18n";
 import { countdownUrgency, formatCountdown } from "../hooks/useCountdown";
 
 interface CountdownBadgeProps {
@@ -22,6 +23,7 @@ export const CountdownBadge = memo(function CountdownBadge({
   secondsLeft,
   className,
 }: CountdownBadgeProps) {
+  const { t } = useI18n();
   const urgency = countdownUrgency(secondsLeft);
 
   // Escalates through weight, then colour: quiet outline → full-contrast text
@@ -37,8 +39,12 @@ export const CountdownBadge = memo(function CountdownBadge({
     <span
       role="timer"
       aria-live="off"
-      aria-label={`${formatCountdown(secondsLeft)} until this session closes`}
-      title="This session closes when the countdown reaches zero. Anything unsaved is discarded."
+      aria-label={t("{time} until this session closes", {
+        time: formatCountdown(secondsLeft),
+      })}
+      title={t(
+        "This session closes when the countdown reaches zero. Anything unsaved is discarded.",
+      )}
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5",
         "text-[11px] font-semibold tabular-nums",

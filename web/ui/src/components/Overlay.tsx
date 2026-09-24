@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useI18n } from "../i18n";
 
 interface OverlayOptions {
   title?: string;
@@ -33,6 +34,7 @@ interface OverlayFrame extends OverlayOptions {
 const OverlayContext = createContext<OverlayContextValue | null>(null);
 
 export function OverlayProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const [stack, setStack] = useState<OverlayFrame[]>([]);
   const nextId = useRef(1);
 
@@ -67,10 +69,10 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
         >
           <DialogHeader>
             <div className="flex items-center justify-between gap-3">
-              <DialogTitle>{top?.title || "Details"}</DialogTitle>
+              <DialogTitle>{top?.title || t("Details")}</DialogTitle>
               {stack.length > 1 && (
                 <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-                  Layer {stack.length}
+                  {t("Layer {count}", { count: stack.length })}
                 </span>
               )}
             </div>
@@ -79,7 +81,7 @@ export function OverlayProvider({ children }: { children: React.ReactNode }) {
             )}
             {!top?.description && (
               <DialogDescription id="overlay-fallback-description" className="sr-only">
-                Nested editor overlay
+                {t("Nested editor overlay")}
               </DialogDescription>
             )}
           </DialogHeader>

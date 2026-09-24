@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "../../i18n";
 
 /** A labelled stop along the track. */
 export interface SliderMark {
@@ -257,6 +258,7 @@ function Readout({
   onMessage,
   onCommit,
 }: ReadoutProps) {
+  const { t } = useI18n();
   const [isEditing, setIsEditing] = React.useState(false);
   const [draft, setDraft] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -285,7 +287,7 @@ function Readout({
     if (parsed === null || !Number.isFinite(parsed)) {
       onMessage({
         tone: "error",
-        text: `Cannot read “${draft.trim()}” as a number`,
+        text: t("Cannot read “{value}” as a number", { value: draft.trim() }),
       });
       return false;
     }
@@ -295,9 +297,10 @@ function Readout({
     onMessage(
       landing.moved === null ? null : {
         tone: "note",
-        text: `${landing.moved === "clamped" ? "Clamped" : "Rounded"} to ${
-          formatValue(landing.value)
-        }`,
+        text: t("{action} to {value}", {
+          action: landing.moved === "clamped" ? t("Clamped") : t("Rounded"),
+          value: formatValue(landing.value),
+        }),
       },
     );
     if (landing.value !== value) onCommit(landing.value);
@@ -317,9 +320,10 @@ function Readout({
     onMessage(
       landing.moved === null ? null : {
         tone: "note",
-        text: `${landing.moved === "clamped" ? "Clamped" : "Rounded"} to ${
-          formatValue(landing.value)
-        }`,
+        text: t("{action} to {value}", {
+          action: landing.moved === "clamped" ? t("Clamped") : t("Rounded"),
+          value: formatValue(landing.value),
+        }),
       },
     );
   };
@@ -340,7 +344,7 @@ function Readout({
 
   const handleBlur = () => {
     if (commitDraft()) return;
-    cancelEditing({ tone: "note", text: `Kept ${formatValue(value)}` });
+    cancelEditing({ tone: "note", text: t("Kept {value}", { value: formatValue(value) }) });
   };
 
   const canEdit = interactive && editable;
@@ -369,7 +373,7 @@ function Readout({
           <button
             type="button"
             tabIndex={-1}
-            aria-label={`Decrease ${name}`}
+            aria-label={t("Decrease {name}", { name })}
             disabled={!canStepDown}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => stepInput(-1)}
@@ -387,7 +391,7 @@ function Readout({
             type="text"
             value={draft}
             inputMode={Number.isInteger(window.step) ? "numeric" : "decimal"}
-            aria-label={`Edit ${name}`}
+            aria-label={t("Edit {name}", { name })}
             aria-invalid={hasError}
             aria-describedby={messageId}
             onChange={(event) => {
@@ -401,7 +405,7 @@ function Readout({
           <button
             type="button"
             tabIndex={-1}
-            aria-label={`Increase ${name}`}
+            aria-label={t("Increase {name}", { name })}
             disabled={!canStepUp}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => stepInput(1)}
@@ -425,7 +429,7 @@ function Readout({
         value={draft}
         style={{ width: `calc(${activeChars}ch + 2rem)`, minWidth: "3.5rem" }}
         inputMode={Number.isInteger(window.step) ? "numeric" : "decimal"}
-        aria-label={`Edit ${name}`}
+        aria-label={t("Edit {name}", { name })}
         aria-invalid={hasError}
         aria-describedby={messageId}
         onChange={(event) => {
@@ -450,7 +454,7 @@ function Readout({
       onClick={startEditing}
       disabled={!canEdit}
       style={{ width: `calc(${maxChars}ch + 2rem)`, minWidth: "3.5rem" }}
-      aria-label={canEdit ? `Edit ${name}` : name}
+      aria-label={canEdit ? t("Edit {name}", { name }) : name}
       className={cn(
         BADGE_BASE,
         "border-border bg-muted/60 px-2.5 py-0.5 text-center text-foreground",
@@ -494,6 +498,7 @@ export function Slider({
   className,
   id,
 }: SliderProps) {
+  const { t } = useI18n();
   const [message, setMessage] = React.useState<Message | null>(null);
   const messageId = React.useId();
 
@@ -634,7 +639,7 @@ export function Slider({
             value={current}
             disabled={disabled || readOnly}
             aria-label={isRange
-              ? (index === 0 ? "Minimum" : "Maximum")
+              ? (index === 0 ? t("Minimum") : t("Maximum"))
               : undefined}
             onChange={(event) => {
               setMessage(null);

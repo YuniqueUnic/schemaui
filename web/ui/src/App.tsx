@@ -15,6 +15,7 @@ import { ValidationErrorsDialog } from "./components/ValidationErrorsDialog";
 import { Panel, PanelHeader } from "./components/Panel";
 import { SegmentedControl } from "./components/SegmentedControl";
 import type { JsonValue, UiNode } from "./types";
+import { useI18n } from "./i18n";
 import { getPointerValue } from "./utils/jsonPointer";
 import {
   findNodeByPointer,
@@ -47,8 +48,11 @@ type PanelView = "nav" | "editor" | "preview";
  * ("Service rollout") that reads as a heading, and a tab needs a label. It also
  * must not come from `layout.roots[0].title` — that is the *first section*, so
  * using it labelled the root tab with the name of one of its own children.
+ *
+ * Resolved through `t` at the call sites (not a module constant) so the word
+ * follows the locale.
  */
-const ROOT_LABEL = "General";
+const ROOT_LABEL_KEY = "General";
 
 interface AppProps {
   /** Where the schema pipeline runs. Defaults to the HTTP session this app
@@ -61,6 +65,8 @@ interface AppProps {
 }
 
 export default function App({ transport = httpTransport, onBack }: AppProps = {}) {
+  const { t } = useI18n();
+  const rootLabel = t(ROOT_LABEL_KEY);
   const { state, actions, dirtyRef } = useSessionState();
   const { sizes, startDrag, isDragging } = useResizableColumns({ nav: 280, preview: 380 });
 
@@ -131,7 +137,7 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
       if (roots.length === 0) return undefined;
       return {
         pointer: "",
-        title: ROOT_LABEL,
+        title: rootLabel,
         description: null,
         required: false,
         default_value: null,
@@ -139,7 +145,7 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
       };
     }
     return findNodeByPointer(roots, state.selectedPointer);
-  }, [roots, state.selectedPointer]);
+  }, [roots, state.selectedPointer, rootLabel]);
 
   const hasLayout = !!(session?.layout && session.layout.roots.length > 0);
   const focusLabel = selectedNode
@@ -157,7 +163,7 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <div className="text-center space-y-2">
           <div className="h-8 w-8 mx-auto animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading session…</p>
+          <p className="text-sm text-muted-foreground">{t("Loading session…")}</p>
         </div>
       </div>
     );
@@ -169,8 +175,8 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
     return (
       <SessionNotice
         icon={<span className="text-4xl">✓</span>}
-        title="Session Ended"
-        message="You can close this browser tab."
+        title={t("Session Ended")}
+        message={t("You can close this browser tab.")}
       />
     );
   }
@@ -179,8 +185,10 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
     return (
       <SessionNotice
         icon={<TimerOff className="h-9 w-9 text-rose-500" aria-hidden="true" />}
-        title="Session Timed Out"
-        message="This session closed itself when its deadline passed, so nothing was saved. Ask whoever started it to run it again."
+        title={t("Session Timed Out")}
+        message={t(
+          "This session closed itself when its deadline passed, so nothing was saved. Ask whoever started it to run it again.",
+        )}
       />
     );
   }
@@ -191,8 +199,10 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
         icon={
           <TriangleAlert className="h-9 w-9 text-amber-500" aria-hidden="true" />
         }
-        title="Session Unavailable"
-        message="This session is no longer being served. It may have timed out or already been closed — ask whoever started it to run it again."
+        title={t("Session Unavailable")}
+        message={t(
+          "This session is no longer being served. It may have timed out or already been closed — ask whoever started it to run it again.",
+        )}
       />
     );
   }
@@ -217,8 +227,8 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
               secondsLeft={secondsLeft}
               onSave={handleSave}
               onExit={() => handleExit()}
-              exitLabel={transport.kind === "wasm" ? "Export" : "Exit"}
-              exitingLabel={transport.kind === "wasm" ? "Exporting…" : "Exiting…"}
+              exitLabel={transport.kind === "wasm" ? t("Export") : t("Exit")}
+              exitingLabel={transport.kind === "wasm" ? t("Exporting…") : t("Exiting…")}
               onBack={onBack}
             />
             <div className="app-panel-muted flex flex-1 flex-col overflow-hidden border-y border-theme lg:flex-row">
@@ -253,8 +263,8 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
                           value={navMode}
                           onChange={(v) => setNavMode(v)}
                           options={[
-                            { id: "schema", label: "Schema" },
-                            { id: "layout", label: "Layout" },
+                            { id: "schema", label: t("Schema") },
+                            { id: "layout", label: t("Layout") },
                           ]}
                         />
                       )}
@@ -262,7 +272,7 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
                         <button
                           type="button"
                           onClick={() => setNavCollapsed((v) => !v)}
-                          aria-label={navCollapsed ? "Expand navigation" : "Collapse navigation"}
+                          aria-label={navCollapsed ? t("Expand navigation") : t("Collapse navigation")}
                           className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                         >
                           {navCollapsed
@@ -281,7 +291,7 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
                         ast={uiAst}
                         selectedPointer={selectedPointer}
                         errors={errors}
-                        rootLabel={ROOT_LABEL}
+                        rootLabel={rootLabel}
                         onSelect={(pointer) => {
                           actions.setSelectedPointer(pointer);
                           if (!isDesktop) setMobileView("editor");
@@ -294,7 +304,7 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
                           layout={session.layout}
                           ast={uiAst}
                           selectedPointer={selectedPointer}
-                          rootLabel={ROOT_LABEL}
+                          rootLabel={rootLabel}
                           onSelect={(pointer) => {
                             actions.setSelectedPointer(pointer);
                             if (!isDesktop) setMobileView("editor");
@@ -322,7 +332,7 @@ export default function App({ transport = httpTransport, onBack }: AppProps = {}
                 <div className="flex flex-1 flex-col overflow-hidden">
                   <SectionTabs
                     roots={roots}
-                    rootLabel={ROOT_LABEL}
+                    rootLabel={rootLabel}
                     selectedPointer={selectedPointer}
                     onSelect={actions.setSelectedPointer}
                   />
@@ -475,6 +485,7 @@ function SectionTabs({
   selectedPointer?: string;
   onSelect(pointer: string): void;
 }) {
+  const { t } = useI18n();
   if (roots.length === 0) return null;
 
   const activePointer = roots.find(
@@ -485,7 +496,7 @@ function SectionTabs({
 
   const tabs = [
     { pointer: "", label: rootLabel },
-    ...roots.map((root) => ({ pointer: root.pointer, label: nodeLabel(root) })),
+    ...roots.map((root) => ({ pointer: root.pointer, label: nodeLabel(root, t) })),
   ];
 
   // One section already is the whole document, so a band of tabs would offer
@@ -501,7 +512,7 @@ function SectionTabs({
       <div className={stripClass}>
         <div className="mx-auto flex h-full w-full max-w-3xl items-center">
           <span className="text-xs font-medium text-foreground">
-            {nodeLabel(roots[0])}
+            {nodeLabel(roots[0], t)}
           </span>
         </div>
       </div>
@@ -660,6 +671,7 @@ function GeneralView({
   errors: Map<string, string>;
   onChange: (pointer: string, value: JsonValue) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-8">
       {roots.map((root) => (
@@ -668,7 +680,7 @@ function GeneralView({
             id={`section-${root.pointer}`}
             className="mb-2 flex items-center gap-2 text-[13px] font-semibold tracking-tight text-foreground"
           >
-            {nodeLabel(root)}
+            {nodeLabel(root, t)}
             {root.required && <RequiredTag />}
           </h2>
           {root.description && (
@@ -681,7 +693,7 @@ function GeneralView({
               <RichSurface
                 content={root.content}
                 variant="block"
-                title={nodeLabel(root)}
+                title={nodeLabel(root, t)}
               />
             </div>
           )}
@@ -697,11 +709,11 @@ function GeneralView({
   );
 }
 
-function nodeLabel(node: UiNode): string {
+function nodeLabel(node: UiNode, t: (key: string) => string = (key) => key): string {
   const title = node.title?.trim();
   if (title) return title;
   const segment = lastPointerSegment(node.pointer);
-  return segment ?? node.pointer ?? "(root)";
+  return segment ?? node.pointer ?? t("(root)");
 }
 
 function lastPointerSegment(pointer: string): string | undefined {
@@ -716,6 +728,7 @@ interface MobilePanelSwitchProps {
 }
 
 function MobilePanelSwitch({ value, onChange }: MobilePanelSwitchProps) {
+  const { t } = useI18n();
   return (
     <div className="app-panel-header justify-center border-b border-theme bg-background/80 px-2 backdrop-blur lg:hidden">
       <SegmentedControl<PanelView>
@@ -723,9 +736,9 @@ function MobilePanelSwitch({ value, onChange }: MobilePanelSwitchProps) {
         onChange={onChange}
         size="md"
         options={[
-          { id: "nav", label: "Nav" },
-          { id: "editor", label: "Editor" },
-          { id: "preview", label: "Preview" },
+          { id: "nav", label: t("Nav") },
+          { id: "editor", label: t("Editor") },
+          { id: "preview", label: t("Preview") },
         ]}
       />
     </div>
@@ -757,6 +770,7 @@ function PreviewPaneWithToggle({
   previewWidth,
   ...previewProps
 }: PreviewPaneWithToggleProps) {
+  const { t } = useI18n();
   if (!isDesktop) {
     // On mobile: show/hide via className, no collapse toggle
     if (!mobileVisible) return null;
@@ -782,7 +796,7 @@ function PreviewPaneWithToggle({
             <button
               type="button"
               onClick={onToggle}
-              aria-label="Expand preview"
+              aria-label={t("Expand preview")}
               className="flex flex-col items-center gap-1.5 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
