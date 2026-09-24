@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [0.2.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-wasm-v0.1.0...schemaui-wasm-v0.2.0) - 2026-09-24
+
+
+
+
+
+
+### Bug Fixes
+
+- **wasm:** enable the mermaid renderer by default and unbreak it on wasm32([#200](https://github.com/YuniqueUnic/schemaui/pull/200), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
+
+
 ## [0.1.0](https://github.com/YuniqueUnic/schemaui/releases/tag/schemaui-wasm-v0.1.0) - 2026-09-21
 
 
