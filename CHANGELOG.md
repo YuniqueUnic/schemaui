@@ -37,6 +37,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.16.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.16.1...schemaui-v0.16.2) - 2026-09-24
+
+
+
+
+
+
+### Bug Fixes
+
+- **wasm:** enable the mermaid renderer by default and unbreak it on wasm32([#200](https://github.com/YuniqueUnic/schemaui/pull/200), @YuniqueUnic)
+
+- **web-ui:** size figures through the interaction wrapper; speak one i18n([#200](https://github.com/YuniqueUnic/schemaui/pull/200), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.16.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.16.0...schemaui-v0.16.1) - 2026-09-24
 
 

@@ -1833,7 +1833,7 @@ dependencies = [
 
 [[package]]
 name = "schemaui"
-version = "0.16.1"
+version = "0.16.2"
 dependencies = [
  "ammonia",
  "anyhow",
@@ -1861,7 +1861,7 @@ dependencies = [
 
 [[package]]
 name = "schemaui-cli"
-version = "0.9.2"
+version = "0.9.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1876,7 +1876,7 @@ dependencies = [
 
 [[package]]
 name = "schemaui-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom 0.3.4",
