@@ -64,20 +64,32 @@ export function DiagramStage({
   const fitClass = fit === "fill"
     ? "[&>svg]:h-full [&>svg]:w-full"
     : "[&>svg]:max-h-full [&>svg]:max-w-full [&>svg]:h-auto [&>svg]:w-auto";
-  const stage = (
-    <div
-      role="img"
-      aria-label={label}
-      className={`${bare
-        ? "flex items-center justify-center overflow-hidden"
-        : "flex items-center justify-center overflow-hidden rounded-md border border-border/60 bg-background p-2"} ${fitClass} ${className ?? ""}`}
-      dangerouslySetInnerHTML={{ __html: svg.body }}
-    />
-  );
-  if (!figure) return stage;
+  // The caller's `className` sizes the OUTERMOST element, and the drawing
+  // stage always fills it. When interactions wrap the stage in a span, a
+  // `h-full` on the stage alone would resolve against the span's auto
+  // height — a percentage of nothing — and the drawing would fall back to
+  // its intrinsic size and spill out of the pane.
+  const frameClass = `flex h-full w-full min-h-0 min-w-0 items-center justify-center overflow-hidden ${
+    bare ? "" : "rounded-md border border-border/60 bg-background p-2"
+  } ${fitClass}`;
+  if (!figure) {
+    return (
+      <div
+        role="img"
+        aria-label={label}
+        className={`${frameClass} ${className ?? ""}`}
+        dangerouslySetInnerHTML={{ __html: svg.body }}
+      />
+    );
+  }
   return (
-    <FigureInteractions figure={figure} mode={interaction === "full" ? "full" : "hover"}>
-      {stage}
+    <FigureInteractions figure={figure} mode={interaction === "full" ? "full" : "hover"} className={className}>
+      <div
+        role="img"
+        aria-label={label}
+        className={frameClass}
+        dangerouslySetInnerHTML={{ __html: svg.body }}
+      />
     </FigureInteractions>
   );
 }
@@ -228,10 +240,13 @@ function VariantStage({
 function FigureInteractions({
   figure,
   mode,
+  className,
   children,
 }: {
   figure: FigureDescriptor;
   mode: "hover" | "full";
+  /** Sizing from the caller — see DiagramStage's note on outer sizing. */
+  className?: string;
   children: React.ReactNode;
 }) {
   const { t } = useI18n();
@@ -245,7 +260,9 @@ function FigureInteractions({
     });
   return (
     <span
-      className={mode === "full" ? "inline-flex cursor-zoom-in" : "inline-flex"}
+      className={`inline-flex ${className ?? ""} ${
+        mode === "full" ? "cursor-zoom-in" : ""
+      }`}
       onMouseEnter={(event) => hover.show(figure, event.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => hover.hide()}
       onFocus={(event) => hover.show(figure, event.currentTarget.getBoundingClientRect())}

@@ -22,14 +22,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useTheme } from "../theme";
+import { useI18n } from "../i18n";
 import { parseDocumentText } from "../transport/wasmTransport";
 import type { JsonValue } from "../types";
-import {
-  LANGUAGE_STORAGE_KEY,
-  STRINGS,
-  type Language,
-  type PlaygroundStrings,
-} from "./i18n";
 // The repo's own control gallery (`examples/controls-gallery.schema.json`),
 // imported verbatim rather than duplicated: one control per property, every
 // default filled in, kept in sync with the schema by construction instead of
@@ -62,13 +57,6 @@ const SYZYGY_REPO_URL = "https://github.com/astrolix-ai/syzygy";
 const SYZYGY_ICON_URL =
   "https://github.com/astrolix-ai/.github/raw/main/brand/syzygy-app-icon.svg";
 
-function initialLanguage(): Language {
-  if (typeof window === "undefined") return "en";
-  const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-  if (stored === "en" || stored === "zh") return stored;
-  return navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
-}
-
 /**
  * The Playground's entry screen: paste — or drop — a schema, get a form.
  *
@@ -78,29 +66,21 @@ function initialLanguage(): Language {
  * and hands it back via `initialSchemaText`/`initialDataText` if the visitor
  * returns from the built form (see `PlaygroundRoot`'s "Back" wiring) — so
  * coming back means picking up where you left off, not retyping it.
+ *
+ * Speaks the app-wide i18n dictionary like every other surface: this screen
+ * used to keep its own table and storage key, which is how the built form's
+ * language switch could disagree with the screen that led to it.
  */
 export function SchemaPasteScreen(
   { onReady, initialSchemaText = "", initialDataText = "" }: SchemaPasteScreenProps,
 ) {
-  const [lang, setLang] = useState<Language>(initialLanguage);
-  const t = STRINGS[lang];
+  const { t, locale, setLocale } = useI18n();
   const { theme, toggle: toggleTheme } = useTheme();
 
   const [schemaText, setSchemaText] = useState(initialSchemaText);
   const [dataText, setDataText] = useState(initialDataText);
   const [error, setError] = useState<string | null>(null);
   const [building, setBuilding] = useState(false);
-
-  const toggleLanguage = () => {
-    const next = lang === "en" ? "zh" : "en";
-    setLang(next);
-    try {
-      localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
-    } catch {
-      // A private-browsing tab with storage disabled just keeps the choice
-      // for this page load instead of remembering it — not worth surfacing.
-    }
-  };
 
   const handleBuild = async () => {
     setBuilding(true);
@@ -109,7 +89,7 @@ export function SchemaPasteScreen(
       try {
         schema = await parseDocumentText(schemaText);
       } catch (err) {
-        setError(`${t.schemaParseError}: ${(err as Error).message}`);
+        setError(`${t("Schema is not valid JSON, YAML or TOML")}: ${(err as Error).message}`);
         return;
       }
 
@@ -118,7 +98,7 @@ export function SchemaPasteScreen(
         try {
           defaults = await parseDocumentText(dataText);
         } catch (err) {
-          setError(`${t.dataParseError}: ${(err as Error).message}`);
+          setError(`${t("Initial data is not valid JSON, YAML or TOML")}: ${(err as Error).message}`);
           return;
         }
       }
@@ -138,7 +118,7 @@ export function SchemaPasteScreen(
           variant="ghost"
           size="sm"
           onClick={toggleTheme}
-          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          title={theme === "dark" ? t("Switch to light mode") : t("Switch to dark mode")}
         >
           {theme === "dark"
             ? <Sun className="h-3.5 w-3.5" aria-hidden="true" />
@@ -148,20 +128,24 @@ export function SchemaPasteScreen(
           type="button"
           variant="ghost"
           size="sm"
-          onClick={toggleLanguage}
+          onClick={() => setLocale(locale === "en" ? "zh" : "en")}
           title="English / 中文"
         >
           <Languages className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="ml-1">{lang === "en" ? "中文" : "English"}</span>
+          <span className="ml-1">{locale === "en" ? "中文" : "English"}</span>
         </Button>
       </div>
 
-      <SyzygyPromo t={t} />
+      <SyzygyPromo />
 
       <Card className="w-full max-w-5xl">
         <CardHeader>
-          <CardTitle className="text-lg">{t.title}</CardTitle>
-          <CardDescription>{t.description}</CardDescription>
+          <CardTitle className="text-lg">{t("SchemaUI Playground")}</CardTitle>
+          <CardDescription>
+            {t(
+              "Paste or drop a JSON Schema below (JSON, YAML or TOML). Everything after this runs in your browser via WebAssembly — no data leaves this tab.",
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-start gap-2 rounded-md border border-theme bg-muted/40 px-3 py-2.5">
@@ -170,14 +154,16 @@ export function SchemaPasteScreen(
               aria-hidden="true"
             />
             <p className="text-xs leading-relaxed text-muted-foreground">
-              {t.privacyNote}{" "}
+              {t(
+                "Everything stays on your computer. Your schema and data are parsed and rendered entirely in this browser tab via WebAssembly — nothing is uploaded, and there is no server on the other end to send it to. See the",
+              )}{" "}
               <a
                 href={SCHEMAUI_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
-                {t.privacyLinkText}
+                {t("source on GitHub")}
               </a>
               .
             </p>
@@ -191,21 +177,19 @@ export function SchemaPasteScreen(
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <DocumentField
               id="playground-schema"
-              label={t.schemaLabel}
+              label={t("JSON Schema")}
               value={schemaText}
               onChange={setSchemaText}
               placeholder={EXAMPLE_SCHEMA}
               minHeightClassName="min-h-[420px]"
-              t={t}
             />
             <DocumentField
               id="playground-data"
-              label={t.dataLabel}
+              label={t("Initial data (optional)")}
               value={dataText}
               onChange={setDataText}
               placeholder="{}"
               minHeightClassName="min-h-[420px]"
-              t={t}
             />
           </div>
           {error && (
@@ -223,7 +207,7 @@ export function SchemaPasteScreen(
                 setError(null);
               }}
             >
-              {t.loadExample}
+              {t("Load example")}
             </Button>
             <Button
               type="button"
@@ -231,14 +215,14 @@ export function SchemaPasteScreen(
               disabled={!schemaText.trim() || building}
               onClick={() => void handleBuild()}
             >
-              {building ? t.building : t.buildForm}
+              {building ? t("Building…") : t("Build form")}
             </Button>
           </div>
         </CardContent>
       </Card>
 
       <p className="max-w-5xl text-center text-xs text-muted-foreground">
-        {t.aboutPrefix}{" "}
+        {t("Playground is part of")}{" "}
         <a
           href={SCHEMAUI_URL}
           target="_blank"
@@ -248,10 +232,10 @@ export function SchemaPasteScreen(
           <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
           SchemaUI
         </a>
-        {t.aboutSuffix}
+        {t(", an open-source library that turns JSON Schema documents into interactive TUI and web forms.")}
       </p>
 
-      <Faq t={t} />
+      <Faq />
     </div>
   );
 }
@@ -263,7 +247,6 @@ interface DocumentFieldProps {
   onChange(value: string): void;
   placeholder: string;
   minHeightClassName: string;
-  t: PlaygroundStrings;
 }
 
 /**
@@ -280,8 +263,8 @@ function DocumentField({
   onChange,
   placeholder,
   minHeightClassName,
-  t,
 }: DocumentFieldProps) {
+  const { t } = useI18n();
   const [dragging, setDragging] = useState(false);
   const fileInputId = useId();
 
@@ -303,10 +286,10 @@ function DocumentField({
         <label
           htmlFor={fileInputId}
           className="flex cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          title={t.uploadHint}
+          title={t("Upload a .json, .yaml or .toml file")}
         >
           <FileUp className="h-3.5 w-3.5" aria-hidden="true" />
-          {t.uploadFile}
+          {t("Upload file")}
         </label>
         <input
           id={fileInputId}
@@ -343,7 +326,7 @@ function DocumentField({
         {dragging && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-md bg-background/90 text-xs font-medium text-primary">
             <UploadCloud className="h-4 w-4" aria-hidden="true" />
-            {t.dropHint}
+            {t("Drop to load")}
           </div>
         )}
       </div>
@@ -351,13 +334,29 @@ function DocumentField({
   );
 }
 
-function faqItems(t: PlaygroundStrings): { question: string; answer: ReactNode }[] {
-  return [
-    { question: t.faqServerQuestion, answer: t.faqServerAnswer },
-    { question: t.faqFormatsQuestion, answer: t.faqFormatsAnswer },
-    { question: t.faqCloseQuestion, answer: t.faqCloseAnswer },
+function Faq() {
+  const { t } = useI18n();
+  const items: { question: string; answer: ReactNode }[] = [
     {
-      question: t.faqSupportQuestion,
+      question: t("Does any of this get sent to a server?"),
+      answer: t(
+        "No. There is no server: the schema pipeline (building the form, validating, rendering the document) runs in this tab via WebAssembly. You can disconnect from the network after the page loads and it keeps working.",
+      ),
+    },
+    {
+      question: t("What formats can I paste or drop?"),
+      answer: t(
+        "JSON, YAML or TOML, for both the schema and the initial data — whichever you have on hand. The format is detected automatically, the same way schemaui-cli does for a file passed without --format.",
+      ),
+    },
+    {
+      question: t("What happens to my data if I close the tab?"),
+      answer: t(
+        "It's gone — nothing is saved automatically. Use \"Export\" once you're done filling out the form to download the result as a file first.",
+      ),
+    },
+    {
+      question: t("Where do I report a bug or ask something else?"),
       answer: (
         <a
           href={`${SCHEMAUI_URL}/issues`}
@@ -365,19 +364,18 @@ function faqItems(t: PlaygroundStrings): { question: string; answer: ReactNode }
           rel="noreferrer"
           className="font-medium text-foreground underline-offset-4 hover:underline"
         >
-          {t.faqSupportLinkText}
+          {t("Open an issue on the SchemaUI repository")}
         </a>
       ),
     },
   ];
-}
-
-function Faq({ t }: { t: PlaygroundStrings }) {
   return (
     <div className="w-full max-w-5xl rounded-lg border border-theme bg-card px-4 py-3">
-      <h2 className="mb-1.5 text-xs font-semibold text-foreground">{t.faqTitle}</h2>
+      <h2 className="mb-1.5 text-xs font-semibold text-foreground">
+        {t("Frequently asked questions")}
+      </h2>
       <div className="divide-y divide-border">
-        {faqItems(t).map((item) => (
+        {items.map((item) => (
           <details key={item.question} className="group py-2 first:pt-0 last:pb-0">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium text-foreground marker:content-none">
               {item.question}
@@ -403,7 +401,8 @@ function Faq({ t }: { t: PlaygroundStrings }) {
  * the first thing on the page precisely so it isn't missed by anyone who
  * doesn't scroll past the fold on a short screen.
  */
-function SyzygyPromo({ t }: { t: PlaygroundStrings }) {
+function SyzygyPromo() {
+  const { t } = useI18n();
   return (
     <div className="flex w-full max-w-5xl items-center gap-3 rounded-lg border border-theme bg-card px-4 py-3">
       <img
@@ -413,8 +412,12 @@ function SyzygyPromo({ t }: { t: PlaygroundStrings }) {
         className="h-9 w-9 shrink-0 rounded-md"
       />
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-foreground">{t.syzygyHeadline}</p>
-        <p className="truncate text-xs text-muted-foreground">{t.syzygyDescription}</p>
+        <p className="text-xs font-semibold text-foreground">
+          {t("Enjoying local-first, no-server tools? Try Syzygy")}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {t("A local-first, peer-to-peer clipboard workbench for keeping devices in sync without a cloud in between.")}
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
         <a
@@ -430,7 +433,7 @@ function SyzygyPromo({ t }: { t: PlaygroundStrings }) {
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-1 hover:text-foreground"
-          title="Syzygy on GitHub"
+          title={t("Syzygy on GitHub")}
         >
           <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
         </a>

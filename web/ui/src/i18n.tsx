@@ -183,6 +183,43 @@ export const zhDictionary: Record<string, string> = {
   "Copy source": "复制源码",
   "Download SVG": "下载 SVG",
   "Figure": "图形",
+
+  // Playground landing screen
+  "SchemaUI Playground": "SchemaUI 演练场",
+  "Paste or drop a JSON Schema below (JSON, YAML or TOML). Everything after this runs in your browser via WebAssembly — no data leaves this tab.":
+    "在下方粘贴或拖入一个 JSON Schema（支持 JSON、YAML 或 TOML）。此后的一切都会在你的浏览器里通过 WebAssembly 运行 —— 没有任何数据离开这个标签页。",
+  "Everything stays on your computer. Your schema and data are parsed and rendered entirely in this browser tab via WebAssembly — nothing is uploaded, and there is no server on the other end to send it to. See the":
+    "一切都保留在你的电脑上。你的 Schema 和数据完全在这个浏览器标签页里通过 WebAssembly 解析与渲染 —— 不会上传任何内容，另一端也没有服务器可以接收它。可以查看",
+  "source on GitHub": "GitHub 上的源代码",
+  "JSON Schema": "JSON Schema",
+  "Initial data (optional)": "初始数据（可选）",
+  "Upload file": "上传文件",
+  "Upload a .json, .yaml or .toml file": "上传 .json、.yaml 或 .toml 文件",
+  "Drop to load": "松开以加载",
+  "Load example": "加载示例",
+  "Build form": "生成表单",
+  "Building…": "生成中…",
+  "Schema is not valid JSON, YAML or TOML": "Schema 不是合法的 JSON、YAML 或 TOML",
+  "Initial data is not valid JSON, YAML or TOML": "初始数据不是合法的 JSON、YAML 或 TOML",
+  "Playground is part of": "Playground 是",
+  ", an open-source library that turns JSON Schema documents into interactive TUI and web forms.":
+    "的一部分 —— 一个把 JSON Schema 文档转换为交互式终端与网页表单的开源库。",
+  "Frequently asked questions": "常见问题",
+  "Does any of this get sent to a server?": "这些内容会发送到服务器吗？",
+  "No. There is no server: the schema pipeline (building the form, validating, rendering the document) runs in this tab via WebAssembly. You can disconnect from the network after the page loads and it keeps working.":
+    "不会。这里没有服务器：整个流程（生成表单、校验、渲染文档）都通过 WebAssembly 在这个标签页里运行。页面加载完成后，即使断网也能继续使用。",
+  "What formats can I paste or drop?": "可以粘贴或拖入哪些格式？",
+  "JSON, YAML or TOML, for both the schema and the initial data — whichever you have on hand. The format is detected automatically, the same way schemaui-cli does for a file passed without --format.":
+    "Schema 和初始数据都支持 JSON、YAML 或 TOML —— 手头有哪种就用哪种，格式会自动识别，和 schemaui-cli 在不传 --format 时的行为一致。",
+  "What happens to my data if I close the tab?": "关闭标签页后，我的数据会怎样？",
+  "It's gone — nothing is saved automatically. Use \"Export\" once you're done filling out the form to download the result as a file first.":
+    "会丢失 —— 不会自动保存任何内容。填完表单后，请先点击「导出」把结果下载为文件。",
+  "Where do I report a bug or ask something else?": "在哪里反馈问题或提出其它疑问？",
+  "Open an issue on the SchemaUI repository": "在 SchemaUI 仓库提交 issue",
+  "Enjoying local-first, no-server tools? Try Syzygy": "喜欢本地优先、无需服务器的工具？试试 Syzygy",
+  "A local-first, peer-to-peer clipboard workbench for keeping devices in sync without a cloud in between.":
+    "一个本地优先、点对点的剪贴板工作台，无需云端即可在设备间保持同步。",
+  "Syzygy on GitHub": "GitHub 上的 Syzygy",
 };
 
 export type TParams = Record<string, string | number>;
