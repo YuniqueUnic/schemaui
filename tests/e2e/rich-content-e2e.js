@@ -475,6 +475,159 @@ class RichContentE2E {
         button?.click();
       });
     });
+
+    await this.test("select trigger stays text-only and the selected figure is a live chip", async () => {
+      // The trigger mirrors the selected item's children, and a figure taller
+      // than the trigger row used to overflow it — the fix is text-only.
+      // The trigger is found by its selected label: the only text-only thing
+      // left to identify a select once figures no longer ride inside it.
+      const triggerProbe = await page.evaluate(() => {
+        const trigger = Array.from(
+          document.querySelectorAll("button[role='combobox'], [role='combobox']"),
+        ).find((b) => b.textContent?.trim() === "Monolith");
+        if (!trigger) return null;
+        return { figures: trigger.querySelectorAll("[role='img']").length };
+      });
+      if (!triggerProbe) throw new Error("reference architecture trigger not found");
+      if (triggerProbe.figures !== 0) {
+        throw new Error("a figure still rides inside the trigger");
+      }
+
+      // The selected option's figure appears beside the control with the
+      // full interaction set: hover enlarges, click opens the viewer.
+      const chip = await page.$(`span.cursor-zoom-in ${this.figure("Monolith")}`);
+      if (!chip) throw new Error("interactive selected-figure chip missing");
+      await chip.scrollIntoView();
+      await page.hover(`span.cursor-zoom-in ${this.figure("Monolith")}`);
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      const hovered = await page.evaluate(() => {
+        const portal = Array.from(document.body.children).find((el) =>
+          String(el.className).includes("pointer-events-none"),
+        );
+        return portal ? Boolean(portal.querySelector("svg")) : false;
+      });
+      if (!hovered) throw new Error("chip hover did not open the preview layer");
+      await page.mouse.move(10, 10);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      await page.click(`span.cursor-zoom-in ${this.figure("Monolith")}`);
+      await page.waitForSelector("[role='dialog']", { visible: true, timeout: 5000 });
+      const dialogText = await page.$eval("[role='dialog']", (el) => el.textContent);
+      if (!dialogText.includes("Copy source")) throw new Error("viewer missing Copy source");
+      await page.keyboard.press("Escape");
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+
+    await this.test("dropdown option rows contain their figures without overflow", async () => {
+      try {
+        const opened = await page.evaluate(() => {
+          const trigger = Array.from(
+            document.querySelectorAll("button[role='combobox'], [role='combobox']"),
+          ).find((b) => b.textContent?.trim() === "Monolith");
+          trigger?.click();
+          return Boolean(trigger);
+        });
+        if (!opened) throw new Error("reference architecture select not found");
+        await page.waitForSelector("[role='listbox']", { visible: true, timeout: 5000 });
+
+        const fit = await page.evaluate(() => {
+          const rows = Array.from(document.querySelectorAll("[role='listbox'] [role='option']"));
+          let overflowing = 0;
+          let figureRows = 0;
+          for (const row of rows) {
+            const figure = row.querySelector("[role='img']");
+            if (!figure) continue;
+            figureRows++;
+            const rowRect = row.getBoundingClientRect();
+            const figRect = figure.getBoundingClientRect();
+            if (figRect.height > rowRect.height + 0.5 || figRect.width > rowRect.width + 0.5) {
+              overflowing++;
+            }
+          }
+          return { figureRows, overflowing };
+        });
+        if (fit.figureRows < 3) {
+          throw new Error(`expected ≥3 option figures, found ${fit.figureRows}`);
+        }
+        if (fit.overflowing > 0) {
+          throw new Error(`${fit.overflowing} option figure(s) overflow their row`);
+        }
+
+        // Hovering a dropdown option's figure enlarges it too.
+        await page.hover(`[role='listbox'] [role='option'] ${this.figure("Microservices")}`);
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        const hovered = await page.evaluate(() => {
+          const portal = Array.from(document.body.children).find((el) =>
+            String(el.className).includes("pointer-events-none"),
+          );
+          return portal ? Boolean(portal.querySelector("svg")) : false;
+        });
+        if (!hovered) throw new Error("dropdown option hover did not open the preview layer");
+      } finally {
+        // A dropdown left open would shade the page and break every later
+        // hover; close it no matter how the assertions above went.
+        await page.keyboard.press("Escape");
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const stillOpen = await page.$("[role='listbox']");
+        if (stillOpen) throw new Error("listbox refused to close");
+      }
+    });
+
+    await this.test("the editor preview joins the global hover/click interactions", async () => {
+      const previewFigure = '[data-testid="mermaid-preview"] [role="img"]';
+      const stage = await page.$(previewFigure);
+      if (!stage) throw new Error("editor preview has no figure stage");
+      await stage.scrollIntoView();
+      await page.hover(previewFigure);
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      const hovered = await page.evaluate(() => {
+        const portal = Array.from(document.body.children).find((el) =>
+          String(el.className).includes("pointer-events-none"),
+        );
+        return portal ? Boolean(portal.querySelector("svg")) : false;
+      });
+      if (!hovered) throw new Error("editor preview hover did not open the preview layer");
+      await page.mouse.move(10, 10);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      await page.click(previewFigure);
+      await page.waitForSelector("[role='dialog']", { visible: true, timeout: 5000 });
+      const dialogText = await page.$eval("[role='dialog']", (el) => el.textContent);
+      if (!dialogText.includes("Copy source")) {
+        throw new Error("editor viewer missing Copy source");
+      }
+      if (!dialogText.includes("Download SVG")) {
+        throw new Error("editor viewer missing Download SVG");
+      }
+      if (!dialogText.includes("flowchart")) {
+        throw new Error("editor viewer does not show the on-screen source");
+      }
+      await page.keyboard.press("Escape");
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+
+    await this.test("the interface follows the locale: zh renders everywhere and the header switches back", async () => {
+      // Chinese, persisted before load.
+      await page.evaluate(() => localStorage.setItem("schemaui-locale", "zh"));
+      await page.reload({ waitUntil: "networkidle0" });
+      const zh = await page.evaluate(() => document.body.innerText);
+      for (const expected of ["保存", "退出", "左右", "上下", "对换", "实时"]) {
+        if (!zh.includes(expected)) throw new Error(`zh UI missing "${expected}"`);
+      }
+      if (/\bSave\b/.test(zh)) throw new Error("English Save survived the switch to zh");
+
+      // The header selector speaks English again on one click.
+      await page.click("[data-testid='language-switcher'] button:first-child");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const en = await page.evaluate(() => document.body.innerText);
+      for (const expected of ["Save", "Exit", "Side by side"]) {
+        if (!en.includes(expected)) throw new Error(`en UI missing "${expected}"`);
+      }
+      if (en.includes("退出")) throw new Error("Chinese Exit survived the switch to en");
+
+      // Leave a clean default behind.
+      await page.evaluate(() => localStorage.removeItem("schemaui-locale"));
+    });
   }
 }
 
