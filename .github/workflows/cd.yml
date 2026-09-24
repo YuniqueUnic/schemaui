@@ -80,6 +80,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           persist-credentials: false
 
       - name: Setup pnpm
@@ -137,6 +138,7 @@ jobs:
       - name: Checkout default branch
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
 
@@ -208,6 +210,7 @@ jobs:
       - name: Checkout default branch
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
 
@@ -285,6 +288,7 @@ jobs:
       - name: Checkout default branch
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
@@ -342,6 +346,7 @@ jobs:
       - name: Checkout default branch
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
 
@@ -378,6 +383,7 @@ jobs:
       - name: Checkout default branch
         uses: actions/checkout@v7
         with:
+          submodules: recursive
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
 
