@@ -35,6 +35,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.16.1](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.16.0...schemaui-v0.16.1) - 2026-09-24
+
+
+
+
+
+
+### Bug Fixes
+
+- **web-ui:** keep select triggers text-only and cover the flows end-to-end([#198](https://github.com/YuniqueUnic/schemaui/pull/198), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.16.0](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.15.0...schemaui-v0.16.0) - 2026-09-23
 
 
