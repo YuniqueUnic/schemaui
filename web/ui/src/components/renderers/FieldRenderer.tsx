@@ -22,6 +22,7 @@ import { RichSurface } from "../rich/RichSurface";
 import { MermaidEditorControl } from "../rich/MermaidEditorControl";
 import type { InlineFieldKind } from "../../utils/typeHelpers";
 import { resolveBounds, resolveControl, snapToBounds } from "../../lib/control";
+import { useI18n } from "../../i18n";
 
 type FieldNode = UiNode & {
   kind: Extract<import("../../types").UiNodeKind, { type: "field" }>;
@@ -49,6 +50,7 @@ function cloneJsonValue<T extends JsonValue>(value: T): T {
  * build cannot draw still produces a working field rather than an empty one.
  */
 export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
+  const { t } = useI18n();
   const resolved = value === undefined
     ? (node.default_value ?? defaultForKind(node.kind))
     : value;
@@ -130,7 +132,7 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
             htmlFor={controlId(node.pointer)}
             className="text-sm text-muted-foreground"
           >
-            {on ? "On" : "Off"}
+            {on ? t("On") : t("Off")}
           </Label>
         </div>
       );
@@ -149,7 +151,7 @@ export function FieldRenderer({ node, value, onChange }: FieldRendererProps) {
             htmlFor={controlId(node.pointer)}
             className="text-sm text-muted-foreground"
           >
-            {checked ? "Enabled" : "Disabled"}
+            {checked ? t("Enabled") : t("Disabled")}
           </Label>
         </div>
       );
@@ -241,6 +243,7 @@ function EnumControl({
   const baseLabels = node.kind.enum_options ?? [];
   const values = node.kind.enum_values ?? baseLabels;
   const details = node.kind.enum_details;
+  const { t } = useI18n();
   // An `x-options` label overrides the derived one, by index.
   const labelFor = (index: number) => details?.[index]?.label ?? baseLabels[index] ?? "";
   const selected = values.findIndex((option) =>
@@ -312,34 +315,50 @@ function EnumControl({
   }
 
   return (
-    <Select
-      value={selected >= 0 ? String(selected) : ""}
-      onValueChange={(next) => pick(Number(next))}
-    >
-      <SelectTrigger className="w-full">
-        <SelectValue placeholder="Select an option" />
-      </SelectTrigger>
-      <SelectContent>
-        {baseLabels.map((_, index) => {
-          const detail = details?.[index];
-          return (
-            <SelectItem key={`${index}-${labelFor(index)}`} value={String(index)}>
-              <span className="flex items-center gap-2">
-                {detail?.content && (
-                  <RichSurface
-                    content={detail.content}
-                    variant="mini"
-                    interactive={false}
-                    title={labelFor(index)}
-                  />
-                )}
-                {labelFor(index)}
-              </span>
-            </SelectItem>
-          );
-        })}
-      </SelectContent>
-    </Select>
+    <div className="space-y-2">
+      <Select
+        value={selected >= 0 ? String(selected) : ""}
+        onValueChange={(next) => pick(Number(next))}
+      >
+        <SelectTrigger className="w-full">
+          {/* Text-only on purpose: Radix mirrors the selected item's children
+              into the trigger, and a figure taller than the trigger row is
+              what overflowed it. The selected option's figure lives below
+              instead, where it has room and the full interactions. */}
+          <SelectValue placeholder={t("Select an option")}>
+            {selected >= 0
+              ? labelFor(selected)
+              : <span className="text-muted-foreground">{t("Select an option")}</span>}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {baseLabels.map((_, index) => {
+            const detail = details?.[index];
+            return (
+              <SelectItem key={`${index}-${labelFor(index)}`} value={String(index)}>
+                <span className="flex items-center gap-2">
+                  {detail?.content && (
+                    <RichSurface
+                      content={detail.content}
+                      variant="mini"
+                      title={labelFor(index)}
+                    />
+                  )}
+                  {labelFor(index)}
+                </span>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+      {selected >= 0 && details?.[selected]?.content && (
+        <RichSurface
+          content={details[selected].content}
+          variant="thumb"
+          title={labelFor(selected)}
+        />
+      )}
+    </div>
   );
 }
 
