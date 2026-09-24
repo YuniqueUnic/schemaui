@@ -2,6 +2,7 @@ import * as React from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+import { useI18n } from "../../i18n";
 import {
   hexToHsv,
   type Hsv,
@@ -53,6 +54,7 @@ interface ColorPickerProps {
 export function ColorPicker(
   { value, onChange, id, disabled }: ColorPickerProps,
 ) {
+  const { t } = useI18n();
   const [open, setOpen] = React.useState(false);
 
   // Hue is kept locally: a fully desaturated colour is grey, and grey has no
@@ -96,7 +98,7 @@ export function ColorPicker(
       <PopoverTrigger
         id={id}
         disabled={disabled}
-        aria-label={`Colour ${value || "unset"}`}
+        aria-label={t("Colour {value}", { value: value || t("unset") })}
         className={cn(
           "inline-flex h-9 w-full items-center gap-2 rounded-md border border-input bg-background px-2 text-left text-sm",
           "shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -134,7 +136,7 @@ export function ColorPicker(
             <input
               value={shown.replace(/^#/, "")}
               spellCheck={false}
-              aria-label="Hex colour"
+              aria-label={t("Hex colour")}
               onChange={(event) => {
                 const next = event.target.value;
                 setDraft(next);

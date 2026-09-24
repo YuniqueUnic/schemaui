@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { CompositeMode, UiVariant } from "../types";
 import { CheckCircle2, Circle } from "lucide-react";
+import { useI18n } from "../i18n";
 
 interface VariantSelectorProps {
   variants: UiVariant[];
@@ -18,10 +19,11 @@ export function VariantSelector({
   onSelect,
   onEdit,
 }: VariantSelectorProps) {
+  const { t } = useI18n();
   if (!variants.length) {
     return (
       <p className="text-xs text-muted-foreground">
-        No variants configured.
+        {t("No variants configured.")}
       </p>
     );
   }
@@ -32,7 +34,7 @@ export function VariantSelector({
       <div
         className="space-y-2"
         role="radiogroup"
-        aria-label={`${mode === "one_of" ? "One of" : "Any of"} variants`}
+        aria-label={t(mode === "one_of" ? "One of variants" : "Any of variants")}
       >
         {variants.map((variant) => {
           const isActive = variant.id === activeVariantId;
@@ -100,15 +102,15 @@ export function VariantSelector({
           onClick={onEdit}
           className="w-full"
         >
-          Edit {mode === "one_of" ? "Selected" : "Active"} Variant
+          {mode === "one_of" ? t("Edit Selected Variant") : t("Edit Active Variant")}
         </Button>
       )}
 
       {/* Help Text */}
       <p className="text-[11px] text-muted-foreground">
         {mode === "one_of"
-          ? "Select a variant type. The corresponding editor will appear below."
-          : "This field can match multiple schemas"}
+          ? t("Select a variant type. The corresponding editor will appear below.")
+          : t("This field can match multiple schemas")}
       </p>
     </div>
   );

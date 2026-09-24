@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useI18n } from "../i18n";
 
 interface ValidationErrorsDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ export function ValidationErrorsDialog({
   errors,
   onNavigateToError,
 }: ValidationErrorsDialogProps) {
+  const { t } = useI18n();
   const errorEntries = Array.from(errors.entries());
 
   return (
@@ -30,11 +32,12 @@ export function ValidationErrorsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-destructive" />
-            Validation Errors ({errors.size})
+            {t("Validation Errors ({count})", { count: errors.size })}
           </DialogTitle>
           <DialogDescription>
-            The following fields have validation errors. Click on an error to
-            navigate to the field.
+            {t(
+              "The following fields have validation errors. Click on an error to navigate to the field.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] pr-4">
@@ -47,7 +50,7 @@ export function ValidationErrorsDialog({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 space-y-1">
                     <p className="text-sm font-mono text-muted-foreground">
-                      {pointer || "(root)"}
+                      {pointer || t("(root)")}
                     </p>
                     <p className="text-sm text-foreground">
                       {message}
@@ -62,7 +65,7 @@ export function ValidationErrorsDialog({
                         onOpenChange(false);
                       }}
                     >
-                      Go to field
+                      {t("Go to field")}
                     </Button>
                   )}
                 </div>

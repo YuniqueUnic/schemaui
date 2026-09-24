@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { AlertTriangle } from "lucide-react";
+import { useI18n } from "../i18n";
 
 interface ExitGuardDialogProps {
   errors: Array<[string, string]>;
@@ -14,6 +15,7 @@ export const ExitGuardDialog = memo(function ExitGuardDialog({
   onCancel,
   onForceExit,
 }: ExitGuardDialogProps) {
+  const { t } = useI18n();
   const preview = errors.slice(0, 6);
   const remaining = Math.max(0, errors.length - preview.length);
 
@@ -30,14 +32,15 @@ export const ExitGuardDialog = memo(function ExitGuardDialog({
           </span>
           <div>
             <p className="text-sm uppercase tracking-[0.25em] text-rose-500 dark:text-rose-200">
-              Exit blocked
+              {t("Exit blocked")}
             </p>
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Resolve the remaining schema errors
+              {t("Resolve the remaining schema errors")}
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              Fix the issues below or force exit to emit only the last saved
-              configuration.
+              {t(
+                "Fix the issues below or force exit to emit only the last saved configuration.",
+              )}
             </p>
           </div>
         </div>
@@ -57,8 +60,10 @@ export const ExitGuardDialog = memo(function ExitGuardDialog({
         {remaining > 0
           ? (
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-              +{remaining}{" "}
-              more issue(s) hidden. Continue editing to see full details.
+              {t(
+                "+{count} more issue(s) hidden. Continue editing to see full details.",
+                { count: remaining },
+              )}
             </p>
           )
           : null}
@@ -68,7 +73,7 @@ export const ExitGuardDialog = memo(function ExitGuardDialog({
             onClick={onCancel}
             className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-500 hover:text-slate-900 dark:border-slate-600 dark:text-slate-200 dark:hover:text-white"
           >
-            Back to form
+            {t("Back to form")}
           </button>
           <button
             type="button"
@@ -76,7 +81,7 @@ export const ExitGuardDialog = memo(function ExitGuardDialog({
             disabled={forcing}
             className="inline-flex items-center gap-2 rounded-full border border-rose-500 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-400 dark:text-rose-200"
           >
-            {forcing ? "Exiting…" : "Force exit with last saved data"}
+            {forcing ? t("Exiting…") : t("Force exit with last saved data")}
           </button>
         </div>
       </div>

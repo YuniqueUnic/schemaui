@@ -10,6 +10,7 @@ import { setPointerValue } from "../../utils/jsonPointer";
 import { VariantSelector } from "../VariantSelector";
 import { EntryEditor } from "./shared/EntryEditor";
 import { useOverlay } from "../Overlay";
+import { useI18n } from "../../i18n";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Card } from "../ui/card";
@@ -41,13 +42,14 @@ export function CompositeRenderer({
   onChange,
   renderNode,
 }: CompositeRendererProps) {
+  const { t } = useI18n();
   const overlay = useOverlay();
   const { variants, allow_multiple } = node.kind;
 
   if (!variants.length) {
     return (
       <p className="text-xs text-muted-foreground">
-        No variants configured.
+        {t("No variants configured.")}
       </p>
     );
   }
@@ -88,6 +90,7 @@ function SingleVariantRenderer({
   onChange,
   renderNode,
 }: Omit<CompositeRendererProps, "overlay">) {
+  const { t } = useI18n();
   const { variants, mode } = node.kind;
   const activeVariant = determineBestVariant(value, variants);
   const activeVariantNode = materializeVariantNode(activeVariant);
@@ -147,7 +150,9 @@ function SingleVariantRenderer({
         className="border-l-2 border-primary/30 pl-4"
       >
         <p className="text-xs text-muted-foreground mb-3">
-          {activeVariant.title ?? "Selected Variant"} content:
+          {t("{name} content:", {
+            name: activeVariant.title ?? t("Selected Variant"),
+          })}
         </p>
         {renderNode(
           {
@@ -178,6 +183,7 @@ function MultiVariantRenderer({
   renderNode,
   overlay,
 }: CompositeRendererProps & { overlay: ReturnType<typeof useOverlay> }) {
+  const { t } = useI18n();
   const { variants } = node.kind;
   const entries = Array.isArray(value) ? (value as JsonValue[]) : [];
 
@@ -193,7 +199,7 @@ function MultiVariantRenderer({
   ) => {
     const entryNode: UiNode = {
       pointer: `${node.pointer}/${index}`,
-      title: variant.title ?? `Variant ${index + 1}`,
+      title: variant.title ?? t("Variant {count}", { count: index + 1 }),
       description: variant.description,
       required: false,
       default_value: node.default_value,
@@ -201,9 +207,11 @@ function MultiVariantRenderer({
     };
 
     overlay.open({
-      title: `${node.title ?? node.pointer} · ${variant.title ?? "Entry"} ${
-        index + 1
-      }`,
+      title: t("{name} · {variant} {count}", {
+        name: node.title ?? node.pointer,
+        variant: variant.title ?? t("Entry"),
+        count: index + 1,
+      }),
       content: (close) => (
         <EntryEditor
           node={entryNode}
@@ -235,11 +243,13 @@ function MultiVariantRenderer({
     } else {
       // Multiple variants - show selector
       overlay.open({
-        title: `Select variant type for ${node.title ?? node.pointer}`,
+        title: t("Select variant type for {name}", {
+          name: node.title ?? node.pointer,
+        }),
         content: (close) => (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Choose which type of item to add:
+              {t("Choose which type of item to add:")}
             </p>
             <div className="space-y-2">
               {variants.map((variant) => (
@@ -285,9 +295,9 @@ function MultiVariantRenderer({
       {entries.length === 0
         ? (
           <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-            <p className="text-sm">No entries yet</p>
+            <p className="text-sm">{t("No entries yet")}</p>
             <p className="text-xs mt-1">
-              Click the button below to add your first entry
+              {t("Click the button below to add your first entry")}
             </p>
           </div>
         )
@@ -317,7 +327,7 @@ function MultiVariantRenderer({
                       </Badge>
                       <span className="text-sm font-medium truncate">
                         {activeVariant?.title ??
-                          `Variant ${index + 1}`}
+                          t("Variant {count}", { count: index + 1 })}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground break-words">
@@ -337,7 +347,7 @@ function MultiVariantRenderer({
                             variants[0],
                         )}
                     >
-                      Edit
+                      {t("Edit")}
                     </Button>
                     <Button
                       type="button"
@@ -346,7 +356,7 @@ function MultiVariantRenderer({
                       onClick={() => removeEntry(index)}
                       className="text-destructive hover:text-destructive"
                     >
-                      Remove
+                      {t("Remove")}
                     </Button>
                   </div>
                 </div>
@@ -361,7 +371,7 @@ function MultiVariantRenderer({
         onClick={addEntry}
         className="w-full"
       >
-        + Add variant entry
+        {t("+ Add variant entry")}
       </Button>
     </div>
   );
