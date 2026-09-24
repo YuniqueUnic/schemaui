@@ -34,9 +34,13 @@
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
-// Set up better panic messages in the browser console in debug builds.
-#[cfg(feature = "console_error_panic_hook")]
-pub use console_error_panic_hook::set_once as set_panic_hook;
+// Panic messages must reach the browser console: a wasm panic surfaces to JS
+// as a bare `RuntimeError: unreachable`, which is undebuggable. The hook costs
+// a few hundred bytes and runs once at module load via `start`.
+#[wasm_bindgen(start)]
+pub fn start() {
+    console_error_panic_hook::set_once();
+}
 
 /// Serialize `value` the way JSON.parse would produce it: plain objects and
 /// arrays, not ES2015 `Map`s. See the module doc for why this matters.

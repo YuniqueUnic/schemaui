@@ -778,6 +778,23 @@ export function RichSurface({ content, variant }: { content: RichContent; varian
    事件），`trim_text` 会吃掉实体相邻空格——消毒器因此采用"文本缓冲 +
    节点边界统一 trim + 实体解析"方案，`Hello &amp; welcome` 全程无损。
 
+### 15.1 wasm 默认开启（2026-09-24 追记：备注 4 的后续）
+
+备注 4 的"编译探针 PASS"只保证了编译——真实渲染在 wasm32 上**全数 panic**： mmdr
+0.3.1 的布局计时读 `std::time::Instant`，而 wasm32-unknown-unknown 的 std 不实现
+time（`time not implemented on this platform`）。wasm 默认不开 mermaid
+期间，Playground 上所有图形因此回落为源码；打开 mermaid 则会话直接
+崩溃（`buildUiAst` abort）。
+
+修复：fork `YuniqueUnic/mermaid-rs-renderer`（分支 `wasm32-time-fix`，基于 上游
+v0.3.1）把三处 `std::time::Instant` 换成 `web-time`（native 上是 std 类型的
+re-export，行为零变化；wasm 上读浏览器时钟），以 git submodule 挂在
+`vendor/mermaid-rs-renderer` 并经 workspace `[patch.crates-io]` 生效；
+`schemaui-wasm` 的 `mermaid` 因此翻为默认开启，`console_error_panic_hook` 随模块
+`start` 安装（此前的 hook 是死代码）。所有含 cargo 的 CI checkout 补
+`submodules: recursive`。升级 mmdr 时需在新版上重放该补丁；上游合入 wasm
+安全计时后可整体撤销。
+
 ---
 
 _本文档由 2026-09-23 调查（代码库逐点核实 + mmdr 外部验证 +

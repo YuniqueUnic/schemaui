@@ -26,6 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          submodules: recursive
           persist-credentials: false
 
       - name: Setup Rust toolchain

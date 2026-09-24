@@ -1,0 +1,4 @@
+[submodule "vendor/mermaid-rs-renderer"]
+	path = vendor/mermaid-rs-renderer
+	url = https://github.com/YuniqueUnic/mermaid-rs-renderer.git
+	branch = wasm32-time-fix

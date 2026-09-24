@@ -130,3 +130,14 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = "debuginfo"
+
+# mermaid-rs-renderer 0.3.1 times its layout stages with `std::time::Instant`,
+# which the wasm32-unknown-unknown standard library does not implement — every
+# render in the Playground's wasm build panicked with "time not implemented on
+# this platform" and the session died before it started. The submodule at
+# vendor/mermaid-rs-renderer (fork YuniqueUnic/mermaid-rs-renderer, branch
+# `wasm32-time-fix`, based on upstream v0.3.1) swaps the type for `web-time` —
+# a no-op on native, where it re-exports std's Instant. Bump the submodule when
+# upgrading mmdr and drop the patch once upstream ships a wasm-safe timer.
+[patch.crates-io]
+mermaid-rs-renderer = { path = "vendor/mermaid-rs-renderer" }
