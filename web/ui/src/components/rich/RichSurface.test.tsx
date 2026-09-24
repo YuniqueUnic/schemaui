@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { RichSurface } from "./RichSurface";
 import { RichAssetsProvider } from "./RichAssetsProvider";
+import { HoverPreviewProvider } from "./HoverPreviewLayer";
 import { ThemeProvider } from "../../theme";
 import { richContentId } from "../../lib/richId";
 import type { RichContent } from "../../types";
@@ -9,10 +10,17 @@ import type { RichContent } from "../../types";
 const SVG_SOURCE = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>`;
 const figure: RichContent = { type: "svg", source: SVG_SOURCE };
 
+const ASSETS = {
+  [richContentId("svg", SVG_SOURCE)]: {
+    kind: "svg" as const,
+    svg: { body: "<svg viewBox='0 0 24 24'></svg>", width: 24, height: 24 },
+  },
+};
+
 function rendered(
   content: RichContent,
   assets?: Record<string, import("../../types").RichAsset> | null,
-  variant: "block" | "thumb" = "block",
+  variant: "block" | "thumb" | "mini" = "block",
 ) {
   return render(
     <ThemeProvider>
@@ -54,5 +62,42 @@ describe("RichSurface", () => {
       [richContentId("markdown", source)]: { kind: "html", html: "<h1>Notes</h1>" },
     });
     expect(screen.getByText("Notes").tagName).toBe("H1");
+  });
+
+  it("wraps thumb and block variants as interactive figures", () => {
+    for (const variant of ["thumb", "block"] as const) {
+      const { container, unmount } = rendered(figure, ASSETS, variant);
+      expect(container.querySelector("span.cursor-zoom-in")).toBeTruthy();
+      unmount();
+    }
+  });
+});
+
+describe("RichSurface interactions", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.removeItem("schemaui-locale");
+  });
+
+  it("a mini keeps only the hover enlargement — its click belongs to the select", async () => {
+    const { container } = render(
+      <ThemeProvider>
+        <HoverPreviewProvider>
+          <RichAssetsProvider assets={ASSETS}>
+            <RichSurface content={figure} variant="mini" title="Mini figure" />
+          </RichAssetsProvider>
+        </HoverPreviewProvider>
+      </ThemeProvider>,
+    );
+    // No click affordance…
+    expect(container.querySelector("span.cursor-zoom-in")).toBeNull();
+    // …but hovering still enlarges through the shared layer.
+    fireEvent.mouseEnter(container.querySelector("span")!);
+    await vi.advanceTimersByTimeAsync(250);
+    const previews = document.body.querySelectorAll('[role="img"]');
+    expect(previews.length).toBeGreaterThan(0);
   });
 });
