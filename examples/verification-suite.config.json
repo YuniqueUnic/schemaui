@@ -1,0 +1,12 @@
+{
+  "service_name": "payment-gateway",
+  "protocol_strategy": "forward_compatible",
+  "explicit_null_field": null,
+  "database": {
+    "url": "postgresql://postgres:secret@localhost:5432/production_db"
+  },
+  "environment_tags": {
+    "ENV": "production",
+    "REGION": "ap-southeast-1"
+  }
+}

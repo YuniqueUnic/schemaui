@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Full Verification Suite (Issues #206, #207, Rich Content & Resilience)",
+  "description": "Live interactive test suite combining Issue #206 (no duplicate descriptions), Issue #207 (untouched optional/null preservation), markdown tables with borders, SVG and Mermaid diagram rendering.",
+  "type": "object",
+  "required": ["service_name"],
+  "properties": {
+    "service_name": {
+      "title": "Service Name",
+      "description": "Required service identifier. Preserves original config value.",
+      "type": "string"
+    },
+    "protocol_strategy": {
+      "title": "Protocol Negotiation Strategy",
+      "description": "Select the wire protocol handling strategy. (Verifies Issue #206: this description appears only once, not duplicated inside option cards).",
+      "type": "string",
+      "enum": ["forward_compatible", "strict_reject"],
+      "default": "forward_compatible",
+      "x-control": "radio",
+      "x-content": {
+        "type": "markdown",
+        "source": "### Wire Protocol Matrix\n\nVerify that this markdown table renders with full cell borders and proper contrast:\n\n| Scenario | Wire Tag | Payload Valid? | Recommended Action |\n| :--- | :--- | :--- | :--- |\n| Forward-compatible peer | `v2_event` | N/A | Wrap in `UnknownType(raw)` |\n| Broken known client | `v1_user` | No | Reject at decode boundary |\n\n> **Note**: Strikethrough ~~old protocol~~ and **bold callouts** are rendered inside `.rich-prose`."
+      },
+      "x-options": [
+        {
+          "label": "Forward Compatible",
+          "description": "Tolerate unknown schema extensions by preserving raw bytes in unknown payload wrappers.",
+          "content": {
+            "type": "mermaid",
+            "source": "flowchart LR\n  Client[v2 Client] -->|v2 payload| Gateway[Gateway]\n  Gateway -->|UnknownType(raw)| Core[Service Core]"
+          }
+        },
+        {
+          "label": "Strict Rejection",
+          "description": "Enforce strict wire boundary decode checks and reject unexpected payload fields.",
+          "content": {
+            "type": "mermaid",
+            "source": "flowchart LR\n  Client[v1 Client] -->|Malformed| Gateway[Gateway]\n  Gateway -->|400 Bad Request| Error[Reject]"
+          }
+        }
+      ]
+    },
+    "architecture_diagram": {
+      "title": "Architecture Overview (Mermaid & SVG)",
+      "description": "Interactive Mermaid flow diagram rendered directly from schema AST.",
+      "type": "string",
+      "default": "view_only",
+      "x-content": {
+        "type": "mermaid",
+        "source": "flowchart TD\n  WebUI[Web Browser UI] -->|/api/v1/session| Server[schemaui Server]\n  Server -->|UI AST + Rich Assets| WebUI\n  WebUI -->|/api/v1/preview| Server\n  WebUI -->|/api/v1/save| Storage[(Config Storage)]"
+      }
+    },
+    "system_status_svg": {
+      "title": "Vector Status Indicator (SVG)",
+      "description": "Sanitized live SVG graphic rendered with vector shapes and text.",
+      "type": "string",
+      "default": "view_only",
+      "x-content": {
+        "type": "svg",
+        "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 380 60\" role=\"img\" aria-label=\"system status\"><rect width=\"380\" height=\"60\" rx=\"8\" fill=\"#1e293b\"/><circle cx=\"25\" cy=\"30\" r=\"12\" fill=\"#10b981\"/><text x=\"50\" y=\"36\" font-size=\"16\" font-weight=\"bold\" fill=\"#f8fafc\">Issues #206 &amp; #207 Fixed</text><circle cx=\"270\" cy=\"30\" r=\"8\" fill=\"#38bdf8\"/><text x=\"290\" y=\"35\" font-size=\"14\" fill=\"#94a3b8\">Online</text></svg>"
+      }
+    },
+    "explicit_null_field": {
+      "title": "Explicit Null Field (Issue #207 Check)",
+      "description": "This field was provided as null in config.json. It MUST stay null and NOT be converted to empty string.",
+      "type": ["string", "null"]
+    },
+    "untouched_optional_with_default": {
+      "title": "Untouched Optional with Default (Issue #207 Check)",
+      "description": "This field was omitted from config.json. It MUST NOT be injected into the preview or output payload.",
+      "type": "string",
+      "default": "injected-if-broken"
+    },
+    "untouched_optional_object": {
+      "title": "Untouched Optional Object (Issue #207 Check)",
+      "description": "This entire object was omitted. It has required children, but must NOT be fabricated out of thin air.",
+      "type": "object",
+      "required": ["api_key"],
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "title": "API Key",
+          "default": "secret-key"
+        }
+      }
+    },
+    "database": {
+      "title": "Database Connection (Nested Object)",
+      "description": "Existing config object. Contains 'url', but 'pool_size' is omitted and must NOT be injected.",
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "title": "Connection URL"
+        },
+        "pool_size": {
+          "type": "integer",
+          "title": "Connection Pool Size (Untouched Optional)",
+          "default": 20
+        }
+      }
+    },
+    "environment_tags": {
+      "title": "Environment Tags (Map / Key-Value)",
+      "description": "Key-value map. Editing existing keys or adding keys checks collision prevention.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}
