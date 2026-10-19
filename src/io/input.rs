@@ -1,7 +1,6 @@
-use std::{borrow::Cow, collections::HashSet};
+use std::borrow::Cow;
 
 use anyhow::{Context, Result};
-use regex::Regex;
 use serde_json::{Map, Number, Value, json};
 
 use super::DocumentFormat;
@@ -151,41 +150,6 @@ fn apply_defaults_at(root: &mut Value, pointer: &str, defaults: &Value) {
             }
         }
 
-        if let Some(patterns) = schema_obj
-            .get("patternProperties")
-            .and_then(Value::as_object)
-        {
-            for (pattern, _) in patterns {
-                if let Some(matched) = pattern_defaults(pattern, default_map) {
-                    tasks.push((
-                        child_pointer(pointer, &["patternProperties", pattern]),
-                        Cow::Owned(Value::Object(matched)),
-                    ));
-                }
-            }
-        }
-
-        if let Some(additional_schema) = schema_obj.get("additionalProperties")
-            && additional_schema.is_object()
-        {
-            let excluded: HashSet<&str> = schema_obj
-                .get("properties")
-                .and_then(Value::as_object)
-                .map(|props| props.keys().map(|k| k.as_str()).collect())
-                .unwrap_or_default();
-            let extras = default_map
-                .iter()
-                .filter(|(key, _)| !excluded.contains(key.as_str()))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<Map<_, _>>();
-            if !extras.is_empty() {
-                tasks.push((
-                    child_pointer(pointer, &["additionalProperties"]),
-                    Cow::Owned(Value::Object(extras)),
-                ));
-            }
-        }
-
         if let Some(deps) = schema_obj.get("dependencies").and_then(Value::as_object) {
             for (prop, dep_schema) in deps {
                 if default_map.contains_key(prop) && dep_schema.is_object() {
@@ -213,26 +177,16 @@ fn apply_defaults_at(root: &mut Value, pointer: &str, defaults: &Value) {
     }
 
     if let Some(default_array) = defaults.as_array()
-        && let Some(items) = schema_obj.get("items")
+        && let Some(Value::Array(tuple)) = schema_obj.get("items")
     {
-        match items {
-            Value::Array(tuple) => {
-                for (idx, _) in tuple.iter().enumerate() {
-                    if let Some(value) = default_array.get(idx) {
-                        let idx_str = idx.to_string();
-                        tasks.push((
-                            child_pointer(pointer, &["items", &idx_str]),
-                            Cow::Borrowed(value),
-                        ));
-                    }
-                }
+        for (idx, _) in tuple.iter().enumerate() {
+            if let Some(value) = default_array.get(idx) {
+                let idx_str = idx.to_string();
+                tasks.push((
+                    child_pointer(pointer, &["items", &idx_str]),
+                    Cow::Borrowed(value),
+                ));
             }
-            Value::Object(_) => {
-                if let Some(first) = default_array.first() {
-                    tasks.push((child_pointer(pointer, &["items"]), Cow::Borrowed(first)));
-                }
-            }
-            _ => {}
         }
     }
 
@@ -250,22 +204,6 @@ fn apply_defaults_at(root: &mut Value, pointer: &str, defaults: &Value) {
 
     for (child_pointer, value) in tasks {
         apply_defaults_at(root, &child_pointer, value.as_ref());
-    }
-}
-
-fn pattern_defaults(pattern: &str, defaults: &Map<String, Value>) -> Option<Map<String, Value>> {
-    let regex = Regex::new(pattern).ok()?;
-
-    let mut matched = Map::new();
-    for (key, value) in defaults {
-        if regex.is_match(key) {
-            matched.insert(key.clone(), value.clone());
-        }
-    }
-    if matched.is_empty() {
-        None
-    } else {
-        Some(matched)
     }
 }
 
@@ -460,9 +398,53 @@ mod tests {
         let defaults = json!([{ "tag": "api" }]);
         let enriched = schema_with_defaults(&schema, &defaults);
         assert_eq!(enriched["default"], defaults);
+        assert!(enriched["items"].get("default").is_none());
+        assert!(
+            enriched["items"]["properties"]["tag"]
+                .get("default")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn merges_tuple_array_defaults_without_polluting_map_templates() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "pair": {
+                    "type": "array",
+                    "items": [
+                        {"type": "string"},
+                        {"type": "integer"}
+                    ]
+                },
+                "env": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"}
+                }
+            }
+        });
+        let defaults = json!({
+            "pair": ["alpha", 7],
+            "env": {"PROD": "1"}
+        });
+        let enriched = schema_with_defaults(&schema, &defaults);
         assert_eq!(
-            enriched["items"]["properties"]["tag"]["default"],
-            json!("api")
+            enriched["properties"]["pair"]["items"][0]["default"],
+            json!("alpha")
+        );
+        assert_eq!(
+            enriched["properties"]["pair"]["items"][1]["default"],
+            json!(7)
+        );
+        assert_eq!(
+            enriched["properties"]["env"]["default"],
+            json!({"PROD": "1"})
+        );
+        assert!(
+            enriched["properties"]["env"]["additionalProperties"]
+                .get("default")
+                .is_none()
         );
     }
 
@@ -477,13 +459,9 @@ mod tests {
         let defaults = json!({"env_api": "v1", "other": "noop"});
         let enriched = schema_with_defaults(&schema, &defaults);
         assert_eq!(enriched["default"], defaults);
-        assert_eq!(
-            enriched["patternProperties"]["^env_"]["default"]["env_api"],
-            json!("v1")
-        );
         assert!(
-            enriched["patternProperties"]["^env_"]["default"]
-                .get("other")
+            enriched["patternProperties"]["^env_"]
+                .get("default")
                 .is_none()
         );
     }

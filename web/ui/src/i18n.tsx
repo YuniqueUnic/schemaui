@@ -101,6 +101,7 @@ export const zhDictionary: Record<string, string> = {
   "Entry {count}": "条目 {count}",
   "{title} entry {count}": "{title} 条目 {count}",
   "{name} · Item {count}": "{name} · 条目 {count}",
+  'Key "{key}" already exists': '键 "{key}" 已存在',
   "Hex colour": "十六进制颜色",
   "Colour {value}": "颜色 {value}",
   "unset": "未设置",

@@ -107,23 +107,6 @@ function ensureContainer(
   return isFinite(Number(next)) ? [] : {};
 }
 
-export function mergeDefaults(
-  base: JsonValue,
-  defaults: Record<string, JsonValue | undefined>,
-): JsonValue {
-  let result: JsonValue = deepClone(base ?? {});
-  for (const [pointer, value] of Object.entries(defaults)) {
-    if (value === undefined) {
-      continue;
-    }
-    const current = getPointerValue(result, pointer);
-    if (current === undefined) {
-      result = setPointerValue(result, pointer, deepClone(value));
-    }
-  }
-  return result;
-}
-
 export function deepClone<T extends JsonValue>(value: T): T {
   return typeof structuredClone === "function"
     ? structuredClone(value)

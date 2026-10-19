@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import type { JsonValue, UiNode } from "../../types";
 import { defaultForKind } from "../../ui-ast";
 import { formatValueSummary } from "../../utils/typeHelpers";
@@ -83,22 +84,19 @@ export function KeyValueRenderer({
   const openEditor = (
     entryIndex: number,
     initialValue: KeyValueEntryDraft,
-    onSaveEntry: (draft: KeyValueEntryDraft) => void,
+    onSaveEntry: (draft: KeyValueEntryDraft) => string | null,
   ) => {
     const entryNode = entryNodeFor(entryIndex);
 
     overlay.open({
       title: `${node.title ?? node.pointer} · Entry ${entryIndex + 1}`,
       content: (close) => (
-        <EntryEditor
-          node={entryNode}
-          initialValue={draftToJsonValue(initialValue)}
+        <KeyValueEntryModal
+          entryNode={entryNode}
+          initialValue={initialValue}
           errors={errors}
-          onSave={(newValue) => {
-            const draft = parseDraftValue(newValue, template);
-            onSaveEntry(draft);
-            close();
-          }}
+          template={template}
+          onSaveEntry={onSaveEntry}
           onClose={close}
           renderNode={renderNode}
         />
@@ -109,16 +107,33 @@ export function KeyValueRenderer({
   const saveEntry = (
     previousKey: string | null,
     draft: KeyValueEntryDraft,
-  ) => {
-    const next = {
-      ...(value && typeof value === "object" && !Array.isArray(value) ? value : {}),
-    } as Record<string, JsonValue>;
+  ): string | null => {
+    const currentMap = (
+      value && typeof value === "object" && !Array.isArray(value) ? value : {}
+    ) as Record<string, JsonValue>;
 
-    if (previousKey !== null) {
-      delete next[previousKey];
+    if (
+      draft.key !== previousKey &&
+      Object.prototype.hasOwnProperty.call(currentMap, draft.key)
+    ) {
+      return t('Key "{key}" already exists', { key: draft.key });
     }
-    next[draft.key] = draft.value;
+
+    const next: Record<string, JsonValue> = {};
+    if (previousKey === null) {
+      Object.assign(next, currentMap);
+      next[draft.key] = draft.value;
+    } else {
+      for (const [k, v] of Object.entries(currentMap)) {
+        if (k === previousKey) {
+          next[draft.key] = draft.value;
+        } else {
+          next[k] = v;
+        }
+      }
+    }
     onChange(node.pointer, next);
+    return null;
   };
 
   return (
@@ -200,6 +215,52 @@ export function KeyValueRenderer({
   );
 }
 
+function KeyValueEntryModal({
+  entryNode,
+  initialValue,
+  errors,
+  template,
+  onSaveEntry,
+  onClose,
+  renderNode,
+}: {
+  entryNode: UiNode;
+  initialValue: KeyValueEntryDraft;
+  errors: Map<string, string>;
+  template: KeyValueNode["kind"]["template"];
+  onSaveEntry: (draft: KeyValueEntryDraft) => string | null;
+  onClose: () => void;
+  renderNode: KeyValueRendererProps["renderNode"];
+}) {
+  const [collisionError, setCollisionError] = useState<string | null>(null);
+  const mergedErrors = useMemo(() => {
+    if (!collisionError) return errors;
+    const next = new Map(errors);
+    next.set("/key", collisionError);
+    return next;
+  }, [collisionError, errors]);
+
+  return (
+    <EntryEditor
+      node={entryNode}
+      initialValue={draftToJsonValue(initialValue)}
+      errors={mergedErrors}
+      onSave={(newValue) => {
+        const draft = parseDraftValue(newValue, template);
+        const errorMessage = onSaveEntry(draft);
+        if (errorMessage) {
+          setCollisionError(errorMessage);
+          return;
+        }
+        setCollisionError(null);
+        onClose();
+      }}
+      onClose={onClose}
+      renderNode={renderNode}
+    />
+  );
+}
+
 function buildDraftValue(
   template: KeyValueNode["kind"]["template"],
 ): KeyValueEntryDraft {
@@ -223,7 +284,9 @@ function parseDraftValue(
       : typeof template.key_default === "string"
       ? template.key_default
       : "",
-    value: draft.value ?? template.value_default ?? defaultForKind(template.value_kind),
+    value: draft.value !== undefined
+      ? draft.value
+      : template.value_default ?? defaultForKind(template.value_kind),
   };
 }
 

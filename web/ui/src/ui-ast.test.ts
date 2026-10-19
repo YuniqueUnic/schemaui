@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { UiAst } from "./types";
-import { applyUiDefaults } from "./ui-ast";
+import type { UiAst, UiVariant } from "./types";
+import { applyUiDefaults, variantDefault } from "./ui-ast";
 
 const ast: UiAst = {
   roots: [
@@ -8,7 +8,7 @@ const ast: UiAst = {
       pointer: "/complexComposite",
       title: "10. Complex Composite",
       description: null,
-      required: false,
+      required: true,
       default_value: {},
       kind: {
         type: "object",
@@ -17,7 +17,7 @@ const ast: UiAst = {
             pointer: "/complexComposite/config",
             title: "complexComposite",
             description: null,
-            required: false,
+            required: true,
             default_value: [],
             kind: {
               type: "composite",
@@ -66,7 +66,7 @@ const ast: UiAst = {
             },
           },
         ],
-        required: [],
+        required: ["config"],
       },
     },
   ],
@@ -78,6 +78,126 @@ describe("applyUiDefaults", () => {
       complexComposite: {
         config: [],
       },
+    });
+  });
+
+  it("seeds only missing required fields and preserves null and absent optional fields", () => {
+    const roundTripAst: UiAst = {
+      roots: [
+        {
+          pointer: "/requiredHost",
+          title: "Host",
+          description: null,
+          required: true,
+          default_value: "localhost",
+          kind: {
+            type: "field",
+            scalar: "string",
+            enum_options: null,
+            enum_values: null,
+          },
+        },
+        {
+          pointer: "/optionalNote",
+          title: "Note",
+          description: null,
+          required: false,
+          default_value: "should-not-be-seeded",
+          kind: {
+            type: "field",
+            scalar: "string",
+            enum_options: null,
+            enum_values: null,
+          },
+        },
+        {
+          pointer: "/nullableToken",
+          title: "Token",
+          description: null,
+          required: true,
+          default_value: "fallback-token",
+          kind: {
+            type: "field",
+            scalar: "string",
+            enum_options: null,
+            enum_values: null,
+            nullable: true,
+          },
+        },
+        {
+          pointer: "/optionalSection",
+          title: "Optional Section",
+          description: null,
+          required: false,
+          default_value: {},
+          kind: {
+            type: "object",
+            required: ["innerRequired"],
+            children: [
+              {
+                pointer: "/optionalSection/innerRequired",
+                title: "Inner Required",
+                description: null,
+                required: true,
+                default_value: "inner-default",
+                kind: {
+                  type: "field",
+                  scalar: "string",
+                  enum_options: null,
+                  enum_values: null,
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    expect(
+      applyUiDefaults(roundTripAst, {
+        nullableToken: null,
+      }),
+    ).toEqual({
+      requiredHost: "localhost",
+      nullableToken: null,
+    });
+  });
+});
+
+describe("variantDefault", () => {
+  it("populates const, required, and $ref-authored defaults while omitting optional placeholders", () => {
+    const variant: UiVariant = {
+      id: "variant_0",
+      title: "Webhook",
+      description: null,
+      is_object: true,
+      node: {
+        type: "object",
+        children: [],
+        required: ["kind", "endpoint"],
+      },
+      schema: {
+        type: "object",
+        required: ["kind", "endpoint"],
+        properties: {
+          kind: { const: "webhook" },
+          endpoint: { type: "string" },
+          retries: { $ref: "#/$defs/Retries" },
+          optionalSecret: { type: "string" },
+        },
+        $defs: {
+          Retries: {
+            type: "integer",
+            default: 3,
+          },
+        },
+      },
+    };
+
+    expect(variantDefault(variant)).toEqual({
+      kind: "webhook",
+      endpoint: "",
+      retries: 3,
     });
   });
 });

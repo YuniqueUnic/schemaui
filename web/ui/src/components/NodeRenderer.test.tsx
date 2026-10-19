@@ -723,11 +723,8 @@ describe("NodeRenderer web overlay flows", () => {
         children: [
           {
             name: "grandchild",
-            children: [],
-            value: "",
           },
         ],
-        value: "",
       },
     ]);
   });
@@ -755,10 +752,6 @@ describe("NodeRenderer web overlay flows", () => {
         {
           x: 0,
           y: 0,
-          data: {
-            type: "point",
-            value: 0,
-          },
         },
       ],
     ]);
@@ -788,11 +781,10 @@ describe("NodeRenderer web overlay flows", () => {
       [
         {
           id: "entry-1",
-          value: 0,
         },
       ],
     );
-    expect(screen.getByText("{ id: entry-1, value: 0 }")).toBeTruthy();
+    expect(screen.getByText("{ id: entry-1 }")).toBeTruthy();
   });
 
   it("does not append a complex array entry when the dialog is cancelled", async () => {
@@ -830,10 +822,7 @@ describe("NodeRenderer web overlay flows", () => {
     expect(screen.queryByText("List Config content:")).toBeNull();
     expect(screen.getByText("/settings")).toBeTruthy();
     expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
-      {
-        mode: "basic",
-        settings: {},
-      },
+      {},
     );
   });
 
@@ -894,6 +883,59 @@ describe("NodeRenderer web overlay flows", () => {
     expect(screen.getByText("8.8.8.8")).toBeTruthy();
     expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
       { "www.google.com": "8.8.8.8" },
+    );
+  });
+
+  it("rejects colliding map keys without overwriting existing entries and preserves null map values", async () => {
+    const user = userEvent.setup();
+    if (dnsHostsNode.kind.type !== "key_value") {
+      throw new Error("expected key_value node");
+    }
+    const nullableMapNode: UiNode = {
+      ...dnsHostsNode,
+      kind: {
+        type: "key_value",
+        template: {
+          ...dnsHostsNode.kind.template,
+          value_default: "fallback",
+          value_kind: {
+            type: "field",
+            scalar: "string",
+            enum_options: ["null", "fallback"],
+            enum_values: [null, "fallback"],
+            nullable: true,
+          },
+        },
+      },
+    };
+
+    render(
+      <EditorHarness
+        node={nullableMapNode}
+        initialValue={{ a: null, b: "fallback" }}
+      />,
+    );
+
+    const editButtons = screen.getAllByRole("button", { name: /^edit$/i });
+    await user.click(editButtons[0]);
+
+    let dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /^done$/i }));
+
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
+      { a: null, b: "fallback" },
+    );
+
+    await user.click(screen.getAllByRole("button", { name: /^edit$/i })[1]);
+    dialog = await screen.findByRole("dialog");
+    const keyInput = within(dialog).getByRole("textbox");
+    await user.clear(keyInput);
+    await user.type(keyInput, "a");
+    await user.click(within(dialog).getByRole("button", { name: /^done$/i }));
+
+    expect(within(dialog).getByText('Key "a" already exists')).toBeTruthy();
+    expect(JSON.parse(screen.getByTestId("value").textContent ?? "null")).toEqual(
+      { a: null, b: "fallback" },
     );
   });
 
