@@ -37,12 +37,12 @@ export interface NodeRendererProps {
   onChange: (pointer: string, value: JsonValue) => void;
   renderMode?: "stack" | "inline";
   /**
-   * Render the control only, without the title/description block.
+   * Render the control only, without the title/description/content block.
    *
-   * The editor already shows the selected node's title and description above the
-   * card, so a leaf card that repeated them would state the same heading twice
-   * in two different styles. Object children keep their headers: each card needs
-   * its own label to be readable.
+   * The editor already shows the selected node's title, description, and rich
+   * content above the card, so a leaf card that repeated them would state the
+   * same heading twice in two different places. Object children keep their
+   * headers: each card needs its own label to be readable.
    */
   hideHeader?: boolean;
 }
@@ -73,7 +73,7 @@ export function NodeRenderer({
   return (
     <div className={chromeClass}>
       {!hideHeader && <NodeHeader node={node} />}
-      {node.content && (
+      {!hideHeader && node.content && (
         <RichSurface
           content={node.content}
           variant="block"

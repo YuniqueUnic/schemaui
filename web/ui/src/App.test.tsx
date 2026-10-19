@@ -716,4 +716,56 @@ describe("App web interactions", () => {
 
     expect(await screen.findByText("Session Unavailable")).toBeTruthy();
   });
+
+  it("renders top-level question rich content once in General view and focused tab view", async () => {
+    const richQuestionText = "UnknownType: preserve raw payload for open unions";
+    apiMocks.fetchSession.mockResolvedValue({
+      ...session,
+      ui_ast: {
+        roots: [
+          {
+            pointer: "/unionPolicy",
+            title: "1. Unknown & InvalidKnown Handling",
+            description: "Select how unknown union variants are handled.",
+            content: {
+              type: "markdown",
+              source: richQuestionText,
+            },
+            required: true,
+            default_value: "preserve",
+            control: "radio",
+            kind: {
+              type: "field",
+              scalar: "string",
+              enum_options: ["Preserve unknown, reject invalid", "Reject all"],
+              enum_values: ["preserve", "reject"],
+            },
+          },
+          {
+            pointer: "/fallbackMode",
+            title: "2. Fallback Mode",
+            description: "Secondary question so section tabs are shown.",
+            required: true,
+            default_value: "strict",
+            kind: {
+              type: "field",
+              scalar: "string",
+              enum_options: ["strict", "lenient"],
+              enum_values: ["strict", "lenient"],
+            },
+          },
+        ],
+      },
+    });
+
+    const user = userEvent.setup();
+    renderApp();
+
+    await waitForSections();
+    expect(screen.getAllByText(richQuestionText)).toHaveLength(1);
+
+    await user.click(sectionTab("1. Unknown & InvalidKnown Handling"));
+
+    expect(screen.getAllByText(richQuestionText)).toHaveLength(1);
+  });
 });
