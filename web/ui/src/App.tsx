@@ -563,16 +563,18 @@ function SectionTabs({
  * machine name rather than a title someone wrote.
  */
 function EditorHeading({ node, isRoot }: { node: UiNode; isRoot: boolean }) {
+  const { t } = useI18n();
   const title = node.title?.trim();
   const description = node.description?.trim();
+  const content = node.content;
 
   // The virtual root has no pointer of its own, so its heading would only
   // restate the session title in the header above; it earns one only when it
   // has something of its own to say.
-  if (!node.pointer && !description) return null;
+  if (!node.pointer && !description && !content) return null;
 
   const showTitle = !isRoot && Boolean(title || node.pointer);
-  if (!showTitle && !description) return null;
+  if (!showTitle && !description && !content) return null;
 
   return (
     <header className="mb-4">
@@ -598,6 +600,15 @@ function EditorHeading({ node, isRoot }: { node: UiNode; isRoot: boolean }) {
         >
           {description}
         </p>
+      )}
+      {content && (
+        <div className={cn((showTitle || description) && "mt-2.5")}>
+          <RichSurface
+            content={content}
+            variant="block"
+            title={nodeLabel(node, t)}
+          />
+        </div>
       )}
     </header>
   );
