@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Prose, save and preview resilience",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "Service name",
+      "default": "api",
+      "x-content": {
+        "type": "markdown",
+        "source": "| Scenario | Wire Tag | Recommended Action |\n| --- | --- | --- |\n| Forward-compatible peer | `v2_event` | Wrap in `UnknownType(raw)` |\n| Broken known client | `v1_user` | Reject at decode boundary |\n\nA paragraph with **bold** text, a [link](https://example.com), and ~~strikethrough~~."
+      }
+    },
+    "note": {
+      "type": ["string", "null"],
+      "title": "Note (explicit null in the config)"
+    },
+    "region": {
+      "type": "string",
+      "title": "Region (omitted in the config)",
+      "default": "us-west-2"
+    }
+  }
+}

@@ -5,6 +5,7 @@ import type {
   ValidationResponse,
 } from "./types";
 import type { RenderContentInput, RenderContentResult } from "./transport/types";
+import { send } from "./utils/requestError";
 
 async function request<T>(
   path: string,
@@ -22,7 +23,7 @@ async function request<T>(
     init.body = JSON.stringify(options.json);
   }
 
-  const response = await fetch(path, init);
+  const response = await send(path, init);
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || `Request failed: ${response.status}`);
@@ -83,7 +84,7 @@ export function fetchSchema(): Promise<JsonValue> {
 export async function renderDiagram(
   input: RenderContentInput,
 ): Promise<RenderContentResult> {
-  const response = await fetch("/api/v1/render", {
+  const response = await send("/api/v1/render", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

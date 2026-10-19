@@ -150,7 +150,7 @@ export function RichSurface({
     // same trust the ui_ast itself gets.
     return (
       <div
-        className={`prose prose-sm dark:prose-invert max-w-none text-sm ${
+        className={`rich-prose text-sm ${
           variant === "viewer" ? "min-h-0" : ""
         }`}
         dangerouslySetInnerHTML={{ __html: asset.html }}

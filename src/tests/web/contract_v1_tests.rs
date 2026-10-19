@@ -34,12 +34,20 @@ fn contract_schema() -> Value {
 /// thread, so every test also exercises the shutdown path it would otherwise
 /// leave untested.
 fn with_session(checks: impl FnOnce(&Agent, &str)) {
+    with_configured_session(|ui| ui, checks);
+}
+
+/// [`with_session`], with a say in how the session is built.
+fn with_configured_session(
+    configure: impl FnOnce(SchemaUI) -> SchemaUI + Send + 'static,
+    checks: impl FnOnce(&Agent, &str),
+) {
     let port = reserve_port();
     let base_url = format!("http://127.0.0.1:{port}");
     let schema = contract_schema();
 
     let handle = thread::spawn(move || {
-        SchemaUI::from_schema(schema).run(FrontendOptions::Web(ServeOptions::new(
+        configure(SchemaUI::from_schema(schema)).run(FrontendOptions::Web(ServeOptions::new(
             IpAddr::from([127, 0, 0, 1]),
             port,
         )))
@@ -165,6 +173,139 @@ fn a_session_without_a_theme_does_not_pretend_to_have_one() {
         assert_eq!(
             status, 404,
             "an unadvertised capability must not be silently routable"
+        );
+    });
+}
+
+fn post_json(agent: &Agent, url: &str, body: &str) -> (u16, Value) {
+    let mut response = agent
+        .post(url)
+        .content_type("application/json")
+        .send(body)
+        .expect("request should reach the server");
+    let status = response.status().as_u16();
+    let raw = response
+        .body_mut()
+        .read_to_string()
+        .expect("response body should be readable");
+    (
+        status,
+        serde_json::from_str(&raw).unwrap_or_else(|_| Value::String(raw)),
+    )
+}
+
+#[test]
+fn saving_an_untouched_document_succeeds() {
+    with_session(|agent, base_url| {
+        let (status, body) = post_json(
+            agent,
+            &format!("{base_url}/api/v1/save"),
+            r#"{"data":{"port":1}}"#,
+        );
+        assert_eq!(status, 200);
+        assert_eq!(body["status"], "saved");
+
+        // Saving again with identical data is not an error either: a user who
+        // presses Save twice must not be told the second one failed.
+        let (status, _) = post_json(
+            agent,
+            &format!("{base_url}/api/v1/save"),
+            r#"{"data":{"port":1}}"#,
+        );
+        assert_eq!(status, 200);
+    });
+}
+
+#[test]
+fn saving_an_empty_document_succeeds() {
+    with_session(|agent, base_url| {
+        let (status, body) = post_json(agent, &format!("{base_url}/api/v1/save"), r#"{"data":{}}"#);
+        assert_eq!(status, 200);
+        assert_eq!(body["status"], "saved");
+    });
+}
+
+#[test]
+fn a_malformed_save_is_refused_without_closing_the_session() {
+    with_session(|agent, base_url| {
+        let (status, _) = post_json(agent, &format!("{base_url}/api/v1/save"), r#"{"nope":1}"#);
+        assert!(
+            (400..500).contains(&status),
+            "a body with no `data` is the client's mistake, got {status}"
+        );
+
+        // The session survives it: the next well-formed save still works.
+        let (status, _) = post_json(
+            agent,
+            &format!("{base_url}/api/v1/save"),
+            r#"{"data":{"port":2}}"#,
+        );
+        assert_eq!(status, 200);
+    });
+}
+
+#[test]
+fn a_draft_that_cannot_be_written_is_reported_with_its_reason() {
+    // A path *under a regular file* can never be created, on any platform.
+    let blocker =
+        std::env::temp_dir().join(format!("schemaui-draft-blocker-{}", std::process::id()));
+    std::fs::write(&blocker, b"not a directory").expect("create blocker file");
+    let draft_path = blocker.join("draft.json");
+
+    with_configured_session(
+        move |ui| ui.with_draft(crate::DraftStore::at(draft_path)),
+        |agent, base_url| {
+            let (status, body) = post_json(
+                agent,
+                &format!("{base_url}/api/v1/save"),
+                r#"{"data":{"port":1}}"#,
+            );
+            assert_eq!(status, 500);
+            let reason = body["error"].as_str().unwrap_or_default();
+            assert!(
+                reason.contains("draft"),
+                "the frontend shows this text to the user, so it has to say what failed: {reason:?}"
+            );
+        },
+    );
+
+    let _ = std::fs::remove_file(&blocker);
+}
+
+#[test]
+fn preview_renders_every_advertised_format_for_the_same_document() {
+    with_session(|agent, base_url| {
+        let session = get_json(agent, &format!("{base_url}/api/v1/session"));
+        let formats = session["formats"].as_array().expect("formats");
+        assert!(!formats.is_empty());
+
+        for format in formats {
+            let format = format.as_str().expect("format keyword");
+            let body = format!(r#"{{"data":{{"port":8080}},"format":"{format}","pretty":true}}"#);
+            let (status, response) = post_json(agent, &format!("{base_url}/api/v1/preview"), &body);
+            assert_eq!(status, 200, "{format} preview should render");
+            assert!(
+                response["payload"]
+                    .as_str()
+                    .is_some_and(|payload| payload.contains("8080")),
+                "{format} preview should carry the document: {response}"
+            );
+        }
+    });
+}
+
+#[test]
+fn preview_of_an_unknown_format_is_a_client_error_with_a_message() {
+    with_session(|agent, base_url| {
+        let (status, body) = post_json(
+            agent,
+            &format!("{base_url}/api/v1/preview"),
+            r#"{"data":{"port":1},"format":"xml","pretty":true}"#,
+        );
+        assert_eq!(status, 400);
+        assert!(
+            body["error"].as_str().is_some_and(|m| !m.is_empty()),
+            "an empty error is a preview pane with nothing to show: {body}"
         );
     });
 }

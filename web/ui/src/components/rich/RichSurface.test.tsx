@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import globalsCss from "../../styles/globals.css?raw";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { RichSurface } from "./RichSurface";
 import { RichAssetsProvider } from "./RichAssetsProvider";
@@ -62,6 +63,40 @@ describe("RichSurface", () => {
       [richContentId("markdown", source)]: { kind: "html", html: "<h1>Notes</h1>" },
     });
     expect(screen.getByText("Notes").tagName).toBe("H1");
+  });
+
+  describe("markdown tables", () => {
+    const source = "| a | b |\n| - | - |\n| 1 | 2 |";
+    const html =
+      "<table><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>";
+
+    it("mount inside the styled .rich-prose scope", () => {
+      const { container } = rendered(
+        { type: "markdown", source },
+        { [richContentId("markdown", source)]: { kind: "html", html } },
+      );
+
+      const scope = container.querySelector(".rich-prose");
+      expect(scope).toBeTruthy();
+      expect(scope?.querySelector("table th")).toBeTruthy();
+      expect(scope?.querySelectorAll("td")).toHaveLength(2);
+    });
+
+    it("do not depend on a typography plugin that was never installed", () => {
+      const { container } = rendered(
+        { type: "markdown", source },
+        { [richContentId("markdown", source)]: { kind: "html", html } },
+      );
+
+      // `prose` is @tailwindcss/typography's class; with no plugin it styles
+      // nothing, which is how tables lost their borders.
+      expect(container.querySelector(".prose")).toBeNull();
+    });
+
+    it("get cell borders from the stylesheet the bundle ships", () => {
+      expect(globalsCss).toMatch(/\.rich-prose\s*:where\(th,\s*td\)\s*\{[^}]*border:\s*1px solid/);
+      expect(globalsCss).toMatch(/\.rich-prose\s+table\s*\{[^}]*border-collapse:\s*collapse/);
+    });
   });
 
   it("wraps thumb and block variants as interactive figures", () => {
