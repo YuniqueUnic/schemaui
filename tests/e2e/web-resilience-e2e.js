@@ -22,6 +22,7 @@
 const { spawn } = require("child_process");
 const fs = require("fs");
 const net = require("net");
+const os = require("os");
 const path = require("path");
 
 const puppeteer = require("puppeteer");
@@ -55,10 +56,13 @@ function reservePort() {
 
 async function startServer() {
   const port = await reservePort();
+  const draftDir = fs.mkdtempSync(path.join(os.tmpdir(), "schemaui-e2e-draft-"));
+  const draftFile = path.join(draftDir, "draft.json");
   const args = [
     "web",
     "--schema", SCHEMA,
     "--config", CONFIG,
+    "--draft", draftFile,
     "--host", "127.0.0.1",
     "--port", String(port),
     "--force",
@@ -72,13 +76,14 @@ async function startServer() {
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
       const response = await fetch(`${base}/api/v1/session`);
-      if (response.ok) return { server, base };
+      if (response.ok) return { server, base, draftDir };
     } catch {
       // not up yet
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   server.kill("SIGKILL");
+  fs.rmSync(draftDir, { recursive: true, force: true });
   throw new Error("server did not become ready");
 }
 
@@ -292,7 +297,7 @@ class ResilienceE2E {
 
 async function main() {
   console.log(chalk.blue("🧪 Web resilience E2E"));
-  const { server, base } = await startServer();
+  const { server, base, draftDir } = await startServer();
   const suite = new ResilienceE2E(base, server);
   try {
     await suite.setup();
@@ -302,6 +307,9 @@ async function main() {
   } finally {
     await suite.teardown();
     server.kill("SIGKILL");
+    if (draftDir) {
+      fs.rmSync(draftDir, { recursive: true, force: true });
+    }
   }
 
   const passed = suite.results.filter((result) => result.passed).length;

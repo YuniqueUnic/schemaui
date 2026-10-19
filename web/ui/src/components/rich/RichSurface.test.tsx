@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import globalsCss from "../../styles/globals.css?raw";
+import fs from "node:fs";
+import path from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
+
+const globalsCss = fs.readFileSync(
+  path.resolve(__dirname, "../../styles/globals.css"),
+  "utf-8",
+);
 import { RichSurface } from "./RichSurface";
 import { RichAssetsProvider } from "./RichAssetsProvider";
 import { HoverPreviewProvider } from "./HoverPreviewLayer";
