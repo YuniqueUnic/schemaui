@@ -2,10 +2,12 @@ import type { JsonValue, UiAst, UiNode, UiNodeKind, UiVariant } from "./types";
 import {
   deepClone,
   getPointerValue,
-  mergeDefaults,
   setPointerValue,
 } from "./utils/jsonPointer";
-import { materializeVariantNode } from "./utils/schemaToUiKind";
+import {
+  materializeVariantNode,
+  resolveVariantPropertySchemas,
+} from "./utils/schemaToUiKind";
 import {
   extractSchemaProperties,
   identifyVariantType,
@@ -16,19 +18,11 @@ export function applyUiDefaults(
   ast: UiAst | undefined,
   data: JsonValue,
 ): JsonValue {
-  if (!ast) return ensureObjectRoot(data);
+  let result: JsonValue = deepClone(ensureObjectRoot(data));
+  if (!ast) return result;
 
-  const defaults: Record<string, JsonValue | undefined> = {};
-  ast.roots.forEach((node) => collectDefaults(node, defaults));
-
-  let result = mergeDefaults(ensureObjectRoot(data), defaults);
-  // fallback: if value becomes undefined after merge, write default explicitly
-  for (const [pointer, value] of Object.entries(defaults)) {
-    if (value === undefined) continue;
-    const current = getPointerValue(result, pointer);
-    if (current === undefined || current === null) {
-      result = setPointerValue(result, pointer, deepClone(value));
-    }
+  for (const node of ast.roots) {
+    result = seedRequiredDefaults(node, result);
   }
   return result;
 }
@@ -39,37 +33,53 @@ export function variantDefault(variant: UiVariant): JsonValue {
   // For object variants, use configurable variant identification
   if (variantNode.type === "object") {
     const result: Record<string, JsonValue> = {};
+    const resolvedPropertySchemas = resolveVariantPropertySchemas(
+      variant.schema,
+    );
+    const hasSchemaProperties = Object.keys(resolvedPropertySchemas).length > 0;
 
-    // First, set any const fields from the schema to ensure unique identification
-    const schemaProperties = extractSchemaProperties(variant.schema);
-
-    if (
-      variant.schema && typeof variant.schema === "object" &&
-      "properties" in variant.schema
-    ) {
-      const properties = variant.schema.properties as Record<string, JsonValue>;
-      for (const [key, prop] of Object.entries(properties)) {
-        if (
-          prop && typeof prop === "object" && prop !== null && "const" in prop
-        ) {
-          result[key] = (prop as { const: JsonValue }).const;
-        }
+    // First, set any const fields from the schema (including via $ref / allOf)
+    // to ensure unique identification
+    for (const [key, propSchema] of Object.entries(resolvedPropertySchemas)) {
+      if (propSchema.const !== undefined) {
+        result[key] = deepClone(propSchema.const);
       }
     }
 
     // Identify variant type using configuration
+    const schemaProperties = hasSchemaProperties
+      ? resolvedPropertySchemas
+      : extractSchemaProperties(variant.schema);
     const variantType = identifyVariantType(schemaProperties);
     const variantConfig = variantType ? VARIANT_CONFIGS[variantType] : null;
+    const requiredSet = new Set(variantNode.required ?? []);
 
-    // Process each child node
+    // Process each child node: include only schema-authored defaults or required fields.
     for (const child of variantNode.children) {
       const key = child.pointer.split("/").pop() || "";
-      if (!(key in result)) {
-        // Use variant-specific defaults if available
+      if (!key || key in result) continue;
+
+      const propSchema = resolvedPropertySchemas[key];
+      const authoredDefault = propSchema !== undefined
+        ? (propSchema.default !== undefined
+          ? propSchema.default
+          : propSchema.const !== undefined
+          ? propSchema.const
+          : undefined)
+        : (!hasSchemaProperties && child.default_value !== null
+          ? child.default_value
+          : undefined);
+
+      const isRequired = child.required || requiredSet.has(key);
+      if (authoredDefault !== undefined) {
+        result[key] = deepClone(authoredDefault);
+      } else if (isRequired) {
         if (variantConfig && key in variantConfig.defaults) {
-          result[key] = variantConfig.defaults[key] as JsonValue;
+          result[key] = deepClone(variantConfig.defaults[key] as JsonValue);
         } else {
-          result[key] = child.default_value ?? defaultForKind(child.kind);
+          result[key] = deepClone(
+            child.default_value ?? defaultForKind(child.kind),
+          );
         }
       }
     }
@@ -82,8 +92,9 @@ export function variantDefault(variant: UiVariant): JsonValue {
             (c) => c.pointer.split("/").pop() === requiredKey,
           );
           if (childNode) {
-            result[requiredKey] = childNode.default_value ??
-              defaultForKind(childNode.kind);
+            result[requiredKey] = deepClone(
+              childNode.default_value ?? defaultForKind(childNode.kind),
+            );
           }
         }
       }
@@ -143,24 +154,47 @@ export function defaultForKind(kind: UiNodeKind): JsonValue {
   }
 }
 
-function collectDefaults(
-  node: UiNode,
-  store: Record<string, JsonValue | undefined>,
-) {
-  if (node.pointer) {
-    // Use backend-provided default_value if available, otherwise use defaultForKind
-    // For arrays: respect backend semantics - empty arrays stay empty unless minItems > 0
-    const fallback = node.default_value ?? defaultForKind(node.kind);
-    store[node.pointer] = deepClone(fallback);
-  }
-
-  // NOTE: Removed the array-specific block that forced [placeholder] for empty arrays
-  // This was causing [] to become [""] which blurs the semantic difference between
-  // "no items" and "one empty item". User must explicitly click "Add entry" to add items.
+function seedRequiredDefaults(node: UiNode, root: JsonValue): JsonValue {
+  let result = root;
 
   if (node.kind.type === "object") {
-    node.kind.children.forEach((child) => collectDefaults(child, store));
+    const current = node.pointer ? getPointerValue(result, node.pointer) : result;
+    if (current === null) {
+      return result;
+    }
+
+    if (current === undefined) {
+      if (!node.required) {
+        return result;
+      }
+      const fallback = node.default_value ?? defaultForKind(node.kind);
+      result = setPointerValue(result, node.pointer, deepClone(fallback));
+    }
+
+    const nextCurrent = node.pointer
+      ? getPointerValue(result, node.pointer)
+      : result;
+    if (
+      nextCurrent !== null &&
+      typeof nextCurrent === "object" &&
+      !Array.isArray(nextCurrent)
+    ) {
+      for (const child of node.kind.children) {
+        result = seedRequiredDefaults(child, result);
+      }
+    }
+    return result;
   }
+
+  if (node.pointer && node.required) {
+    const current = getPointerValue(result, node.pointer);
+    if (current === undefined) {
+      const fallback = node.default_value ?? defaultForKind(node.kind);
+      result = setPointerValue(result, node.pointer, deepClone(fallback));
+    }
+  }
+
+  return result;
 }
 
 function ensureObjectRoot(value: JsonValue): JsonValue {

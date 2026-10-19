@@ -36,15 +36,34 @@ export function materializeCompositeKind(kind: UiNodeKind): UiNodeKind {
 }
 
 export function materializeVariantNode(variant: UiVariant): UiNodeKind {
-  const resolvedSchema = resolveStandaloneSchema(ensureObject(variant.schema));
+  const rawSchema = ensureObject(variant.schema);
+  const resolvedSchema = resolveStandaloneSchema(rawSchema);
   if (!needsMaterializedNode(variant, resolvedSchema)) {
     return variant.node;
   }
   return buildKindFromSchema({
     ...resolvedSchema,
-    definitions: ensureObject(variant.schema).definitions,
-    $defs: ensureObject(variant.schema).$defs,
+    definitions: rawSchema.definitions ?? resolvedSchema.definitions,
+    $defs: rawSchema.$defs ?? resolvedSchema.$defs,
   });
+}
+
+export function resolveVariantPropertySchemas(
+  schemaValue: JsonValue | undefined,
+): Record<string, JsonSchema> {
+  const rawSchema = ensureObject(schemaValue);
+  const definitions = extractDefinitions(rawSchema);
+  const context: BuildContext = { activeRefs: [], definitions };
+  const resolvedRoot = mergeAllOf(resolveStandaloneSchema(rawSchema), context);
+  const properties = ensureObjectMap(resolvedRoot.properties);
+  const result: Record<string, JsonSchema> = {};
+
+  for (const [key, propValue] of Object.entries(properties)) {
+    const resolvedProp = resolveSchema(ensureObject(propValue), context);
+    result[key] = mergeAllOf(resolvedProp.schema, context);
+  }
+
+  return result;
 }
 
 function needsMaterializedNode(variant: UiVariant, schema: JsonSchema): boolean {
@@ -54,16 +73,9 @@ function needsMaterializedNode(variant: UiVariant, schema: JsonSchema): boolean 
 }
 
 function resolveStandaloneSchema(schema: JsonSchema): JsonSchema {
-  const ref = readString(schema.$ref);
-  if (!ref || !ref.startsWith("#/")) {
-    return schema;
-  }
-  const definitions = {
-    ...ensureObjectMap(schema.$defs),
-    ...ensureObjectMap(schema.definitions),
-  };
-  const resolved = resolveLocalRef(ref, definitions);
-  return Object.keys(resolved).length === 0 ? schema : resolved;
+  const definitions = extractDefinitions(schema);
+  const resolved = followLocalRef(schema, definitions, []);
+  return mergeAllOf(resolved.schema, { activeRefs: [], definitions });
 }
 
 function visitNode(
@@ -104,7 +116,7 @@ function buildNodeFromResolvedSchema(
       title: readString(normalized.title),
       description: readString(normalized.description),
       required,
-      default_value: defaultForKind(kind),
+      default_value: schemaDefaultOrConst(normalized),
       kind,
     };
   }
@@ -116,7 +128,7 @@ function buildNodeFromResolvedSchema(
       title: readString(normalized.title),
       description: readString(normalized.description),
       required,
-      default_value: defaultForKind(kind),
+      default_value: schemaDefaultOrConst(normalized),
       kind,
     };
   }
@@ -127,7 +139,7 @@ function buildNodeFromResolvedSchema(
     title: readString(normalized.title),
     description: readString(normalized.description),
     required,
-    default_value: schemaDefaultOrConst(normalized) ?? defaultForKind(kind),
+    default_value: schemaDefaultOrConst(normalized),
     kind,
   };
 }
@@ -290,7 +302,7 @@ function recursiveBoundaryNode(
     title: readString(schema.title),
     description: readString(schema.description),
     required,
-    default_value: schemaDefaultOrConst(schema) ?? defaultForKind(kind),
+    default_value: schemaDefaultOrConst(schema),
     kind: normalizeEmbeddedKind(schema, kind, context),
   };
 }
@@ -380,77 +392,6 @@ function normalizeScalarKind(schema: JsonSchema): ScalarKind {
   }
 }
 
-function defaultForKind(kind: UiNodeKind): JsonValue {
-  switch (kind.type) {
-    case "field":
-      if (kind.enum_values?.length) {
-        return clone(kind.enum_values[0]);
-      }
-      switch (kind.scalar) {
-        case "integer":
-        case "number":
-          return 0;
-        case "boolean":
-          return false;
-        case "string":
-        default:
-          return "";
-      }
-    case "array":
-      return [];
-    case "object": {
-      const result: Record<string, JsonValue> = {};
-      for (const child of kind.children) {
-        const key = pointerSegment(child.pointer);
-        if (!key) {
-          continue;
-        }
-        result[key] = clone(child.default_value ?? defaultForKind(child.kind));
-      }
-      return result;
-    }
-    case "composite":
-      if (kind.allow_multiple) {
-        return [];
-      }
-      return kind.variants[0] ? generateVariantDefault(kind.variants[0]) : {};
-    case "key_value":
-      return {};
-  }
-}
-
-function generateVariantDefault(variant: UiVariant): JsonValue {
-  const node = variant.node;
-  if (node.type === "object") {
-    const result: Record<string, JsonValue> = {};
-    const schemaProps = ensureObjectMap(ensureObject(variant.schema).properties);
-    for (const [key, value] of Object.entries(schemaProps)) {
-      const propertySchema = ensureObject(value);
-      if (propertySchema.const !== undefined) {
-        result[key] = clone(propertySchema.const);
-      }
-    }
-
-    for (const child of node.children) {
-      const key = pointerSegment(child.pointer);
-      if (!key || key in result) {
-        continue;
-      }
-      if (node.required.includes(key) || child.default_value !== undefined) {
-        result[key] = clone(child.default_value ?? defaultForKind(child.kind));
-      }
-    }
-
-    return result;
-  }
-
-  if (node.type === "array") {
-    return [defaultForKind(node.item)];
-  }
-
-  return defaultForKind(node);
-}
-
 function schemaDefaultOrConst(schema: JsonSchema): JsonValue | undefined {
   if (schema.default !== undefined) {
     return clone(schema.default);
@@ -465,17 +406,60 @@ function resolveSchema(
   schema: JsonSchema,
   context: BuildContext,
 ): { schema: JsonSchema; ref?: string; recursive: boolean } {
-  const ref = readString(schema.$ref);
-  if (!ref || !ref.startsWith("#/")) {
+  return followLocalRef(schema, context.definitions, context.activeRefs);
+}
+
+function followLocalRef(
+  schema: JsonSchema,
+  definitions: Record<string, JsonValue>,
+  activeRefs: string[],
+): { schema: JsonSchema; ref?: string; recursive: boolean } {
+  const firstRef = readString(schema.$ref);
+  if (!firstRef || !firstRef.startsWith("#/")) {
     return { schema, recursive: false };
   }
 
-  const resolved = resolveLocalRef(ref, context.definitions);
+  const seen = new Set<string>();
+  let current: JsonSchema = schema;
+  let recursive = false;
+
+  while (true) {
+    const ref = readString(current.$ref);
+    if (!ref || !ref.startsWith("#/")) {
+      break;
+    }
+    if (activeRefs.includes(ref) || seen.has(ref)) {
+      recursive = true;
+      const target = resolveLocalRef(ref, definitions);
+      if (Object.keys(target).length > 0) {
+        current = mergeRefTargetWithOverrides(target, current);
+      }
+      break;
+    }
+    seen.add(ref);
+    const target = resolveLocalRef(ref, definitions);
+    if (Object.keys(target).length === 0) {
+      break;
+    }
+    current = mergeRefTargetWithOverrides(target, current);
+  }
+
   return {
-    schema: resolved,
-    ref,
-    recursive: context.activeRefs.includes(ref),
+    schema: current,
+    ref: firstRef,
+    recursive,
   };
+}
+
+function mergeRefTargetWithOverrides(
+  target: JsonSchema,
+  source: JsonSchema,
+): JsonSchema {
+  const overrides = omitKey(source, "$ref");
+  if (Object.keys(overrides).length === 0) {
+    return clone(target);
+  }
+  return deepMerge(target, overrides);
 }
 
 function resolveLocalRef(
@@ -522,10 +506,11 @@ function mergeAllOf(schema: JsonSchema, context: BuildContext): JsonSchema {
     return schema;
   }
 
-  return schema.allOf.reduce<JsonSchema>((acc, entry) => {
+  const mergedBranches = schema.allOf.reduce<JsonSchema>((acc, entry) => {
     const resolved = resolveSchema(ensureObject(entry), context);
-    return deepMerge(acc, resolved.schema);
-  }, omitKey(schema, "allOf"));
+    return deepMerge(acc, mergeAllOf(resolved.schema, context));
+  }, {});
+  return deepMerge(mergedBranches, omitKey(schema, "allOf"));
 }
 
 function deepMerge(left: JsonSchema, right: JsonSchema): JsonSchema {
@@ -603,15 +588,6 @@ function isPlainObject(value: JsonValue | undefined): value is Record<string, Js
 function appendPointer(base: string, segment: string): string {
   const encoded = segment.replace(/~/g, "~0").replace(/\//g, "~1");
   return `${base}/${encoded}`;
-}
-
-function pointerSegment(pointer: string): string | undefined {
-  if (!pointer || pointer === "/") {
-    return undefined;
-  }
-  const parts = pointer.split("/").filter(Boolean);
-  const last = parts[parts.length - 1];
-  return last?.replace(/~1/g, "/").replace(/~0/g, "~");
 }
 
 function omitKey(schema: JsonSchema, key: string): JsonSchema {

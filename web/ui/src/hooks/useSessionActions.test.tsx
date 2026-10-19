@@ -57,7 +57,7 @@ const session: SessionResponse = {
         pointer: "/field",
         title: "field",
         description: null,
-        required: false,
+        required: true,
         default_value: "",
         kind: {
           type: "field",
