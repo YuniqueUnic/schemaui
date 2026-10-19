@@ -39,6 +39,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+
+
+## [0.16.3](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.16.2...schemaui-v0.16.3) - 2026-10-19
+
+
+
+
+
+
+### Bug Fixes
+
+- preserve untouched optional, null, and map/variant values when editing documents ([#209](https://github.com/YuniqueUnic/schemaui/pull/209))([#209](https://github.com/YuniqueUnic/schemaui/pull/209), @YuniqueUnic)
+
+- **web:** style markdown tables, isolate test drafts, and handle lost connection ([#210](https://github.com/YuniqueUnic/schemaui/pull/210))([#210](https://github.com/YuniqueUnic/schemaui/pull/210), @YuniqueUnic)
+
+
+
+
+
+
+
+
+
+
+
+
+### Contributors
+
+- @YuniqueUnic
+
+
 ## [0.16.2](https://github.com/YuniqueUnic/schemaui/compare/schemaui-v0.16.1...schemaui-v0.16.2) - 2026-09-24
 
 
