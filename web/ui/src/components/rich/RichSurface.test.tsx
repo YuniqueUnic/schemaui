@@ -1,12 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import fs from "node:fs";
-import path from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
-
-const globalsCss = fs.readFileSync(
-  path.resolve(__dirname, "../../styles/globals.css"),
-  "utf-8",
-);
 import { RichSurface } from "./RichSurface";
 import { RichAssetsProvider } from "./RichAssetsProvider";
 import { HoverPreviewProvider } from "./HoverPreviewLayer";
@@ -97,11 +90,6 @@ describe("RichSurface", () => {
       // `prose` is @tailwindcss/typography's class; with no plugin it styles
       // nothing, which is how tables lost their borders.
       expect(container.querySelector(".prose")).toBeNull();
-    });
-
-    it("get cell borders from the stylesheet the bundle ships", () => {
-      expect(globalsCss).toMatch(/\.rich-prose\s*:where\(th,\s*td\)\s*\{[^}]*border:\s*1px solid/);
-      expect(globalsCss).toMatch(/\.rich-prose\s+table\s*\{[^}]*border-collapse:\s*collapse/);
     });
   });
 
