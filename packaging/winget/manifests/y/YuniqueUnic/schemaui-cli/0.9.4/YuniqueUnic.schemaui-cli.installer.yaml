@@ -1,0 +1,25 @@
+PackageIdentifier: YuniqueUnic.schemaui-cli
+PackageVersion: 0.9.4
+Installers:
+  - Architecture: x64
+    InstallerType: zip
+    NestedInstallerType: portable
+    NestedInstallerFiles:
+      - RelativeFilePath: schemaui.exe
+        PortableCommandAlias: schemaui
+    Commands:
+      - schemaui
+    InstallerUrl: https://github.com/YuniqueUnic/schemaui/releases/download/schemaui-cli-v0.9.4/schemaui-x86_64-pc-windows-msvc.zip
+    InstallerSha256: 83BC43F4679BF5641E72F64AE56759E73F356BE0B853637015839DBC64AE447D
+  - Architecture: arm64
+    InstallerType: zip
+    NestedInstallerType: portable
+    NestedInstallerFiles:
+      - RelativeFilePath: schemaui.exe
+        PortableCommandAlias: schemaui
+    Commands:
+      - schemaui
+    InstallerUrl: https://github.com/YuniqueUnic/schemaui/releases/download/schemaui-cli-v0.9.4/schemaui-aarch64-pc-windows-msvc.zip
+    InstallerSha256: 7E8146B0E2883C89CACD58E6EF9497DD11D167DDB70C39065F773E140CC44EED
+ManifestType: installer
+ManifestVersion: 1.12.0
