@@ -12,6 +12,7 @@ import type { JsonValue, UiAst } from "../types";
 import { applyUiDefaults } from "../ui-ast";
 import { downloadTextFile } from "../utils/downloadFile";
 import { deepClone, setPointerValue } from "../utils/jsonPointer";
+import { errorMessage } from "../utils/requestError";
 import type { useSessionState } from "./useSessionState";
 import { staticSession } from "../generated/session";
 
@@ -88,7 +89,7 @@ export function useSessionActions(
         actions.setPreviewPayload(result.payload);
       } catch (error) {
         if (seq !== previewSeq.current) return;
-        const message = previewErrorMessage(error);
+        const message = errorMessage(error, "Preview failed");
         console.error("Preview failed", error);
         actions.setPreviewError(message);
       }
@@ -229,7 +230,7 @@ export function useSessionActions(
       );
     } catch (error) {
       console.error("Save failed", error);
-      toast.error("Failed to save draft");
+      toast.error(`Failed to save draft: ${errorMessage(error, "unknown error")}`);
       actions.setSaving(false);
     }
   }, [state.session, state.data, actions, runValidation, transport]);
@@ -405,21 +406,6 @@ function fnv1a64(text: string): string {
  * left as a bare `""` at the call site.
  */
 const ROOT_POINTER = "";
-
-function previewErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    try {
-      const parsed = JSON.parse(error.message) as { error?: unknown };
-      if (typeof parsed.error === "string" && parsed.error.trim()) {
-        return parsed.error;
-      }
-    } catch {
-      return error.message;
-    }
-    return error.message;
-  }
-  return "Preview failed";
-}
 
 const PREVIEW_MIME_TYPES: Record<string, string> = {
   json: "application/json",
