@@ -1,8 +1,8 @@
 use std::fs;
 
 use anyhow::Result;
-use schemaui::SchemaUI;
 use schemaui::precompile::tui as pre_tui;
+use schemaui::{FrontendOptions, SchemaUI, UiOptions};
 
 use crate::cli::{CommonArgs, TuiSnapshotCommand};
 use crate::session::diagnostics::DiagnosticCollector;
@@ -22,12 +22,24 @@ pub fn run_cli(args: &CommonArgs) -> Result<()> {
         );
     }
     let session = prepare_session(args)?;
-    execute_session(session, lifecycle::deadline_from_seconds(args.timeout))
+    let mut options = UiOptions::default();
+    if let Some(protocol) = args.image_protocol {
+        options = options.with_image_protocol(protocol);
+    }
+    if let Some(cell_size) = args.image_cell_size {
+        options = options.with_image_cell_size(cell_size);
+    }
+    execute_session(
+        session,
+        lifecycle::deadline_from_seconds(args.timeout),
+        options,
+    )
 }
 
 pub(crate) fn execute_session(
     session: SessionBundle,
     deadline: Option<std::time::Duration>,
+    options: UiOptions,
 ) -> Result<()> {
     let SessionBundle {
         schema,
@@ -54,7 +66,7 @@ pub(crate) fn execute_session(
     if let Some(draft) = draft {
         ui = ui.with_draft(draft);
     }
-    lifecycle::finish(ui.run_tui()?, output)
+    lifecycle::finish(ui.run(FrontendOptions::Tui(options))?, output)
 }
 
 pub fn run_snapshot_cli(cmd: TuiSnapshotCommand) -> Result<()> {

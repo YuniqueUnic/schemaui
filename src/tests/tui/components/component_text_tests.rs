@@ -18,6 +18,7 @@ fn integer_schema() -> FieldSchema {
         kind: FieldKind::Integer,
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: Default::default(),
     }
 }
@@ -32,6 +33,7 @@ fn string_schema(default: &str) -> FieldSchema {
         kind: FieldKind::String,
         required: false,
         default: Some(json!(default)),
+        presentation: Default::default(),
         metadata: Default::default(),
     }
 }
@@ -46,6 +48,7 @@ fn number_schema() -> FieldSchema {
         kind: FieldKind::Number,
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: Default::default(),
     }
 }
@@ -60,6 +63,7 @@ fn bool_schema() -> FieldSchema {
         kind: FieldKind::Boolean,
         required: false,
         default: Some(json!(false)),
+        presentation: Default::default(),
         metadata: Default::default(),
     }
 }
@@ -77,6 +81,7 @@ fn enum_schema() -> FieldSchema {
         },
         required: false,
         default: Some(json!("alpha")),
+        presentation: Default::default(),
         metadata: Default::default(),
     }
 }

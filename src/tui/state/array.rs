@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde_json::{Number, Value, json};
 use unicode_width::UnicodeWidthStr;
 
-use crate::tui::model::{FieldKind, FieldSchema};
+use crate::tui::model::{FieldKind, FieldSchema, NodePresentation};
 
 use super::{
     error::FieldCoercionError,
@@ -29,6 +29,7 @@ struct ScalarArrayTemplate {
     description: Option<String>,
     entry_schema: Value,
     item_kind: FieldKind,
+    item_presentation: NodePresentation,
 }
 
 #[derive(Debug, Clone)]
@@ -48,14 +49,7 @@ pub struct ArrayEditorContext {
 }
 
 impl ScalarArrayState {
-    pub fn new(
-        pointer: &str,
-        label: String,
-        description: Option<String>,
-        kind: &FieldKind,
-        default: Option<&Value>,
-        palette: Arc<ComponentPalette>,
-    ) -> Self {
+    pub fn new(schema: &FieldSchema, kind: &FieldKind, palette: Arc<ComponentPalette>) -> Self {
         let entry_schema = json!({
             "type": "object",
             "required": ["value"],
@@ -64,18 +58,23 @@ impl ScalarArrayState {
             }
         });
         let mut state = Self {
-            pointer: pointer.to_string(),
+            pointer: schema.pointer.clone(),
             template: ScalarArrayTemplate {
-                label,
-                description,
+                label: schema.display_label(),
+                description: schema.description.clone(),
                 entry_schema,
                 item_kind: kind.clone(),
+                item_presentation: NodePresentation {
+                    multiline: schema.presentation.multiline,
+                    enum_details: schema.presentation.enum_details.clone(),
+                    ..Default::default()
+                },
             },
             entries: Vec::new(),
             selected: 0,
             palette,
         };
-        if let Some(Value::Array(items)) = default {
+        if let Some(Value::Array(items)) = schema.default.as_ref() {
             state.seed_entries_from_array(items);
         }
         state
@@ -293,17 +292,22 @@ fn build_entry_form_state(
         id: "array_entry".to_string(),
         title: template.label.clone(),
         description: template.description.clone(),
+        presentation: Default::default(),
+        required: true,
+        default: None,
         path: vec!["value".to_string()],
         depth: 0,
         fields: vec![field_state],
         scroll_offset: 0,
     };
-    FormState::from_sections(
+    let mut form = FormState::from_sections(
         "array_entry",
         template.label.clone(),
         template.description.clone(),
         vec![section],
-    )
+    );
+    form.seed_from_value(&json!({ "value": value }));
+    form
 }
 
 struct FieldSchemaStub {
@@ -331,6 +335,7 @@ impl From<FieldSchemaStub> for FieldSchema {
             kind: stub.template.item_kind,
             required: true,
             default: Some(stub.value),
+            presentation: stub.template.item_presentation,
             metadata: Default::default(),
         }
     }

@@ -42,17 +42,17 @@ ureq = { version = "3", default-features = false, features = [
 url = "2"
 
 [features]
-default = ["full", "completion", "remote-schema", "mermaid"]
+default = ["full", "completion", "remote-schema"]
 
-full = ["json", "yaml", "toml", "tui", "web"]
+full = ["json", "yaml", "toml", "tui-images", "web", "mermaid"]
 completion = ["dep:clap_complete"]
 remote-schema = ["dep:ureq"]
-# Rich content ships in the CLI by default: the agent-facing question forms
-# it serves are the feature's primary audience, and a form that silently
-# shows diagram sources would look broken rather than slim.
+# Full builds include rich previews; source viewing remains available when
+# a feature, terminal capability, or renderer is unavailable.
 mermaid = ["schemaui/mermaid"]
 
 tui = ["schemaui/tui"]
+tui-images = ["tui", "schemaui/tui-images"]
 web = ["schemaui/web"]
 json = ["schemaui/json"]
 yaml = ["schemaui/yaml"]

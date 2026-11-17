@@ -1,0 +1,334 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TUI showcase / 终端交互演示",
+  "description": "Ctrl+L/J 切标签；Tab/Shift+Tab 切字段；Ctrl+P 看图片/源码；Ctrl+S 保存。详见同目录 README.md。",
+  "type": "object",
+  "required": ["media", "controls", "conditional", "nested", "preservation"],
+  "properties": {
+    "media": {
+      "title": "Images / 图片与多行",
+      "description": "第一个字段按 Ctrl+P 预览 SVG；s 切源码，Esc 返回。Enter 在 textarea 内插入换行。",
+      "type": "object",
+      "required": ["notes", "diagram", "swatch", "topology", "guide"],
+      "properties": {
+        "notes": {
+          "title": "SVG preview + textarea / 图片与多行笔记",
+          "description": "Ctrl+P 打开彩色 SVG；返回后试试 Enter、中文/emoji 粘贴、Ctrl+Z/Y。图片是固定内容，笔记是独立的字符串值。",
+          "type": "string",
+          "x-control": "textarea",
+          "default": "第一行：在这里按 Enter 试试换行。\n第二行：中文、emoji 🙂、粘贴与撤销。",
+          "x-content": {
+            "type": "svg",
+            "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 480 240\" role=\"img\" aria-label=\"TUI preview with colour swatches and a sample bar chart\">\n  <rect width=\"480\" height=\"240\" rx=\"12\" fill=\"#111827\"/>\n  <text x=\"24\" y=\"36\" font-family=\"sans-serif\" font-size=\"20\" font-weight=\"bold\" fill=\"#f8fafc\">SchemaUI / TUI image preview</text>\n  <text x=\"24\" y=\"60\" font-family=\"sans-serif\" font-size=\"12\" fill=\"#cbd5e1\">Self-contained SVG. Illustrative values, not live metrics.</text>\n  <rect x=\"24\" y=\"84\" width=\"48\" height=\"48\" rx=\"4\" fill=\"#22c55e\"/>\n  <rect x=\"80\" y=\"84\" width=\"48\" height=\"48\" rx=\"4\" fill=\"#38bdf8\"/>\n  <rect x=\"136\" y=\"84\" width=\"48\" height=\"48\" rx=\"4\" fill=\"#f59e0b\"/>\n  <circle cx=\"48\" cy=\"168\" r=\"18\" fill=\"#22c55e\"/>\n  <path d=\"M38 168 L45 175 L59 160\" fill=\"none\" stroke=\"#111827\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n  <text x=\"80\" y=\"166\" font-family=\"sans-serif\" font-size=\"14\" fill=\"#f8fafc\">Shapes + colour</text>\n  <text x=\"80\" y=\"186\" font-family=\"sans-serif\" font-size=\"12\" fill=\"#cbd5e1\">No external images</text>\n  <line x1=\"256\" y1=\"188\" x2=\"448\" y2=\"188\" stroke=\"#64748b\" stroke-width=\"2\"/>\n  <rect x=\"268\" y=\"148\" width=\"28\" height=\"40\" fill=\"#22c55e\"/>\n  <rect x=\"312\" y=\"116\" width=\"28\" height=\"72\" fill=\"#38bdf8\"/>\n  <rect x=\"356\" y=\"132\" width=\"28\" height=\"56\" fill=\"#f59e0b\"/>\n  <rect x=\"400\" y=\"84\" width=\"28\" height=\"104\" fill=\"#a78bfa\"/>\n  <text x=\"24\" y=\"220\" font-family=\"sans-serif\" font-size=\"12\" fill=\"#cbd5e1\">Ctrl+P: open preview   s: source   Esc: return</text>\n</svg>\n"
+          }
+        },
+        "diagram": {
+          "title": "Mermaid / 可编辑图表",
+          "description": "编辑的是 Mermaid 源码；Ctrl+P 预览当前草稿，Esc 返回后可继续输入。TUI 不会逐键实时重绘预览。",
+          "type": "string",
+          "x-control": "mermaid",
+          "default": "flowchart LR\n  Schema[JSON Schema] --> AST[UiAst]\n  AST --> TUI[Terminal]\n  AST --> Web[Web]\n  TUI --> Result[JSON output]"
+        },
+        "swatch": {
+          "title": "SVG option images / 选项图片",
+          "description": "Enter 打开选择器，Up/Down 高亮，Ctrl+P 先预览；Esc 回到选择器，Enter 才确认。保存的仍是数值 10 或 20。",
+          "type": "integer",
+          "enum": [10, 20],
+          "default": 10,
+          "x-control": "select",
+          "x-options": [
+            {
+              "label": "Green / 绿色方块",
+              "description": "SVG 选项图片；原始 JSON 值为整数 10。",
+              "content": {
+                "type": "svg",
+                "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 120\" role=\"img\" aria-label=\"Green square\"><rect width=\"240\" height=\"120\" fill=\"#111827\"/><rect x=\"24\" y=\"24\" width=\"72\" height=\"72\" rx=\"8\" fill=\"#22c55e\"/><text x=\"120\" y=\"68\" font-family=\"sans-serif\" font-size=\"20\" fill=\"#f8fafc\">Green / 10</text></svg>"
+              }
+            },
+            {
+              "label": "Blue / 蓝色圆形",
+              "description": "先预览再确认，或取消并保留原选择；原始 JSON 值为整数 20。",
+              "content": {
+                "type": "svg",
+                "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 240 120\" role=\"img\" aria-label=\"Blue circle\"><rect width=\"240\" height=\"120\" fill=\"#111827\"/><circle cx=\"60\" cy=\"60\" r=\"36\" fill=\"#38bdf8\"/><text x=\"120\" y=\"68\" font-family=\"sans-serif\" font-size=\"20\" fill=\"#f8fafc\">Blue / 20</text></svg>"
+              }
+            }
+          ]
+        },
+        "topology": {
+          "title": "Radio + diagrams / 图表单选",
+          "description": "Left/Right 切换选项；Ctrl+P 查看选中项的 Mermaid 图与描述，查看器内 n/p 或 Tab/BackTab 切内容，方向键平移图片。",
+          "type": "string",
+          "enum": ["direct", "queue"],
+          "default": "direct",
+          "x-control": "radio",
+          "x-options": [
+            {
+              "label": "Direct / 直接调用",
+              "description": "演示同步请求路径，不连接任何真实服务。",
+              "content": {
+                "type": "mermaid",
+                "source": "flowchart LR\n  Client --> API\n  API --> Database"
+              }
+            },
+            {
+              "label": "Queue / 异步队列",
+              "description": "演示队列与 worker 的路径，不连接任何真实服务。",
+              "content": {
+                "type": "mermaid",
+                "source": "flowchart LR\n  Client --> API\n  API --> Queue\n  Queue --> Worker\n  Worker --> Database"
+              }
+            }
+          ]
+        },
+        "guide": {
+          "title": "Markdown source / 源码降级",
+          "description": "Ctrl+P 查看 Markdown 源码；TUI 不宣称已渲染 HTML 表格。",
+          "type": "string",
+          "default": "source-only demonstration",
+          "x-content": {
+            "type": "markdown",
+            "source": "## TUI 手动体验\n\n| 操作 | 按键 |\n| --- | --- |\n| 图片 / 图表 / 源码 | Ctrl+P |\n| 源码切换 | s |\n| 返回字段或选择器 | Esc |\n| 切标签 | Ctrl+L / Ctrl+J |\n| 保存 | Ctrl+S |\n\n**图片与字段值彼此独立。** SVG/Mermaid 使用可选的终端原生像素预览；缺少 feature 或终端未确认支持时保留源码。"
+          }
+        }
+      }
+    },
+    "controls": {
+      "title": "Controls / 控件",
+      "description": "试试数值步进、双端点范围、原始类型枚举和 nullable 控件。Tab 离开字段，避免与字段内方向键混淆。",
+      "type": "object",
+      "required": ["sample_rate", "window", "priority", "enabled", "acknowledged", "accent", "nullable_flag", "nullable_number"],
+      "properties": {
+        "sample_rate": {
+          "title": "Slider / 采样率",
+          "description": "Left/Right 按 0.05 步进，Shift 加速；也可精确输入。",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "multipleOf": 0.05,
+          "x-control": "slider",
+          "x-slider-marks": [
+            { "value": 0, "label": "0%" },
+            { "value": 0.5, "label": "50%" },
+            { "value": 1, "label": "100%" }
+          ],
+          "default": 0.25
+        },
+        "window": {
+          "title": "Range / 小时范围",
+          "description": "Up/Down 选择起点或终点，Left/Right 步进；方向键操作不会让端点交叉。",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 24 },
+          "minItems": 2,
+          "maxItems": 2,
+          "minimum": 0,
+          "maximum": 24,
+          "x-control": "range",
+          "default": [9, 17]
+        },
+        "priority": {
+          "title": "Segmented / 整数优先级",
+          "description": "Left/Right 切换 Low/Normal/High，输出保留整数 1/2/3，不保存展示标签。",
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "x-control": "segmented",
+          "x-options": [
+            { "label": "Low" },
+            { "label": "Normal" },
+            { "label": "High" }
+          ],
+          "default": 2
+        },
+        "enabled": {
+          "title": "Switch / 开关",
+          "description": "Space 切换。",
+          "type": "boolean",
+          "x-control": "switch",
+          "default": true
+        },
+        "acknowledged": {
+          "title": "Checkbox / 复选框",
+          "description": "Space 切换；这里只是演示值，不会执行其他操作。",
+          "type": "boolean",
+          "x-control": "checkbox",
+          "default": false
+        },
+        "accent": {
+          "title": "Color / 颜色源码",
+          "description": "试试 #38bdf8 或 rebeccapurple；十六进制显示色块，保存的仍是 CSS 字符串。",
+          "type": "string",
+          "x-control": "color",
+          "default": "#38bdf8"
+        },
+        "nullable_flag": {
+          "title": "Nullable checkbox / 可空布尔值",
+          "description": "初始 null；Space 设为 true，Delete/Backspace 清回 null；Enter 也可打开布尔选择器。",
+          "type": ["boolean", "null"],
+          "x-control": "checkbox",
+          "default": null
+        },
+        "nullable_number": {
+          "title": "Nullable number / 可空数值",
+          "description": "初始 null；输入数值后再用 Backspace 清空，应重新保存为 null。",
+          "type": ["number", "null"],
+          "default": null
+        }
+      }
+    },
+    "conditional": {
+      "title": "Visibility / 条件显示",
+      "description": "切换字段显示不会删除已有数据；隐藏字段依然按 schema 校验。",
+      "type": "object",
+      "required": ["show_advanced", "features"],
+      "properties": {
+        "show_advanced": {
+          "title": "Show advanced / 显示高级设置",
+          "description": "Space 打开后，可见高级说明与下一分区；再关闭检查保存结果仍保留它们。",
+          "type": "boolean",
+          "x-control": "switch",
+          "default": false
+        },
+        "advanced_note": {
+          "title": "Advanced note / 隐藏后保留",
+          "description": "这里的已编辑值不会因为 show_advanced 变成 false 而消失。",
+          "type": "string",
+          "x-control": "textarea",
+          "x-visible-when": { "field": "show_advanced", "op": "equals", "value": true }
+        },
+        "features": {
+          "title": "Features / 功能集合",
+          "description": "Enter 选择，Space 勾选 advanced，Enter 应用，下面的 details 会按 contains 条件出现。",
+          "type": "array",
+          "items": { "type": "string", "enum": ["basic", "advanced"] },
+          "uniqueItems": true,
+          "default": ["basic"]
+        },
+        "feature_details": {
+          "title": "Contains condition / 集合包含条件",
+          "description": "只在 features 包含 advanced 时显示；取消勾选不会删除文本。",
+          "type": "string",
+          "x-control": "textarea",
+          "x-visible-when": { "field": "features", "op": "contains", "value": "advanced" }
+        },
+        "advanced": {
+          "title": "Advanced section / 条件分区",
+          "description": "Ctrl+Tab 切到此分区；关闭上方开关后分区隐藏，但配置保留。",
+          "type": "object",
+          "x-visible-when": { "field": "show_advanced", "op": "equals", "value": true },
+          "properties": {
+            "retained_text": {
+              "title": "Retained text / 保留的文本",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "nested": {
+      "title": "Nested / 嵌套草稿",
+      "description": "Ctrl+E 打开，Enter 从条目标签进入字段；Ctrl+S 提交已打开草稿栈到根内存，Esc 关闭当前层。丢弃有修改的草稿时按提示再次 Esc。",
+      "type": "object",
+      "required": ["items", "ports", "shared", "empty_items"],
+      "properties": {
+        "items": {
+          "title": "Object list / 对象列表",
+          "description": "保留第二个条目和未知属性；编辑第一个 name 后可先取消，再重新打开检查原值。Ctrl+N 只新增，之后 Ctrl+E 打开。",
+          "type": "array",
+          "items": { "$ref": "#/definitions/Item" }
+        },
+        "ports": {
+          "title": "Map with root definitions / 带根定义的映射",
+          "description": "Ctrl+E 编辑 http 的 port；独立条目校验仍能解析根 definitions，未知属性保持不变。",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/Port" }
+        },
+        "shared": {
+          "title": "anyOf / 同一文档的两个视图",
+          "description": "两个分支编辑同一个 JSON：修改 alpha，切到 beta 后再返回，草稿应保留；Esc 取消整份未提交草稿。",
+          "anyOf": [
+            {
+              "title": "Alpha view",
+              "type": "object",
+              "required": ["alpha"],
+              "properties": { "alpha": { "type": "string", "title": "Alpha" } }
+            },
+            {
+              "title": "Beta view",
+              "type": "object",
+              "required": ["beta"],
+              "properties": { "beta": { "type": "string", "title": "Beta" } }
+            }
+          ]
+        },
+        "empty_items": {
+          "title": "Empty list / 不自动新增",
+          "description": "空列表按 Ctrl+E 不会创建条目；显式 Ctrl+N 新增后再 Ctrl+E 编辑，未编辑 optional_note 不应出现在结果中。",
+          "type": "array",
+          "items": { "$ref": "#/definitions/Item" }
+        }
+      }
+    },
+    "preservation": {
+      "title": "Preservation / 无损保存",
+      "description": "不修改直接保存：null、空数组、空 map 与未知属性应保留；未提供的 optional_default 不应自动出现。",
+      "type": "object",
+      "required": ["explicit_null", "empty_array", "empty_map"],
+      "properties": {
+        "explicit_null": {
+          "title": "Explicit null / 显式空值",
+          "description": "原值是 null，不输入时不应变成空字符串。",
+          "type": ["string", "null"]
+        },
+        "empty_array": {
+          "title": "Empty array / 空数组",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "empty_map": {
+          "title": "Empty map / 空映射",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "optional_default": {
+          "title": "Untouched optional / 缺失可选字段",
+          "description": "故意不在配置中提供；即使有 default，未编辑也应保持缺失。",
+          "type": "string",
+          "default": "must remain absent until edited"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Item": {
+      "title": "List item",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "title": "Name / 名称" },
+        "optional_note": {
+          "type": "string",
+          "title": "Optional note / 可选笔记",
+          "x-control": "textarea"
+        },
+        "children": {
+          "title": "Children / 子条目",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "Port": {
+      "title": "Port entry",
+      "type": "object",
+      "required": ["port"],
+      "properties": {
+        "port": {
+          "title": "Port / 端口",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}

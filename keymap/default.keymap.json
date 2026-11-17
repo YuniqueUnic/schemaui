@@ -883,5 +883,393 @@
       "Ctrl+?",
       "Ctrl+H"
     ]
+  },
+  {
+    "id": "content.open",
+    "description": "View field / option content",
+    "descriptionZh": "查看字段 / 选项富内容",
+    "contexts": [
+      "default",
+      "collection",
+      "overlay",
+      "popup"
+    ],
+    "action": {
+      "kind": "viewContent"
+    },
+    "combos": [
+      "Ctrl+P"
+    ]
+  },
+  {
+    "id": "content.close",
+    "description": "Close content viewer",
+    "descriptionZh": "关闭富内容查看器",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentClose"
+    },
+    "combos": [
+      "Esc",
+      "Ctrl+P"
+    ]
+  },
+  {
+    "id": "content.help",
+    "description": "Full viewer help",
+    "descriptionZh": "查看完整图片快捷键",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "showHelp"
+    },
+    "combos": [
+      "?",
+      "Ctrl+H"
+    ]
+  },
+  {
+    "id": "content.source",
+    "description": "Toggle preview / source",
+    "descriptionZh": "切换预览 / 源码",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentToggleSource"
+    },
+    "combos": [
+      "s"
+    ]
+  },
+  {
+    "id": "content.next",
+    "description": "Next figure",
+    "descriptionZh": "下一项富内容",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentStep",
+      "delta": 1
+    },
+    "combos": [
+      "n",
+      "Tab"
+    ]
+  },
+  {
+    "id": "content.prev",
+    "description": "Previous figure",
+    "descriptionZh": "上一项富内容",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentStep",
+      "delta": -1
+    },
+    "combos": [
+      "p",
+      "BackTab"
+    ]
+  },
+  {
+    "id": "content.scroll.up",
+    "description": "Scroll image / source up",
+    "descriptionZh": "图片 / 源码向上滚动",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentScroll",
+      "horizontal": 0,
+      "vertical": -1
+    },
+    "combos": [
+      "Up",
+      "k"
+    ]
+  },
+  {
+    "id": "content.scroll.down",
+    "description": "Scroll image / source down",
+    "descriptionZh": "图片 / 源码向下滚动",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentScroll",
+      "horizontal": 0,
+      "vertical": 1
+    },
+    "combos": [
+      "Down",
+      "j"
+    ]
+  },
+  {
+    "id": "content.scroll.left",
+    "description": "Scroll image left",
+    "descriptionZh": "图片向左滚动",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentScroll",
+      "horizontal": -1,
+      "vertical": 0
+    },
+    "combos": [
+      "Left",
+      "h"
+    ]
+  },
+  {
+    "id": "content.scroll.right",
+    "description": "Scroll image right",
+    "descriptionZh": "图片向右滚动",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentScroll",
+      "horizontal": 1,
+      "vertical": 0
+    },
+    "combos": [
+      "Right",
+      "l"
+    ]
+  },
+  {
+    "id": "content.zoom.in",
+    "description": "Zoom image in",
+    "descriptionZh": "放大图片",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentZoom",
+      "delta": 1
+    },
+    "combos": [
+      "i",
+      "="
+    ]
+  },
+  {
+    "id": "content.zoom.out",
+    "description": "Zoom image out",
+    "descriptionZh": "缩小图片",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentZoom",
+      "delta": -1
+    },
+    "combos": [
+      "o",
+      "-"
+    ]
+  },
+  {
+    "id": "content.fit",
+    "description": "Fit and center image",
+    "descriptionZh": "适应窗口并居中图片",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentFit"
+    },
+    "combos": [
+      "f"
+    ]
+  },
+  {
+    "id": "content.page.up",
+    "description": "Page image / source up",
+    "descriptionZh": "图片 / 源码上翻页",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentPage",
+      "delta": -1
+    },
+    "combos": [
+      "PageUp"
+    ]
+  },
+  {
+    "id": "content.page.down",
+    "description": "Page image / source down",
+    "descriptionZh": "图片 / 源码下翻页",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentPage",
+      "delta": 1
+    },
+    "combos": [
+      "PageDown"
+    ]
+  },
+  {
+    "id": "content.home",
+    "description": "Image top-left / source start",
+    "descriptionZh": "图片左上角 / 源码开头",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentHome"
+    },
+    "combos": [
+      "Home"
+    ]
+  },
+  {
+    "id": "content.end",
+    "description": "Image bottom-right / source end",
+    "descriptionZh": "图片右下角 / 源码结尾",
+    "contexts": [
+      "content"
+    ],
+    "action": {
+      "kind": "contentEnd"
+    },
+    "combos": [
+      "End"
+    ]
+  },
+  {
+    "id": "field.multiline.newline",
+    "description": "Insert newline",
+    "descriptionZh": "插入换行",
+    "contexts": [
+      "multiline"
+    ],
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Enter"
+    ],
+    "dispatch": false
+  },
+  {
+    "id": "field.multiline.up",
+    "description": "Move to previous text line",
+    "descriptionZh": "移到上一行",
+    "contexts": [
+      "multiline"
+    ],
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Up"
+    ],
+    "dispatch": false
+  },
+  {
+    "id": "field.multiline.down",
+    "description": "Move to next text line",
+    "descriptionZh": "移到下一行",
+    "contexts": [
+      "multiline"
+    ],
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Down"
+    ],
+    "dispatch": false
+  },
+  {
+    "id": "field.multiline.start",
+    "description": "Jump to text start",
+    "descriptionZh": "跳到文本开头",
+    "contexts": [
+      "multiline"
+    ],
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Ctrl+Home"
+    ],
+    "dispatch": false
+  },
+  {
+    "id": "field.multiline.end",
+    "description": "Jump to text end",
+    "descriptionZh": "跳到文本结尾",
+    "contexts": [
+      "multiline"
+    ],
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Ctrl+End"
+    ],
+    "dispatch": false
+  },
+  {
+    "id": "field.range.endpoint",
+    "description": "Choose lower / upper endpoint",
+    "descriptionZh": "选择下限 / 上限端点",
+    "contexts": [
+      "range"
+    ],
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Up",
+      "Down"
+    ],
+    "dispatch": false
+  },
+  {
+    "id": "field.range.step",
+    "description": "Step the active endpoint",
+    "descriptionZh": "调整当前端点",
+    "contexts": [
+      "range"
+    ],
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Left",
+      "Right"
+    ],
+    "dispatch": false
+  },
+  {
+    "id": "field.range.fast",
+    "description": "Fast-step the active endpoint",
+    "descriptionZh": "快速调整当前端点",
+    "contexts": [
+      "range"
+    ],
+    "action": {
+      "kind": "none"
+    },
+    "combos": [
+      "Shift+Left",
+      "Shift+Right"
+    ],
+    "dispatch": false
   }
 ]

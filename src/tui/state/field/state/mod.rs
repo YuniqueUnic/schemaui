@@ -11,7 +11,9 @@ use super::components::{ComponentKind, FieldComponent, helpers::OverlayContext};
 pub struct FieldState {
     pub schema: FieldSchema,
     pub(crate) component: Box<dyn FieldComponent>,
+    palette: std::sync::Arc<super::components::ComponentPalette>,
     pub dirty: bool,
+    pub(crate) edited: bool,
     pub error: Option<String>,
 }
 

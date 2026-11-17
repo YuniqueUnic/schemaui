@@ -4,23 +4,32 @@ use crate::tui::model::{FieldKind, FieldSchema};
 
 use super::super::components::{
     ArrayBufferComponent, BoolComponent, CompositeComponent, CompositeListComponent, EnumComponent,
-    FieldComponent, KeyValueComponent, MultiSelectComponent, ScalarArrayComponent, TextComponent,
-    palette::ComponentPalette,
+    FieldComponent, KeyValueComponent, MultiSelectComponent, RangeComponent, ScalarArrayComponent,
+    TextComponent, palette::ComponentPalette,
 };
 use super::FieldState;
 
 impl FieldState {
+    pub(crate) fn reset_value(&mut self) {
+        *self = Self::from_schema_with_palette(self.schema.clone(), Arc::clone(&self.palette));
+    }
+
     #[allow(dead_code)]
     pub fn from_schema(schema: FieldSchema) -> Self {
         Self::from_schema_with_palette(schema, Arc::new(ComponentPalette::default()))
     }
 
     pub fn from_schema_with_palette(schema: FieldSchema, palette: Arc<ComponentPalette>) -> Self {
-        let component = build_component(&schema, palette);
+        let mut component = build_component(&schema, Arc::clone(&palette));
+        if let Some(value) = schema.default.as_ref() {
+            component.seed_value(&schema, value);
+        }
         Self {
             schema,
             component,
+            palette,
             dirty: false,
+            edited: false,
             error: None,
         }
     }
@@ -30,7 +39,10 @@ fn build_component(
     schema: &FieldSchema,
     palette: Arc<ComponentPalette>,
 ) -> Box<dyn FieldComponent> {
-    match &schema.kind {
+    if schema.presentation.control == Some(crate::ui_ast::FieldControl::Range) {
+        return Box::new(RangeComponent::new(schema, palette));
+    }
+    match schema.kind.non_nullable() {
         FieldKind::String
         | FieldKind::Integer
         | FieldKind::Number

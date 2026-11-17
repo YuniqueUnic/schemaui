@@ -36,7 +36,21 @@ impl CompositeEditorOverlay {
         self.state.build_result()
     }
 
+    pub(crate) fn form_is_focused(&self) -> bool {
+        self.store.focus() == OverlayFocusMode::FormFields
+    }
+
+    pub(crate) fn has_variant_tabs(&self) -> bool {
+        self.store
+            .entry_tabs
+            .as_ref()
+            .is_some_and(|tabs| tabs.kind() == EntryTabsKind::Variants)
+    }
+
     pub(super) fn needs_list_panel(&self) -> bool {
+        if self.has_variant_tabs() {
+            return false;
+        }
         matches!(
             self.state.target(),
             CompositeOverlayTarget::ListEntry { .. }
@@ -78,7 +92,7 @@ impl CompositeEditorOverlay {
         true
     }
 
-    pub(super) fn focus_form_first(&mut self) -> bool {
+    pub(crate) fn focus_form_first(&mut self) -> bool {
         if !self.focus_form_default() {
             return false;
         }
@@ -190,12 +204,12 @@ impl CompositeEditorOverlay {
         self.state.set_exit_armed(armed);
     }
 
-    pub(super) fn validator_clone(&self) -> Option<Arc<Validator>> {
+    pub(super) fn validator_clone(&self) -> Result<Arc<Validator>, String> {
         self.state.validator_clone()
     }
 
-    pub(super) fn set_validator(&mut self, validator: Option<Arc<Validator>>) {
-        self.state.set_validator(validator);
+    pub(super) fn mark_clean(&mut self) {
+        self.state.mark_clean();
     }
 
     pub(super) fn session(&self) -> &OverlaySession {
@@ -204,12 +218,6 @@ impl CompositeEditorOverlay {
 
     pub(super) fn current_variant_index(&self) -> Option<usize> {
         self.state.current_variant_index()
-    }
-
-    pub(super) fn take_composite_session(
-        &mut self,
-    ) -> Option<crate::tui::state::CompositeEditorSession> {
-        self.state.take_composite_session()
     }
 
     pub(super) fn replace_composite_session(
@@ -225,43 +233,15 @@ impl CompositeEditorOverlay {
         }
     }
 
-    pub(super) fn advance_entry_tab(&mut self, delta: i32) -> Option<EntryAdvance> {
-        let store = self.store.entry_tabs.as_mut()?;
-        if !store.advance(delta) {
-            return None;
-        }
+    pub(super) fn next_entry_tab(&self, delta: i32) -> Option<EntryAdvance> {
+        let store = self.store.entry_tabs.as_ref()?;
+        let next = store.next_id(delta)?;
         match store.kind() {
-            EntryTabsKind::Entries => Some(EntryAdvance::Collection {
-                selected: store.selected(),
+            EntryTabsKind::Entries => Some(EntryAdvance::Collection { selected: next }),
+            EntryTabsKind::Variants => Some(EntryAdvance::Variant {
+                variant_index: next,
             }),
-            EntryTabsKind::Variants => store
-                .selected_id()
-                .map(|variant_index| EntryAdvance::Variant { variant_index }),
         }
-    }
-
-    pub(super) fn session_kind(&self) -> &'static str {
-        match self.session() {
-            OverlaySession::Composite(_) => "composite",
-            OverlaySession::KeyValue(_) => "keyvalue",
-            OverlaySession::Array(_) => "array",
-            OverlaySession::Detached => "detached",
-        }
-    }
-
-    pub(super) fn validator_cache_key(&self) -> String {
-        let target = match self.target() {
-            CompositeOverlayTarget::Field => "field",
-            CompositeOverlayTarget::ListEntry { .. } => "list",
-            CompositeOverlayTarget::KeyValueEntry { .. } => "keyvalue-entry",
-            CompositeOverlayTarget::ArrayEntry { .. } => "array-entry",
-        };
-        format!(
-            "{}::{}::{}",
-            self.field_pointer(),
-            self.session_kind(),
-            target
-        )
     }
 
     pub(super) fn advance_focus(

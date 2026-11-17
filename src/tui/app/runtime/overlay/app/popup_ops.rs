@@ -20,7 +20,7 @@ fn apply_selection_to_field(field: &mut FieldState, selection: usize, multi: Opt
         return;
     }
 
-    match &field.schema.kind {
+    match field.schema.kind.non_nullable() {
         FieldKind::Composite(_) => {
             field.apply_composite_selection(selection, None);
         }
@@ -56,12 +56,8 @@ impl App {
                     self.run_overlay_validation();
                 }
             }
-            PopupOwner::VariantSelector {
-                field_pointer,
-                overlay_host,
-            } => {
-                // Handle variant selector: add entry with selected variant
-                self.handle_variant_selector_result(&field_pointer, overlay_host, selection);
+            PopupOwner::VariantSelector { target } => {
+                self.handle_variant_selector_result(target, selection);
             }
         }
     }

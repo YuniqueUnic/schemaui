@@ -251,6 +251,20 @@ pub struct CommonArgs {
         value_parser = value_parser!(PathBuf)
     )]
     pub web_theme: Option<PathBuf>,
+    #[cfg(feature = "tui")]
+    #[arg(
+        long = "image-protocol",
+        value_name = "PROTOCOL",
+        help = "terminal pixels: auto, kitty, iterm2, sixel or source (TUI only); auto uses terminal hints without input queries"
+    )]
+    pub image_protocol: Option<schemaui::tui::app::options::ImageProtocol>,
+    #[cfg(feature = "tui")]
+    #[arg(
+        long = "image-cell-size",
+        value_name = "WIDTHxHEIGHT",
+        help = "override terminal cell pixels when the terminal does not report them (TUI only)"
+    )]
+    pub image_cell_size: Option<schemaui::tui::app::options::ImageCellSize>,
 }
 
 impl CommonArgs {
@@ -274,6 +288,10 @@ impl CommonArgs {
             timeout: local.timeout.or(self.timeout),
             draft: local.draft.clone().or_else(|| self.draft.clone()),
             web_theme: local.web_theme.clone().or_else(|| self.web_theme.clone()),
+            #[cfg(feature = "tui")]
+            image_protocol: local.image_protocol.or(self.image_protocol),
+            #[cfg(feature = "tui")]
+            image_cell_size: local.image_cell_size.or(self.image_cell_size),
         }
     }
 }

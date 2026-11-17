@@ -19,6 +19,7 @@ fn scalar_array_field_state() -> FieldState {
         kind: FieldKind::Array(Box::new(FieldKind::String)),
         required: false,
         default: Some(json!(["GET"])),
+        presentation: Default::default(),
         metadata: HashMap::new(),
     };
     FieldState::from_schema(schema)
@@ -32,6 +33,9 @@ fn build_app_with_scalar_array() -> App {
         path: vec!["app".to_string()],
         depth: 0,
         fields: vec![scalar_array_field_state()],
+        presentation: Default::default(),
+        required: true,
+        default: None,
         scroll_offset: 0,
     };
     let form_state = FormState::from_sections("app", "App", None, vec![section]);

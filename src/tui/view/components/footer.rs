@@ -254,7 +254,7 @@ fn footer_chip(text: impl Into<String>, style: Style) -> Span<'static> {
 
 /// `Timeout in 4:32` — the hour field only appears when there is one, so the
 /// footer stays narrow for the common short-budget case.
-fn countdown_label(remaining: Duration) -> String {
+pub(crate) fn countdown_label(remaining: Duration) -> String {
     // Rounded up, matching the web UI: the clock reads 0:01 through the final
     // second and only reaches 0:00 at the deadline. Truncating would show 0:00
     // for a whole second while the session was still open, and would make

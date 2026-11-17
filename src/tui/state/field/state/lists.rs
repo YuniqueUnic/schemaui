@@ -45,16 +45,6 @@ impl FieldState {
         )
     }
 
-    pub fn ensure_composite_list_popup_entry(&mut self) -> bool {
-        if !matches!(self.component.kind(), ComponentKind::CompositeList) {
-            return false;
-        }
-        if self.composite_list_selected_index().is_some() {
-            return false;
-        }
-        self.composite_list_add_entry()
-    }
-
     pub fn multi_states(&self) -> Option<&[bool]> {
         self.component.multi_state().map(|state| state.selected)
     }
@@ -64,9 +54,11 @@ impl FieldState {
     }
 
     pub fn apply_composite_selection(&mut self, selection: usize, multi_flags: Option<Vec<bool>>) {
+        let previous = self.current_value();
         if self
             .component
             .apply_composite_selection(selection, multi_flags)
+            && previous != self.current_value()
         {
             self.after_edit();
         }
@@ -181,11 +173,28 @@ impl FieldState {
             .open_scalar_array_editor(&self.schema.pointer)
     }
 
-    pub fn close_composite_editor(&mut self, session: CompositeEditorSession, mark_dirty: bool) {
-        if mark_dirty {
+    pub fn open_composite_list_variant_editor(
+        &self,
+        entry_index: usize,
+        variant_index: usize,
+    ) -> Result<CompositeEditorSession, FieldCoercionError> {
+        self.component.open_composite_list_variant_editor(
+            &self.schema.pointer,
+            entry_index,
+            variant_index,
+        )
+    }
+
+    pub fn close_composite_editor(
+        &mut self,
+        session: CompositeEditorSession,
+        mark_dirty: bool,
+    ) -> Result<bool, FieldCoercionError> {
+        let changed = self.component.apply_composite_editor(session)?;
+        if mark_dirty && changed {
             self.after_edit();
         }
-        self.component.restore_composite_editor(session);
+        Ok(changed)
     }
 
     pub fn close_composite_list_editor(
@@ -193,12 +202,14 @@ impl FieldState {
         entry_index: usize,
         session: CompositeEditorSession,
         mark_dirty: bool,
-    ) {
-        self.component
-            .restore_composite_list_editor(entry_index, session);
-        if mark_dirty {
+    ) -> Result<bool, FieldCoercionError> {
+        let changed = self
+            .component
+            .apply_composite_list_editor(entry_index, session)?;
+        if mark_dirty && changed {
             self.after_edit();
         }
+        Ok(changed)
     }
 
     pub fn close_key_value_editor(

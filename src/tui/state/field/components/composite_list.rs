@@ -133,12 +133,22 @@ impl FieldComponent for CompositeListComponent {
         self.state.open_selected_editor()
     }
 
-    fn restore_composite_list_editor(
+    fn open_composite_list_variant_editor(
+        &self,
+        _pointer: &str,
+        entry_index: usize,
+        variant_index: usize,
+    ) -> Result<CompositeEditorSession, FieldCoercionError> {
+        self.state
+            .open_entry_variant_editor(entry_index, variant_index)
+    }
+
+    fn apply_composite_list_editor(
         &mut self,
         entry_index: usize,
         session: CompositeEditorSession,
-    ) {
-        self.state.restore_entry_editor(entry_index, session);
+    ) -> Result<bool, FieldCoercionError> {
+        self.state.apply_entry_editor(entry_index, session)
     }
 
     fn overlay_context(&self, _schema: &FieldSchema) -> Option<OverlayContext> {

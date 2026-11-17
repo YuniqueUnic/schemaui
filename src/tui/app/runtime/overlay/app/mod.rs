@@ -20,7 +20,6 @@ mod validation;
 const MSG_NO_FIELD_SELECTED: &str = "No field selected";
 const MSG_SELECT_VARIANT_BEFORE_EDIT: &str =
     "Select a variant via Enter before editing (oneOf/anyOf)";
-const MSG_UNABLE_AUTO_CREATE_ENTRY: &str = "Unable to auto-create the first entry; use Ctrl+N";
 const MSG_FOCUS_COMPOSITE_BEFORE_EDITING: &str =
     "Focus a composite or composite list field before editing";
 const MSG_OVERLAY_DIRTY_CONFIRM_EXIT: &str = "Overlay dirty. Press Esc again to discard changes.";
@@ -29,9 +28,7 @@ impl App {
     fn validate_overlay_before_commit(
         overlay: &mut CompositeEditorOverlay,
     ) -> std::result::Result<(), String> {
-        let Some(validator) = overlay.validator_clone() else {
-            return Ok(());
-        };
+        let validator = overlay.validator_clone()?;
 
         match validate_form(overlay.form_state_mut(), &validator) {
             ValidationOutcome::Valid(_) => Ok(()),
@@ -50,13 +47,16 @@ impl App {
         let Some(mut overlay) = self.overlay_stack.pop() else {
             return;
         };
-        self.overlay_validator_cache
-            .remove(&overlay.validator_cache_key());
         self.popup = None;
         if commit {
+            if let Err(message) = Self::validate_overlay_before_commit(&mut overlay) {
+                self.status.set_raw(&message);
+                self.overlay_stack.push(overlay);
+                return;
+            }
             match self.apply_overlay_commit(&overlay) {
                 Ok(()) => {
-                    overlay.form_state_mut().mark_clean();
+                    overlay.mark_clean();
                     overlay.set_exit_armed(false);
                     self.exit_armed = false;
                     self.status.value_updated();
@@ -141,7 +141,7 @@ impl App {
         }
         match self.apply_overlay_commit(&overlay) {
             Ok(()) => {
-                overlay.form_state_mut().mark_clean();
+                overlay.mark_clean();
                 overlay.set_exit_armed(false);
                 self.status
                     .set_raw(format!("Overlay {} saved.", overlay.level()));
@@ -201,7 +201,7 @@ impl App {
             // Mark the overlay itself as clean so that subsequent exits do
             // not discard already-committed changes.
             let overlay = &mut self.overlay_stack[idx];
-            overlay.form_state_mut().mark_clean();
+            overlay.mark_clean();
             overlay.set_exit_armed(false);
         }
 

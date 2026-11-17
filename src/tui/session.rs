@@ -38,7 +38,7 @@ impl Frontend for TuiFrontend {
             description: _,
             ui_ast,
             layout,
-            initial_data: _,
+            initial_data,
             schema: _,
             validator,
             deadline,
@@ -50,6 +50,7 @@ impl Frontend for TuiFrontend {
         let palette = options.component_palette();
         let mut form_state = FormState::from_schema_with_palette(&resolved.form_schema, palette);
         form_state.set_layout_nav(resolved.layout_nav);
+        form_state.initialize_document(&initial_data)?;
 
         let mut app = App::new(form_state, validator, options);
         app.set_session_title(title);

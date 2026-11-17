@@ -197,13 +197,7 @@ impl KeyValueState {
         }
         let mut map = Map::new();
         for entry in &self.entries {
-            let key = entry.key.trim();
-            if key.is_empty() {
-                return Err(FieldCoercionError {
-                    pointer: self.pointer.clone(),
-                    message: "key cannot be empty".to_string(),
-                });
-            }
+            let key = entry.key.as_str();
             if map.insert(key.to_string(), entry.value.clone()).is_some() {
                 return Err(FieldCoercionError {
                     pointer: pointer_for_key(&self.pointer, key),
@@ -268,12 +262,6 @@ impl KeyValueState {
         } else {
             key_value.to_string()
         };
-        if key.trim().is_empty() {
-            return Err(FieldCoercionError {
-                pointer: pointer_for_key(&self.pointer, &key),
-                message: "key cannot be empty".to_string(),
-            });
-        }
         let value_field = object.get("value").cloned().unwrap_or(Value::Null);
 
         for (idx, existing) in self.entries.iter().enumerate() {
@@ -327,12 +315,20 @@ impl KeyValueState {
             id: "key_value".to_string(),
             title: "Key/Value Entry".to_string(),
             description: None,
+            presentation: Default::default(),
+            required: true,
+            default: None,
             path: vec!["entry".to_string()],
             depth: 0,
             fields: vec![key_field, value_field],
             scroll_offset: 0,
         };
-        FormState::from_sections("key_value", "Key/Value Entry", None, vec![section])
+        let mut form =
+            FormState::from_sections("key_value", "Key/Value Entry", None, vec![section]);
+        if let Some(entry) = entry {
+            form.seed_from_value(&serde_json::json!({ "key": entry.key, "value": entry.value }));
+        }
+        form
     }
 
     fn key_field_schema(&self) -> FieldSchema {
@@ -345,6 +341,7 @@ impl KeyValueState {
             kind: FieldKind::String,
             required: true,
             default: self.template.key_default.clone(),
+            presentation: Default::default(),
             metadata: Default::default(),
         }
     }
@@ -359,6 +356,7 @@ impl KeyValueState {
             kind: (*self.template.value_kind).clone(),
             required: true,
             default: self.template.value_default.clone(),
+            presentation: self.template.value_presentation.clone(),
             metadata: Default::default(),
         }
     }

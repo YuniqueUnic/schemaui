@@ -25,6 +25,7 @@ fn text_field(pointer: &str, title: &str) -> FieldState {
         kind: FieldKind::String,
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: HashMap::new(),
     };
     FieldState::from_schema(schema)
@@ -43,6 +44,9 @@ fn section_with_single_field(
         path: vec![id.to_string()],
         depth: 0,
         fields: vec![text_field(field_pointer, field_title)],
+        presentation: Default::default(),
+        required: true,
+        default: None,
         scroll_offset: 0,
     }
 }

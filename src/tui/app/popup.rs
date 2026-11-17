@@ -25,12 +25,16 @@ impl PopupState {
             });
         }
 
-        if let Some(value) = field.bool_value() {
+        if matches!(
+            field.schema.kind.non_nullable(),
+            crate::tui::model::FieldKind::Boolean
+        ) {
+            let value = field.bool_value();
             return Some(Self {
                 field_pointer: field.schema.pointer.clone(),
                 title: field.schema.display_label(),
                 options: vec!["true".to_string(), "false".to_string()],
-                selected: if value { 0 } else { 1 },
+                selected: usize::from(value == Some(false)),
                 multi: false,
                 toggles: Vec::new(),
             });
@@ -41,7 +45,7 @@ impl PopupState {
                 field_pointer: field.schema.pointer.clone(),
                 title: field.schema.display_label(),
                 options: state.options.to_vec(),
-                selected: state.selected,
+                selected: state.selected.unwrap_or(0),
                 multi: false,
                 toggles: Vec::new(),
             });

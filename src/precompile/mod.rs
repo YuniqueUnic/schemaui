@@ -22,7 +22,7 @@ pub mod tui;
 #[cfg(feature = "web")]
 pub mod web;
 
-pub const UI_ARTIFACT_BUNDLE_VERSION: u32 = 1;
+pub const UI_ARTIFACT_BUNDLE_VERSION: u32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UiArtifactFingerprint {
@@ -115,7 +115,7 @@ pub fn ui_ast_to_json(ast: &UiAst) -> Result<String> {
 /// Generate a Rust module under OUT_DIR that exposes a UiAst JSON constant.
 ///
 /// The generated module will contain:
-/// `pub const <const_name>: &str = r#"<UiAst-json>"#;`
+/// `pub const <const_name>: &str = "<escaped UiAst-json>";`
 pub fn generate_ui_ast_rust_module(
     schema_path: &Path,
     format: DocumentFormat,
@@ -124,11 +124,7 @@ pub fn generate_ui_ast_rust_module(
 ) -> Result<()> {
     let ast = build_ui_ast_from_file(schema_path, format)?;
     let json = ui_ast_to_json(&ast)?;
-    let src = format!(
-        "pub const {name}: &str = r#\"{json}\"#;\n",
-        name = const_name,
-        json = json,
-    );
+    let src = format!("pub const {const_name}: &str = {json:?};\n");
     fs::write(out_module_path, src)?;
     Ok(())
 }
@@ -151,7 +147,23 @@ pub fn ui_artifact_bundle_to_json(bundle: &UiArtifactBundle) -> Result<String> {
 }
 
 pub fn decode_ui_artifact_bundle(json: &str) -> Result<UiArtifactBundle> {
-    Ok(serde_json::from_str(json)?)
+    let value: Value = serde_json::from_str(json)?;
+    validate_artifact_version(value.get("artifact_version").and_then(Value::as_u64))?;
+    Ok(serde_json::from_value(value)?)
+}
+
+impl UiArtifactBundle {
+    pub(crate) fn validate_version(&self) -> Result<()> {
+        validate_artifact_version(Some(u64::from(self.artifact_version)))
+    }
+}
+
+fn validate_artifact_version(version: Option<u64>) -> Result<()> {
+    anyhow::ensure!(
+        version == Some(u64::from(UI_ARTIFACT_BUNDLE_VERSION)),
+        "unsupported UI artifact version {version:?}; regenerate artifacts with this schemaui version (format {UI_ARTIFACT_BUNDLE_VERSION})"
+    );
+    Ok(())
 }
 
 /// Generate a Rust module under OUT_DIR that exposes a constructor for
@@ -166,7 +178,7 @@ pub fn generate_ui_artifact_bundle_module(
     let bundle = build_ui_artifact_bundle_from_file(schema_path, format, defaults_path)?;
     let json = ui_artifact_bundle_to_json(&bundle)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::precompile::UiArtifactBundle {{\n    serde_json::from_str::<schemaui::precompile::UiArtifactBundle>(r#\"{json}\"#).expect(\"invalid UI artifact bundle JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::precompile::UiArtifactBundle {{\n    schemaui::precompile::decode_ui_artifact_bundle({json:?}).expect(\"invalid UI artifact bundle JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())

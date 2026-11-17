@@ -18,14 +18,7 @@ pub struct ScalarArrayComponent {
 impl ScalarArrayComponent {
     pub fn new(schema: &FieldSchema, inner: &FieldKind, palette: Arc<ComponentPalette>) -> Self {
         Self {
-            state: ScalarArrayState::new(
-                &schema.pointer,
-                schema.display_label(),
-                schema.description.clone(),
-                inner,
-                schema.default.as_ref(),
-                Arc::clone(&palette),
-            ),
+            state: ScalarArrayState::new(schema, inner, Arc::clone(&palette)),
             palette,
         }
     }

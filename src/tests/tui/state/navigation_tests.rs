@@ -20,6 +20,7 @@ fn text_field(pointer: &str, title: &str) -> FieldState {
         kind: FieldKind::String,
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: HashMap::new(),
     };
     FieldState::from_schema(schema)
@@ -33,6 +34,9 @@ fn section(id: &str, title: &str, depth: usize, fields: Vec<FieldState>) -> Sect
         path: vec![id.to_string()],
         depth,
         fields,
+        presentation: Default::default(),
+        required: true,
+        default: None,
         scroll_offset: 0,
     }
 }

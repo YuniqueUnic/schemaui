@@ -224,10 +224,16 @@ impl CompositeListState {
             pointer: self.pointer.clone(),
             message: "invalid entry selection".to_string(),
         })?;
-        let variant_index = entry.state.active_indices().first().copied().unwrap_or(0);
+        let variant_index = entry
+            .state
+            .selected_index()
+            .ok_or_else(|| FieldCoercionError {
+                pointer: entry.pointer.clone(),
+                message: "select a matching variant before editing".to_string(),
+            })?;
         let session = entry
             .state
-            .take_editor_session(&entry.pointer, variant_index)?;
+            .open_editor_session(&entry.pointer, variant_index)?;
         Ok(CompositeListEditorContext {
             entry_index: idx,
             entry_label: format!("#{} {}", idx + 1, entry.state.summary_with_preview()),
@@ -235,10 +241,36 @@ impl CompositeListState {
         })
     }
 
-    pub fn restore_entry_editor(&mut self, entry_index: usize, session: CompositeEditorSession) {
-        if let Some(entry) = self.entries.get(entry_index) {
-            entry.state.restore_editor_session(session);
-        }
+    pub fn open_entry_variant_editor(
+        &self,
+        entry_index: usize,
+        variant_index: usize,
+    ) -> Result<CompositeEditorSession, FieldCoercionError> {
+        let entry = self
+            .entries
+            .get(entry_index)
+            .ok_or_else(|| FieldCoercionError {
+                pointer: self.pointer.clone(),
+                message: "invalid entry selection".to_string(),
+            })?;
+        entry
+            .state
+            .open_editor_session(&entry.pointer, variant_index)
+    }
+
+    pub fn apply_entry_editor(
+        &mut self,
+        entry_index: usize,
+        session: CompositeEditorSession,
+    ) -> Result<bool, FieldCoercionError> {
+        let entry = self
+            .entries
+            .get_mut(entry_index)
+            .ok_or_else(|| FieldCoercionError {
+                pointer: self.pointer.clone(),
+                message: "invalid entry selection".to_string(),
+            })?;
+        entry.state.apply_editor_session(session)
     }
 
     pub fn build_value(&self, required: bool) -> Result<Option<Value>, FieldCoercionError> {
@@ -330,40 +362,7 @@ impl CompositeListState {
         };
 
         if entry.state.is_multi() {
-            let Some(flags) = flags else {
-                return false;
-            };
-
-            // Multi-choice semantics for arrays of composites (e.g. deepItems):
-            // treat each active variant as its own list entry instead of storing
-            // multiple active variants on a single entry.
-            let active_indices: Vec<usize> = flags
-                .iter()
-                .enumerate()
-                .filter_map(|(idx, flag)| if *flag { Some(idx) } else { None })
-                .collect();
-
-            if active_indices.is_empty() {
-                // No variants selected: clear entries.
-                self.entries.clear();
-                self.selected = 0;
-                self.counter = 0;
-                return true;
-            }
-
-            // Rebuild the entries collection: one entry per active variant.
-            self.entries.clear();
-            self.counter = 0;
-            for (index, variant_index) in active_indices.iter().copied().enumerate() {
-                let pointer = format!("{}/entry_{}", self.pointer, index);
-                let mut state =
-                    CompositeState::new(&pointer, &self.template, Arc::clone(&self.palette));
-                // Ensure only this variant is active for the new entry.
-                state.ensure_editable_variant_with_index(Some(variant_index));
-                self.entries.push(CompositeListEntry { pointer, state });
-            }
-            self.selected = 0;
-            true
+            flags.is_some_and(|flags| entry.state.apply_multi(&flags))
         } else {
             entry.state.apply_single(selection)
         }

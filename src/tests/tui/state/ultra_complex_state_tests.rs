@@ -95,7 +95,7 @@ fn ultra_complex_const_discriminants_autofill_without_manual_kind_input() {
             .expect("beta variant value");
         let expected_beta = json!({
             "kind": "beta",
-            "betaValue": 0.0
+            "betaValue": 0
         });
         assert_eq!(built_beta, expected_beta);
 
@@ -105,7 +105,9 @@ fn ultra_complex_const_discriminants_autofill_without_manual_kind_input() {
             "const discriminant should make the variant valid without manual kind input"
         );
 
-        variant_field.close_composite_editor(beta_ctx, true);
+        variant_field
+            .close_composite_editor(beta_ctx, true)
+            .expect("commit beta variant");
     }
 
     let built_entry = entry_ctx
@@ -117,7 +119,7 @@ fn ultra_complex_const_discriminants_autofill_without_manual_kind_input() {
         "id": 0,
         "variant": {
             "kind": "beta",
-            "betaValue": 0.0
+            "betaValue": 0
         }
     });
     assert_eq!(built_entry, expected_entry);
@@ -126,7 +128,9 @@ fn ultra_complex_const_discriminants_autofill_without_manual_kind_input() {
         let field = state
             .field_mut_by_pointer(ULTRA_DEEP_PTR)
             .expect("ultraDeep field");
-        field.close_composite_list_editor(entry_ctx.entry_index, entry_ctx.session, true);
+        field
+            .close_composite_list_editor(entry_ctx.entry_index, entry_ctx.session, true)
+            .expect("commit ultraDeep entry");
     }
 
     let current = state
@@ -182,30 +186,25 @@ fn ultra_complex_matrix_rows_and_cells_roundtrip_through_nested_composite_lists(
 
         {
             let cell_form = &mut cell_ctx.session.form_state;
-            cell_form
-                .field_mut_by_pointer("/x")
-                .expect("x field")
-                .seed_value(&json!(1.5));
-            cell_form
-                .field_mut_by_pointer("/y")
-                .expect("y field")
-                .seed_value(&json!(2.5));
+            for (pointer, value) in [("/x", json!(1.5)), ("/y", json!(2.5))] {
+                let field = cell_form.field_mut_by_pointer(pointer).expect("cell field");
+                field.seed_value(&value);
+                field.after_edit();
+            }
 
             let data_field = cell_form.field_mut_by_pointer("/data").expect("data field");
             data_field.apply_composite_selection(1, None);
             let mut data_ctx = data_field
                 .open_composite_editor(1)
                 .expect("open vector data editor");
-            data_ctx
-                .form_state
-                .field_mut_by_pointer("/magnitude")
-                .expect("magnitude field")
-                .seed_value(&json!(3.0));
-            data_ctx
-                .form_state
-                .field_mut_by_pointer("/direction")
-                .expect("direction field")
-                .seed_value(&json!(90.0));
+            for (pointer, value) in [("/magnitude", json!(3.0)), ("/direction", json!(90.0))] {
+                let field = data_ctx
+                    .form_state
+                    .field_mut_by_pointer(pointer)
+                    .expect("vector field");
+                field.seed_value(&value);
+                field.after_edit();
+            }
 
             let built_data = data_ctx
                 .form_state
@@ -221,7 +220,9 @@ fn ultra_complex_matrix_rows_and_cells_roundtrip_through_nested_composite_lists(
             let validator = validator_for(&data_ctx.schema).expect("data validator");
             assert!(validator.validate(&built_data).is_ok());
 
-            data_field.close_composite_editor(data_ctx, true);
+            data_field
+                .close_composite_editor(data_ctx, true)
+                .expect("commit vector data");
         }
 
         let expected_cell = json!({
@@ -240,7 +241,9 @@ fn ultra_complex_matrix_rows_and_cells_roundtrip_through_nested_composite_lists(
             .expect("matrix cell value");
         assert_eq!(built_cell, expected_cell);
 
-        row_field.close_composite_list_editor(cell_ctx.entry_index, cell_ctx.session, true);
+        row_field
+            .close_composite_list_editor(cell_ctx.entry_index, cell_ctx.session, true)
+            .expect("commit matrix cell");
     }
 
     let expected_row = json!({
@@ -265,7 +268,9 @@ fn ultra_complex_matrix_rows_and_cells_roundtrip_through_nested_composite_lists(
         let field = state
             .field_mut_by_pointer(MATRIX_PTR)
             .expect("matrix field");
-        field.close_composite_list_editor(row_ctx.entry_index, row_ctx.session, true);
+        field
+            .close_composite_list_editor(row_ctx.entry_index, row_ctx.session, true)
+            .expect("commit matrix row");
     }
 
     let current = state

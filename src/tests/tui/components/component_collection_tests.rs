@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::tui::{
-    model::{CompositeField, CompositeMode, CompositeVariant, FieldKind, FieldSchema},
+    model::{
+        CompositeField, CompositeMode, CompositeVariant, CompositeVariantLayout, FieldKind,
+        FieldSchema,
+    },
     state::{FieldState, field::components::helpers::format_collection_value},
 };
 use serde_json::json;
@@ -31,7 +34,7 @@ fn composite_list_display_value_uses_available_width_for_selected_entry() {
                 "Id": {"type": "integer"}
             }
         }),
-        is_object: true,
+        layout: CompositeVariantLayout::ObjectFields,
     }];
 
     let template = CompositeField {
@@ -48,6 +51,7 @@ fn composite_list_display_value_uses_available_width_for_selected_entry() {
         kind: FieldKind::Array(Box::new(FieldKind::Composite(Box::new(template)))),
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: HashMap::new(),
     });
     field.seed_value(&json!([{

@@ -10,6 +10,7 @@ pub mod reducers;
 pub mod section;
 pub mod ui_store;
 pub mod value_summary;
+mod visibility;
 
 pub use actions::FormCommand;
 pub use array::ArrayEditorSession;

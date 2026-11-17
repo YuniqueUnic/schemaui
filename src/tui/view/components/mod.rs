@@ -5,6 +5,7 @@ mod help;
 mod layout;
 pub(crate) mod overlay;
 mod popup;
+mod rich;
 mod sections;
 mod tabstrip;
 

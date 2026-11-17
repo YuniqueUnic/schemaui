@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use crate::ui_ast::{CompositeMode, EnumDetail, ScalarKind, UiAst, UiNode, UiNodeKind, UiVariant};
 
+use super::NodePresentation;
 use super::form_schema::{
-    CompositeField, CompositeMode as DomainCompositeMode, CompositeVariant, FieldKind, FieldSchema,
-    FormSchema, FormSection, KeyValueField, RootSection,
+    CompositeField, CompositeMode as DomainCompositeMode, CompositeVariant, CompositeVariantLayout,
+    FieldKind, FieldSchema, FormSchema, FormSection, KeyValueField, RootSection,
 };
 
-/// Build a legacy `FormSchema` tree from the canonical [`UiAst`].
+/// Adapt the canonical [`UiAst`] to the terminal's section and field layout.
 pub fn form_schema_from_ui_ast(ast: &UiAst) -> FormSchema {
     let mut roots = Vec::new();
     let mut general_fields = Vec::new();
@@ -40,6 +41,9 @@ pub fn form_schema_from_ui_ast(ast: &UiAst) -> FormSchema {
                     id: "general".into(),
                     title: "General".into(),
                     description: None,
+                    presentation: NodePresentation::default(),
+                    required: true,
+                    default: None,
                     path: Vec::new(),
                     fields: general_fields,
                     children: Vec::new(),
@@ -57,6 +61,9 @@ pub fn form_schema_from_ui_ast(ast: &UiAst) -> FormSchema {
                 id: "general".into(),
                 title: "General".into(),
                 description: None,
+                presentation: NodePresentation::default(),
+                required: true,
+                default: None,
                 path: Vec::new(),
                 fields: Vec::new(),
                 children: Vec::new(),
@@ -100,6 +107,9 @@ fn build_section_from_object(node: &UiNode) -> FormSection {
         id,
         title,
         description,
+        presentation: node.into(),
+        required: node.required,
+        default: node.default_value.clone(),
         path: pointer_path,
         fields,
         children,
@@ -123,14 +133,13 @@ fn field_schema_from_node(node: &UiNode) -> FieldSchema {
         kind: field_kind_from_node_kind(&node.kind),
         required: node.required,
         default: node.default_value.clone(),
+        presentation: node.into(),
         metadata: HashMap::new(),
     }
 }
 
-/// Enum labels with `x-options` overrides applied by index: the author's
-/// label where declared, the derived one everywhere else. The terminal cannot
-/// render figures or long descriptions, so a label the author bothered to
-/// write is the one part of the details worth keeping.
+/// Enum labels with `x-options` overrides applied by index. Descriptions and
+/// figures remain in the node's presentation for inline details and the viewer.
 ///
 /// Selection indexes by position, so the result keeps the base list's length
 /// even if a hand-built AST skimps on details.
@@ -192,6 +201,7 @@ fn field_kind_from_node_kind(kind: &UiNodeKind) -> FieldKind {
             value_default: template.value_default.clone(),
             value_schema: template.value_schema.clone(),
             value_kind: Box::new(field_kind_from_node_kind(template.value_kind.as_ref())),
+            value_presentation: template.value_kind.as_ref().into(),
             entry_schema: template.entry_schema.clone(),
         })),
         UiNodeKind::Composite { mode, variants, .. } => {
@@ -213,7 +223,12 @@ fn to_composite_variant(variant: &UiVariant) -> CompositeVariant {
         title: variant.title.clone().unwrap_or_else(|| variant.id.clone()),
         description: variant.description.clone(),
         schema: variant.schema.clone(),
-        is_object: variant.is_object,
+        layout: match &variant.node {
+            UiNodeKind::Object { children, .. } if !children.is_empty() => {
+                CompositeVariantLayout::ObjectFields
+            }
+            _ => CompositeVariantLayout::ValueField,
+        },
     }
 }
 

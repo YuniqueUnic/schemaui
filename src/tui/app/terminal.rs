@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Stdout},
+    io::{self, IsTerminal, Stderr},
     ops::{Deref, DerefMut},
     sync::Once,
 };
@@ -7,26 +7,49 @@ use std::{
 use anyhow::{Context, Result};
 use crossterm::{
     cursor::Show,
+    event::{DisableBracketedPaste, EnableBracketedPaste},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{Terminal, backend::CrosstermBackend};
 
+#[cfg(all(feature = "tui-images", not(target_arch = "wasm32")))]
+pub(crate) mod graphics;
+
 static PANIC_HOOK: Once = Once::new();
 
 pub struct TerminalGuard {
-    terminal: Terminal<CrosstermBackend<Stdout>>,
+    terminal: Terminal<CrosstermBackend<Stderr>>,
 }
 
 impl TerminalGuard {
+    pub(crate) fn clear_image(&mut self) -> Result<()> {
+        #[cfg(all(feature = "tui-images", not(target_arch = "wasm32")))]
+        graphics::clear_image(self.terminal.backend_mut())
+            .context("failed to clear terminal image")?;
+        Ok(())
+    }
+
     pub fn new() -> Result<Self> {
+        anyhow::ensure!(
+            io::stderr().is_terminal(),
+            "TUI requires an interactive terminal on stderr"
+        );
         enable_raw_mode().context("failed to enable raw mode")?;
-        let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
-        let backend = CrosstermBackend::new(stdout);
-        let terminal = Terminal::new(backend).context("failed to initialize terminal")?;
         install_panic_hook();
-        Ok(Self { terminal })
+        let initialized = (|| {
+            let mut stderr = io::stderr();
+            execute!(stderr, EnterAlternateScreen, EnableBracketedPaste)
+                .context("failed to enter alternate screen")?;
+            Terminal::new(CrosstermBackend::new(stderr)).context("failed to initialize terminal")
+        })();
+        match initialized {
+            Ok(terminal) => Ok(Self { terminal }),
+            Err(error) => {
+                restore_terminal();
+                Err(error)
+            }
+        }
     }
 }
 
@@ -38,7 +61,7 @@ impl Drop for TerminalGuard {
 }
 
 impl Deref for TerminalGuard {
-    type Target = Terminal<CrosstermBackend<Stdout>>;
+    type Target = Terminal<CrosstermBackend<Stderr>>;
 
     fn deref(&self) -> &Self::Target {
         &self.terminal
@@ -62,7 +85,9 @@ fn install_panic_hook() {
 }
 
 fn restore_terminal() {
+    #[cfg(all(feature = "tui-images", not(target_arch = "wasm32")))]
+    graphics::restore();
     let _ = disable_raw_mode();
-    let mut stdout = io::stdout();
-    let _ = execute!(stdout, LeaveAlternateScreen, Show);
+    let mut stderr = io::stderr();
+    let _ = execute!(stderr, DisableBracketedPaste, LeaveAlternateScreen, Show);
 }

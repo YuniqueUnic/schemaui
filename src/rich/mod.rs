@@ -106,7 +106,7 @@ pub fn collect_assets(ast: &UiAst) -> Option<RichAssets> {
 
 /// Render one declared content, or `None` when this build cannot render that
 /// kind at all — an absent capability, reported by leaving the entry out.
-fn render(content: &RichContent) -> Option<RichAsset> {
+pub(crate) fn render(content: &RichContent) -> Option<RichAsset> {
     match content {
         #[cfg(feature = "mermaid")]
         RichContent::Mermaid { source } => Some(mermaid::render_asset(source)),

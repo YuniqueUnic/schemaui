@@ -15,6 +15,7 @@ fn scalar_array_field() -> FieldState {
         kind: FieldKind::Array(Box::new(FieldKind::String)),
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: HashMap::new(),
     })
 }
@@ -30,6 +31,7 @@ fn key_value_field() -> FieldState {
         value_default: None,
         value_schema: json!({"type": "string"}),
         value_kind: Box::new(FieldKind::String),
+        value_presentation: Default::default(),
         entry_schema: json!({"type": "object"}),
     };
     FieldState::from_schema(FieldSchema {
@@ -41,6 +43,7 @@ fn key_value_field() -> FieldState {
         kind: FieldKind::KeyValue(Box::new(template)),
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: HashMap::new(),
     })
 }

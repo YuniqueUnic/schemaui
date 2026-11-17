@@ -329,7 +329,10 @@ stdin/内联文本，则回退到当前工作目录。对于 JSON 配置，根�
 
 两者的默认 feature 按使用场景刻意分开：
 
-- `schemaui-cli` 默认走“开箱即用”路径：TUI + Web + 远程 schema 加载都开启。
+- `schemaui-cli` 默认开启 `full + completion + remote-schema`：JSON/YAML/TOML、
+  带图片预览的 TUI、Web、Mermaid、Shell 补全与远程 schema 加载。
+  `--no-default-features --features full` 保留完整本地 UI，不引入补全或远程
+  schema 加载。
 - `schemaui` 作为库默认开 `tui + json`，这样保留最基础的 JSON
   能力，同时不默认引入 Web 与联网相关能力。
 - `json`、`yaml`、`toml` 都是真正落在代码路径上的 feature
@@ -461,18 +464,98 @@ fn main() -> Result<()> {
 `build_ui_ast` 先把解析后的模式规范化为 UI AST，再由 `form_schema_from_ui_ast`
 将每个子树映射为 `FormSection`/`FieldSchema`：
 
-| 模式功能                                                     | 结果控件                                                |
-| ------------------------------------------------------------ | ------------------------------------------------------- |
-| `type: string`, `integer`, `number`                          | 带有数值保护的内联文本编辑器                            |
-| `type: boolean`                                              | 切换/复选框                                             |
-| `enum`                                                       | 弹出选择器（单选或多选用于数组枚举）                    |
-| 数组                                                         | 内联列表摘要 + 每个项目的覆盖层编辑器                   |
-| `patternProperties`, `propertyNames`, `additionalProperties` | 带有模式支持验证的键值编辑器                            |
-| `$ref`, `definitions`                                        | 在布局前解析；被视为内联模式                            |
-| `oneOf` / `anyOf`                                            | 变体选择器 + 覆盖层表单，将非活动变体排除在最终负载之外 |
+| 模式功能                                                     | 结果控件                                              |
+| ------------------------------------------------------------ | ----------------------------------------------------- |
+| `type: string`, `integer`, `number`                          | 带有数值保护的内联文本编辑器                          |
+| `type: boolean`                                              | 切换/复选框                                           |
+| `enum`                                                       | 弹出选择器（单选或多选用于数组枚举）                  |
+| 数组                                                         | 内联列表摘要 + 每个项目的覆盖层编辑器                 |
+| `patternProperties`, `propertyNames`, `additionalProperties` | 带有模式支持验证的键值编辑器                          |
+| `$ref`, `definitions`                                        | 在布局前解析；被视为内联模式                          |
+| `oneOf` / `anyOf`                                            | 变体选择器 + 独立草稿；anyOf 各视图编辑同一个 JSON 值 |
 
 根对象生成标签；嵌套对象成为带有面包屑标题的部分。每个字段记录其 JSON
 指针（例如`/runtime/http/port`），以便焦点管理和验证可以精确映射错误。
+
+### 终端控件与富内容
+
+TUI 与 Web 消费同一份强类型 UI AST 展示提示：
+
+- `x-control: "textarea"` 和 `"mermaid"`：Enter 换行，Up/Down 在文本行间移动，
+  Home/End 跳到行首/行尾，Ctrl+Home/End 跳到全文首尾。Tab/BackTab 离开字段；
+  bracketed paste 整块粘贴可一次撤销。
+- `select`、`radio`、`segmented` 保留枚举真实值与选项标签；`switch`、`checkbox`
+  编辑布尔值。`slider` 按 minimum/maximum/multipleOf 步进，Shift 快速步进。
+  `range` 用 Up/Down 选择端点、Left/Right 步进，也可输入精确数值。颜色字段保留
+  CSS 源码，十六进制颜色另外显示终端色块。
+- `x-visible-when` 只控制字段和分区显示，不删除数据，也不豁免 schema 校验。
+  保存会保留未编辑的缺失值、null、空集合与未知属性；新对象条目只初始化必填字段，
+  不会凭空写入未编辑的可选字段。取消覆盖层只丢弃草稿。可空布尔字段可用
+  Delete/Backspace 恢复 null；可空数值字段清空输入后同样恢复 null。
+- Ctrl+P 查看节点/分区内容、当前 Mermaid 文本或已选枚举选项内容。
+  在弹出选择器内会预览高亮选项，不会先提交选择。`s` 切换源码；`n`/`p` 或
+  Tab/BackTab 切换内容。图片预览用方向键或 `hjkl` 平移，`i`/`=` 放大，`o`/`-`
+  缩小，`f` 适应窗口并居中。PageUp/PageDown 翻页，Home/End
+  跳到图片两端或源码首尾；`?` 或 Ctrl+H 打开可滚动的完整帮助。Esc
+  返回原编辑器或选择器；查看图片或源码时仍显示会话倒计时。
+
+库的可选 `tui-images` feature 使用 `resvg` 与 `ratatui-image`，把安全 SVG 渲染成
+**原生像素图片**；另加 `mermaid` 可预览图表。Kitty/Ghostty 使用 Kitty 协议，
+iTerm2/WezTerm/Rio 使用 iTerm2 协议，可识别的 foot/mlterm 使用
+Sixel；不再使用低分辨率半块字符图。预览默认
+**Fit**，整图水平、垂直居中；放大后可双向滚动。缩放按终端字符格的实际像素
+重新栅格化可见区域，不放大低分辨率缩略图。Mermaid 使用高对比度深色预览。
+
+SVG 准备、系统字体加载、栅格化与编码由会话拥有的单个后台 worker
+执行，只保留最新待处理图片请求。
+按键仍按原顺序处理，包括首次尺寸就绪前的操作；源码、帮助和关闭会取消过期图片工作，不等待整张图完成。
+已经开始的单次依赖库调用与终端 payload 写入仍不能抢占。
+
+自动模式保守读取终端环境提示及窗口报告的像素尺寸，不查询
+stdin、不吞按键、不调用外部图片程序，也不修改 tmux
+设置。终端提示未知/冲突、无法获取准确字符格像素、`TERM=dumb`、Markdown
+或缺少所需 feature 时明确显示源码，不再拿模糊字符图充当预览；源码始终可查看。
+已知终端确实支持时，可用 `--image-protocol kitty|iterm2|sixel`
+显式选择；终端未报告像素尺寸时，用 `--image-cell-size WIDTHxHEIGHT`
+提供实际字符格像素。`--image-protocol source` 关闭图片。Multiplexer
+内自动模式显示源码；显式 Kitty/iTerm2 透传要求用户现有 tmux 已正确配置，screen
+和 Sixel-through-tmux 仍显示源码。
+
+保守的 128 MiB
+工作集估算分别核对渲染与编码峰值。必要时缩小可见区域，而不是降低原生像素密度：
+手动缩放比例不变，Fit 仍显示整图。无法安全预览或不支持的 SVG
+特性明确显示错误及源码，不会假报成功。该估算不是进程内存硬上限。Kitty 使用无损
+zlib，iTerm2 使用 PNG，Sixel 有调色与量化；不加载 SVG 外部图片。
+协议选择与几何限制见
+[示例说明](examples/tui-showcase/README.md#图片能力与源码降级)。
+
+**临时依赖限制：** `tui-images` 固定官方 resvg
+`9e24e7b3`，包含嵌套裁剪与可见图层修复
+（[#1238](https://github.com/linebender/resvg/pull/1238)、[#1239](https://github.com/linebender/resvg/pull/1239)）。
+registry 的 0.50
+尚未包含这些修复；本工作树可本地构建，但在上游发布并切回相应版本前，不能发布到
+crates.io。
+
+```bash
+# 库：轻量 TUI，自带源码查看器
+cargo add schemaui --no-default-features --features tui,json
+# 库：SVG 与 Mermaid 预览
+cargo add schemaui --no-default-features --features tui-images,json,mermaid
+# CLI：完整本地 UI（默认 CLI 构建另含 remote-schema/completion）
+mbx build -p schemaui-cli --no-default-features --features full
+```
+
+可直接运行的综合示例见
+[examples/tui-showcase](examples/tui-showcase/README.md)：包含初始配置、自包含
+SVG、Mermaid、控件、条件显示和嵌套草稿，以及不覆盖示例文件的启动命令与按键路线。
+
+TUI 绘制到 **stderr**，该输出必须连接 TTY；stdout 保留给机器可读结果。
+例如在交互终端执行 `schemaui -s schema.json -c config.json -o - > result.json`。
+Unix 下支持先用 `-c -` 读取管道配置，再从控制终端接收键盘输入。退出时恢复 raw
+mode、备用屏幕与 bracketed paste。
+
+预编译 UI artifact bundle 现使用 **格式 2** 以携带展示提示。
+旧产物需用当前生成器重新生成；不支持的版本会明确提示重生成，不会静默丢失控件。
 
 ## 验证生命周期
 
@@ -532,19 +615,21 @@ fn main() -> Result<()> {
 | `Ctrl+Q` / `Ctrl+C` | 退出（脏状态需确认）                  | `命令` |
 | `Esc`               | 取消 / 清除状态（覆盖层：弹出当前层） | `命令` |
 | `Ctrl+?` / `Ctrl+H` | 显示帮助与错误摘要                    | `命令` |
+| `Ctrl+P`            | 查看字段 / 选项富内容                 | `命令` |
 
 #### 集合上下文
 
-| 快捷键              | 动作               | 类型   |
-| ------------------- | ------------------ | ------ |
-| `Ctrl+E`            | 打开复合编辑器     | `命令` |
-| `Ctrl+N`            | 添加条目           | `命令` |
-| `Ctrl+D`            | 删除条目           | `命令` |
-| `Ctrl+Left`         | 选择上一个条目     | `命令` |
-| `Ctrl+Right`        | 选择下一个条目     | `命令` |
-| `Ctrl+Up`           | 条目上移           | `命令` |
-| `Ctrl+Down`         | 条目下移           | `命令` |
-| `Ctrl+?` / `Ctrl+H` | 显示帮助与错误摘要 | `命令` |
+| 快捷键              | 动作                  | 类型   |
+| ------------------- | --------------------- | ------ |
+| `Ctrl+E`            | 打开复合编辑器        | `命令` |
+| `Ctrl+N`            | 添加条目              | `命令` |
+| `Ctrl+D`            | 删除条目              | `命令` |
+| `Ctrl+Left`         | 选择上一个条目        | `命令` |
+| `Ctrl+Right`        | 选择下一个条目        | `命令` |
+| `Ctrl+Up`           | 条目上移              | `命令` |
+| `Ctrl+Down`         | 条目下移              | `命令` |
+| `Ctrl+?` / `Ctrl+H` | 显示帮助与错误摘要    | `命令` |
+| `Ctrl+P`            | 查看字段 / 选项富内容 | `命令` |
 
 #### 覆盖层上下文
 
@@ -561,16 +646,18 @@ fn main() -> Result<()> {
 | `Ctrl+S`            | 保存并验证（覆盖层保持打开）          | `命令` |
 | `Esc`               | 取消 / 清除状态（覆盖层：弹出当前层） | `命令` |
 | `Ctrl+?` / `Ctrl+H` | 显示帮助与错误摘要                    | `命令` |
+| `Ctrl+P`            | 查看字段 / 选项富内容                 | `命令` |
 
 #### 弹窗上下文
 
-| 快捷键  | 动作               | 类型   |
-| ------- | ------------------ | ------ |
-| `Esc`   | 关闭弹窗           | `命令` |
-| `Up`    | 选择上一个弹窗选项 | `命令` |
-| `Down`  | 选择下一个弹窗选项 | `命令` |
-| `Space` | 切换弹窗选项       | `命令` |
-| `Enter` | 应用弹窗选择       | `命令` |
+| 快捷键   | 动作                  | 类型   |
+| -------- | --------------------- | ------ |
+| `Esc`    | 关闭弹窗              | `命令` |
+| `Up`     | 选择上一个弹窗选项    | `命令` |
+| `Down`   | 选择下一个弹窗选项    | `命令` |
+| `Space`  | 切换弹窗选项          | `命令` |
+| `Enter`  | 应用弹窗选择          | `命令` |
+| `Ctrl+P` | 查看字段 / 选项富内容 | `命令` |
 
 #### 帮助上下文
 
@@ -588,6 +675,27 @@ fn main() -> Result<()> {
 | `h`                         | 错误文本左滚   | `命令` |
 | `l`                         | 错误文本右滚   | `命令` |
 
+#### 富内容查看器上下文
+
+| 快捷键           | 动作                  | 类型   |
+| ---------------- | --------------------- | ------ |
+| `Esc` / `Ctrl+P` | 关闭富内容查看器      | `命令` |
+| `?` / `Ctrl+H`   | 查看完整图片快捷键    | `命令` |
+| `s`              | 切换预览 / 源码       | `命令` |
+| `n` / `Tab`      | 下一项富内容          | `命令` |
+| `p` / `BackTab`  | 上一项富内容          | `命令` |
+| `Up` / `k`       | 图片 / 源码向上滚动   | `命令` |
+| `Down` / `j`     | 图片 / 源码向下滚动   | `命令` |
+| `Left` / `h`     | 图片向左滚动          | `命令` |
+| `Right` / `l`    | 图片向右滚动          | `命令` |
+| `i` / `=`        | 放大图片              | `命令` |
+| `o` / `-`        | 缩小图片              | `命令` |
+| `f`              | 适应窗口并居中图片    | `命令` |
+| `PageUp`         | 图片 / 源码上翻页     | `命令` |
+| `PageDown`       | 图片 / 源码下翻页     | `命令` |
+| `Home`           | 图片左上角 / 源码开头 | `命令` |
+| `End`            | 图片右下角 / 源码结尾 | `命令` |
+
 #### 文本字段上下文
 
 | 快捷键      | 动作           | 类型       |
@@ -602,6 +710,16 @@ fn main() -> Result<()> {
 | `Ctrl+Z`    | 撤销文本编辑   | `局部编辑` |
 | `Ctrl+Y`    | 重做文本编辑   | `局部编辑` |
 
+#### 多行字段上下文
+
+| 快捷键      | 动作         | 类型       |
+| ----------- | ------------ | ---------- |
+| `Enter`     | 插入换行     | `局部编辑` |
+| `Up`        | 移到上一行   | `局部编辑` |
+| `Down`      | 移到下一行   | `局部编辑` |
+| `Ctrl+Home` | 跳到文本开头 | `局部编辑` |
+| `Ctrl+End`  | 跳到文本结尾 | `局部编辑` |
+
 #### 数值字段上下文
 
 | 快捷键        | 动作           | 类型       |
@@ -614,6 +732,14 @@ fn main() -> Result<()> {
 | `Delete`      | 删除后一个字符 | `局部编辑` |
 | `Ctrl+Z`      | 撤销数值编辑   | `局部编辑` |
 | `Ctrl+Y`      | 重做数值编辑   | `局部编辑` |
+
+#### 区间字段上下文
+
+| 快捷键                       | 动作                | 类型       |
+| ---------------------------- | ------------------- | ---------- |
+| `Up` / `Down`                | 选择下限 / 上限端点 | `局部编辑` |
+| `Left` / `Right`             | 调整当前端点        | `局部编辑` |
+| `Shift+Left` / `Shift+Right` | 快速调整当前端点    | `局部编辑` |
 
 #### 布尔字段上下文
 
@@ -677,8 +803,8 @@ README 快捷键参考都使用单一信息源。
 - **集成** –
   `InputRouter::classify`委托给`keymap::classify_key`，该函数返回嵌入在 JSON
   中的`KeyAction`。`keymap::help_text`根据`KeymapContext`过滤绑定，连接用于`StatusLine`和覆盖层说明的片段。
-- **生成文档** – `build.rs`会解析 `keymap/default.keymap.json`，并通过显式 HTML
-  marker 刷新 `README.md` 与 `README.ZH.md` 中的快捷键块；因此常规 Cargo
+- **生成文档** – `src/build.rs`会解析 `keymap/default.keymap.json`，并通过显式
+  HTML marker 刷新 `README.md` 与 `README.ZH.md` 中的快捷键块；因此常规 Cargo
   构建就会让双语快捷键参考与运行时行为保持同步。
 - **扩展** – 要添加快捷键，编辑
   JSON，选择暴露帮助文本的上下文，并在引入新的语义命令时在`KeyBindingMap`中连接结果`KeyAction`。

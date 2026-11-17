@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use serde_json::json;
 
 use crate::{
-    tui::model::{CompositeField, CompositeMode, CompositeVariant, FieldKind, FieldSchema},
+    tui::model::{
+        CompositeField, CompositeMode, CompositeVariant, CompositeVariantLayout, FieldKind,
+        FieldSchema,
+    },
     tui::state::FieldState,
 };
 
@@ -19,21 +22,21 @@ fn composite_list_field() -> FieldState {
                     "url": {"type": "string"}
                 }
             }),
-            is_object: true,
+            layout: CompositeVariantLayout::ObjectFields,
         },
         CompositeVariant {
             id: "string".to_string(),
             title: "String entry".to_string(),
             description: None,
             schema: json!({"type": "string"}),
-            is_object: false,
+            layout: CompositeVariantLayout::ValueField,
         },
         CompositeVariant {
             id: "integer".to_string(),
             title: "Integer entry".to_string(),
             description: None,
             schema: json!({"type": "integer"}),
-            is_object: false,
+            layout: CompositeVariantLayout::ValueField,
         },
     ];
     let template = CompositeField {
@@ -49,6 +52,7 @@ fn composite_list_field() -> FieldState {
         kind: FieldKind::Array(Box::new(FieldKind::Composite(Box::new(template)))),
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: HashMap::new(),
     })
 }
@@ -58,8 +62,8 @@ fn composite_list_popup_exposes_entry_variants() {
     let mut field = composite_list_field();
     assert!(field.composite_popup().is_none(), "no entry yet");
     assert!(
-        field.ensure_composite_list_popup_entry(),
-        "first popup should seed an entry"
+        field.composite_list_add_entry(),
+        "explicit add should create an entry"
     );
     let popup = field.composite_popup().expect("popup available");
     assert_eq!(popup.options.len(), 3);
@@ -70,7 +74,7 @@ fn composite_list_popup_exposes_entry_variants() {
 #[test]
 fn composite_list_selection_updates_summary() {
     let mut field = composite_list_field();
-    field.ensure_composite_list_popup_entry();
+    field.composite_list_add_entry();
     let popup = field.composite_popup().expect("popup");
     let mut toggles = vec![false; popup.options.len()];
     toggles[0] = true;
@@ -80,16 +84,20 @@ fn composite_list_selection_updates_summary() {
         .composite_list_panel()
         .expect("panel state must exist");
     assert_eq!(selected, 0, "first entry should be selected");
-    assert_eq!(entries.len(), 2, "one entry per selected variant");
+    assert_eq!(
+        entries.len(),
+        1,
+        "variant selection must not add or remove array entries"
+    );
     assert!(
         entries[0].contains("Target object"),
         "first entry should summarize the 'Target object' variant: {:?}",
         entries[0]
     );
     assert!(
-        entries[1].contains("Integer entry"),
-        "second entry should summarize the 'Integer entry' variant: {:?}",
-        entries[1]
+        entries[0].contains("Integer entry"),
+        "the same entry should expose the 'Integer entry' editing view: {:?}",
+        entries[0]
     );
 }
 
@@ -141,7 +149,7 @@ fn composite_list_summary_includes_object_preview() {
                 "Id": {"type": "integer"}
             }
         }),
-        is_object: true,
+        layout: CompositeVariantLayout::ObjectFields,
     }];
     let template = CompositeField {
         mode: CompositeMode::AnyOf,
@@ -157,6 +165,7 @@ fn composite_list_summary_includes_object_preview() {
         kind: FieldKind::Array(Box::new(FieldKind::Composite(Box::new(template)))),
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: HashMap::new(),
     });
     field.seed_value(&json!([{
@@ -187,7 +196,7 @@ fn composite_list_summary_with_limit_keeps_bar_and_id_visible() {
                 "Id": {"type": "integer"}
             }
         }),
-        is_object: true,
+        layout: CompositeVariantLayout::ObjectFields,
     }];
     let template = CompositeField {
         mode: CompositeMode::AnyOf,
@@ -203,6 +212,7 @@ fn composite_list_summary_with_limit_keeps_bar_and_id_visible() {
         kind: FieldKind::Array(Box::new(FieldKind::Composite(Box::new(template)))),
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: HashMap::new(),
     });
     field.seed_value(&json!([{

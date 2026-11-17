@@ -82,6 +82,12 @@ fn ultra_complex_recursive_tree_children_overlay_supports_nested_depth() {
     {
         let form_state = app.form_state_mut_for_test();
         focus_field(form_state, RECURSIVE_CHILDREN_PTR);
+        assert!(
+            form_state
+                .focused_field_mut()
+                .unwrap()
+                .composite_list_add_entry()
+        );
     }
     app.open_overlay_for_test();
     assert_eq!(
@@ -96,11 +102,16 @@ fn ultra_complex_recursive_tree_children_overlay_supports_nested_depth() {
             .expect("first overlay form");
         assert!(overlay.field_by_pointer("/name").is_some());
         assert!(overlay.field_by_pointer("/children").is_some());
-        overlay
-            .field_mut_by_pointer("/name")
-            .expect("name field")
-            .seed_value(&json!("child-1"));
+        let name = overlay.field_mut_by_pointer("/name").expect("name field");
+        name.seed_value(&json!("child-1"));
+        name.after_edit();
         focus_field(overlay, "/children");
+        assert!(
+            overlay
+                .focused_field_mut()
+                .unwrap()
+                .composite_list_add_entry()
+        );
     }
 
     app.open_overlay_for_test();
@@ -115,10 +126,11 @@ fn ultra_complex_recursive_tree_children_overlay_supports_nested_depth() {
             .active_overlay_form_state_for_test()
             .expect("nested overlay form");
         assert!(overlay.field_by_pointer("/name").is_some());
-        overlay
+        let name = overlay
             .field_mut_by_pointer("/name")
-            .expect("grandchild name")
-            .seed_value(&json!("grandchild-1"));
+            .expect("grandchild name");
+        name.seed_value(&json!("grandchild-1"));
+        name.after_edit();
     }
 
     assert!(
@@ -150,6 +162,12 @@ fn ultra_complex_matrix_overlay_opens_for_rows_and_cells() {
     {
         let form_state = app.form_state_mut_for_test();
         focus_field(form_state, MATRIX_PTR);
+        assert!(
+            form_state
+                .focused_field_mut()
+                .unwrap()
+                .composite_list_add_entry()
+        );
     }
     app.open_overlay_for_test();
     assert_eq!(
@@ -167,6 +185,12 @@ fn ultra_complex_matrix_overlay_opens_for_rows_and_cells() {
             "row overlay should expose the wrapped inner array field"
         );
         focus_field(overlay, "/__value");
+        assert!(
+            overlay
+                .focused_field_mut()
+                .unwrap()
+                .composite_list_add_entry_with_variant(0)
+        );
     }
 
     app.open_overlay_for_test();
