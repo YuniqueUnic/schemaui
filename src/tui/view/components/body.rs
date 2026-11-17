@@ -17,6 +17,7 @@ pub fn render_body(
     form_state: &mut FormState,
     enable_cursor: bool,
 ) {
+    form_state.normalize_focus();
     if form_state.is_empty() {
         let placeholder = Paragraph::new("No editable fields in schema")
             .block(Block::default().borders(Borders::ALL));
@@ -71,21 +72,26 @@ fn build_root_tabs_view(form_state: &FormState) -> Option<RootTabsView> {
     }
     Some(RootTabsView {
         titles: form_state
-            .roots
+            .visible_root_indices()
             .iter()
-            .map(|root| root.title.clone())
+            .map(|index| form_state.roots[*index].title.clone())
             .collect(),
-        selected: form_state.root_index(),
+        selected: form_state
+            .visible_root_indices()
+            .iter()
+            .position(|index| *index == form_state.root_index())
+            .unwrap_or(0),
     })
 }
 
 fn build_section_tabs_view(form_state: &FormState) -> Option<SectionTabsView> {
     let root = form_state.active_root()?;
     Some(SectionTabsView {
-        titles: root
-            .sections
+        titles: form_state
+            .visible_section_indices()
             .iter()
-            .map(|section| {
+            .map(|index| {
+                let section = &root.sections[*index];
                 if section.depth == 0 {
                     section.title.clone()
                 } else {
@@ -93,7 +99,11 @@ fn build_section_tabs_view(form_state: &FormState) -> Option<SectionTabsView> {
                 }
             })
             .collect(),
-        selected: form_state.section_index(),
+        selected: form_state
+            .visible_section_indices()
+            .iter()
+            .position(|index| *index == form_state.section_index())
+            .unwrap_or(0),
         label: format!("{} Sections", root.title),
     })
 }

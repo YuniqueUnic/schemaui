@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::NodePresentation;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FormSchema {
     #[allow(dead_code)]
@@ -25,6 +27,9 @@ pub struct FormSection {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
+    pub presentation: NodePresentation,
+    pub required: bool,
+    pub default: Option<Value>,
     pub path: Vec<String>,
     pub fields: Vec<FieldSchema>,
     pub children: Vec<FormSection>,
@@ -45,6 +50,15 @@ pub enum FieldKind {
     Json,
     Composite(Box<CompositeField>),
     KeyValue(Box<KeyValueField>),
+}
+
+impl FieldKind {
+    pub(crate) fn non_nullable(&self) -> &Self {
+        match self {
+            Self::Nullable(inner) => inner.non_nullable(),
+            kind => kind,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,6 +92,7 @@ mod tests {
             kind: FieldKind::String,
             required: false,
             default: None,
+            presentation: Default::default(),
             metadata: HashMap::new(),
         };
         assert_eq!(schema.display_label(), "String List");
@@ -94,6 +109,7 @@ mod tests {
             kind: FieldKind::String,
             required: false,
             default: None,
+            presentation: Default::default(),
             metadata: HashMap::new(),
         };
         assert_eq!(schema.display_label(), "Deep Items (deepItems)");
@@ -111,6 +127,7 @@ pub struct KeyValueField {
     pub value_default: Option<Value>,
     pub value_schema: Value,
     pub value_kind: Box<FieldKind>,
+    pub value_presentation: NodePresentation,
     pub entry_schema: Value,
 }
 
@@ -120,13 +137,19 @@ pub enum CompositeMode {
     AnyOf,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CompositeVariantLayout {
+    ObjectFields,
+    ValueField,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompositeVariant {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
     pub schema: Value,
-    pub is_object: bool,
+    pub layout: CompositeVariantLayout,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -139,6 +162,7 @@ pub struct FieldSchema {
     pub kind: FieldKind,
     pub required: bool,
     pub default: Option<Value>,
+    pub presentation: NodePresentation,
     pub metadata: HashMap<String, Value>,
 }
 

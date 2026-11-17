@@ -25,7 +25,10 @@ fn defs_2020_12_schema_path() -> std::path::PathBuf {
 use crate::{
     tui::state::field::components::ComponentPalette,
     tui::{
-        model::{CompositeField, CompositeMode, CompositeVariant, form_schema_from_ui_ast},
+        model::{
+            CompositeField, CompositeMode, CompositeVariant, CompositeVariantLayout,
+            form_schema_from_ui_ast,
+        },
         state::{CompositeState, FormState},
     },
     ui_ast::build_ui_ast,
@@ -46,7 +49,7 @@ fn seed_from_value_uses_enum_discriminator() {
                 }
             }
         }),
-        is_object: true,
+        layout: CompositeVariantLayout::ObjectFields,
     };
     let variant_two = CompositeVariant {
         id: "variant_two".to_string(),
@@ -61,7 +64,7 @@ fn seed_from_value_uses_enum_discriminator() {
                 }
             }
         }),
-        is_object: true,
+        layout: CompositeVariantLayout::ObjectFields,
     };
 
     let field = CompositeField {
@@ -94,7 +97,7 @@ fn non_object_variant_round_trips_through_wrapper() {
             "type": "array",
             "items": {"type": "string"}
         }),
-        is_object: false,
+        layout: CompositeVariantLayout::ValueField,
     };
     let field = CompositeField {
         mode: CompositeMode::OneOf,
@@ -111,7 +114,7 @@ fn non_object_variant_round_trips_through_wrapper() {
     );
 
     let mut session = state
-        .take_editor_session("/options", 0)
+        .open_editor_session("/options", 0)
         .expect("editor session");
     assert!(
         session
@@ -124,7 +127,9 @@ fn non_object_variant_round_trips_through_wrapper() {
     session
         .form_state
         .seed_from_value(&json!({"__value": ["z"]}));
-    state.restore_editor_session(session);
+    state
+        .apply_editor_session(session)
+        .expect("apply editor session");
 
     assert_eq!(
         state.build_value(true).expect("build updated value"),

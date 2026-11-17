@@ -1,0 +1,56 @@
+{
+  "$schema": "./schema.json",
+  "media": {
+    "notes": "第一行：在这里按 Enter 试试换行。\n第二行：中文、emoji 🙂、粘贴与撤销。",
+    "diagram": "flowchart LR\n  Schema[JSON Schema] --> AST[UiAst]\n  AST --> TUI[Terminal]\n  AST --> Web[Web]\n  TUI --> Result[JSON output]",
+    "swatch": 10,
+    "topology": "direct",
+    "guide": "source-only demonstration"
+  },
+  "controls": {
+    "sample_rate": 0.25,
+    "window": [9, 17],
+    "priority": 2,
+    "enabled": true,
+    "acknowledged": false,
+    "accent": "#38bdf8",
+    "nullable_flag": null,
+    "nullable_number": null
+  },
+  "conditional": {
+    "show_advanced": false,
+    "advanced_note": "隐藏字段的初始内容：切换显示不应删除我。",
+    "features": ["basic"],
+    "feature_details": "contains 条件下的文本也应保留。",
+    "advanced": {
+      "retained_text": "分区隐藏后仍需保留。"
+    }
+  },
+  "nested": {
+    "items": [
+      {
+        "name": "first",
+        "optional_note": "修改后可按两次 Esc 取消，重新打开应恢复此原值。",
+        "children": ["child-a", "child-b"],
+        "extra": { "keep": true }
+      },
+      {
+        "name": "second",
+        "children": ["outer-kept"]
+      }
+    ],
+    "ports": {
+      "http": { "port": 8080, "extra": "keep-map-entry" },
+      "metrics": { "port": 9090 }
+    },
+    "shared": { "alpha": "A", "beta": "B", "extra": "keep-anyof" },
+    "empty_items": []
+  },
+  "preservation": {
+    "explicit_null": null,
+    "empty_array": [],
+    "empty_map": {},
+    "unmodeled": { "keep": true }
+  },
+  "unmodeled": { "keep": "root value outside the schema properties" }
+}

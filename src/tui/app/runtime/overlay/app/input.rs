@@ -15,6 +15,36 @@ impl App {
             return Ok(());
         }
 
+        if self
+            .active_overlay()
+            .is_some_and(|editor| !editor.form_is_focused())
+            && key.modifiers.is_empty()
+        {
+            match key.code {
+                KeyCode::Enter => {
+                    if let Some(editor) = self.active_overlay_mut() {
+                        editor.focus_form_first();
+                    }
+                    return Ok(());
+                }
+                KeyCode::Left | KeyCode::Right => {
+                    self.advance_overlay_entry(if key.code == KeyCode::Left { -1 } else { 1 });
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+
+        if self
+            .active_overlay()
+            .filter(|editor| editor.form_is_focused())
+            .and_then(|editor| editor.form_state().focused_field())
+            .is_some_and(|field| field.captures_key(&key))
+        {
+            self.handle_overlay_field_input(&key);
+            return Ok(());
+        }
+
         let dispatch = self
             .options
             .keymap
@@ -24,9 +54,12 @@ impl App {
                 if self.handle_overlay_focus_command(&command) {
                     return Ok(());
                 }
-                if let Some(editor) = self.active_overlay_mut() {
+                if let Some(editor) = self
+                    .active_overlay_mut()
+                    .filter(|editor| editor.form_is_focused())
+                {
                     editor.set_exit_armed(false);
-                    apply_command(editor.form_state_mut(), command.clone());
+                    apply_command(editor.form_state_mut(), command);
                     self.run_overlay_validation();
                 }
             }
@@ -44,11 +77,36 @@ impl App {
         Ok(())
     }
 
+    pub(crate) fn handle_overlay_paste(&mut self, text: &str) {
+        let Some(editor) = self
+            .active_overlay_mut()
+            .filter(|editor| editor.form_is_focused())
+        else {
+            return;
+        };
+        let parent_label = editor.field_label().to_string();
+        let edited = editor
+            .form_state_mut()
+            .focused_field_mut()
+            .and_then(|field| {
+                field
+                    .paste(text)
+                    .then(|| (field.schema.pointer.clone(), field.schema.display_label()))
+            });
+        if let Some((pointer, label)) = edited {
+            editor.set_exit_armed(false);
+            self.status.editing(&format!("{parent_label} › {label}"));
+            self.validate_overlay_field(pointer);
+        }
+    }
+
     fn handle_overlay_field_input(&mut self, event: &KeyEvent) {
         let Some(result) = ({
-            let editor = match self.active_overlay_mut() {
-                Some(editor) => editor,
-                None => return,
+            let Some(editor) = self
+                .active_overlay_mut()
+                .filter(|editor| editor.form_is_focused())
+            else {
+                return;
             };
             editor.set_exit_armed(false);
             overlay_field_input_result(editor, event)
@@ -73,7 +131,18 @@ impl App {
                 return Ok(true);
             }
             AppCommand::EditComposite => {
-                self.try_open_composite_editor();
+                if let Some(editor) = self
+                    .active_overlay_mut()
+                    .filter(|editor| !editor.form_is_focused())
+                {
+                    editor.focus_form_first();
+                } else {
+                    self.try_open_composite_editor();
+                }
+                return Ok(true);
+            }
+            AppCommand::ViewContent => {
+                self.open_content_viewer();
                 return Ok(true);
             }
             AppCommand::ShowHelp => {

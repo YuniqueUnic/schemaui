@@ -51,9 +51,7 @@ impl FieldComponent for CompositeComponent {
     }
 
     fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {
-        if value.is_object() {
-            let _ = self.state.seed_from_value(value);
-        }
+        let _ = self.state.seed_from_value(value);
     }
 
     fn current_value(&self, schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
@@ -93,11 +91,14 @@ impl FieldComponent for CompositeComponent {
         pointer: &str,
         variant_index: usize,
     ) -> Result<CompositeEditorSession, FieldCoercionError> {
-        self.state.take_editor_session(pointer, variant_index)
+        self.state.open_editor_session(pointer, variant_index)
     }
 
-    fn restore_composite_editor(&mut self, session: CompositeEditorSession) {
-        self.state.restore_editor_session(session);
+    fn apply_composite_editor(
+        &mut self,
+        session: CompositeEditorSession,
+    ) -> Result<bool, FieldCoercionError> {
+        self.state.apply_editor_session(session)
     }
 }
 

@@ -10,36 +10,7 @@ use crossterm::event::KeyEvent;
 
 use super::{
     MSG_FOCUS_COMPOSITE_BEFORE_EDITING, MSG_NO_FIELD_SELECTED, MSG_SELECT_VARIANT_BEFORE_EDIT,
-    MSG_UNABLE_AUTO_CREATE_ENTRY,
 };
-
-fn ensure_variant_selected_for_anyof(
-    field: &mut FieldState,
-    is_anyof: bool,
-    variant_count: usize,
-) -> std::result::Result<usize, &'static str> {
-    let mut active = field.active_composite_variants();
-    if active.is_empty() && is_anyof && variant_count > 0 {
-        let mut flags = vec![false; variant_count];
-        flags[0] = true;
-        field.apply_composite_selection(0, Some(flags));
-        active = field.active_composite_variants();
-    }
-
-    if let Some(&index) = active.first() {
-        Ok(index)
-    } else {
-        Err(MSG_SELECT_VARIANT_BEFORE_EDIT)
-    }
-}
-
-fn ensure_composite_list_entry(field: &mut FieldState) -> std::result::Result<(), &'static str> {
-    if field.composite_list_selected_index().is_none() && !field.composite_list_add_entry() {
-        Err(MSG_UNABLE_AUTO_CREATE_ENTRY)
-    } else {
-        Ok(())
-    }
-}
 
 pub(super) fn overlay_field_input_result(
     editor: &mut CompositeEditorOverlay,
@@ -82,21 +53,19 @@ impl App {
             self.status.set_raw(MSG_NO_FIELD_SELECTED);
             return;
         };
+        if field.is_composite_list() && field.composite_list_selected_index().is_none() {
+            self.status
+                .set_raw("Collection is empty; use Ctrl+N to add an entry.");
+            return;
+        }
         let component_context = field.overlay_context();
 
         match &field.schema.kind {
-            FieldKind::Composite(template) => {
-                let schema = template.as_ref();
-                let is_anyof = matches!(schema.mode, CompositeMode::AnyOf);
-                let variant_index =
-                    match ensure_variant_selected_for_anyof(field, is_anyof, schema.variants.len())
-                    {
-                        Ok(idx) => idx,
-                        Err(msg) => {
-                            self.status.set_raw(msg);
-                            return;
-                        }
-                    };
+            FieldKind::Composite(_) => {
+                let Some(variant_index) = field.active_composite_variants().first().copied() else {
+                    self.status.set_raw(MSG_SELECT_VARIANT_BEFORE_EDIT);
+                    return;
+                };
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
                 match field.open_composite_editor(variant_index) {
@@ -126,10 +95,6 @@ impl App {
             FieldKind::Array(inner) if matches!(inner.as_ref(), FieldKind::Composite(_)) => {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
-                if let Err(msg) = ensure_composite_list_entry(field) {
-                    self.status.set_raw(msg);
-                    return;
-                }
                 match field.open_composite_list_editor() {
                     Ok(context) => {
                         let mut overlay = CompositeEditorOverlay::new(
@@ -192,10 +157,6 @@ impl App {
             {
                 let pointer = field.schema.pointer.clone();
                 let label = field.schema.display_label();
-                if let Err(msg) = ensure_composite_list_entry(field) {
-                    self.status.set_raw(msg);
-                    return;
-                }
                 match field.open_scalar_array_editor() {
                     Ok(context) => {
                         self.popup = None;

@@ -4,7 +4,7 @@ use crate::tui::app::runtime::overlay::state::{
 };
 
 impl App {
-    pub(super) fn advance_overlay_entry(&mut self, delta: i32) -> bool {
+    pub(crate) fn advance_overlay_entry(&mut self, delta: i32) -> bool {
         let (action, field_pointer, host) = {
             let editor = match self.active_overlay_mut() {
                 Some(editor) => editor,
@@ -18,7 +18,7 @@ impl App {
             }
             let pointer = editor.field_pointer().to_string();
             let host = editor.host();
-            let Some(next) = editor.advance_entry_tab(delta) else {
+            let Some(next) = editor.next_entry_tab(delta) else {
                 editor.set_exit_armed(false);
                 if !editor.focus_entries() {
                     editor.focus_form_first();
@@ -76,58 +76,54 @@ impl App {
     }
 
     pub(super) fn switch_overlay_variant(&mut self, variant_index: usize) -> bool {
-        let (field_pointer, host) = {
-            let editor = match self.active_overlay() {
-                Some(editor) => editor,
-                None => return false,
+        let (field_pointer, host, target, value, dirty) = {
+            let Some(editor) = self.active_overlay() else {
+                return false;
             };
-            match editor.session() {
-                OverlaySession::Composite(_) => {}
-                _ => return false,
-            }
-            let current = editor.current_variant_index().unwrap_or(variant_index);
-            if current == variant_index {
+            let OverlaySession::Composite(session) = editor.session() else {
+                return false;
+            };
+            if session.variant_index == variant_index {
                 return true;
             }
-            (editor.field_pointer().to_string(), editor.host())
-        };
-
-        let old_session = {
-            let editor = match self.active_overlay_mut() {
-                Some(editor) => editor,
-                None => return false,
-            };
-            match editor.take_composite_session() {
-                Some(session) => session,
-                None => return false,
-            }
-        };
-
-        let host_state = self.host_form_state_mut(host);
-        let Some(field) = host_state.field_mut_by_pointer(&field_pointer) else {
-            if let Some(editor) = self.active_overlay_mut() {
-                editor.replace_composite_session(old_session);
-            }
-            return false;
-        };
-
-        let old_index = old_session.variant_index;
-        field.close_composite_editor(old_session, false);
-
-        let new_session = match field.open_composite_editor(variant_index) {
-            Ok(session) => session,
-            Err(err) => {
-                if let Ok(restored) = field.open_composite_editor(old_index)
-                    && let Some(editor) = self.active_overlay_mut()
-                {
-                    editor.replace_composite_session(restored);
-                    editor.sync_variant_selection(old_index);
+            let value = match session.value() {
+                Ok(value) => value,
+                Err(error) => {
+                    self.status.set_raw(error.message);
+                    return false;
                 }
-                self.status.set_raw(&err.message);
+            };
+            (
+                editor.field_pointer().to_string(),
+                editor.host(),
+                editor.target().clone(),
+                value,
+                editor.dirty(),
+            )
+        };
+
+        let result = {
+            let host_state = self.host_form_state_mut(host);
+            let Some(field) = host_state.field_mut_by_pointer(&field_pointer) else {
+                self.status.set_raw("Overlay target no longer exists");
+                return false;
+            };
+            match target {
+                CompositeOverlayTarget::Field => field.open_composite_editor(variant_index),
+                CompositeOverlayTarget::ListEntry { entry_index } => {
+                    field.open_composite_list_variant_editor(entry_index, variant_index)
+                }
+                _ => return false,
+            }
+        };
+        let mut new_session = match result {
+            Ok(session) => session,
+            Err(error) => {
+                self.status.set_raw(error.message);
                 return false;
             }
         };
-
+        new_session.seed_draft(&value, dirty);
         if let Some(editor) = self.active_overlay_mut() {
             editor.replace_composite_session(new_session);
             editor.sync_variant_selection(variant_index);
@@ -140,7 +136,6 @@ impl App {
         self.exit_armed = false;
         self.status
             .set_raw(format!("Switched to variant #{}", variant_index + 1));
-        self.setup_overlay_validator();
         self.run_overlay_validation();
         true
     }

@@ -8,6 +8,7 @@ pub(crate) mod helpers;
 mod key_value;
 mod multi_select;
 pub mod palette;
+mod range;
 mod scalar_array;
 mod text;
 
@@ -26,5 +27,6 @@ pub use palette::{
     BoolTogglePresentation, CollectionHints, ComponentPalette, CompositeHints, EnumBehaviour,
     NumericTuning,
 };
+pub use range::RangeComponent;
 pub use scalar_array::ScalarArrayComponent;
 pub use text::TextComponent;

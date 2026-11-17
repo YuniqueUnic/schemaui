@@ -15,6 +15,7 @@ fn make_field() -> FieldState {
         kind: FieldKind::String,
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: Default::default(),
     })
 }

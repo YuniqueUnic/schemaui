@@ -61,7 +61,6 @@ impl App {
     pub(super) fn initialize_active_overlay(&mut self) {
         self.set_overlay_status_message();
         self.refresh_list_overlay_panel();
-        self.setup_overlay_validator();
         self.run_overlay_validation();
         self.reset_overlay_focus_mode();
     }

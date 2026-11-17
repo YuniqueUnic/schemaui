@@ -5,20 +5,22 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use unicode_width::UnicodeWidthStr;
 
-#[path = "src/keymap_spec.rs"]
 mod keymap_spec;
 
 const SHORTCUTS_BEGIN: &str = "<!-- AUTO-GENERATED:SHORTCUTS:BEGIN -->";
 const SHORTCUTS_END: &str = "<!-- AUTO-GENERATED:SHORTCUTS:END -->";
 
-const CONTEXT_ORDER: [&str; 12] = [
+const CONTEXT_ORDER: [&str; 15] = [
     "default",
     "collection",
     "overlay",
     "popup",
     "help",
+    "content",
     "text",
+    "multiline",
     "numeric",
+    "range",
     "boolean",
     "enum",
     "multiSelect",
@@ -63,8 +65,11 @@ impl Locale {
             (Locale::En, "overlay") => "Overlay context",
             (Locale::En, "popup") => "Popup context",
             (Locale::En, "help") => "Help context",
+            (Locale::En, "content") => "Rich content viewer context",
             (Locale::En, "text") => "Text field context",
+            (Locale::En, "multiline") => "Multiline field context",
             (Locale::En, "numeric") => "Numeric field context",
+            (Locale::En, "range") => "Range field context",
             (Locale::En, "boolean") => "Boolean field context",
             (Locale::En, "enum") => "Enum field context",
             (Locale::En, "multiSelect") => "Multi-select field context",
@@ -75,8 +80,11 @@ impl Locale {
             (Locale::Zh, "overlay") => "覆盖层上下文",
             (Locale::Zh, "popup") => "弹窗上下文",
             (Locale::Zh, "help") => "帮助上下文",
+            (Locale::Zh, "content") => "富内容查看器上下文",
             (Locale::Zh, "text") => "文本字段上下文",
+            (Locale::Zh, "multiline") => "多行字段上下文",
             (Locale::Zh, "numeric") => "数值字段上下文",
+            (Locale::Zh, "range") => "区间字段上下文",
             (Locale::Zh, "boolean") => "布尔字段上下文",
             (Locale::Zh, "enum") => "枚举字段上下文",
             (Locale::Zh, "multiSelect") => "多选字段上下文",
@@ -108,7 +116,8 @@ impl Locale {
 
 fn main() {
     for path in [
-        "build.rs",
+        "src/build.rs",
+        "src/keymap_spec.rs",
         "README.md",
         "README.ZH.md",
         "keymap/default.keymap.json",

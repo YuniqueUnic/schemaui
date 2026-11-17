@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use crate::tui::model::FormSection;
+use crate::tui::model::{FormSection, NodePresentation};
+use serde_json::Value;
 
 use super::field::{FieldState, components::ComponentPalette};
 
@@ -10,6 +11,9 @@ pub struct SectionState {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
+    pub presentation: NodePresentation,
+    pub required: bool,
+    pub default: Option<Value>,
     #[allow(dead_code)]
     pub path: Vec<String>,
     pub depth: usize,
@@ -34,6 +38,9 @@ impl SectionState {
             id: section.id.clone(),
             title: section.title.clone(),
             description: section.description.clone(),
+            presentation: section.presentation.clone(),
+            required: section.required,
+            default: section.default.clone(),
             path: section.path.clone(),
             depth,
             fields,

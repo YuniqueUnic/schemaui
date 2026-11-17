@@ -75,6 +75,11 @@ pub(super) fn build_key_value_template(
         )
     };
 
+    let mut entry_schema = key_value_entry_schema(&key_schema, &value_schema);
+    if let Some(object) = entry_schema.as_object_mut() {
+        resolver.root_dialect_context().apply_to_overlay(object);
+    }
+
     Ok(Some(UiKeyValueNode {
         key_title,
         key_description,
@@ -85,7 +90,7 @@ pub(super) fn build_key_value_template(
         value_default,
         value_schema: value_schema.clone(),
         value_kind: Box::new(value_kind),
-        entry_schema: key_value_entry_schema(&key_schema, &value_schema),
+        entry_schema,
     }))
 }
 

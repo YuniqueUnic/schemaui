@@ -15,6 +15,16 @@ pub enum KeyAction {
     TogglePopup,
     EditComposite,
     ShowHelp,
+    ViewContent,
+    ContentClose,
+    ContentToggleSource,
+    ContentStep(i32),
+    ContentScroll(i32, i32),
+    ContentPage(i32),
+    ContentZoom(i32),
+    ContentFit,
+    ContentHome,
+    ContentEnd,
     HelpClose,
     HelpPageStep(i32),
     HelpShortcutScroll(i32),
@@ -45,6 +55,7 @@ pub enum AppCommand {
     TogglePopup,
     EditComposite,
     ShowHelp,
+    ViewContent,
     ListAddEntry,
     ListRemoveEntry,
     ListMove(i32),
@@ -168,6 +179,7 @@ impl KeyBindingMap {
                 .get(&KeyActionDiscriminant::ResetStatus)
                 .cloned()
                 .unwrap_or(CommandDispatch::App(AppCommand::ResetStatus)),
+            KeyAction::ViewContent => CommandDispatch::App(AppCommand::ViewContent),
             KeyAction::ShowHelp => self
                 .bindings
                 .get(&KeyActionDiscriminant::ShowHelp)
@@ -251,7 +263,16 @@ impl KeyBindingMap {
                     .cloned()
                     .unwrap_or(CommandDispatch::App(AppCommand::ListSelect(delta)))
             }
-            KeyAction::HelpClose
+            KeyAction::ContentClose
+            | KeyAction::ContentToggleSource
+            | KeyAction::ContentStep(_)
+            | KeyAction::ContentScroll(_, _)
+            | KeyAction::ContentPage(_)
+            | KeyAction::ContentZoom(_)
+            | KeyAction::ContentFit
+            | KeyAction::ContentHome
+            | KeyAction::ContentEnd
+            | KeyAction::HelpClose
             | KeyAction::HelpPageStep(_)
             | KeyAction::HelpShortcutScroll(_)
             | KeyAction::HelpShortcutPage(_)
@@ -284,8 +305,6 @@ impl InputRouter {
     }
 
     pub fn classify(&self, key: &KeyEvent) -> KeyAction {
-        #[cfg(feature = "debug")]
-        println!("{key:?}");
         self.store.classify(key).unwrap_or(KeyAction::Input(*key))
     }
 
@@ -294,8 +313,6 @@ impl InputRouter {
         key: &KeyEvent,
         contexts: &[super::keymap::KeymapContext],
     ) -> KeyAction {
-        #[cfg(feature = "debug")]
-        println!("{key:?} @ {contexts:?}");
         self.store
             .classify_for_contexts(key, contexts)
             .unwrap_or(KeyAction::Input(*key))

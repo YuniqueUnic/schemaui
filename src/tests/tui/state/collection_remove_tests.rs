@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use serde_json::{Map, Value, json};
 
-use crate::tui::model::{CompositeField, CompositeMode, CompositeVariant, FieldKind};
+use crate::tui::model::{
+    CompositeField, CompositeMode, CompositeVariant, CompositeVariantLayout, FieldKind, FieldSchema,
+};
 use crate::tui::state::array::ScalarArrayState;
 use crate::tui::state::composite::CompositeListState;
 use crate::tui::state::field::components::ComponentPalette;
@@ -10,14 +12,19 @@ use crate::tui::state::key_value::KeyValueState;
 
 fn scalar_array(values: &[Value]) -> ScalarArrayState {
     let kind = FieldKind::String;
-    let mut state = ScalarArrayState::new(
-        "/tags",
-        "Tags".to_string(),
-        None,
-        &kind,
-        None,
-        Arc::new(ComponentPalette::default()),
-    );
+    let schema = FieldSchema {
+        name: "tags".into(),
+        path: vec!["tags".into()],
+        pointer: "/tags".into(),
+        title: "Tags".into(),
+        description: None,
+        kind: FieldKind::Array(Box::new(kind.clone())),
+        required: false,
+        default: None,
+        presentation: Default::default(),
+        metadata: Default::default(),
+    };
+    let mut state = ScalarArrayState::new(&schema, &kind, Arc::new(ComponentPalette::default()));
     state.seed_entries_from_array(values);
     state
 }
@@ -28,7 +35,7 @@ fn composite_list(defaults: &[Value]) -> CompositeListState {
         title: "Entry".to_string(),
         description: None,
         schema: json!({"type": "string"}),
-        is_object: false,
+        layout: CompositeVariantLayout::ValueField,
     }];
     let template = CompositeField {
         mode: CompositeMode::OneOf,
@@ -56,6 +63,7 @@ fn key_value_with_entries(pairs: &[(&str, &str)]) -> KeyValueState {
         value_default: None,
         value_schema: json!({"type": "string"}),
         value_kind: Box::new(value_kind),
+        value_presentation: Default::default(),
         entry_schema: json!({"type": "object"}),
     };
 

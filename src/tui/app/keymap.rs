@@ -31,6 +31,9 @@ pub(crate) enum KeymapContext {
     MultiSelectInput,
     CompositeInput,
     ArrayBufferInput,
+    MultilineInput,
+    RangeInput,
+    Content,
 }
 
 impl KeymapContext {
@@ -41,6 +44,9 @@ impl KeymapContext {
             "overlay" => Some(KeymapContext::Overlay),
             "popup" => Some(KeymapContext::Popup),
             "help" => Some(KeymapContext::Help),
+            "multiline" => Some(KeymapContext::MultilineInput),
+            "range" => Some(KeymapContext::RangeInput),
+            "content" => Some(KeymapContext::Content),
             "text" | "textInput" | "text-input" => Some(KeymapContext::TextInput),
             "numeric" | "numericInput" | "numeric-input" => Some(KeymapContext::NumericInput),
             "boolean" | "booleanInput" | "boolean-input" => Some(KeymapContext::BooleanInput),
@@ -79,6 +85,16 @@ enum RawAction {
     TogglePopup,
     EditComposite,
     ShowHelp,
+    ViewContent,
+    ContentClose,
+    ContentToggleSource,
+    ContentStep { delta: i32 },
+    ContentScroll { horizontal: i32, vertical: i32 },
+    ContentPage { delta: i32 },
+    ContentZoom { delta: i32 },
+    ContentFit,
+    ContentHome,
+    ContentEnd,
     HelpClose,
     HelpPageStep { delta: i32 },
     HelpShortcutScroll { delta: i32 },
@@ -188,7 +204,7 @@ impl KeyBinding {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct KeyPattern {
     matcher: CodeMatcher,
     required: KeyModifiers,
@@ -249,7 +265,7 @@ impl KeyPattern {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum CodeMatcher {
     Literal(KeyCode),
     Alpha(char),
@@ -312,6 +328,19 @@ impl RawAction {
             RawAction::TogglePopup => KeyAction::TogglePopup,
             RawAction::EditComposite => KeyAction::EditComposite,
             RawAction::ShowHelp => KeyAction::ShowHelp,
+            RawAction::ViewContent => KeyAction::ViewContent,
+            RawAction::ContentClose => KeyAction::ContentClose,
+            RawAction::ContentToggleSource => KeyAction::ContentToggleSource,
+            RawAction::ContentStep { delta } => KeyAction::ContentStep(delta),
+            RawAction::ContentScroll {
+                horizontal,
+                vertical,
+            } => KeyAction::ContentScroll(horizontal, vertical),
+            RawAction::ContentPage { delta } => KeyAction::ContentPage(delta),
+            RawAction::ContentZoom { delta } => KeyAction::ContentZoom(delta),
+            RawAction::ContentFit => KeyAction::ContentFit,
+            RawAction::ContentHome => KeyAction::ContentHome,
+            RawAction::ContentEnd => KeyAction::ContentEnd,
             RawAction::HelpClose => KeyAction::HelpClose,
             RawAction::HelpPageStep { delta } => KeyAction::HelpPageStep(delta),
             RawAction::HelpShortcutScroll { delta } => KeyAction::HelpShortcutScroll(delta),
@@ -384,20 +413,11 @@ impl KeymapStore {
 
     pub fn help_text_for_contexts(&self, contexts: &[KeymapContext]) -> Option<String> {
         let snippets = self
-            .bindings
-            .iter()
-            .filter(|binding| {
-                contexts
-                    .iter()
-                    .any(|context| binding.contexts.contains(context))
-            })
-            .map(|binding| binding.snippet.clone())
+            .help_entries_for_contexts(contexts)
+            .into_iter()
+            .map(|entry| format!("{} -> {}", entry.keys, entry.action))
             .collect::<Vec<_>>();
-        if snippets.is_empty() {
-            None
-        } else {
-            Some(snippets.join(" • "))
-        }
+        (!snippets.is_empty()).then(|| snippets.join(" • "))
     }
 
     pub(crate) fn help_entries(&self, context: KeymapContext) -> Vec<HelpEntry> {
@@ -405,6 +425,20 @@ impl KeymapStore {
     }
 
     pub(crate) fn help_entries_for_contexts(&self, contexts: &[KeymapContext]) -> Vec<HelpEntry> {
+        let captures: Vec<_> = self
+            .bindings
+            .iter()
+            .filter(|binding| {
+                binding.contexts.iter().any(|context| {
+                    contexts.contains(context)
+                        && matches!(
+                            context,
+                            KeymapContext::MultilineInput | KeymapContext::RangeInput
+                        )
+                })
+            })
+            .flat_map(|binding| &binding.combos)
+            .collect();
         self.bindings
             .iter()
             .filter(|binding| {
@@ -412,12 +446,23 @@ impl KeymapStore {
                     .iter()
                     .any(|context| binding.contexts.contains(context))
             })
-            .map(|binding| {
-                let (keys, action) = match binding.snippet.split_once("->") {
-                    Some((keys, action)) => (keys.trim().to_string(), action.trim().to_string()),
-                    None => (binding.snippet.clone(), String::new()),
-                };
-                HelpEntry { keys, action }
+            .filter_map(|binding| {
+                let keys = binding
+                    .combos
+                    .iter()
+                    .filter(|pattern| !binding.dispatch || !captures.contains(pattern))
+                    .map(|pattern| pattern.display.as_str())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                if keys.is_empty() {
+                    return None;
+                }
+                let action = binding
+                    .snippet
+                    .split_once("->")
+                    .map_or("", |(_, action)| action.trim())
+                    .to_string();
+                Some(HelpEntry { keys, action })
             })
             .collect()
     }

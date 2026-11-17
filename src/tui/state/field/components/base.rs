@@ -20,6 +20,7 @@ pub enum ComponentKind {
     Composite,
     CompositeList,
     ScalarArray,
+    Range,
     KeyValue,
 }
 
@@ -37,6 +38,18 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
     fn current_value(&self, schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError>;
     fn cursor_offset(&self, _schema: &FieldSchema) -> Option<usize> {
         None
+    }
+
+    fn edit_buffer(&self) -> Option<&str> {
+        None
+    }
+
+    fn range_endpoint(&self) -> Option<usize> {
+        None
+    }
+
+    fn paste(&mut self, _schema: &FieldSchema, _text: &str) -> bool {
+        false
     }
 
     fn bool_value(&self) -> Option<bool> {
@@ -99,7 +112,12 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
         ))
     }
 
-    fn restore_composite_editor(&mut self, _session: CompositeEditorSession) {}
+    fn apply_composite_editor(
+        &mut self,
+        _session: CompositeEditorSession,
+    ) -> Result<bool, FieldCoercionError> {
+        Err(FieldCoercionError::unsupported("", "composite editing"))
+    }
 
     fn collection_panel(&self) -> Option<(Vec<String>, usize)> {
         None
@@ -163,11 +181,27 @@ pub(crate) trait FieldComponent: FieldComponentClone + std::fmt::Debug {
         ))
     }
 
-    fn restore_composite_list_editor(
+    fn open_composite_list_variant_editor(
+        &self,
+        pointer: &str,
+        _entry_index: usize,
+        _variant_index: usize,
+    ) -> Result<CompositeEditorSession, FieldCoercionError> {
+        Err(FieldCoercionError::unsupported(
+            pointer,
+            "composite list editing",
+        ))
+    }
+
+    fn apply_composite_list_editor(
         &mut self,
         _entry_index: usize,
         _session: CompositeEditorSession,
-    ) {
+    ) -> Result<bool, FieldCoercionError> {
+        Err(FieldCoercionError::unsupported(
+            "",
+            "composite list editing",
+        ))
     }
 
     fn open_key_value_editor(
@@ -227,7 +261,7 @@ impl Clone for Box<dyn FieldComponent> {
 #[derive(Debug, Clone)]
 pub struct EnumStateRef<'a> {
     pub options: &'a [String],
-    pub selected: usize,
+    pub selected: Option<usize>,
 }
 
 #[derive(Debug, Clone)]

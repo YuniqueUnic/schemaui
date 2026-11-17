@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use jsonschema::Validator;
+use jsonschema::{Validator, validator_for};
 
 use crate::tui::state::field::components::helpers::OverlayContext;
 use crate::tui::state::{
@@ -59,10 +59,6 @@ impl EntryTabsStore {
         self.selected
     }
 
-    pub(super) fn selected_id(&self) -> Option<usize> {
-        self.ids.get(self.selected).copied()
-    }
-
     pub(super) fn kind(&self) -> EntryTabsKind {
         self.kind
     }
@@ -102,19 +98,16 @@ impl EntryTabsStore {
         }
     }
 
-    pub(super) fn advance(&mut self, delta: i32) -> bool {
+    pub(super) fn next_id(&self, delta: i32) -> Option<usize> {
         if self.entries.is_empty() {
-            return false;
+            return None;
         }
-        let len = self.entries.len() as i32;
-        let mut next = self.selected as i32 + delta;
-        next = ((next % len) + len) % len;
-        let next = next as usize;
+        let next = (self.selected as i64 + i64::from(delta)).rem_euclid(self.entries.len() as i64)
+            as usize;
         if next == self.selected {
-            false
+            None
         } else {
-            self.selected = next;
-            true
+            self.ids.get(next).copied()
         }
     }
 }
@@ -244,7 +237,12 @@ impl OverlayStore {
         if let Some(description) = ctx.description {
             self.display_description = Some(description);
         }
-        if let Some(panel) = ctx.entry_panel {
+        if let Some(panel) = ctx.entry_panel
+            && !self
+                .entry_tabs
+                .as_ref()
+                .is_some_and(|tabs| tabs.kind() == EntryTabsKind::Variants)
+        {
             self.set_entry_tabs("Entries", panel.entries, panel.selected);
         }
         if let Some(extra) = ctx.instructions {
@@ -287,8 +285,10 @@ impl OverlayResult {
                 let Some(field) = host_state.field_mut_by_pointer(&self.field_pointer) else {
                     return Err("Overlay target no longer exists".to_string());
                 };
-                field.close_composite_editor(session, true);
-                Ok(())
+                field
+                    .close_composite_editor(session, true)
+                    .map_err(|error| error.message)
+                    .map(|_| ())
             }
             CompositeOverlayTarget::ListEntry { entry_index } => {
                 let OverlaySession::Composite(session) = self.session else {
@@ -297,8 +297,10 @@ impl OverlayResult {
                 let Some(field) = host_state.field_mut_by_pointer(&self.field_pointer) else {
                     return Err("Overlay target no longer exists".to_string());
                 };
-                field.close_composite_list_editor(entry_index, session, true);
-                Ok(())
+                field
+                    .close_composite_list_editor(entry_index, session, true)
+                    .map_err(|error| error.message)
+                    .map(|_| ())
             }
             CompositeOverlayTarget::KeyValueEntry { entry_index } => {
                 let OverlaySession::KeyValue(session) = self.session else {
@@ -337,7 +339,7 @@ pub(super) struct OverlayState {
     pub(super) target: CompositeOverlayTarget,
     pub(super) session: OverlaySession,
     pub(super) exit_armed: bool,
-    pub(super) validator: Option<Arc<Validator>>,
+    validator: Result<Arc<Validator>, String>,
 }
 
 impl OverlayState {
@@ -348,6 +350,7 @@ impl OverlayState {
         level: usize,
         session: OverlaySession,
     ) -> Self {
+        let validator = session.validator();
         Self {
             field_pointer,
             field_label,
@@ -356,7 +359,7 @@ impl OverlayState {
             target: CompositeOverlayTarget::Field,
             session,
             exit_armed: false,
-            validator: None,
+            validator,
         }
     }
 
@@ -373,24 +376,12 @@ impl OverlayState {
     }
 
     pub(super) fn session(&self) -> &OverlaySession {
-        if matches!(self.session, OverlaySession::Detached) {
-            panic!("overlay session detached");
-        }
         &self.session
-    }
-
-    pub(super) fn take_composite_session(&mut self) -> Option<CompositeEditorSession> {
-        match std::mem::replace(&mut self.session, OverlaySession::Detached) {
-            OverlaySession::Composite(session) => Some(session),
-            other => {
-                self.session = other;
-                None
-            }
-        }
     }
 
     pub(super) fn replace_composite_session(&mut self, session: CompositeEditorSession) {
         self.session = OverlaySession::Composite(session);
+        self.validator = self.session.validator();
     }
 
     pub(super) fn current_variant_index(&self) -> Option<usize> {
@@ -436,12 +427,15 @@ impl OverlayState {
         self.exit_armed = armed;
     }
 
-    pub(super) fn set_validator(&mut self, validator: Option<Arc<Validator>>) {
-        self.validator = validator;
+    pub(super) fn validator_clone(&self) -> Result<Arc<Validator>, String> {
+        self.validator.clone()
     }
 
-    pub(super) fn validator_clone(&self) -> Option<Arc<Validator>> {
-        self.validator.clone()
+    pub(super) fn mark_clean(&mut self) {
+        match &mut self.session {
+            OverlaySession::Composite(session) => session.mark_clean(),
+            session => session.form_state_mut().mark_clean(),
+        }
     }
 
     pub(super) fn build_result(&self) -> OverlayResult {
@@ -459,16 +453,25 @@ pub(super) enum OverlaySession {
     Composite(CompositeEditorSession),
     KeyValue(KeyValueEditorSession),
     Array(ArrayEditorSession),
-    Detached,
 }
 
 impl OverlaySession {
+    fn validator(&self) -> Result<Arc<Validator>, String> {
+        let schema = match self {
+            Self::Composite(session) => &session.schema,
+            Self::KeyValue(session) => &session.schema,
+            Self::Array(session) => &session.schema,
+        };
+        validator_for(schema)
+            .map(Arc::new)
+            .map_err(|error| format!("Cannot validate this editor: {error}"))
+    }
+
     pub(super) fn form_state(&self) -> &FormState {
         match self {
             OverlaySession::Composite(session) => &session.form_state,
             OverlaySession::KeyValue(session) => &session.form_state,
             OverlaySession::Array(session) => &session.form_state,
-            OverlaySession::Detached => panic!("overlay session detached"),
         }
     }
 
@@ -477,12 +480,14 @@ impl OverlaySession {
             OverlaySession::Composite(session) => &mut session.form_state,
             OverlaySession::KeyValue(session) => &mut session.form_state,
             OverlaySession::Array(session) => &mut session.form_state,
-            OverlaySession::Detached => panic!("overlay session detached"),
         }
     }
 
     pub(super) fn is_dirty(&self) -> bool {
-        self.form_state().is_dirty()
+        match self {
+            Self::Composite(session) => session.is_dirty(),
+            session => session.form_state().is_dirty(),
+        }
     }
 
     pub(super) fn title(&self) -> &str {
@@ -490,7 +495,6 @@ impl OverlaySession {
             OverlaySession::Composite(session) => &session.title,
             OverlaySession::KeyValue(_) => "Entry",
             OverlaySession::Array(session) => &session.title,
-            OverlaySession::Detached => panic!("overlay session detached"),
         }
     }
 
@@ -499,12 +503,11 @@ impl OverlaySession {
             OverlaySession::Composite(session) => session.description.clone(),
             OverlaySession::KeyValue(_) => None,
             OverlaySession::Array(session) => session.description.clone(),
-            OverlaySession::Detached => None,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OverlayHost {
     RootForm,
     Overlay { parent_level: usize },

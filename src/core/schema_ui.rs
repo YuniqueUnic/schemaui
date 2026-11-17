@@ -290,6 +290,9 @@ impl SchemaUI {
     }
 
     fn into_frontend_context(self) -> Result<crate::core::frontend::FrontendContext> {
+        if let Some(bundle) = &self.ui_artifact_bundle {
+            bundle.validate_version()?;
+        }
         let inputs = self.resolve_inputs()?;
         let SchemaUI {
             document: _,

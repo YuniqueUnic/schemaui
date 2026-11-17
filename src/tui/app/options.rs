@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc, time::Duration};
+use std::{borrow::Cow, fmt, num::NonZeroU16, str::FromStr, sync::Arc, time::Duration};
 
 use anyhow::Result;
 
@@ -11,12 +11,91 @@ use crate::tui::state::field::components::{
     NumericTuning,
 };
 
+/// Terminal graphics selection. Automatic mode never queries terminal input.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ImageProtocol {
+    #[default]
+    Auto,
+    Kitty,
+    Iterm2,
+    Sixel,
+    Source,
+}
+
+impl FromStr for ImageProtocol {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "auto" => Ok(Self::Auto),
+            "kitty" => Ok(Self::Kitty),
+            "iterm2" => Ok(Self::Iterm2),
+            "sixel" => Ok(Self::Sixel),
+            "source" => Ok(Self::Source),
+            _ => Err("expected auto, kitty, iterm2, sixel or source".into()),
+        }
+    }
+}
+
+impl fmt::Display for ImageProtocol {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Auto => "auto",
+            Self::Kitty => "kitty",
+            Self::Iterm2 => "iterm2",
+            Self::Sixel => "sixel",
+            Self::Source => "source",
+        })
+    }
+}
+
+/// Pixel dimensions of a terminal cell, when supplied by the host or user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ImageCellSize {
+    width: NonZeroU16,
+    height: NonZeroU16,
+}
+
+impl ImageCellSize {
+    pub fn new(width: u16, height: u16) -> Option<Self> {
+        Some(Self {
+            width: NonZeroU16::new(width)?,
+            height: NonZeroU16::new(height)?,
+        })
+    }
+
+    pub fn width(self) -> u16 {
+        self.width.get()
+    }
+
+    pub fn height(self) -> u16 {
+        self.height.get()
+    }
+}
+
+impl FromStr for ImageCellSize {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let invalid =
+            || "expected positive cell pixels as WIDTHxHEIGHT, for example 10x20".to_string();
+        let (width, height) = value.split_once('x').ok_or_else(invalid)?;
+        Self::new(
+            width.parse().map_err(|_| invalid())?,
+            height.parse().map_err(|_| invalid())?,
+        )
+        .ok_or_else(invalid)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct UiOptions {
     pub tick_rate: Duration,
     pub auto_validate: bool,
     pub confirm_exit: bool,
     pub show_help: bool,
+    pub image_protocol: ImageProtocol,
+    pub image_cell_size: Option<ImageCellSize>,
     pub keymap: KeyBindingMap,
     pub(crate) keymap_store: Arc<KeymapStore>,
     pub(crate) component_palette: Arc<ComponentPalette>,
@@ -29,6 +108,8 @@ impl Default for UiOptions {
             auto_validate: true,
             confirm_exit: true,
             show_help: true,
+            image_protocol: ImageProtocol::Auto,
+            image_cell_size: None,
             keymap: KeyBindingMap::default(),
             keymap_store: keymap::default_store(),
             component_palette: Arc::new(ComponentPalette::default()),
@@ -37,6 +118,16 @@ impl Default for UiOptions {
 }
 
 impl UiOptions {
+    pub fn with_image_protocol(mut self, protocol: ImageProtocol) -> Self {
+        self.image_protocol = protocol;
+        self
+    }
+
+    pub fn with_image_cell_size(mut self, cell_size: ImageCellSize) -> Self {
+        self.image_cell_size = Some(cell_size);
+        self
+    }
+
     pub fn with_keymap(mut self, keymap: KeyBindingMap) -> Self {
         self.keymap = keymap;
         self

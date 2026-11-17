@@ -13,6 +13,7 @@ fn mk_field(name: &str) -> FieldState {
         kind: FieldKind::String,
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: Default::default(),
     })
 }
@@ -25,6 +26,9 @@ fn mk_section(id: &str, fields: &[&str]) -> SectionState {
         path: vec![id.to_string()],
         depth: 0,
         fields: fields.iter().map(|name| mk_field(name)).collect(),
+        presentation: Default::default(),
+        required: true,
+        default: None,
         scroll_offset: 0,
     }
 }

@@ -516,10 +516,11 @@ fn save_overlay_stack_rejects_invalid_composite_payloads() {
         let overlay_form = app
             .active_overlay_form_state_for_test()
             .expect("service overlay form");
-        overlay_form
+        let field = overlay_form
             .field_mut_by_pointer("/port")
-            .expect("port field")
-            .seed_value(&json!("oops"));
+            .expect("port field");
+        field.seed_value(&json!("oops"));
+        field.after_edit();
     }
 
     assert!(

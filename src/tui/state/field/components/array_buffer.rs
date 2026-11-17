@@ -46,6 +46,10 @@ impl FieldComponent for ArrayBufferComponent {
         }
     }
 
+    fn edit_buffer(&self) -> Option<&str> {
+        Some(&self.buffer)
+    }
+
     fn current_value(&self, schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
         if let FieldKind::Array(inner) = &schema.kind {
             array_value(&self.buffer, inner.as_ref(), schema)

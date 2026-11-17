@@ -65,5 +65,5 @@ fn enum_integer_seed_uses_raw_value_matching() {
 
     let field = state.field_by_pointer("/EnumInteger").expect("enum field");
     let enum_state = field.enum_state().expect("enum state");
-    assert_eq!(enum_state.selected, 2);
+    assert_eq!(enum_state.selected, Some(2));
 }

@@ -153,6 +153,58 @@ impl TextComponent {
         true
     }
 
+    fn move_line_boundary(&mut self, end: bool) -> bool {
+        let chars: Vec<char> = self.buffer.chars().collect();
+        let start = chars[..self.cursor]
+            .iter()
+            .rposition(|ch| *ch == '\n')
+            .map_or(0, |i| i + 1);
+        let next = if end {
+            self.cursor
+                + chars[self.cursor..]
+                    .iter()
+                    .position(|ch| *ch == '\n')
+                    .unwrap_or(chars.len() - self.cursor)
+        } else {
+            start
+        };
+        let changed = next != self.cursor;
+        self.cursor = next;
+        changed
+    }
+
+    fn move_cursor_vertical(&mut self, delta: i32) -> bool {
+        let chars: Vec<char> = self.buffer.chars().collect();
+        let start = chars[..self.cursor]
+            .iter()
+            .rposition(|ch| *ch == '\n')
+            .map_or(0, |i| i + 1);
+        let column = self.cursor - start;
+        let next = if delta < 0 {
+            if start == 0 {
+                return false;
+            }
+            let end = start - 1;
+            let previous = chars[..end]
+                .iter()
+                .rposition(|ch| *ch == '\n')
+                .map_or(0, |i| i + 1);
+            previous + column.min(end - previous)
+        } else {
+            let Some(offset) = chars[self.cursor..].iter().position(|ch| *ch == '\n') else {
+                return false;
+            };
+            let next = self.cursor + offset + 1;
+            let length = chars[next..]
+                .iter()
+                .position(|ch| *ch == '\n')
+                .unwrap_or(chars.len() - next);
+            next + column.min(length)
+        };
+        self.cursor = next;
+        true
+    }
+
     fn delete_backward(&mut self) -> bool {
         if self.cursor == 0 {
             return false;
@@ -200,12 +252,21 @@ impl TextComponent {
 
     fn step_numeric(&mut self, schema: &FieldSchema, key: &KeyEvent) -> bool {
         let fast = key.modifiers.contains(KeyModifiers::SHIFT);
+        if schema.presentation.control == Some(crate::ui_ast::FieldControl::Slider)
+            && let Some(scale) = crate::tui::model::numeric_scale::NumericScale::from_schema(schema)
+        {
+            let direction = if key.code == KeyCode::Left { -1 } else { 1 };
+            let current = self.buffer.trim().parse().ok();
+            let next = scale.adjust(current, direction, fast).to_string();
+            let cursor = next.chars().count();
+            return self.commit_edit(next, cursor);
+        }
         let sign = if matches!(key.code, KeyCode::Left) {
             -1.0
         } else {
             1.0
         };
-        let delta = match schema.kind {
+        let delta = match schema.kind.non_nullable() {
             FieldKind::Integer => {
                 let step = self.palette.numeric.step_i64(fast) as f64 * sign;
                 NumericStepValue::Integer(step.round() as i64)
@@ -218,19 +279,21 @@ impl TextComponent {
         };
 
         let mut next = self.buffer.clone();
-        if !adjust_numeric_value(&mut next, &schema.kind, delta) {
+        if !adjust_numeric_value(&mut next, schema.kind.non_nullable(), delta) {
             return false;
         }
         let next_cursor = next.chars().count();
         self.commit_edit(next, next_cursor)
     }
 
-    fn handle_string_like_key(&mut self, key: &KeyEvent) -> bool {
+    fn handle_string_like_key(&mut self, schema: &FieldSchema, key: &KeyEvent) -> bool {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             return match key.code {
                 KeyCode::Char(ch) if ch.eq_ignore_ascii_case(&'w') => self.delete_previous_word(),
                 KeyCode::Char(ch) if ch.eq_ignore_ascii_case(&'y') => self.redo(),
                 KeyCode::Char(ch) if ch.eq_ignore_ascii_case(&'z') => self.undo(),
+                KeyCode::Home => self.move_cursor_start(),
+                KeyCode::End => self.move_cursor_end(),
                 _ => false,
             };
         }
@@ -238,8 +301,13 @@ impl TextComponent {
         match key.code {
             KeyCode::Left => self.move_cursor_left(),
             KeyCode::Right => self.move_cursor_right(),
+            KeyCode::Home if schema.presentation.is_multiline() => self.move_line_boundary(false),
+            KeyCode::End if schema.presentation.is_multiline() => self.move_line_boundary(true),
             KeyCode::Home => self.move_cursor_start(),
             KeyCode::End => self.move_cursor_end(),
+            KeyCode::Enter if schema.presentation.is_multiline() => self.insert_char('\n'),
+            KeyCode::Up if schema.presentation.is_multiline() => self.move_cursor_vertical(-1),
+            KeyCode::Down if schema.presentation.is_multiline() => self.move_cursor_vertical(1),
             KeyCode::Backspace => self.delete_backward(),
             KeyCode::Delete => self.delete_forward(),
             KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::ALT) => self.insert_char(ch),
@@ -261,7 +329,7 @@ impl TextComponent {
             KeyCode::Backspace => self.delete_backward(),
             KeyCode::Delete => self.delete_forward(),
             KeyCode::Char(ch) if !key.modifiers.contains(KeyModifiers::ALT) => {
-                self.insert_numeric_char(&schema.kind, ch)
+                self.insert_numeric_char(schema.kind.non_nullable(), ch)
             }
             _ => false,
         }
@@ -278,16 +346,18 @@ impl FieldComponent for TextComponent {
     }
 
     fn handle_key(&mut self, schema: &FieldSchema, key: &KeyEvent) -> bool {
-        match schema.kind {
-            FieldKind::String | FieldKind::Json | FieldKind::Nullable(_) => {
-                self.handle_string_like_key(key)
-            }
+        match schema.kind.non_nullable() {
+            FieldKind::String | FieldKind::Json => self.handle_string_like_key(schema, key),
             FieldKind::Integer | FieldKind::Number => self.handle_numeric_key(schema, key),
             _ => false,
         }
     }
 
-    fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {
+    fn seed_value(&mut self, schema: &FieldSchema, value: &Value) {
+        if matches!(schema.kind, FieldKind::Json) {
+            self.set_buffer(value.to_string());
+            return;
+        }
         match value {
             Value::String(text) => self.set_buffer(text.clone()),
             Value::Number(num) => self.set_buffer(num.to_string()),
@@ -300,15 +370,55 @@ impl FieldComponent for TextComponent {
             FieldKind::String => string_value(&self.buffer, schema),
             FieldKind::Integer => integer_value(&self.buffer, schema),
             FieldKind::Number => number_value(&self.buffer, schema),
-            FieldKind::Json => string_value(&self.buffer, schema),
+            FieldKind::Json => {
+                if self.buffer.trim().is_empty() {
+                    return Ok(None);
+                }
+                serde_json::from_str(&self.buffer)
+                    .map(Some)
+                    .map_err(|error| FieldCoercionError {
+                        pointer: schema.pointer.clone(),
+                        message: format!("expected JSON: {error}"),
+                    })
+            }
             FieldKind::Nullable(ref inner) => nullable_value(&self.buffer, inner, schema),
             _ => Ok(None),
         }
     }
 
+    fn edit_buffer(&self) -> Option<&str> {
+        Some(&self.buffer)
+    }
+
+    fn paste(&mut self, schema: &FieldSchema, text: &str) -> bool {
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        let text: String = normalized
+            .chars()
+            .filter_map(|ch| match ch {
+                '\n' if !schema.presentation.is_multiline() => Some(' '),
+                '\n' | '\t' => Some(ch),
+                ch if !ch.is_control() => Some(ch),
+                _ => None,
+            })
+            .collect();
+        if text.is_empty() {
+            return false;
+        }
+        let mut next = self.buffer.clone();
+        next.insert_str(byte_index_for_char_offset(&next, self.cursor), &text);
+        if matches!(
+            schema.kind.non_nullable(),
+            FieldKind::Integer | FieldKind::Number
+        ) && !is_valid_numeric_edit_buffer(schema.kind.non_nullable(), &next)
+        {
+            return false;
+        }
+        self.commit_edit(next, self.cursor + text.chars().count())
+    }
+
     fn cursor_offset(&self, schema: &FieldSchema) -> Option<usize> {
-        match schema.kind {
-            FieldKind::String | FieldKind::Json | FieldKind::Nullable(_) => Some(self.cursor),
+        match schema.kind.non_nullable() {
+            FieldKind::String | FieldKind::Json => Some(self.cursor),
             _ => None,
         }
     }

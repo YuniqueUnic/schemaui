@@ -83,7 +83,7 @@ pub fn generate_tui_artifacts_module_from_value(
     let (_ast, artifacts) = build_tui_artifacts(schema, defaults)?;
     let json = serde_json::to_string_pretty(&artifacts)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::TuiArtifacts {{\n    serde_json::from_str::<schemaui::TuiArtifacts>(r#\"{json}\"#).expect(\"invalid TUI artifacts JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::TuiArtifacts {{\n    serde_json::from_str::<schemaui::TuiArtifacts>({json:?}).expect(\"invalid TUI artifacts JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())
@@ -113,7 +113,7 @@ pub fn generate_tui_form_schema_module_from_value(
     let (_ast, form_schema) = build_tui_form_schema(schema, defaults)?;
     let json = serde_json::to_string_pretty(&form_schema)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::FormSchema {{\n    serde_json::from_str::<schemaui::FormSchema>(r#\"{json}\"#).expect(\"invalid generated FormSchema JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::FormSchema {{\n    serde_json::from_str::<schemaui::FormSchema>({json:?}).expect(\"invalid generated FormSchema JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())
@@ -152,7 +152,7 @@ pub fn generate_tui_layout_nav_module_from_value(
     let (_ast, layout_nav) = build_tui_layout_nav(schema, defaults)?;
     let json = serde_json::to_string_pretty(&layout_nav)?;
     let src = format!(
-        "pub fn {fn_name}() -> schemaui::LayoutNavModel {{\n    serde_json::from_str::<schemaui::LayoutNavModel>(r#\"{json}\"#).expect(\"invalid generated LayoutNavModel JSON\")\n}}\n",
+        "pub fn {fn_name}() -> schemaui::LayoutNavModel {{\n    serde_json::from_str::<schemaui::LayoutNavModel>({json:?}).expect(\"invalid generated LayoutNavModel JSON\")\n}}\n",
     );
     fs::write(out_module_path, src)?;
     Ok(())

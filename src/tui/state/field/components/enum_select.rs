@@ -12,7 +12,7 @@ use super::{ComponentKind, EnumStateRef, FieldComponent, palette::ComponentPalet
 pub struct EnumComponent {
     labels: Vec<String>,
     values: Vec<Value>,
-    selected: usize,
+    selected: Option<usize>,
     palette: Arc<ComponentPalette>,
 }
 
@@ -39,7 +39,7 @@ impl EnumComponent {
         Self {
             labels: labels.to_vec(),
             values: values.to_vec(),
-            selected,
+            selected: Some(selected),
             palette,
         }
     }
@@ -51,10 +51,10 @@ impl FieldComponent for EnumComponent {
     }
 
     fn display_value(&self, _schema: &FieldSchema) -> String {
-        self.labels
-            .get(self.selected)
+        self.selected
+            .and_then(|index| self.labels.get(index))
             .cloned()
-            .unwrap_or_else(|| "<none>".to_string())
+            .unwrap_or_else(|| "<select a valid option>".to_string())
     }
 
     fn handle_key(&mut self, _schema: &FieldSchema, key: &crossterm::event::KeyEvent) -> bool {
@@ -63,26 +63,23 @@ impl FieldComponent for EnumComponent {
                 if self.labels.is_empty() {
                     return false;
                 }
-                if self.selected == 0 {
-                    if self.palette.enums.wrap_around {
-                        self.selected = self.labels.len().saturating_sub(1);
-                    }
-                } else {
-                    self.selected -= 1;
-                }
+                self.selected = Some(match self.selected {
+                    None => self.labels.len() - 1,
+                    Some(0) if self.palette.enums.wrap_around => self.labels.len() - 1,
+                    Some(index) => index.saturating_sub(1),
+                });
                 true
             }
             crossterm::event::KeyCode::Down | crossterm::event::KeyCode::Right => {
                 if self.labels.is_empty() {
                     return false;
                 }
-                if self.selected + 1 >= self.labels.len() {
-                    if self.palette.enums.wrap_around {
-                        self.selected = 0;
-                    }
-                } else {
-                    self.selected += 1;
-                }
+                self.selected = Some(match self.selected {
+                    None => 0,
+                    Some(index) if index + 1 < self.labels.len() => index + 1,
+                    Some(_) if self.palette.enums.wrap_around => 0,
+                    Some(index) => index,
+                });
                 true
             }
             _ => false,
@@ -90,13 +87,14 @@ impl FieldComponent for EnumComponent {
     }
 
     fn seed_value(&mut self, _schema: &FieldSchema, value: &Value) {
-        if let Some(idx) = self.values.iter().position(|candidate| candidate == value) {
-            self.selected = idx;
-        }
+        self.selected = self.values.iter().position(|candidate| candidate == value);
     }
 
     fn current_value(&self, _schema: &FieldSchema) -> Result<Option<Value>, FieldCoercionError> {
-        Ok(self.values.get(self.selected).cloned())
+        Ok(self
+            .selected
+            .and_then(|index| self.values.get(index))
+            .cloned())
     }
 
     fn enum_state(&self) -> Option<EnumStateRef<'_>> {
@@ -111,8 +109,8 @@ impl FieldComponent for EnumComponent {
             return false;
         }
         let bounded = index.min(self.labels.len() - 1);
-        if self.selected != bounded {
-            self.selected = bounded;
+        if self.selected != Some(bounded) {
+            self.selected = Some(bounded);
             true
         } else {
             false

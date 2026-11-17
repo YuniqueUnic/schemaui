@@ -103,9 +103,11 @@ pub(super) fn number_value(
     }
     trimmed
         .parse::<f64>()
-        .map(Value::from)
+        .ok()
+        .and_then(serde_json::Number::from_f64)
+        .map(Value::Number)
         .map(Some)
-        .map_err(|_| FieldCoercionError {
+        .ok_or_else(|| FieldCoercionError {
             pointer: schema.pointer.clone(),
             message: "expected number".to_string(),
         })

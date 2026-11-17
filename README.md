@@ -354,8 +354,10 @@ remote schema loading by default.
 
 Feature defaults are intentionally split by audience:
 
-- `schemaui-cli` defaults to the convenient, batteries-included path: TUI +
-  Web + remote schema loading.
+- `schemaui-cli` defaults to `full + completion + remote-schema`:
+  JSON/YAML/TOML, TUI with image previews, Web, Mermaid, shell completions, and
+  remote schema loading. `--no-default-features --features full` keeps the
+  complete local UI without shell completion or remote schema loading.
 - `schemaui` defaults to `tui + json`, so library consumers keep JSON support
   without pulling in Web or remote/network-related surface area by default.
 - `json`, `yaml`, and `toml` are real code-level gates. Keep at least one of
@@ -496,19 +498,119 @@ code change to its architectural responsibility.
 `form_schema_from_ui_ast` maps that tree into `FormSection`/`FieldSchema` for
 the TUI runtime:
 
-| Schema feature                                               | Resulting control                                                                |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| `type: string`, `integer`, `number`                          | Inline text editors with numeric guards                                          |
-| `type: boolean`                                              | Toggle/checkbox                                                                  |
-| `enum`                                                       | Popup selector (single or multi-select for array enums)                          |
-| Arrays                                                       | Inline list summary + overlay editor per item                                    |
-| `patternProperties`, `propertyNames`, `additionalProperties` | Key/Value editor with schema-backed validation                                   |
-| `$ref`, `definitions`                                        | Resolved before layout; treated like inline schemas                              |
-| `oneOf` / `anyOf`                                            | Variant chooser + overlay form, keeps inactive variants out of the final payload |
+| Schema feature                                               | Resulting control                                                       |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `type: string`, `integer`, `number`                          | Inline text editors with numeric guards                                 |
+| `type: boolean`                                              | Toggle/checkbox                                                         |
+| `enum`                                                       | Popup selector (single or multi-select for array enums)                 |
+| Arrays                                                       | Inline list summary + overlay editor per item                           |
+| `patternProperties`, `propertyNames`, `additionalProperties` | Key/Value editor with schema-backed validation                          |
+| `$ref`, `definitions`                                        | Resolved before layout; treated like inline schemas                     |
+| `oneOf` / `anyOf`                                            | Variant chooser + draft overlay; anyOf views edit one shared JSON value |
 
 Root objects spawn tabs; nested objects become sections with breadcrumb titles.
 Every field records its JSON pointer (for example `/runtime/http/port`) so focus
 management and validation can map errors back precisely.
+
+### Terminal controls and rich content
+
+The TUI consumes the same typed UI AST hints as the Web frontend:
+
+- `x-control: "textarea"` and `"mermaid"`: Enter inserts a newline; Up/Down move
+  between text lines; Home/End move within the line, Ctrl+Home/End across the
+  document. Tab/BackTab leave the field. Bracketed paste is one undoable edit.
+- `select`, `radio`, and `segmented` retain raw enum values and option labels;
+  `switch` and `checkbox` edit booleans. `slider` uses
+  minimum/maximum/multipleOf for bounded steps (Shift for faster steps). `range`
+  uses Up/Down to select an endpoint, Left/Right to step, and typing for exact
+  values. Colour inputs retain the CSS source; hex colours also show a terminal
+  swatch.
+- `x-visible-when` filters fields and sections without deleting their data or
+  bypassing schema validation. Unedited missing values, nulls, empty
+  collections, and unknown properties survive a save. New object entries
+  initialise required fields without materialising untouched optional fields.
+  Overlay cancellation discards the draft. Nullable booleans can be cleared to
+  null with Delete/Backspace; clearing a nullable number's text also restores
+  null.
+- Ctrl+P opens node/section content, the current Mermaid buffer, or selected
+  enum option content. In a popup it previews the highlighted option without
+  applying it. `s` toggles source; `n`/`p` or Tab/BackTab select content. In
+  image previews, arrows or `hjkl` pan, `i`/`=` zoom in, `o`/`-` zoom out, and
+  `f` fits and centres the image. PageUp/PageDown scroll a page; Home/End jump
+  to the image's corners or the source's start/end. `?` or Ctrl+H opens the full
+  scrollable viewer help. Esc returns to the previous editor or popup. A session
+  countdown stays visible while viewing images or source.
+
+The library's optional `tui-images` feature uses `resvg` and `ratatui-image` for
+sanitised SVG **native pixel previews**; add `mermaid` for diagrams.
+Kitty/Ghostty use Kitty graphics, iTerm2/WezTerm/Rio use iTerm2 graphics, and
+recognised foot/mlterm terminals use Sixel. This replaces the low-resolution
+half-block renderer. Previews start in **Fit** mode, centred on both axes;
+oversized images scroll after zooming in. Zooming rasterises the visible SVG
+region at the terminal's cell pixel size, not a scaled-up thumbnail. Mermaid
+uses a high-contrast dark preview.
+
+SVG preparation, system-font loading, rasterisation and encoding run on one
+session-owned worker. Pending image work is replaced by the latest requested
+view; keyboard actions remain ordered, including those entered before dimensions
+arrive. Source, help and closing cancel obsolete work without waiting for image
+completion. A single active library call and terminal payload writes cannot be
+interrupted.
+
+Automatic selection uses conservative terminal environment hints and the
+reported window pixels. It never queries stdin or consumes keys, invokes image
+programs, or changes tmux settings. Unknown/conflicting hints, missing exact
+cell pixels, `TERM=dumb`, Markdown and builds without the required feature show
+source instead of a blurry character image. Source is always available. With a
+known supported terminal, `--image-protocol kitty|iterm2|sixel` selects
+explicitly; `--image-cell-size WIDTHxHEIGHT` supplies actual cell pixels if the
+terminal omits them. `--image-protocol source` disables previews. Auto uses
+source inside multiplexers; explicit Kitty/iTerm2 passthrough requires an
+already configured tmux setup. Screen and Sixel-through-tmux use source.
+
+A conservative 128 MiB working-set estimate checks rendering and encoding peaks.
+When necessary, the preview reduces the visible area rather than lowering native
+pixel density: manual zoom keeps its scale, while Fit still shows the whole
+image. Unsupported SVG features or a view that cannot fit safely show an
+explicit error and source. This estimate is not a process-memory limit. Kitty
+uses lossless zlib; iTerm2 uses PNG; Sixel uses palette quantisation. External
+SVG images are not loaded. See the
+[showcase guide](examples/tui-showcase/README.md#图片能力与源码降级) for
+protocol selection and geometry limits.
+
+**Temporary dependency constraint:** `tui-images` pins the official resvg
+revision `9e24e7b3` containing the nested crop and visible-layer fixes
+([#1238](https://github.com/linebender/resvg/pull/1238),
+[#1239](https://github.com/linebender/resvg/pull/1239)). These fixes are not in
+the 0.50 registry release. This checkout builds locally, but publishing to
+crates.io is blocked until resvg releases them and the pin is replaced with that
+version.
+
+```bash
+# Library: lightweight TUI, source viewer included
+cargo add schemaui --no-default-features --features tui,json
+# Library: SVG and Mermaid previews
+cargo add schemaui --no-default-features --features tui-images,json,mermaid
+# CLI: complete local UI (the default CLI build also adds remote-schema/completion)
+mbx build -p schemaui-cli --no-default-features --features full
+```
+
+Try the self-contained [TUI showcase](examples/tui-showcase/README.md), with a
+sample config, inline SVG images, Mermaid, controls, visibility and nested
+drafts. Its guide includes launch commands that keep the example files unchanged
+and a step-by-step keyboard walkthrough.
+
+TUI drawing uses **stderr**, which must be a TTY. Stdout stays available for
+machine-readable output, for example
+`schemaui -s schema.json -c config.json -o - > result.json` from an interactive
+terminal. On Unix, piped config input (`-c -`) is read before the TUI takes
+keyboard input from the controlling terminal. Raw mode, alternate screen and
+bracketed paste are restored on exit.
+
+Precompiled UI artifact bundles now use **format 2** to carry presentation
+hints. Regenerate older bundles with the current code generator; unsupported
+versions are rejected with a regeneration message instead of silently losing
+controls.
 
 ## Validation Lifecycle
 
@@ -523,19 +625,13 @@ management and validation can map errors back precisely.
   the parent form.
 
 ```text
-┌─────────────┐ parse schema ┌─────────────────┐ inflate state  ┌────────────┐
-│ SchemaUI::run├────────────▶│ domain::parse   ├───────────────▶│ FormState  │
-└─────┬───────┘              │ (schema::layout)│                └─────┬──────┘
-      │ validator_for()      └─────────────────┘                edits │
-      │                                                        ┌──────▼─────────┐
-      └────────────────────────────────────────────────────── ▶│ app::runtime   │
-                                                               │ (status, input)│
-                                                               └──────┬─────────┘
-                                                                      │ FormCommand
-                                                               ┌──────▼──────────┐
-                                                               │ FormEngine      │
-                                                               │ + jsonschema    │
-                                                               └─────────────────┘
+SchemaPipeline → UiAst → form_schema_from_ui_ast → FormState
+       │                                            │
+       └─ validator_for() → App runtime ← input events
+                                  │
+                             FormCommand
+                                  ↓
+                         FormEngine + jsonschema
 ```
 
 `App` is the sole owner of `FormState`; even overlay edits flow through
@@ -583,6 +679,7 @@ management and validation can map errors back precisely.
 | `Ctrl+Q` / `Ctrl+C` | Quit (confirm if dirty)                             | `command` |
 | `Esc`               | Cancel / clear status (overlays: pop current level) | `command` |
 | `Ctrl+?` / `Ctrl+H` | Show help and error summary                         | `command` |
+| `Ctrl+P`            | View field / option content                         | `command` |
 
 #### Collection context
 
@@ -596,6 +693,7 @@ management and validation can map errors back precisely.
 | `Ctrl+Up`           | Move entry up               | `command` |
 | `Ctrl+Down`         | Move entry down             | `command` |
 | `Ctrl+?` / `Ctrl+H` | Show help and error summary | `command` |
+| `Ctrl+P`            | View field / option content | `command` |
 
 #### Overlay context
 
@@ -612,6 +710,7 @@ management and validation can map errors back precisely.
 | `Ctrl+S`            | Save & validate (overlays stay open)                | `command` |
 | `Esc`               | Cancel / clear status (overlays: pop current level) | `command` |
 | `Ctrl+?` / `Ctrl+H` | Show help and error summary                         | `command` |
+| `Ctrl+P`            | View field / option content                         | `command` |
 
 #### Popup context
 
@@ -622,6 +721,7 @@ management and validation can map errors back precisely.
 | `Down`   | Select next popup option     | `command` |
 | `Space`  | Toggle popup option          | `command` |
 | `Enter`  | Apply popup selection        | `command` |
+| `Ctrl+P` | View field / option content  | `command` |
 
 #### Help context
 
@@ -639,6 +739,27 @@ management and validation can map errors back precisely.
 | `h`                         | Scroll error text left   | `command` |
 | `l`                         | Scroll error text right  | `command` |
 
+#### Rich content viewer context
+
+| Shortcut         | Action                          | Kind      |
+| ---------------- | ------------------------------- | --------- |
+| `Esc` / `Ctrl+P` | Close content viewer            | `command` |
+| `?` / `Ctrl+H`   | Full viewer help                | `command` |
+| `s`              | Toggle preview / source         | `command` |
+| `n` / `Tab`      | Next figure                     | `command` |
+| `p` / `BackTab`  | Previous figure                 | `command` |
+| `Up` / `k`       | Scroll image / source up        | `command` |
+| `Down` / `j`     | Scroll image / source down      | `command` |
+| `Left` / `h`     | Scroll image left               | `command` |
+| `Right` / `l`    | Scroll image right              | `command` |
+| `i` / `=`        | Zoom image in                   | `command` |
+| `o` / `-`        | Zoom image out                  | `command` |
+| `f`              | Fit and center image            | `command` |
+| `PageUp`         | Page image / source up          | `command` |
+| `PageDown`       | Page image / source down        | `command` |
+| `Home`           | Image top-left / source start   | `command` |
+| `End`            | Image bottom-right / source end | `command` |
+
 #### Text field context
 
 | Shortcut    | Action                    | Kind         |
@@ -653,6 +774,16 @@ management and validation can map errors back precisely.
 | `Ctrl+Z`    | Undo text edit            | `local edit` |
 | `Ctrl+Y`    | Redo text edit            | `local edit` |
 
+#### Multiline field context
+
+| Shortcut    | Action                     | Kind         |
+| ----------- | -------------------------- | ------------ |
+| `Enter`     | Insert newline             | `local edit` |
+| `Up`        | Move to previous text line | `local edit` |
+| `Down`      | Move to next text line     | `local edit` |
+| `Ctrl+Home` | Jump to text start         | `local edit` |
+| `Ctrl+End`  | Jump to text end           | `local edit` |
+
 #### Numeric field context
 
 | Shortcut      | Action                    | Kind         |
@@ -665,6 +796,14 @@ management and validation can map errors back precisely.
 | `Delete`      | Delete next character     | `local edit` |
 | `Ctrl+Z`      | Undo numeric edit         | `local edit` |
 | `Ctrl+Y`      | Redo numeric edit         | `local edit` |
+
+#### Range field context
+
+| Shortcut                     | Action                        | Kind         |
+| ---------------------------- | ----------------------------- | ------------ |
+| `Up` / `Down`                | Choose lower / upper endpoint | `local edit` |
+| `Left` / `Right`             | Step the active endpoint      | `local edit` |
+| `Shift+Left` / `Shift+Right` | Fast-step the active endpoint | `local edit` |
 
 #### Boolean field context
 
@@ -734,7 +873,7 @@ of truth.
   which returns the `KeyAction` embedded in the JSON. `keymap::help_text`
   filters bindings by `KeymapContext`, concatenating snippets used by
   `StatusLine` and overlay instructions.
-- **Generated docs** – `build.rs` parses `keymap/default.keymap.json` and
+- **Generated docs** – `src/build.rs` parses `keymap/default.keymap.json` and
   refreshes the shortcut blocks in `README.md` and `README.ZH.md` using explicit
   HTML markers, so normal Cargo builds keep the bilingual reference in sync with
   runtime behavior.

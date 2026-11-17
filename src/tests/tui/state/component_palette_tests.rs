@@ -18,6 +18,7 @@ fn integer_field_schema() -> FieldSchema {
         kind: FieldKind::Integer,
         required: false,
         default: Some(Value::Number(0.into())),
+        presentation: Default::default(),
         metadata: Default::default(),
     }
 }
@@ -32,6 +33,7 @@ fn bool_field_schema() -> FieldSchema {
         kind: FieldKind::Boolean,
         required: false,
         default: Some(Value::Bool(false)),
+        presentation: Default::default(),
         metadata: Default::default(),
     }
 }
@@ -47,6 +49,7 @@ fn key_value_schema() -> FieldSchema {
         value_default: None,
         value_schema: json!({"type": "string"}),
         value_kind: Box::new(FieldKind::String),
+        value_presentation: Default::default(),
         entry_schema: json!({
             "type": "object",
             "required": ["key", "value"],
@@ -65,6 +68,7 @@ fn key_value_schema() -> FieldSchema {
         kind: FieldKind::KeyValue(Box::new(template)),
         required: false,
         default: None,
+        presentation: Default::default(),
         metadata: Default::default(),
     }
 }
